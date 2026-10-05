@@ -31,6 +31,6 @@ selene src
 stylua --check src
 ```
 
-## Still to add
+## Saving
 
-- ProfileService for saving player data (wired up in `DataService`).
+Player data saves through [ProfileStore](https://github.com/MadStudioRoblox/ProfileStore) (by loleris, Apache 2.0), vendored at `src/server/Vendor/ProfileStore.luau` with its license in `licenses/`. To test real saving in Studio, turn on **Game Settings > Security > Enable Studio Access to API Services** (the place must be published). Without it, ProfileStore uses a mock store and nothing persists between play tests.

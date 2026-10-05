@@ -1,10 +1,16 @@
 --!strict
--- Player save data. The template below is the shape of a save; loading and saving
--- will go through ProfileService (see the README for adding it).
+-- Player save data, loaded and saved through ProfileStore (session-locked, auto-saves
+-- every few minutes and on leave). In Studio without API access ProfileStore falls back
+-- to a mock store, so nothing persists between play tests.
 
 local Players = game:GetService("Players")
 
+local ProfileStore = require("../Vendor/ProfileStore")
+
 local DataService = {}
+
+-- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
+DataService.StoreName = "PlayerData_v1"
 
 DataService.Template = {
 	money = 0,
@@ -16,19 +22,68 @@ DataService.Template = {
 	stealingEnabled = false,
 }
 
-local profiles: { [Player]: typeof(DataService.Template) } = {}
+export type Data = typeof(DataService.Template)
 
-function DataService.get(player: Player)
-	return profiles[player]
+local store = ProfileStore.New(DataService.StoreName, DataService.Template)
+local profiles: { [Player]: any } = {}
+local loadedCallbacks: { (Player, Data) -> () } = {}
+
+-- Returns the player's data, or nil while it is still loading (or after they left).
+function DataService.get(player: Player): Data?
+	local profile = profiles[player]
+	return if profile then profile.Data else nil
+end
+
+-- Runs callback for every player whose data finishes loading, including ones already loaded.
+function DataService.onLoaded(callback: (Player, Data) -> ())
+	table.insert(loadedCallbacks, callback)
+	for player, profile in profiles do
+		task.spawn(callback, player, profile.Data)
+	end
+end
+
+local function loadPlayer(player: Player)
+	local profile = store:StartSessionAsync(`Player_{player.UserId}`, {
+		Cancel = function()
+			return player.Parent ~= Players
+		end,
+	})
+
+	if profile == nil then
+		-- Another server kept the session or DataStores are down; never play on unsaved data.
+		player:Kick("Your save couldn't be loaded. Please rejoin.")
+		return
+	end
+
+	profile:AddUserId(player.UserId) -- GDPR compliance
+	profile:Reconcile() -- fills in keys added to the template since the last save
+
+	profile.OnSessionEnd:Connect(function()
+		profiles[player] = nil
+		player:Kick("Your save was opened on another server. Please rejoin.")
+	end)
+
+	if player.Parent ~= Players then
+		profile:EndSession() -- left while loading
+		return
+	end
+
+	profiles[player] = profile
+	for _, callback in loadedCallbacks do
+		task.spawn(callback, player, profile.Data)
+	end
 end
 
 function DataService.start()
-	Players.PlayerAdded:Connect(function(player)
-		-- TODO: load with ProfileService instead of a fresh copy.
-		profiles[player] = table.clone(DataService.Template)
-	end)
+	for _, player in Players:GetPlayers() do
+		task.spawn(loadPlayer, player)
+	end
+	Players.PlayerAdded:Connect(loadPlayer)
 	Players.PlayerRemoving:Connect(function(player)
-		profiles[player] = nil
+		local profile = profiles[player]
+		if profile then
+			profile:EndSession()
+		end
 	end)
 end
 
