@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Spawning = require(ReplicatedStorage.Shared.Util.Spawning)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Zones = require(ReplicatedStorage.Shared.Config.Zones)
+local World = require(script.Parent.Parent.World)
 
 local SpawnService = {}
 
@@ -91,7 +92,7 @@ end
 
 local function spawnOne(zoneIndex: number, spawnPointsFolder: Instance, monstersFolder: Folder)
 	local points = {}
-	for _, child in spawnPointsFolder:GetChildren() do
+	for _, child in spawnPointsFolder:GetDescendants() do
 		if child:IsA("BasePart") then
 			table.insert(points, child)
 		end
@@ -146,14 +147,17 @@ function SpawnService.capture(model: Model, equippedItemIds: { string }): Value.
 end
 
 function SpawnService.start()
-	local zonesFolder = workspace:FindFirstChild("Zones")
+	local zonesFolder = World.find(workspace, "Zones")
 	if not zonesFolder then
 		warn("SpawnService: no Workspace.Zones folder, nothing will spawn")
 		return
 	end
 	for _, zone in Zones.List do
-		local zoneFolder = zonesFolder:FindFirstChild(zone.id)
-		local spawnPoints = zoneFolder and zoneFolder:FindFirstChild("SpawnPoints")
+		local zoneFolder = World.find(zonesFolder, zone.id)
+		local spawnPoints = World.find(zoneFolder, "SpawnPoints")
+		if zoneFolder and not spawnPoints then
+			warn(`SpawnService: {zone.id} has no SpawnPoints folder, so nothing spawns there`)
+		end
 		if zoneFolder and spawnPoints then
 			local monstersFolder = zoneFolder:FindFirstChild("Monsters")
 			if not monstersFolder then
