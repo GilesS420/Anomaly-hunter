@@ -20,6 +20,7 @@ export type Combo = {
 local Effects = {}
 
 Effects.MaxSlots = 3
+Effects.CatchChance = 25 -- percent a Catch-effect tool (Spirit Lens, Moonbeam) applies its effect (placeholder)
 
 Effects.List = {
 	Cobwebbed = { id = "Cobwebbed", multiplier = 1.2, source = "Roam" },

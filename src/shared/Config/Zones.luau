@@ -22,4 +22,6 @@ return {
 	List = Zones,
 	MaxHearts = 3,
 	CarryLimit = 1,
+	MaxAlive = 12, -- monsters roaming a zone at once (placeholder)
+	RespawnSeconds = 8, -- delay before a caught monster is replaced (placeholder)
 }
