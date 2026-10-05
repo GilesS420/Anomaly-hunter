@@ -1,0 +1,2 @@
+--!strict
+-- Client entry point. UI and input controllers start here.
