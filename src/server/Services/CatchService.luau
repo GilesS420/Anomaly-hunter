@@ -1,6 +1,6 @@
 --!strict
 -- Catching, Luigi's Mansion style: shine the flashlight to stun a monster, then vacuum it
--- while moving against the way it yanks. The client only sends intent (shine at this,
+-- while dragging against the way it yanks. The client only sends intent (shine at this,
 -- start/stop vacuuming, which way I'm pulling); every rule is checked here.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

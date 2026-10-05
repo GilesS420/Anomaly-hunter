@@ -27,7 +27,7 @@ Tools.Vacuums = {
 	VoidVac = { catchSpeed = 0.6, range = 30 },
 } :: { [string]: Vacuum }
 
--- Tug-of-war while vacuuming: the monster yanks left or right and you move the other way.
+-- Tug-of-war while vacuuming: the monster yanks left or right and you drag the other way.
 Tools.Tug = {
 	FlipMin = 0.6, -- seconds before the monster changes direction (random in this range)
 	FlipMax = 1.6,
