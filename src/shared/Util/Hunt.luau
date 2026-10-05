@@ -29,6 +29,21 @@ function Hunt.isZoneUnlocked(zoneIndex: number, wingsOwned: number): boolean
 	return false
 end
 
+-- Why a zone's gate won't open, as a message for the player, or nil if it's open.
+function Hunt.lockedReason(zoneIndex: number, wingsOwned: number): string?
+	local zone = Hunt.zoneByIndex(zoneIndex)
+	if not zone then
+		return "This gate doesn't lead anywhere yet."
+	end
+	if not zone.launch then
+		return `{zone.name} opens in a future update.`
+	end
+	if not Hunt.isZoneUnlocked(zoneIndex, wingsOwned) then
+		return `{zone.name} is locked. Buy the {zone.wing} wing for your mansion to open it.`
+	end
+	return nil
+end
+
 -- Hearts after taking damage; at 0 the carried monster is dropped.
 function Hunt.afterDamage(hearts: number, damage: number): number
 	return math.max(0, hearts - math.max(0, damage))

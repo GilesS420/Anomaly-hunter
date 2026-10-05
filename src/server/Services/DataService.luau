@@ -47,6 +47,16 @@ function DataService.onLoaded(callback: (Player, Data) -> ())
 	end
 end
 
+-- STUB (sprint 2): implement per the spec (leaderstats Money, no negative balance).
+function DataService.addMoney(_player: Player, _delta: number): boolean
+	return false
+end
+
+-- STUB (sprint 2): implement per the spec.
+function DataService.isLoaded(player: Player): boolean
+	return profiles[player] ~= nil
+end
+
 local function loadPlayer(player: Player)
 	local profile = store:StartSessionAsync(`Player_{player.UserId}`, {
 		Cancel = function()

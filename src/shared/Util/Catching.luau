@@ -40,29 +40,21 @@ function Catching.canVacuum(vacuumId: string, sizeId: string, rarityId: string):
 	return Catching.vacuumTier(vacuumId) >= Catching.requiredTier(sizeId, rarityId)
 end
 
--- Meter filled per second for this vacuum against this rarity.
-function Catching.catchRate(vacuumId: string, rarityId: string): number
+-- Seconds of holding needed to catch this rarity with this vacuum (math.huge if unknown).
+function Catching.catchSeconds(vacuumId: string, rarityId: string): number
 	local vacuum = Tools.Vacuums[vacuumId]
 	if not vacuum then
-		return 0
+		return math.huge
 	end
 	local rarity = Rarities[rarityId]
 	local steps = if rarity then rarity.order - 1 else 0
-	return vacuum.catchSpeed / (1 + steps * Tools.Tug.ResistPerRarity)
+	return vacuum.catchSeconds * (1 + steps * Tools.ResistPerRarity)
 end
 
--- Moves the catch meter. pull is the hunter's sideways input (-1, 0 or 1) and tug the
--- monster's direction (-1 or 1); pulling against the tug fills the meter.
-function Catching.step(progress: number, pull: number, tug: number, rate: number, dt: number): number
-	local factor
-	if pull == 0 then
-		factor = Tools.Tug.IdleFactor
-	elseif pull == -tug then
-		factor = 1
-	else
-		factor = Tools.Tug.WrongFactor
-	end
-	return math.clamp(progress + factor * rate * dt, 0, 1)
+-- How far away (studs) this flashlight lets you start and keep a catch, slack included.
+function Catching.reach(flashlightId: string): number
+	local flashlight = Tools.Flashlights[flashlightId]
+	return if flashlight then flashlight.reach + Tools.ReachSlack else 0
 end
 
 return Catching
