@@ -4,6 +4,7 @@
 local Monsters = require("../src/shared/Config/Monsters")
 local Rarities = require("../src/shared/Config/Rarities")
 local Sizes = require("../src/shared/Config/Sizes")
+local Catching = require("../src/shared/Util/Catching")
 local Spawning = require("../src/shared/Util/Spawning")
 local Value = require("../src/shared/Util/Value")
 
@@ -95,6 +96,26 @@ local effects = Spawning.rollCatchEffects({ "SpiritLens", "Moonbeam", "SpiritLen
 check(
 	"lens + moonbeam give Ghost and Werewolf once each",
 	#effects == 2 and table.find(effects, "Ghost") ~= nil and table.find(effects, "Werewolf") ~= nil
+)
+
+-- Catching: vacuum tiers gate size and rarity.
+check("Dust Buster catches a Normal Common", Catching.canVacuum("DustBuster", "Normal", "Common"))
+check("Dust Buster can't hold a Big monster", not Catching.canVacuum("DustBuster", "Big", "Common"))
+check("Phantom Vac holds a Huge Epic", Catching.canVacuum("PhantomVac", "Huge", "Epic"))
+check("Mythic needs the Void Vac", not Catching.canVacuum("PhantomVac", "Tiny", "Mythic"))
+check("Void Vac holds a Colossal Divine", Catching.canVacuum("VoidVac", "Colossal", "Divine"))
+check(
+	"rarer monsters are slower to catch",
+	Catching.catchRate("VoidVac", "Divine") < Catching.catchRate("VoidVac", "Common")
+)
+
+-- Tug-of-war: pulling against the yank fills the meter, the wrong way drains it.
+check("pulling against the tug fills the meter", Catching.step(0.5, -1, 1, 0.5, 0.1) > 0.5)
+check("pulling with the tug drains the meter", Catching.step(0.5, 1, 1, 0.5, 0.1) < 0.5)
+check("standing still drains slowly", Catching.step(0.5, 0, 1, 0.5, 0.1) > Catching.step(0.5, 1, 1, 0.5, 0.1))
+check(
+	"meter stays between 0 and 1",
+	Catching.step(0.99, -1, 1, 5, 1) == 1 and Catching.step(0.01, 1, 1, 5, 1) == 0
 )
 
 if failures > 0 then
