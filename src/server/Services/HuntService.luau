@@ -14,6 +14,7 @@ local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Zones = require(ReplicatedStorage.Shared.Config.Zones)
 local DataService = require(script.Parent.DataService)
+local World = require(script.Parent.Parent.World)
 
 local HuntService = {}
 
@@ -52,12 +53,8 @@ local function teleport(player: Player, to: BasePart)
 end
 
 local function returnPoint(): BasePart?
-	local hub = workspace:FindFirstChild("Hub")
-	local point = hub and hub:FindFirstChild("ReturnPoint")
-	if point and point:IsA("BasePart") then
-		return point
-	end
-	return workspace:FindFirstChildWhichIsA("SpawnLocation", true)
+	return World.partAt(workspace, "Hub", "ReturnPoint")
+		or workspace:FindFirstChildWhichIsA("SpawnLocation", true)
 end
 
 local function setCarrying(player: Player, caught: Value.CaughtMonster?)
@@ -165,14 +162,30 @@ end)
 function HuntService.start()
 	remotes.Parent = ReplicatedStorage
 
-	local hub = workspace:FindFirstChild("Hub")
-	local gates = hub and hub:FindFirstChild("ZoneGates")
-	local zonesFolder = workspace:FindFirstChild("Zones")
 	for _, zone in Zones.List do
-		local zoneFolder = zonesFolder and zonesFolder:FindFirstChild(zone.id)
-		local gate = gates and gates:FindFirstChild(zone.id)
-		local arrival = zoneFolder and zoneFolder:FindFirstChild("Arrival")
-		if gate and gate:IsA("BasePart") and arrival and arrival:IsA("BasePart") then
+		local zoneFolder = World.find(World.find(workspace, "Zones"), zone.id)
+		local gate = World.partAt(workspace, "Hub", "ZoneGates", zone.id)
+		local arrival = World.part(World.find(zoneFolder, "Arrival"))
+		local exit = World.part(World.find(zoneFolder, "Exit"))
+
+		-- Say what's missing in the Output window, but only for zones someone started building.
+		if zoneFolder or gate then
+			if not gate then
+				warn(
+					`HuntService: {zone.id} has no gate. Add a Part at Workspace > Hub > ZoneGates > {zone.id}`
+				)
+			end
+			if not arrival then
+				warn(
+					`HuntService: {zone.id} has no Arrival. Add a Part at Workspace > Zones > {zone.id} > Arrival`
+				)
+			end
+			if not exit then
+				warn(`HuntService: {zone.id} has no Exit. Add a Part at Workspace > Zones > {zone.id} > Exit`)
+			end
+		end
+
+		if gate and arrival then
 			gate.Touched:Connect(function(hit)
 				local player = playerFromHit(hit)
 				if player and player:GetAttribute("Zone") == nil then
@@ -180,8 +193,7 @@ function HuntService.start()
 				end
 			end)
 		end
-		local exit = zoneFolder and zoneFolder:FindFirstChild("Exit")
-		if exit and exit:IsA("BasePart") then
+		if exit then
 			exit.Touched:Connect(function(hit)
 				local player = playerFromHit(hit)
 				if player then
@@ -189,6 +201,9 @@ function HuntService.start()
 				end
 			end)
 		end
+	end
+	if not returnPoint() then
+		warn("HuntService: no Workspace > Hub > ReturnPoint part (or SpawnLocation) to send hunters home to")
 	end
 
 	local function onPlayer(player: Player)
