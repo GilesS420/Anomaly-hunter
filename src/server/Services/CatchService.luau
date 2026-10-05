@@ -1,33 +1,52 @@
 --!strict
--- Catching, Luigi's Mansion style: shine the flashlight to stun a monster, then vacuum it
--- while dragging against the way it yanks. The client only sends intent (shine at this,
--- start/stop vacuuming, which way I'm pulling); every rule is checked here.
+-- Catching: press and hold on a wild monster. It freezes in your flashlight beam and a catch
+-- meter fills by itself (1-3 seconds, longer for rarer monsters). Let go early, walk out of
+-- reach or get knocked out and it escapes (dazed for a moment, so you can grab it again).
+-- The client only says "start catching this" and "stop"; every rule is checked here.
+--
+-- Remotes in ReplicatedStorage.CatchRemotes:
+--   StartCatch  client -> server (model)
+--   StopCatch   client -> server ()
+--   State       server -> client ("Holding", {model, seconds}) or ("Ended", {result, model})
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Catching = require(ReplicatedStorage.Shared.Util.Catching)
+local Format = require(ReplicatedStorage.Shared.Util.Format)
+local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
+local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Tools = require(ReplicatedStorage.Shared.Config.Tools)
 local DataService = require(script.Parent.DataService)
 local HuntService = require(script.Parent.HuntService)
+local MansionService = require(script.Parent.MansionService)
+local Notify = require(script.Parent.Parent.Notify)
+local RoamService = require(script.Parent.RoamService)
 local SpawnService = require(script.Parent.SpawnService)
 
 local CatchService = {}
 
 type Hold = {
 	model: Model,
-	progress: number,
-	pull: number,
-	tug: number,
-	nextFlip: number,
-	rate: number,
-	range: number,
+	name: string, -- monster's display name, for messages
+	zoneId: string, -- the zone the monster lives in; the hunter must stay in it
+	reach: number,
+	stunSeconds: number,
+	endTime: number, -- server time the meter is full
+	glow: Highlight,
+	beam: Beam,
+	from: Attachment, -- on the hunter
+	to: Attachment, -- on the monster
+	died: RBXScriptConnection?,
 }
 
-local random = Random.new()
+local StartCooldown = 0.25 -- seconds between StartCatch requests (stops spam)
+
 local holds: { [Player]: Hold } = {}
 local heldBy: { [Model]: Player } = {}
-local lastShine: { [Player]: number } = {}
+local lastStart: { [Player]: number } = {}
+local pendingStart: { [Player]: Model } = {} -- a quick re-press waiting for the cooldown to pass
 
 local remotes = Instance.new("Folder")
 remotes.Name = "CatchRemotes"
@@ -37,11 +56,23 @@ local function remote(name: string): RemoteEvent
 	event.Parent = remotes
 	return event
 end
-local Shine = remote("Shine") -- client -> server: (model)
-local VacuumStart = remote("VacuumStart") -- client -> server: (model)
-local VacuumStop = remote("VacuumStop") -- client -> server: ()
-local Pull = remote("Pull") -- client -> server: (-1 | 0 | 1)
-local Result = remote("Result") -- server -> client: (kind, monsterId?, info?)
+local StartCatch = remote("StartCatch") -- client -> server: (model)
+local StopCatch = remote("StopCatch") -- client -> server: ()
+local State = remote("State") -- server -> client: ("Holding" | "Ended", info)
+
+-- Shop names by item id ("CandleLamp" -> "Candle Lamp"), and vacuum names by tier.
+local itemNames: { [string]: string } = {}
+local vacuumByTier: { [number]: string } = {}
+for _, item in Shop.Workshop do
+	itemNames[item.id] = item.name
+	if item.kind == "Vacuum" and item.tier then
+		vacuumByTier[item.tier] = item.name
+	end
+end
+
+local function itemName(id: string): string
+	return itemNames[id] or Format.name(id)
+end
 
 local function rootOf(player: Player): BasePart?
 	local character = player.Character
@@ -49,189 +80,281 @@ local function rootOf(player: Player): BasePart?
 	return if root and root:IsA("BasePart") then root else nil
 end
 
+-- True while the hunter is alive and still in this zone (not knocked out, not gone home).
+local function isHunting(player: Player, zoneId: string): boolean
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	return humanoid ~= nil and humanoid.Health > 0 and player:GetAttribute("Zone") == zoneId
+end
+
+-- Studs from the hunter to where the monster really is (math.huge if either is missing).
 local function distanceTo(player: Player, model: Model): number
 	local root = rootOf(player)
-	local body = model.PrimaryPart
-	if not root or not body then
+	local position = RoamService.position(model) or (model.PrimaryPart and model.PrimaryPart.Position)
+	if not root or not position then
 		return math.huge
 	end
-	return (root.Position - body.Position).Magnitude
+	return (root.Position - position).Magnitude
 end
 
-local function isLiveMonster(model: any): boolean
-	return typeof(model) == "Instance" and model:IsA("Model") and SpawnService.get(model) ~= nil
-end
-
-local function setStunned(model: Model, seconds: number)
-	model:SetAttribute("StunnedUntil", workspace:GetServerTimeNow() + seconds)
-	local body = model.PrimaryPart
-	if body and not body:FindFirstChild("StunGlow") then
-		local glow = Instance.new("Highlight")
-		glow.Name = "StunGlow"
-		glow.FillColor = Color3.new(1, 1, 0.7)
-		glow.FillTransparency = 0.4
-		glow.Parent = body
-	end
-	task.delay(seconds, function()
-		local until_ = model:GetAttribute("StunnedUntil")
-		if body and not heldBy[model] and (until_ == nil or until_ <= workspace:GetServerTimeNow()) then
-			local glow = body:FindFirstChild("StunGlow")
-			if glow then
-				glow:Destroy()
-			end
-		end
-	end)
-end
-
-local function isStunned(model: Model): boolean
-	local until_ = model:GetAttribute("StunnedUntil")
-	return typeof(until_) == "number" and until_ > workspace:GetServerTimeNow()
-end
-
-local function release(player: Player, reason: string?)
+-- Removes the glow, beam and attributes and forgets the hold. Doesn't touch the roaming.
+local function clear(player: Player): Hold?
 	local hold = holds[player]
+	if not hold then
+		return nil
+	end
+	holds[player] = nil
+	if heldBy[hold.model] == player then
+		heldBy[hold.model] = nil
+	end
+	if hold.died then
+		hold.died:Disconnect()
+	end
+	hold.beam:Destroy()
+	hold.from:Destroy()
+	hold.to:Destroy()
+	hold.glow:Destroy()
+	hold.model:SetAttribute("HeldBy", nil)
+	hold.model:SetAttribute("CatchStart", nil)
+	hold.model:SetAttribute("CatchEnd", nil)
+	return hold
+end
+
+-- Lets the monster go (it stays dazed for the flashlight's stun time). message is toasted
+-- if given; nil when the player is leaving.
+local function release(player: Player, message: string?)
+	local hold = clear(player)
 	if not hold then
 		return
 	end
-	holds[player] = nil
-	heldBy[hold.model] = nil
-	hold.model:SetAttribute("HeldBy", nil)
-	hold.model:SetAttribute("Tug", nil)
-	hold.model:SetAttribute("CatchProgress", nil)
-	local body = hold.model.PrimaryPart
-	local glow = body and body:FindFirstChild("StunGlow")
-	if glow then
-		glow:Destroy()
+	RoamService.release(hold.model, hold.stunSeconds)
+	if message then
+		Notify.toast(player, message)
 	end
-	if reason then
-		Result:FireClient(player, reason, hold.model:GetAttribute("MonsterId"))
+	if player.Parent == Players then
+		State:FireClient(player, "Ended", { result = "Escaped", model = hold.model })
 	end
 end
 
-local function finishCatch(player: Player, hold: Hold)
-	local data = DataService.get(player)
-	local model = hold.model
-	release(player)
-	if not data then
+local function finish(player: Player)
+	local hold = clear(player)
+	if not hold then
 		return
 	end
+	local model = hold.model
+	local data = DataService.get(player)
+	if not data or HuntService.isCarrying(player) or not isHunting(player, hold.zoneId) then
+		RoamService.release(model, hold.stunSeconds)
+		State:FireClient(player, "Ended", { result = "Escaped", model = model })
+		return
+	end
+
 	local equipped = { data.equipped.flashlight, data.equipped.vacuum, data.equipped.lens }
 	local caught = SpawnService.capture(model, equipped)
 	if not caught then
+		State:FireClient(player, "Ended", { result = "Gone", model = model })
 		return
 	end
-	-- VacuumStart refuses a hunter who is already carrying, so this always fits.
 	HuntService.carry(player, caught)
-	Result:FireClient(player, "Caught", caught.monsterId, { size = caught.size, effects = caught.effects })
+
+	local bonus = ""
+	if #caught.effects > 0 then
+		local names = {}
+		for _, effectId in caught.effects do
+			table.insert(names, Format.name(effectId))
+		end
+		bonus = ` Bonus: {table.concat(names, " and ")}!`
+	end
+	Notify.toast(player, `Caught a {caught.size} {hold.name}!{bonus} Now bring it to the Exit.`)
+	State:FireClient(player, "Ended", { result = "Caught", monsterId = caught.monsterId, model = model })
 end
 
-Shine.OnServerEvent:Connect(function(player, model)
-	local data = DataService.get(player)
-	if not data or not isLiveMonster(model) or heldBy[model] then
+local function onStartCatch(player: Player, model: unknown)
+	if typeof(model) ~= "Instance" or not model:IsA("Model") then
 		return
 	end
-	local flashlight = Tools.Flashlights[data.equipped.flashlight]
-	if not flashlight then
+
+	-- 1. Save loaded, not already catching, not spamming.
+	local data = DataService.get(player)
+	if not data then
+		Notify.toast(player, "Your save is still loading. Try again in a moment!")
+		return
+	end
+	if holds[player] then
 		return
 	end
 	local now = os.clock()
-	if now - (lastShine[player] or 0) < flashlight.cooldown then
+	local remaining = StartCooldown - (now - (lastStart[player] or 0))
+	if remaining > 0 then
+		-- A quick re-press (a double tap): start it once the cooldown is over, unless they let
+		-- go before then. Dropping it would leave them holding with no meter.
+		pendingStart[player] = model
+		task.delay(remaining, function()
+			if pendingStart[player] == model then
+				pendingStart[player] = nil
+				onStartCatch(player, model)
+			end
+		end)
 		return
 	end
-	-- Small allowance for lag between what the client saw and where things are now.
-	if distanceTo(player, model) > flashlight.range + 4 then
-		return
-	end
-	lastShine[player] = now
-	setStunned(model, flashlight.stunSeconds)
-end)
+	pendingStart[player] = nil
+	lastStart[player] = now
 
-VacuumStart.OnServerEvent:Connect(function(player, model)
-	local data = DataService.get(player)
-	if not data or holds[player] or not isLiveMonster(model) or heldBy[model] then
+	-- 2. A live wild monster nobody else is catching, in the zone the hunter is in, and the
+	-- hunter is alive (a knocked-out hunter's body can't catch).
+	local spawned = SpawnService.get(model)
+	if not spawned then
 		return
 	end
-	local spawned = SpawnService.get(model) :: SpawnService.Spawned
+	local zone = Hunt.zoneByIndex(spawned.zone)
+	if not zone or not isHunting(player, zone.id) then
+		return
+	end
+	local name = Format.name(spawned.monsterId)
+	local holder = heldBy[model]
+	if holder then
+		if holder ~= player then
+			Notify.toast(player, "Someone else is catching that one!")
+		end
+		return
+	end
+
+	-- 3. One monster per trip.
 	if HuntService.isCarrying(player) then
-		Result:FireClient(player, "VacuumFull", spawned.monsterId)
-		return
-	end
-	local vacuumId = data.equipped.vacuum
-	local vacuum = Tools.Vacuums[vacuumId]
-	if not vacuum or distanceTo(player, model) > vacuum.range + 4 then
-		return
-	end
-	if not isStunned(model) then
-		Result:FireClient(player, "NotStunned", spawned.monsterId)
-		return
-	end
-	if not Catching.canVacuum(vacuumId, spawned.size, spawned.rarity) then
-		Result:FireClient(player, "TooStrong", spawned.monsterId, {
-			needTier = Catching.requiredTier(spawned.size, spawned.rarity),
-		})
+		Notify.toast(player, "Your vacuum is full. Bring your catch home first!")
 		return
 	end
 
+	-- 4. Room at home.
+	if not MansionService.hasRoom(player) then
+		Notify.toast(player, "Your mansion is full! Buy a new wing to catch more.")
+		return
+	end
+
+	-- 5. Close enough for the flashlight.
+	local flashlightId = data.equipped.flashlight
+	local reach = Catching.reach(flashlightId)
+	if distanceTo(player, model) > reach then
+		local shown = math.floor(reach - Tools.ReachSlack)
+		Notify.toast(player, `Get closer! Your {itemName(flashlightId)} reaches {shown} studs.`)
+		return
+	end
+
+	-- 6. Strong enough vacuum.
+	local vacuumId = data.equipped.vacuum
+	if not Catching.canVacuum(vacuumId, spawned.size, spawned.rarity) then
+		local tier = Catching.requiredTier(spawned.size, spawned.rarity)
+		local vacuumName = vacuumByTier[tier]
+		local which = if vacuumName then ` (the {vacuumName})` else ""
+		Notify.toast(player, `Too strong! You need a tier {tier} vacuum{which}.`)
+		return
+	end
+
+	local root = rootOf(player)
+	local body = model.PrimaryPart
+	if not root or not body then
+		return
+	end
+
+	-- Start holding: freeze it, light it up, and draw a beam from the hunter to it.
+	RoamService.hold(model)
+	local seconds = Catching.catchSeconds(vacuumId, spawned.rarity)
+	local serverNow = workspace:GetServerTimeNow()
+	model:SetAttribute("HeldBy", player.UserId)
+	model:SetAttribute("CatchStart", serverNow)
+	model:SetAttribute("CatchEnd", serverNow + seconds)
+
+	local glow = Instance.new("Highlight")
+	glow.Name = "CatchGlow"
+	glow.FillColor = Color3.fromRGB(255, 250, 200)
+	glow.FillTransparency = 0.5
+	glow.OutlineColor = Color3.fromRGB(255, 255, 255)
+	glow.DepthMode = Enum.HighlightDepthMode.Occluded
+	glow.Parent = model
+
+	local from = Instance.new("Attachment")
+	from.Name = "CatchBeamFrom"
+	from.Parent = root
+	local to = Instance.new("Attachment")
+	to.Name = "CatchBeamTo"
+	to.Parent = body
+	local beam = Instance.new("Beam")
+	beam.Name = "CatchBeam"
+	beam.Attachment0 = from
+	beam.Attachment1 = to
+	beam.Color = ColorSequence.new(Color3.fromRGB(255, 245, 180))
+	beam.Transparency = NumberSequence.new(0.2, 0.6)
+	beam.LightEmission = 1
+	beam.FaceCamera = true
+	beam.Width0 = 0.4
+	beam.Width1 = 1.6
+	beam.Segments = 1
+	beam.Parent = body
+
+	local flashlight = Tools.Flashlights[flashlightId]
 	local hold: Hold = {
 		model = model,
-		progress = Tools.Tug.StartProgress,
-		pull = 0,
-		tug = if random:NextNumber() < 0.5 then -1 else 1,
-		nextFlip = os.clock() + random:NextNumber(Tools.Tug.FlipMin, Tools.Tug.FlipMax),
-		rate = Catching.catchRate(vacuumId, spawned.rarity),
-		range = vacuum.range,
+		name = name,
+		zoneId = zone.id,
+		reach = reach,
+		stunSeconds = if flashlight then flashlight.stunSeconds else 1,
+		endTime = serverNow + seconds,
+		glow = glow,
+		beam = beam,
+		from = from,
+		to = to,
+		died = nil,
 	}
 	holds[player] = hold
 	heldBy[model] = player
-	model:SetAttribute("HeldBy", player.UserId)
-	model:SetAttribute("Tug", hold.tug)
-	model:SetAttribute("CatchProgress", hold.progress)
-	Result:FireClient(player, "Holding", spawned.monsterId, { model = model })
-end)
 
-VacuumStop.OnServerEvent:Connect(function(player)
-	release(player, "Stopped")
-end)
-
-Pull.OnServerEvent:Connect(function(player, pull)
-	local hold = holds[player]
-	if hold and (pull == -1 or pull == 0 or pull == 1) then
-		hold.pull = pull
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		hold.died = humanoid.Died:Connect(function()
+			release(player, `{name} got away! Hold until the meter is full.`)
+		end)
 	end
-end)
+
+	State:FireClient(player, "Holding", { model = model, seconds = seconds })
+end
+
+-- Checks every catch in progress each frame.
+local function update()
+	local serverNow = workspace:GetServerTimeNow()
+	for player, hold in holds do
+		if SpawnService.get(hold.model) == nil then
+			-- Gone (cleared by an event, or the zone was removed).
+			clear(player)
+			State:FireClient(player, "Ended", { result = "Gone", model = hold.model })
+		elseif not isHunting(player, hold.zoneId) then
+			-- Knocked out or went home (Exit, Return Charm): it just stays behind, no message.
+			release(player, nil)
+		elseif distanceTo(player, hold.model) > hold.reach then
+			release(player, `{hold.name} got away!`)
+		elseif serverNow >= hold.endTime then
+			finish(player)
+		end
+	end
+end
 
 function CatchService.start()
 	remotes.Parent = ReplicatedStorage
 
-	RunService.Heartbeat:Connect(function(dt)
-		local now = os.clock()
-		for player, hold in holds do
-			if not isLiveMonster(hold.model) then
-				release(player)
-				continue
-			end
-			if distanceTo(player, hold.model) > hold.range + 4 then
-				release(player, "Escaped")
-				continue
-			end
-			if now >= hold.nextFlip then
-				hold.tug = -hold.tug
-				hold.nextFlip = now + random:NextNumber(Tools.Tug.FlipMin, Tools.Tug.FlipMax)
-				hold.model:SetAttribute("Tug", hold.tug)
-			end
-			hold.progress = Catching.step(hold.progress, hold.pull, hold.tug, hold.rate, dt)
-			hold.model:SetAttribute("CatchProgress", hold.progress)
-			if hold.progress >= 1 then
-				finishCatch(player, hold)
-			elseif hold.progress <= 0 then
-				release(player, "Escaped")
-			end
+	StartCatch.OnServerEvent:Connect(onStartCatch)
+	StopCatch.OnServerEvent:Connect(function(player)
+		pendingStart[player] = nil
+		local hold = holds[player]
+		if hold then
+			release(player, `{hold.name} got away! Hold until the meter is full.`)
 		end
 	end)
 
-	game:GetService("Players").PlayerRemoving:Connect(function(player)
-		release(player)
-		lastShine[player] = nil
+	RunService.Heartbeat:Connect(update)
+
+	Players.PlayerRemoving:Connect(function(player)
+		release(player, nil)
+		lastStart[player] = nil
+		pendingStart[player] = nil
 	end)
 end
 
