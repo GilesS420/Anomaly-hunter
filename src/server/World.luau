@@ -37,6 +37,23 @@ function World.part(instance: Instance?): BasePart?
 	return instance:FindFirstChildWhichIsA("BasePart", true)
 end
 
+-- Every part that makes up an instance: the part itself, or all parts inside a Folder/Model.
+function World.parts(instance: Instance?): { BasePart }
+	if not instance then
+		return {}
+	end
+	if instance:IsA("BasePart") then
+		return { instance }
+	end
+	local parts = {}
+	for _, child in instance:GetDescendants() do
+		if child:IsA("BasePart") then
+			table.insert(parts, child)
+		end
+	end
+	return parts
+end
+
 -- Shorthand for World.part(World.find(...)) along a path, e.g. World.partAt(workspace, "Hub", "ReturnPoint").
 function World.partAt(root: Instance, ...: string): BasePart?
 	local current: Instance? = root

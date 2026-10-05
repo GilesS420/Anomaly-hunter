@@ -1,14 +1,24 @@
 --!strict
--- Keeps each zone stocked with monsters. A zone is built in Studio as
---   Workspace.Zones.<ZoneId>.SpawnPoints  (a folder of parts where monsters can appear)
--- Spawned monsters go in Workspace.Zones.<ZoneId>.Monsters. Zones without a folder are skipped.
--- The models are placeholders (a coloured ball with a name tag) until the art is in.
+-- Keeps each zone stocked with wandering monsters (Zones.MaxAlive each). Per zone it reads
+--   Workspace.Zones.<ZoneId>.RoamArea     a Part (or a Folder/Model of Parts) the monsters wander over
+--   Workspace.Zones.<ZoneId>.SpawnPoints  (older zones) parts; each one becomes a 30x30 area around it
+-- WorldBuilder makes all of this as grey placeholders if it's missing.
+-- RoamArea parts must lie flat; turning them 90 or 180 degrees is fine, tilting them is not.
+-- Monsters appear in Workspace.Zones.<ZoneId>.Monsters, never inside another monster: if the
+-- zone is too crowded, the spawn waits and tries again later.
+-- Wild monsters wander off after a minute or two (unless someone is catching them) and a fresh
+-- one takes their place, so monsters too strong for anyone here don't pile up in a zone.
 
+local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Rarities = require(ReplicatedStorage.Shared.Config.Rarities)
+local Roam = require(ReplicatedStorage.Shared.Util.Roam)
 local Spawning = require(ReplicatedStorage.Shared.Util.Spawning)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Zones = require(ReplicatedStorage.Shared.Config.Zones)
+local MonsterModel = require(script.Parent.Parent.MonsterModel)
+local RoamService = require(script.Parent.RoamService)
 local World = require(script.Parent.Parent.World)
 
 local SpawnService = {}
@@ -20,110 +30,166 @@ export type Spawned = {
 	zone: number,
 }
 
-local RarityColors: { [string]: Color3 } = {
-	Common = Color3.fromRGB(190, 190, 190),
-	Uncommon = Color3.fromRGB(90, 200, 90),
-	Rare = Color3.fromRGB(70, 140, 255),
-	Epic = Color3.fromRGB(170, 80, 255),
-	Legendary = Color3.fromRGB(255, 170, 30),
-	Mythic = Color3.fromRGB(255, 60, 90),
-	Divine = Color3.fromRGB(255, 255, 160),
+type ZoneState = {
+	zone: Zones.Zone,
+	folder: Instance, -- Workspace.Zones.<ZoneId>
+	monsters: Folder?, -- where spawned models go (made on first spawn)
+	rects: { Roam.Rect },
+	group: string, -- RoamService group, so orbs only avoid others in the same zone
+	alive: number,
+	retrying: boolean, -- a "too crowded, try later" refill is already waiting
 }
+
+local SpawnPointAreaSize = 30 -- studs; area around each SpawnPoints part when there's no RoamArea
+local LifetimeMin, LifetimeMax = 60, 120 -- seconds a wild monster stays before wandering off
+local HeldRecheck = 5 -- seconds to wait when it's due to leave but someone is catching it
 
 local random = Random.new()
 local live: { [Model]: Spawned } = {}
 
-local function buildModel(spawned: Spawned, scale: number, at: BasePart): Model
-	local model = Instance.new("Model")
-	model.Name = spawned.monsterId
-
-	local body = Instance.new("Part")
-	body.Name = "Body"
-	body.Shape = Enum.PartType.Ball
-	body.Size = Vector3.one * 3 * scale
-	body.Color = RarityColors[spawned.rarity] or Color3.new(1, 1, 1)
-	body.Material = Enum.Material.Neon
-	body.Anchored = true
-	body.CanCollide = false
-	body.CFrame = at.CFrame + Vector3.new(0, body.Size.Y / 2 + 0.5, 0)
-	body.Parent = model
-	model.PrimaryPart = body
-
-	local tag = Instance.new("BillboardGui")
-	tag.Size = UDim2.fromOffset(200, 50)
-	tag.StudsOffset = Vector3.new(0, body.Size.Y / 2 + 1.5, 0)
-	tag.AlwaysOnTop = true
-	tag.MaxDistance = 80
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
-	label.TextColor3 = body.Color
-	label.TextStrokeTransparency = 0
-	label.TextScaled = true
-	label.Font = Enum.Font.GothamBold
-	label.Text = `{spawned.monsterId}\n{spawned.size} {spawned.rarity}`
-	label.Parent = tag
-	tag.Parent = body
-
-	model:SetAttribute("MonsterId", spawned.monsterId)
-	model:SetAttribute("Rarity", spawned.rarity)
-	model:SetAttribute("Size", spawned.size)
-	model:SetAttribute("Zone", spawned.zone)
-	return model
+-- True if the part is turned a quarter (90 or 270 degrees), so its X size runs along world Z.
+local function turnedSideways(part: BasePart): boolean
+	local right = part.CFrame.RightVector
+	return math.abs(right.Z) > math.abs(right.X)
 end
 
-local function pickSpawnPoint(points: { BasePart }, monstersFolder: Folder): BasePart
-	local free = {}
-	for _, point in points do
-		local taken = false
-		for _, model in monstersFolder:GetChildren() do
-			if model:GetAttribute("SpawnPoint") == point.Name then
-				taken = true
-				break
+-- Floor rectangles monsters may wander over in this zone (empty if nothing was built).
+local function zoneRects(zone: Zones.Zone, zoneFolder: Instance): { Roam.Rect }
+	local rects = {}
+	local roamArea = World.find(zoneFolder, "RoamArea")
+	if roamArea then
+		for _, part in World.parts(roamArea) do
+			local width, depth = part.Size.X, part.Size.Z
+			if turnedSideways(part) then
+				width, depth = depth, width
 			end
+			local top = part.Position.Y + part.Size.Y / 2
+			table.insert(rects, Roam.rect(part.Position.X, part.Position.Z, width, depth, top))
 		end
-		if not taken then
-			table.insert(free, point)
+		if #rects == 0 then
+			warn(`SpawnService: {zone.id} has a RoamArea with no Part in it, so nothing spawns there`)
+		end
+		return rects
+	end
+
+	local spawnPoints = World.find(zoneFolder, "SpawnPoints")
+	if spawnPoints then
+		for _, part in World.parts(spawnPoints) do
+			local top = part.Position.Y + part.Size.Y / 2
+			table.insert(
+				rects,
+				Roam.rect(part.Position.X, part.Position.Z, SpawnPointAreaSize, SpawnPointAreaSize, top)
+			)
 		end
 	end
-	local pool = if #free > 0 then free else points
-	return pool[random:NextInteger(1, #pool)]
+	if #rects == 0 then
+		warn(
+			`SpawnService: {zone.id} has nowhere for monsters to roam. Add a flat Part at `
+				.. `Workspace > Zones > {zone.id} > RoamArea (it can be invisible)`
+		)
+	end
+	return rects
 end
 
-local function spawnOne(zoneIndex: number, spawnPointsFolder: Instance, monstersFolder: Folder)
-	local points = {}
-	for _, child in spawnPointsFolder:GetDescendants() do
-		if child:IsA("BasePart") then
-			table.insert(points, child)
-		end
+-- The zone's Monsters folder, made if needed. Nil if the zone itself was removed.
+local function monstersFolder(state: ZoneState): Folder?
+	local existing = state.monsters
+	if existing and existing.Parent == state.folder then
+		return existing
 	end
-	if #points == 0 then
+	if not state.folder:IsDescendantOf(workspace) then
+		return nil
+	end
+	local found = state.folder:FindFirstChild("Monsters")
+	local folder: Folder
+	if found and found:IsA("Folder") then
+		folder = found
+	else
+		folder = Instance.new("Folder")
+		folder.Name = "Monsters"
+		folder.Parent = state.folder
+	end
+	state.monsters = folder
+	return folder
+end
+
+local refill: (state: ZoneState) -> ()
+
+-- Time's up: the monster leaves the zone (its Destroying handler schedules a fresh one).
+-- Never while a hunter is holding it; it waits for them to finish.
+local function wanderOff(model: Model)
+	if not live[model] then
+		return -- already caught
+	end
+	if RoamService.isHeld(model) then
+		task.delay(HeldRecheck, wanderOff, model)
 		return
 	end
+	live[model] = nil
+	model:Destroy()
+end
 
-	local monster = Spawning.rollMonster(zoneIndex, random)
+-- Spawns one monster at a free spot. False if the zone is too crowded (or gone).
+local function spawnOne(state: ZoneState): boolean
+	local folder = monstersFolder(state)
+	if not folder then
+		return false
+	end
+
+	local monster = Spawning.rollMonster(state.zone.index, random)
 	local size = Spawning.rollSize(random)
-	local spawned: Spawned =
-		{ monsterId = monster.id, rarity = monster.rarity, size = size.id, zone = zoneIndex }
-	local point = pickSpawnPoint(points, monstersFolder)
+	local radius = MonsterModel.radius(size.id)
+	local point = Roam.findFreePoint(state.rects, radius, RoamService.bodies(state.group), random)
+	if not point then
+		return false
+	end
 
-	local model = buildModel(spawned, size.scale, point)
-	model:SetAttribute("SpawnPoint", point.Name)
+	local model = MonsterModel.build({ monsterId = monster.id, rarity = monster.rarity, size = size.id })
+	model:SetAttribute("Wild", true)
+	model:SetAttribute("Zone", state.zone.index)
+
+	local spawned: Spawned =
+		{ monsterId = monster.id, rarity = monster.rarity, size = size.id, zone = state.zone.index }
 	live[model] = spawned
+	state.alive += 1
 
 	-- However a monster leaves (caught, cleared by an event), replace it after a delay.
 	model.Destroying:Connect(function()
 		live[model] = nil
-		task.delay(Zones.RespawnSeconds, function()
-			if #monstersFolder:GetChildren() < Zones.MaxAlive then
-				spawnOne(zoneIndex, spawnPointsFolder, monstersFolder)
-			end
-		end)
+		state.alive -= 1
+		task.delay(Zones.RespawnSeconds, refill, state)
 	end)
-	model.Parent = monstersFolder
+
+	local rarity = Rarities[monster.rarity]
+	RoamService.add(model, {
+		rects = state.rects,
+		radius = radius,
+		speed = 6 + 0.5 * (if rarity then rarity.order else 1),
+		group = state.group,
+		at = Vector3.new(point.x, point.y + radius + 0.5, point.z),
+	})
+	model.Parent = folder
+	task.delay(random:NextNumber(LifetimeMin, LifetimeMax), wanderOff, model)
+	return true
 end
 
--- What a spawned model is, or nil if it isn't a live monster (already caught, or not one).
+-- Tops the zone up to MaxAlive. When it's too crowded it tries again after RespawnSeconds.
+function refill(state: ZoneState)
+	while state.alive < Zones.MaxAlive do
+		if not spawnOne(state) then
+			if not state.retrying and state.folder:IsDescendantOf(workspace) then
+				state.retrying = true
+				task.delay(Zones.RespawnSeconds, function()
+					state.retrying = false
+					refill(state)
+				end)
+			end
+			return
+		end
+	end
+end
+
+-- What a spawned model is, or nil if it isn't a live wild monster (already caught, or not one).
 function SpawnService.get(model: Model): Spawned?
 	return live[model]
 end
@@ -138,6 +204,7 @@ function SpawnService.capture(model: Model, equippedItemIds: { string }): Value.
 	live[model] = nil
 	model:Destroy()
 	return {
+		uid = HttpService:GenerateGUID(false),
 		monsterId = spawned.monsterId,
 		size = spawned.size,
 		effects = Spawning.rollCatchEffects(equippedItemIds, random),
@@ -149,26 +216,32 @@ end
 function SpawnService.start()
 	local zonesFolder = World.find(workspace, "Zones")
 	if not zonesFolder then
-		warn("SpawnService: no Workspace.Zones folder, nothing will spawn")
+		warn("SpawnService: no Workspace > Zones folder, so no monsters will spawn")
 		return
 	end
 	for _, zone in Zones.List do
+		if not zone.launch then
+			continue
+		end
 		local zoneFolder = World.find(zonesFolder, zone.id)
-		local spawnPoints = World.find(zoneFolder, "SpawnPoints")
-		if zoneFolder and not spawnPoints then
-			warn(`SpawnService: {zone.id} has no SpawnPoints folder, so nothing spawns there`)
+		if not zoneFolder then
+			warn(`SpawnService: no Workspace > Zones > {zone.id} folder, so nothing spawns there`)
+			continue
 		end
-		if zoneFolder and spawnPoints then
-			local monstersFolder = zoneFolder:FindFirstChild("Monsters")
-			if not monstersFolder then
-				monstersFolder = Instance.new("Folder")
-				monstersFolder.Name = "Monsters"
-				monstersFolder.Parent = zoneFolder
-			end
-			for _ = 1, Zones.MaxAlive do
-				spawnOne(zone.index, spawnPoints, monstersFolder :: Folder)
-			end
+		local rects = zoneRects(zone, zoneFolder)
+		if #rects == 0 then
+			continue
 		end
+		local state: ZoneState = {
+			zone = zone,
+			folder = zoneFolder,
+			monsters = nil,
+			rects = rects,
+			group = "Zone:" .. zone.id,
+			alive = 0,
+			retrying = false,
+		}
+		refill(state)
 	end
 end
 
