@@ -5,6 +5,7 @@ local Monsters = require("../src/shared/Config/Monsters")
 local Rarities = require("../src/shared/Config/Rarities")
 local Sizes = require("../src/shared/Config/Sizes")
 local Catching = require("../src/shared/Util/Catching")
+local Hunt = require("../src/shared/Util/Hunt")
 local Spawning = require("../src/shared/Util/Spawning")
 local Value = require("../src/shared/Util/Value")
 
@@ -117,6 +118,13 @@ check(
 	"meter stays between 0 and 1",
 	Catching.step(0.99, -1, 1, 5, 1) == 1 and Catching.step(0.01, 1, 1, 5, 1) == 0
 )
+
+-- Hunt runs: zones open with their wing and only once they've shipped.
+check("Pumpkin Graveyard is open from the start", Hunt.isZoneUnlocked(1, 1))
+check("Murky Bayou needs the Library", not Hunt.isZoneUnlocked(2, 1) and Hunt.isZoneUnlocked(2, 2))
+check("Abandoned Carnival needs the Ballroom", not Hunt.isZoneUnlocked(3, 2) and Hunt.isZoneUnlocked(3, 3))
+check("zones 4 and 5 stay shut at launch", not Hunt.isZoneUnlocked(4, 6) and not Hunt.isZoneUnlocked(5, 6))
+check("hearts never go below 0", Hunt.afterDamage(1, 5) == 0 and Hunt.afterDamage(3, 1) == 2)
 
 if failures > 0 then
 	error(`{failures} check(s) failed`)
