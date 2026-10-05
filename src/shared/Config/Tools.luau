@@ -1,40 +1,39 @@
 --!strict
--- How the hunting tools behave. Prices and stock live in Shop.luau; vacuum tiers too.
+-- How the hunting tools behave. Prices and stock live in Shop.luau (vacuum tiers too).
 -- All numbers are placeholders to tune in playtesting.
+--
+-- Catching: press and hold on a monster. The flashlight's beam freezes it (reach = how far
+-- away you can grab it from), then the vacuum fills the catch meter (catchSeconds = how long
+-- that takes). Let go early and it escapes, but stays dazed for stunSeconds so you can grab
+-- it again quickly.
 
 export type Flashlight = {
-	stunSeconds: number, -- how long a monster stays stunned after being lit
-	range: number, -- studs
-	cooldown: number, -- seconds between shines
+	reach: number, -- studs; how far away you can start (and keep) catching
+	stunSeconds: number, -- how long a monster stays frozen after you let go
 }
 
 export type Vacuum = {
-	catchSpeed: number, -- catch meter filled per second while pulling the right way (1 = full)
-	range: number, -- studs; walk further than this and the monster breaks free
+	catchSeconds: number, -- time to catch a Common monster; rarer ones take longer
 }
 
 local Tools = {}
 
 Tools.Flashlights = {
-	CandleLamp = { stunSeconds = 1.5, range = 30, cooldown = 1.5 },
-	StrobeLight = { stunSeconds = 2.5, range = 40, cooldown = 1.2 },
-	Moonbeam = { stunSeconds = 4, range = 45, cooldown = 1 },
+	CandleLamp = { reach = 25, stunSeconds = 1.5 },
+	StrobeLight = { reach = 35, stunSeconds = 2.5 },
+	Moonbeam = { reach = 45, stunSeconds = 4 },
 } :: { [string]: Flashlight }
 
 Tools.Vacuums = {
-	DustBuster = { catchSpeed = 0.25, range = 20 },
-	PhantomVac = { catchSpeed = 0.4, range = 25 },
-	VoidVac = { catchSpeed = 0.6, range = 30 },
+	DustBuster = { catchSeconds = 1.6 },
+	PhantomVac = { catchSeconds = 1.2 },
+	VoidVac = { catchSeconds = 0.9 },
 } :: { [string]: Vacuum }
 
--- Tug-of-war while vacuuming: the monster yanks left or right and you drag the other way.
-Tools.Tug = {
-	FlipMin = 0.6, -- seconds before the monster changes direction (random in this range)
-	FlipMax = 1.6,
-	IdleFactor = -0.15, -- meter change while not pulling, as a share of catchSpeed
-	WrongFactor = -0.6, -- meter change while pulling the wrong way
-	StartProgress = 0.25, -- the meter starts a quarter full; hitting 0 means it broke free
-	ResistPerRarity = 0.3, -- each rarity step above Common slows catching by this much
-}
+-- Each rarity step above Common makes catching take this much longer (0.15 = +15%).
+Tools.ResistPerRarity = 0.15
+
+-- Extra studs allowed on top of reach, for lag between what the client saw and the server.
+Tools.ReachSlack = 6
 
 return Tools

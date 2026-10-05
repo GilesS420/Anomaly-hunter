@@ -35,6 +35,23 @@ function Spawning.rollMonster(zoneIndex: number, random: Random?): Monsters.Mons
 	end, random)
 end
 
+-- Orbs are drawn as balls 3 studs across at Normal size, scaled by size.
+Spawning.BaseRadius = 1.5
+
+function Spawning.scale(sizeId: string): number
+	for _, size in Sizes do
+		if size.id == sizeId then
+			return size.scale
+		end
+	end
+	return 1
+end
+
+-- Radius of a monster's orb in studs (used to keep orbs from overlapping).
+function Spawning.radius(sizeId: string): number
+	return Spawning.BaseRadius * Spawning.scale(sizeId)
+end
+
 function Spawning.rollSize(random: Random?): Sizes.Size
 	return Rng.pickWeighted(Sizes, function(s)
 		return s.weight

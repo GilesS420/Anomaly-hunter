@@ -14,6 +14,7 @@ local Value = {}
 Value.FamiliarityMaxMultiplier = 2 -- placeholder, tune in playtesting
 
 export type CaughtMonster = {
+	uid: string?, -- unique id, given when caught (older saves get one when loaded)
 	monsterId: string,
 	size: string,
 	effects: { string },
