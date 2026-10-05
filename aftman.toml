@@ -1,0 +1,5 @@
+# Toolchain manager: run `aftman install` once to get these tools.
+[tools]
+rojo = "rojo-rbx/rojo@7.4.4"
+selene = "Kampfkarren/selene@0.27.1"
+stylua = "JohnnyMorganz/StyLua@0.20.0"
