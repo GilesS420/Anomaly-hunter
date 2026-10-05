@@ -18,6 +18,11 @@ DataService.Template = {
 	monsters = {}, -- caught monsters roaming the mansion
 	vault = {}, -- up to 3 monsters that can never be stolen
 	inventory = {}, -- shop items by id
+	equipped = { -- item ids in use; the starter tools are free
+		flashlight = "CandleLamp",
+		vacuum = "DustBuster",
+		lens = "", -- "" for none
+	},
 	codex = {}, -- discovered monsters, effects and combo recipes
 	stealingEnabled = false,
 }
