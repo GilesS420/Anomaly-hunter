@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 local Catching = require(ReplicatedStorage.Shared.Util.Catching)
 local Tools = require(ReplicatedStorage.Shared.Config.Tools)
 local DataService = require(script.Parent.DataService)
+local HuntService = require(script.Parent.HuntService)
 local SpawnService = require(script.Parent.SpawnService)
 
 local CatchService = {}
@@ -119,9 +120,8 @@ local function finishCatch(player: Player, hold: Hold)
 	if not caught then
 		return
 	end
-	-- TODO(#4): carry the monster back through the zone and drop it off at the mansion.
-	-- Until the hunt run exists it goes straight into the save.
-	table.insert(data.monsters :: { any }, caught)
+	-- VacuumStart refuses a hunter who is already carrying, so this always fits.
+	HuntService.carry(player, caught)
 	Result:FireClient(player, "Caught", caught.monsterId, { size = caught.size, effects = caught.effects })
 end
 
@@ -152,6 +152,10 @@ VacuumStart.OnServerEvent:Connect(function(player, model)
 		return
 	end
 	local spawned = SpawnService.get(model) :: SpawnService.Spawned
+	if HuntService.isCarrying(player) then
+		Result:FireClient(player, "VacuumFull", spawned.monsterId)
+		return
+	end
 	local vacuumId = data.equipped.vacuum
 	local vacuum = Tools.Vacuums[vacuumId]
 	if not vacuum or distanceTo(player, model) > vacuum.range + 4 then

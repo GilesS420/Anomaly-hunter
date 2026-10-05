@@ -148,7 +148,9 @@ function CatchController.start()
 			local effects = if info and #info.effects > 0
 				then " + " .. table.concat(info.effects, ", ")
 				else ""
-			say(`Caught a {info and info.size or ""} {monsterId}{effects}!`)
+			say(`Caught a {info and info.size or ""} {monsterId}{effects}! Bring it back to the exit.`)
+		elseif kind == "VacuumFull" then
+			say("Your vacuum is full. Bring your catch home first!")
 		elseif kind == "Escaped" then
 			say(`{monsterId} broke free!`)
 		elseif kind == "NotStunned" then
