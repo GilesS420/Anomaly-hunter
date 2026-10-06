@@ -4,6 +4,7 @@
 --   /money 1000000    adds money (a negative number takes some away; 5k, 2.5m and 1b work too)
 --   /wings 3          sets how many wings your mansion has (1 to 6) and rebuilds it
 --   /clearmonsters    empties your mansion
+--   /summon           starts the next Watcher event right away (Flicker, then Blood Moon)
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
 
 local Players = game:GetService("Players")
@@ -17,6 +18,7 @@ local Wings = require(ReplicatedStorage.Shared.Config.Wings)
 local DataService = require(script.Parent.DataService)
 local MansionService = require(script.Parent.MansionService)
 local Notify = require(script.Parent.Parent.Notify)
+local WatcherService = require(script.Parent.WatcherService)
 
 local DevService = {}
 
@@ -84,6 +86,12 @@ commands["/clearmonsters"] = function(player)
 	Notify.toast(player, "Your mansion is empty now.")
 end
 
+commands["/summon"] = function(player)
+	if not WatcherService.summon() then
+		Notify.toast(player, "An event is already playing. Wait for it to end first.")
+	end
+end
+
 -- Runs a chat message if it's one of the commands above.
 local function run(player: Player, message: string)
 	local name, argument = string.match(message, "^%s*(/%S+)%s*(%S*)")
@@ -139,7 +147,7 @@ function DevService.start()
 	else
 		useTextChatCommands()
 	end
-	print(`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters`)
+	print(`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /summon`)
 end
 
 return DevService

@@ -12,6 +12,8 @@ local Roam = require("../src/shared/Util/Roam")
 local Hunt = require("../src/shared/Util/Hunt")
 local Spawning = require("../src/shared/Util/Spawning")
 local Value = require("../src/shared/Util/Value")
+local Events = require("../src/shared/Config/Events")
+local Watcher = require("../src/shared/Util/Watcher")
 
 local failures = 0
 local function check(name: string, ok: boolean)
@@ -137,6 +139,60 @@ check(
 	"unreleased zones say they're coming",
 	string.find(Hunt.lockedReason(4, 6) or "", "future update") ~= nil
 )
+
+-- Watcher: Hunger cycle, meter and event monsters.
+do
+	local steps = Watcher.cycle({ Flicker = true, BloodMoon = true })
+	check(
+		"the cycle is Flicker then Blood Moon",
+		#steps == 2 and steps[1].event.id == "Flicker" and steps[2].event.id == "BloodMoon"
+	)
+	check(
+		"Flicker comes at 60 Hunger, Blood Moon at 150",
+		steps[1].threshold == 60 and steps[2].threshold == 150
+	)
+	check("events that aren't built are skipped", #Watcher.cycle({ Flicker = true, MimicNight = true }) == 1)
+	check("8 hunters fill 8 Hunger a minute", near(Watcher.gain(8, 60), 8))
+	check("nobody hunting means no Hunger", Watcher.gain(0, 60) == 0)
+	check("the meter is half full at 30 of 60", near(Watcher.meter(30, steps, 1), 0.5))
+	check(
+		"the meter restarts after Flicker",
+		near(Watcher.meter(60, steps, 2), 0) and near(Watcher.meter(105, steps, 2), 0.5)
+	)
+	check("the meter never overflows", Watcher.meter(999, steps, 1) == 1)
+	check("at least 4 event monsters", Watcher.monsterCount(1) == Events.MinMonsters)
+	check("one event monster per player", Watcher.monsterCount(7) == 7)
+	check("at most 10 event monsters", Watcher.monsterCount(30) == Events.MaxMonsters)
+	check("countdown clock", Watcher.clock(125) == "2:05" and Watcher.clock(-3) == "0:00")
+
+	local eventRng = fakeRandom(3)
+	local wrong, wicks = 0, 0
+	for _ = 1, 20_000 do
+		local m = Watcher.rollMonster(steps[1].event, eventRng)
+		if m.event ~= "Flicker" then
+			wrong += 1
+		elseif m.id == "Flickerwick" then
+			wicks += 1
+		end
+	end
+	check("Flicker only spawns Flicker monsters", wrong == 0)
+	check("about 70% of Flicker monsters are Flickerwicks", math.abs(wicks / 20_000 - 0.7) < 0.02)
+
+	local valid = true
+	for _, event in Events.List do
+		for id in event.monsters or {} do
+			local m = Monsters[id]
+			if not m or m.event ~= event.id then
+				valid = false
+			end
+		end
+	end
+	check("event monster lists match Monsters config", valid)
+	check(
+		"Phantoms can be caught with the starter vacuum",
+		Catching.canVacuum("DustBuster", "Normal", "Phantom")
+	)
+end
 
 -- Mansion: capacity grows with wings, wings are bought in order, unreleased wings can't be bought.
 check("the Foyer holds 8", Mansion.capacity(1) == 8)
