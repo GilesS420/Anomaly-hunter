@@ -533,6 +533,36 @@ function MansionService.addMonster(player: Player, caught: Value.CaughtMonster):
 	return true
 end
 
+-- Takes sold monsters out of the save and off the mansion floor. uids is a set of the
+-- monsters' uids. Returns the ones it removed (anything not found is skipped).
+function MansionService.removeMonsters(player: Player, uids: { [string]: boolean }): { Value.CaughtMonster }
+	local data = DataService.get(player)
+	if not data then
+		return {}
+	end
+	local removed = {}
+	for i = #data.monsters, 1, -1 do
+		local caught = data.monsters[i]
+		if caught.uid and uids[caught.uid] then
+			table.insert(removed, table.remove(data.monsters, i) :: Value.CaughtMonster)
+		end
+	end
+	local state = mansions[player]
+	if state then
+		for _, child in state.monsters:GetChildren() do
+			local uid = child:GetAttribute("Uid")
+			if typeof(uid) == "string" and uids[uid] then
+				if child:IsA("Model") then
+					RoamService.remove(child)
+				end
+				child:Destroy()
+			end
+		end
+		updateSign(state)
+	end
+	return removed
+end
+
 -- Rebuilds the whole mansion from the save (wings, sign and monsters). Used after the save
 -- was changed directly, e.g. by the Studio test commands.
 function MansionService.rebuild(player: Player)

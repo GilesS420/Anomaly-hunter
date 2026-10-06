@@ -235,6 +235,10 @@ local function onStartCatch(player: Player, model: unknown)
 	if not zoneId or not isHunting(player, zoneId) then
 		return
 	end
+	if spawned.reservedFor and spawned.reservedFor ~= player.UserId then
+		Notify.toast(player, "That one came for someone else's Bait Bell!")
+		return
+	end
 	local name = Format.name(spawned.monsterId)
 	local holder = heldBy[model]
 	if holder then
@@ -252,7 +256,7 @@ local function onStartCatch(player: Player, model: unknown)
 
 	-- 4. Room at home.
 	if not MansionService.hasRoom(player) then
-		Notify.toast(player, "Your mansion is full! Buy a new wing to catch more.")
+		Notify.toast(player, "Your mansion is full! Sell some at the Collector or buy a new wing.")
 		return
 	end
 

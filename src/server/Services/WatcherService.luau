@@ -40,6 +40,7 @@ export type Spawned = {
 	rarity: string,
 	size: string,
 	zone: number,
+	reservedFor: number?, -- always nil: anyone in the main area can catch an event monster
 	event: string,
 }
 
