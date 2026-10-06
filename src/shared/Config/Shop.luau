@@ -17,6 +17,13 @@ local Shop = {}
 
 Shop.RestockSeconds = 5 * 60
 
+-- How many of one single-use item (Bait Bell, Return Charm) a player can buy per restock.
+-- Tools (vacuums, flashlights, lenses) are bought once and kept forever.
+Shop.ConsumablesPerRestock = 3
+
+-- Selling a monster of this rarity or rarer at the Collector asks "are you sure?" first.
+Shop.ConfirmSellFrom = "Legendary"
+
 Shop.Bakery = {
 	{
 		id = "PumpkinCandy",

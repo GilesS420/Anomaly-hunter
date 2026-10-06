@@ -10,8 +10,9 @@
 --
 -- Remotes in ReplicatedStorage.HuntRemotes:
 --   UseReturnCharm  client -> server ()  (the Return Charm button)
--- Player attribute ReturnCharms (number) mirrors how many charms they own, so the button only
--- shows when there is one to use.
+--   UseBaitBell     client -> server ()  (the Bait Bell button: a rarer monster comes to you)
+-- Player attributes ReturnCharms and BaitBells (numbers) mirror how many the player owns, so
+-- the buttons only show when there is one to use.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,6 +26,7 @@ local DataService = require(script.Parent.DataService)
 local MansionService = require(script.Parent.MansionService)
 local Notify = require(script.Parent.Parent.Notify)
 local PlotService = require(script.Parent.PlotService)
+local SpawnService = require(script.Parent.SpawnService)
 local World = require(script.Parent.Parent.World)
 
 local HuntService = {}
@@ -41,6 +43,9 @@ remotes.Name = "HuntRemotes"
 local UseReturnCharm = Instance.new("RemoteEvent") -- client -> server: ()
 UseReturnCharm.Name = "UseReturnCharm"
 UseReturnCharm.Parent = remotes
+local UseBaitBell = Instance.new("RemoteEvent") -- client -> server: ()
+UseBaitBell.Name = "UseBaitBell"
+UseBaitBell.Parent = remotes
 
 local function playerFromHit(hit: BasePart): Player?
 	local character = hit:FindFirstAncestorOfClass("Model")
@@ -84,10 +89,17 @@ local function setCarrying(player: Player, caught: Value.CaughtMonster?)
 	player:SetAttribute("CarryingSize", if caught then caught.size else nil)
 end
 
--- How many Return Charms the save holds.
-local function charmCount(data: DataService.Data): number
-	local inventory: { [string]: any } = data.inventory
-	return if typeof(inventory.ReturnCharm) == "number" then inventory.ReturnCharm else 0
+-- How many of a single-use item (ReturnCharm, BaitBell) the save holds.
+local function itemCount(data: DataService.Data, itemId: string): number
+	local count: any = (data.inventory :: { [string]: any })[itemId]
+	return if typeof(count) == "number" then count else 0
+end
+
+-- Uses one up; the last one leaves the inventory list.
+local function useItem(data: DataService.Data, itemId: string)
+	local count = itemCount(data, itemId)
+	local inventory: { [string]: number? } = data.inventory
+	inventory[itemId] = if count <= 1 then nil else count - 1
 end
 
 -- Drops the carried monster (it's lost) without ending anything else.
@@ -106,7 +118,7 @@ local function goHome(player: Player, deliver: boolean)
 		if MansionService.addMonster(player, caught) then
 			Notify.toast(player, `{caught.size} {Format.name(caught.monsterId)} is home in your mansion!`)
 		else
-			Notify.toast(player, "Your mansion is full! Buy a new wing to keep more monsters.")
+			Notify.toast(player, "Your mansion is full! Sell some at the Collector or buy a new wing.")
 		end
 	end
 	setCarrying(player, nil)
@@ -124,11 +136,12 @@ local function goHome(player: Player, deliver: boolean)
 	end
 end
 
--- Updates the ReturnCharms attribute (the client shows the button only if it's above 0).
--- Call it after anything changes data.inventory.ReturnCharm (e.g. the Workshop selling one).
-function HuntService.refreshCharms(player: Player)
+-- Updates the ReturnCharms and BaitBells attributes (the client shows each button only if
+-- it's above 0). Call it after anything changes the inventory (e.g. a Workshop purchase).
+function HuntService.refreshItems(player: Player)
 	local data = DataService.get(player)
-	player:SetAttribute("ReturnCharms", if data then charmCount(data) else 0)
+	player:SetAttribute("ReturnCharms", if data then itemCount(data, "ReturnCharm") else 0)
+	player:SetAttribute("BaitBells", if data then itemCount(data, "BaitBell") else 0)
 end
 
 function HuntService.isCarrying(player: Player): boolean
@@ -218,15 +231,40 @@ UseReturnCharm.OnServerEvent:Connect(function(player)
 	if not data or (player:GetAttribute("Zone") == nil and not carrying[player]) then
 		return
 	end
-	local charms = charmCount(data)
-	if charms <= 0 then
-		Notify.toast(player, "You don't have a Return Charm yet. (The Workshop opens soon.)")
+	if itemCount(data, "ReturnCharm") <= 0 then
+		Notify.toast(player, "You don't have a Return Charm. The Hunter's Workshop sells them.")
 		return
 	end
-	local inventory: { [string]: any } = data.inventory
-	inventory.ReturnCharm = if charms <= 1 then nil else charms - 1 -- the last one leaves the list
-	HuntService.refreshCharms(player)
+	useItem(data, "ReturnCharm")
+	HuntService.refreshItems(player)
 	goHome(player, true)
+end)
+
+UseBaitBell.OnServerEvent:Connect(function(player)
+	local data = DataService.get(player)
+	local zone = Hunt.zoneById(player:GetAttribute("Zone"))
+	if not data or not zone then
+		return
+	end
+	if itemCount(data, "BaitBell") <= 0 then
+		Notify.toast(player, "You don't have a Bait Bell. The Hunter's Workshop sells them.")
+		return
+	end
+	-- A monster you couldn't catch would waste the bell.
+	if carrying[player] then
+		Notify.toast(player, "Bring your catch home before ringing the bell!")
+		return
+	end
+	if not MansionService.hasRoom(player) then
+		Notify.toast(player, "Your mansion is full! Sell some at the Collector first.")
+		return
+	end
+	local ok, message = SpawnService.lure(player, zone.index, data.equipped.vacuum)
+	if ok then
+		useItem(data, "BaitBell") -- only used up when a monster actually came
+		HuntService.refreshItems(player)
+	end
+	Notify.toast(player, message)
 end)
 
 -- Connects one zone's gate and exit. Only zones that exist in Workspace.Zones are wired.
@@ -305,7 +343,7 @@ function HuntService.start()
 		onPlayer(player)
 	end
 	DataService.onLoaded(function(player)
-		HuntService.refreshCharms(player)
+		HuntService.refreshItems(player)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		-- Leaving mid-run loses the catch, so quitting can't be used as a free teleport home.

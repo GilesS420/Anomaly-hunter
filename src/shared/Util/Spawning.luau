@@ -3,6 +3,7 @@
 
 local Effects = require("../Config/Effects")
 local Monsters = require("../Config/Monsters")
+local Rarities = require("../Config/Rarities")
 local Rng = require("./Rng")
 local Sizes = require("../Config/Sizes")
 
@@ -31,6 +32,32 @@ function Spawning.rollMonster(zoneIndex: number, random: Random?): Monsters.Mons
 	local list = byZone[zoneIndex]
 	assert(list, `no monsters in zone {zoneIndex}`)
 	return Rng.pickWeighted(list, function(m)
+		return m.spawnWeight :: number
+	end, random)
+end
+
+-- A Bait Bell's monster: a normal roll, then the next rarity up that this zone has (the
+-- same one if the roll was already the zone's rarest). Picked by spawnWeight within that rarity.
+function Spawning.rollLured(zoneIndex: number, random: Random?): Monsters.Monster
+	local rolled = Spawning.rollMonster(zoneIndex, random)
+	local rolledOrder = Rarities[rolled.rarity].order
+	local nextOrder = math.huge
+	for _, m in Spawning.monstersInZone(zoneIndex) do
+		local order = Rarities[m.rarity].order
+		if order > rolledOrder and order < nextOrder then
+			nextOrder = order
+		end
+	end
+	if nextOrder == math.huge then
+		return rolled
+	end
+	local candidates = {}
+	for _, m in Spawning.monstersInZone(zoneIndex) do
+		if Rarities[m.rarity].order == nextOrder then
+			table.insert(candidates, m)
+		end
+	end
+	return Rng.pickWeighted(candidates, function(m)
 		return m.spawnWeight :: number
 	end, random)
 end

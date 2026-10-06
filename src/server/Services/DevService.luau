@@ -4,6 +4,7 @@
 --   /money 1000000    adds money (a negative number takes some away; 5k, 2.5m and 1b work too)
 --   /wings 3          sets how many wings your mansion has (1 to 6) and rebuilds it
 --   /clearmonsters    empties your mansion
+--   /give VoidVac     gives a Workshop item for free (tools are equipped; /give BaitBell 5 gives five)
 --   /summon           starts the next Watcher event right away (Flicker, then Blood Moon)
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
 
@@ -14,8 +15,11 @@ local TextChatService = game:GetService("TextChatService")
 
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
+local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Wings = require(ReplicatedStorage.Shared.Config.Wings)
+local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local DataService = require(script.Parent.DataService)
+local HuntService = require(script.Parent.HuntService)
 local MansionService = require(script.Parent.MansionService)
 local Notify = require(script.Parent.Parent.Notify)
 local WatcherService = require(script.Parent.WatcherService)
@@ -90,11 +94,41 @@ commands["/summon"] = function(player)
 	if not WatcherService.summon() then
 		Notify.toast(player, "An event is already playing. Wait for it to end first.")
 	end
+
+commands["/give"] = function(player, argument)
+	local data = DataService.get(player)
+	local itemId, countText = string.match(argument or "", "^(%S+)%s*(%S*)")
+	local item = nil
+	if itemId then
+		-- Any capitals: "/give voidvac" works too.
+		for _, candidate in Shop.Workshop do
+			if string.lower(candidate.id) == string.lower(itemId) then
+				item = candidate
+			end
+		end
+	end
+	if not data or not item then
+		Notify.toast(player, "Try: /give VoidVac, /give Moonbeam, /give SpiritLens or /give BaitBell 5")
+		return
+	end
+	local count = math.clamp(math.floor(tonumber(countText) or 1), 1, 99)
+	local equipSlot = Workshop.equipSlot(item)
+	if equipSlot then
+		local equipped: { [string]: string } = data.equipped
+		data.inventory[item.id] = 1
+		equipped[equipSlot] = item.id
+		Notify.toast(player, `You got the {item.name} and you're using it.`)
+	else
+		data.inventory[item.id] = (data.inventory[item.id] or 0) + count
+		Notify.toast(player, `You now have {data.inventory[item.id]} x {item.name}.`)
+	end
+	HuntService.refreshItems(player)
 end
 
 -- Runs a chat message if it's one of the commands above.
 local function run(player: Player, message: string)
-	local name, argument = string.match(message, "^%s*(/%S+)%s*(%S*)")
+	local name, rest = string.match(message, "^%s*(/%S+)%s*(.-)%s*$")
+	local argument = rest
 	local command = name and commands[string.lower(name)]
 	if not command then
 		return
@@ -147,7 +181,9 @@ function DevService.start()
 	else
 		useTextChatCommands()
 	end
-	print(`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /summon`)
+	print(
+		`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /give <item> [count], /summon`
+	)
 end
 
 return DevService
