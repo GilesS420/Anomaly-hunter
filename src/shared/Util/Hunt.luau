@@ -16,6 +16,19 @@ function Hunt.zoneByIndex(zoneIndex: number): Zones.Zone?
 end
 
 -- A zone opens once its wing is owned (wings are bought in order) and it has shipped.
+-- The zone with this id ("PumpkinGraveyard"), or nil. Takes anything, e.g. a player attribute.
+function Hunt.zoneById(zoneId: unknown): Zones.Zone?
+	if typeof(zoneId) ~= "string" then
+		return nil
+	end
+	for _, zone in Zones.List do
+		if zone.id == zoneId then
+			return zone
+		end
+	end
+	return nil
+end
+
 function Hunt.isZoneUnlocked(zoneIndex: number, wingsOwned: number): boolean
 	local zone = Hunt.zoneByIndex(zoneIndex)
 	if not zone or not zone.launch then

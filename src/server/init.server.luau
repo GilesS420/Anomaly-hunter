@@ -6,6 +6,7 @@
 local DataService = require(script.Services.DataService)
 local _Notify = require(script.Notify) -- no start(); made here so the Toast remote exists early
 local _MonsterModel = require(script.MonsterModel) -- no start()
+local _Counter = require(script.Counter) -- no start()
 local WorldBuilder = require(script.Services.WorldBuilder)
 local PlotService = require(script.Services.PlotService)
 local RoamService = require(script.Services.RoamService)
@@ -13,6 +14,8 @@ local SpawnService = require(script.Services.SpawnService)
 local MansionService = require(script.Services.MansionService)
 local HuntService = require(script.Services.HuntService)
 local CatchService = require(script.Services.CatchService)
+local CollectorService = require(script.Services.CollectorService)
+local WorkshopService = require(script.Services.WorkshopService)
 local DevService = require(script.Services.DevService)
 
 local services: { { name: string, start: () -> ...any } } = {
@@ -24,6 +27,8 @@ local services: { { name: string, start: () -> ...any } } = {
 	{ name = "MansionService", start = MansionService.start },
 	{ name = "HuntService", start = HuntService.start },
 	{ name = "CatchService", start = CatchService.start },
+	{ name = "CollectorService", start = CollectorService.start },
+	{ name = "WorkshopService", start = WorkshopService.start },
 	{ name = "DevService", start = DevService.start },
 }
 

@@ -65,7 +65,7 @@ Layout.Landmarks = {
 	{ name = "WatcherSquare", label = "Watcher Square", x = 0, z = 0, width = 60, depth = 60, height = 1 },
 	{
 		name = "Collector",
-		label = "The Collector (coming soon)",
+		label = "The Collector",
 		x = -110,
 		z = 0,
 		width = 40,
@@ -92,7 +92,7 @@ Layout.Landmarks = {
 	},
 	{
 		name = "Workshop",
-		label = "Hunter's Workshop (coming soon)",
+		label = "Hunter's Workshop",
 		x = -380,
 		z = 45,
 		width = 40,

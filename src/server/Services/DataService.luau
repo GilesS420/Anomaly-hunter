@@ -21,6 +21,7 @@ export type Data = {
 	inventory: { [string]: number }, -- shop items by id -> how many
 	equipped: { flashlight: string, vacuum: string, lens: string },
 	codex: { [string]: any }, -- discovered monsters, effects and combo recipes
+	shop: { slot: number, bought: { [string]: number } }, -- Workshop buys since the last restock
 	stealingEnabled: boolean,
 }
 
@@ -39,6 +40,7 @@ DataService.Template = {
 		lens = "", -- "" for none
 	},
 	codex = {},
+	shop = { slot = 0, bought = {} },
 	stealingEnabled = false,
 } :: Data
 

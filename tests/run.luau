@@ -12,6 +12,8 @@ local Roam = require("../src/shared/Util/Roam")
 local Hunt = require("../src/shared/Util/Hunt")
 local Spawning = require("../src/shared/Util/Spawning")
 local Value = require("../src/shared/Util/Value")
+local Shop = require("../src/shared/Config/Shop")
+local Workshop = require("../src/shared/Util/Workshop")
 
 local failures = 0
 local function check(name: string, ok: boolean)
@@ -240,6 +242,87 @@ do
 		end
 	end
 	check("every gate is inside the oval", gatesInOval)
+end
+
+-- Workshop: stock comes from the slot alone, matches restockChance, and buying follows the rules.
+do
+	check("a slot lasts 5 minutes", Workshop.slotAt(299) == 0 and Workshop.slotAt(300) == 1)
+	check("the next restock is the start of the next slot", Workshop.restockAt(4) == 1500)
+	local strobe = Workshop.item("StrobeLight") :: Shop.Item
+	local voidVac = Workshop.item("VoidVac") :: Shop.Item
+	local charm = Workshop.item("ReturnCharm") :: Shop.Item
+	local starter = Workshop.item("DustBuster") :: Shop.Item
+	check(
+		"the same slot always has the same stock",
+		Workshop.inStock(strobe, 1234) == Workshop.inStock(strobe, 1234)
+	)
+	local slots = 20_000
+	local strobeIn, voidIn = 0, 0
+	for slot = 1, slots do
+		if Workshop.inStock(strobe, slot) then
+			strobeIn += 1
+		end
+		if Workshop.inStock(voidVac, slot) then
+			voidIn += 1
+		end
+	end
+	check("Strobe Light is in stock about 40% of restocks", math.abs(strobeIn / slots - 0.40) < 0.02)
+	check("Void Vac is in stock about 1% of restocks", math.abs(voidIn / slots - 0.01) < 0.005)
+	check(
+		"starter tools are always in stock and owned",
+		Workshop.inStock(starter, 7) and Workshop.owns({}, starter)
+	)
+
+	local inSlot = 1
+	while not Workshop.inStock(charm, inSlot) do
+		inSlot += 1
+	end
+	local outSlot = 1
+	while Workshop.inStock(charm, outSlot) do
+		outSlot += 1
+	end
+	check("can buy a charm in stock", Workshop.canBuy(charm, inSlot, 1e6, {}, 0) == "Ok")
+	check("can't buy a charm out of stock", Workshop.canBuy(charm, outSlot, 1e6, {}, 0) == "OutOfStock")
+	check(
+		"charms sell out after the limit",
+		Workshop.canBuy(charm, inSlot, 1e6, {}, Shop.ConsumablesPerRestock) == "SoldOut"
+	)
+	check("can't buy without the money", Workshop.canBuy(charm, inSlot, charm.price - 1, {}, 0) == "TooPoor")
+	check(
+		"a tool you own can't be bought again",
+		Workshop.canBuy(strobe, 1, 1e9, { StrobeLight = 1 }, 0) == "Owned"
+	)
+	check("an unknown item can't be bought", Workshop.canBuy(nil, 1, 1e9, {}, 0) == "Unknown")
+	check("vacuums go in the vacuum slot", Workshop.equipSlot(voidVac) == "vacuum")
+	check("charms aren't equipped", Workshop.equipSlot(charm) == nil)
+	local described = true
+	for _, item in Shop.Workshop do
+		if Workshop.describe(item) == "" then
+			described = false
+		end
+	end
+	check("every Workshop item has a description", described)
+end
+
+-- Bait Bell: the lured monster is one rarity up (or the rarest the zone has).
+do
+	local rng = fakeRandom(7)
+	local upgraded = true
+	for _ = 1, 5000 do
+		local m = Spawning.rollLured(1, rng)
+		if m.rarity == "Common" or m.zone ~= 1 then
+			upgraded = false
+		end
+	end
+	check("a Bait Bell never brings a Common", upgraded)
+	local divines = 0
+	for _ = 1, 20_000 do
+		if Spawning.rollLured(1, rng).rarity == "Divine" then
+			divines += 1
+		end
+	end
+	-- Mythic rolls (0.45%) move up to Divine and Divine rolls stay: about 0.5% in total.
+	check("a Bait Bell brings a Divine about 0.5% of the time", math.abs(divines / 20_000 - 0.005) < 0.002)
 end
 
 if failures > 0 then
