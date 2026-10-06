@@ -5,7 +5,9 @@ local Effects = require("../Config/Effects")
 local Monsters = require("../Config/Monsters")
 local Rarities = require("../Config/Rarities")
 local Rng = require("./Rng")
+local Shop = require("../Config/Shop")
 local Sizes = require("../Config/Sizes")
+local Zones = require("../Config/Zones")
 
 local Spawning = {}
 
@@ -27,6 +29,12 @@ function Spawning.monstersInZone(zoneIndex: number): { Monsters.Monster }
 	return byZone[zoneIndex] or {}
 end
 
+-- How many wild monsters a zone keeps alive with this many hunters in it: more hunters get
+-- more monsters, so a crowded zone isn't picked clean (Zones.luau).
+function Spawning.aliveTarget(hunters: number): number
+	return math.clamp(Zones.AliveBase + Zones.AlivePerHunter * hunters, Zones.MaxAlive, Zones.MaxAliveCap)
+end
+
 -- Picks which monster spawns next in a zone, using spawnWeight.
 function Spawning.rollMonster(zoneIndex: number, random: Random?): Monsters.Monster
 	local list = byZone[zoneIndex]
@@ -36,8 +44,17 @@ function Spawning.rollMonster(zoneIndex: number, random: Random?): Monsters.Mons
 	end, random)
 end
 
+-- The rarest rarity a Bait Bell can bring (Shop.luau BaitBell.maxRarity; nil = no limit).
+local lureMaxOrder = math.huge
+for _, item in Shop.Workshop do
+	if item.id == "BaitBell" and item.maxRarity then
+		lureMaxOrder = Rarities[item.maxRarity].order
+	end
+end
+
 -- A Bait Bell's monster: a normal roll, then the next rarity up that this zone has (the
--- same one if the roll was already the zone's rarest). Picked by spawnWeight within that rarity.
+-- same one if the roll was already the zone's rarest), but never above the bell's maxRarity
+-- (rolls at or above it give that rarity). Picked by spawnWeight within that rarity.
 function Spawning.rollLured(zoneIndex: number, random: Random?): Monsters.Monster
 	local rolled = Spawning.rollMonster(zoneIndex, random)
 	local rolledOrder = Rarities[rolled.rarity].order
@@ -49,13 +66,17 @@ function Spawning.rollLured(zoneIndex: number, random: Random?): Monsters.Monste
 		end
 	end
 	if nextOrder == math.huge then
-		return rolled
+		nextOrder = rolledOrder
 	end
+	nextOrder = math.min(nextOrder, lureMaxOrder)
 	local candidates = {}
 	for _, m in Spawning.monstersInZone(zoneIndex) do
 		if Rarities[m.rarity].order == nextOrder then
 			table.insert(candidates, m)
 		end
+	end
+	if #candidates == 0 then
+		return rolled
 	end
 	return Rng.pickWeighted(candidates, function(m)
 		return m.spawnWeight :: number

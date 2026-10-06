@@ -54,9 +54,9 @@ check("effect bonuses add up", near(Value.effectMultiplier({ "Slimed", "Mummy" }
 check("combo replaces its recipe", near(Value.effectMultiplier({ "Vampire", "Batty" }), 10))
 
 local caught = { monsterId = "Gravepup", size = "Big", effects = { "Ghost" }, familiarity = 0, fed = true }
-check("fed value uses effects", Value.sellValue(caught, 1) == 450) -- 100 x 1.5 x 3
+check("fed value uses effects", Value.sellValue(caught, 1) == 45_000) -- 10,000 x 1.5 x 3
 caught.fed = false
-check("unfed value is base x size", Value.sellValue(caught, 1) == 150)
+check("unfed value is base x size", Value.sellValue(caught, 1) == 15_000)
 
 -- Spawn rolls. The CLI has no Roblox Random, so use a small seeded stand-in.
 local function fakeRandom(seed: number): any
@@ -305,6 +305,7 @@ do
 	check("a slot lasts 5 minutes", Workshop.slotAt(299) == 0 and Workshop.slotAt(300) == 1)
 	check("the next restock is the start of the next slot", Workshop.restockAt(4) == 1500)
 	local strobe = Workshop.item("StrobeLight") :: Shop.Item
+	local phantomVac = Workshop.item("PhantomVac") :: Shop.Item
 	local voidVac = Workshop.item("VoidVac") :: Shop.Item
 	local charm = Workshop.item("ReturnCharm") :: Shop.Item
 	local starter = Workshop.item("DustBuster") :: Shop.Item
@@ -313,17 +314,21 @@ do
 		Workshop.inStock(strobe, 1234) == Workshop.inStock(strobe, 1234)
 	)
 	local slots = 20_000
-	local strobeIn, voidIn = 0, 0
+	local strobeIn, phantomIn, voidIn = 0, 0, 0
 	for slot = 1, slots do
 		if Workshop.inStock(strobe, slot) then
 			strobeIn += 1
+		end
+		if Workshop.inStock(phantomVac, slot) then
+			phantomIn += 1
 		end
 		if Workshop.inStock(voidVac, slot) then
 			voidIn += 1
 		end
 	end
-	check("Strobe Light is in stock about 40% of restocks", math.abs(strobeIn / slots - 0.40) < 0.02)
-	check("Void Vac is in stock about 1% of restocks", math.abs(voidIn / slots - 0.01) < 0.005)
+	check("Strobe Light is always in stock", strobeIn == slots)
+	check("Phantom Vac is in stock about 80% of restocks", math.abs(phantomIn / slots - 0.80) < 0.02)
+	check("Void Vac is in stock about 6% of restocks", math.abs(voidIn / slots - 0.06) < 0.01)
 	check(
 		"starter tools are always in stock and owned",
 		Workshop.inStock(starter, 7) and Workshop.owns({}, starter)
@@ -360,7 +365,7 @@ do
 	check("every Workshop item has a description", described)
 end
 
--- Bait Bell: the lured monster is one rarity up (or the rarest the zone has).
+-- Bait Bell: the lured monster is one rarity up, but never above Legendary.
 do
 	local rng = fakeRandom(7)
 	local upgraded = true
@@ -371,14 +376,196 @@ do
 		end
 	end
 	check("a Bait Bell never brings a Common", upgraded)
-	local divines = 0
+	local tooRare, legendaries = 0, 0
 	for _ = 1, 20_000 do
-		if Spawning.rollLured(1, rng).rarity == "Divine" then
-			divines += 1
+		local rarity = Spawning.rollLured(1, rng).rarity
+		if Rarities[rarity].order > Rarities.Legendary.order then
+			tooRare += 1
+		elseif rarity == "Legendary" then
+			legendaries += 1
 		end
 	end
-	-- Mythic rolls (0.45%) move up to Divine and Divine rolls stay: about 0.5% in total.
-	check("a Bait Bell brings a Divine about 0.5% of the time", math.abs(divines / 20_000 - 0.005) < 0.002)
+	check("a Bait Bell never brings anything above Legendary", tooRare == 0)
+	-- Epic rolls (7%) move up to Legendary, and Legendary, Mythic and Divine rolls (3%) give one.
+	check(
+		"a Bait Bell brings a Legendary about 10% of the time",
+		math.abs(legendaries / 20_000 - 0.10) < 0.01
+	)
+end
+
+-- Pacing: the balance sheet's targets (docs in /mnt/project-files/balance) in plain math, so a
+-- price or value change that breaks the money pace fails here. The full simulation lives with
+-- the docs; these checks use expected values only.
+do
+	local Effects = require("../src/shared/Config/Effects")
+	local Wings = require("../src/shared/Config/Wings")
+	local Zones = require("../src/shared/Config/Zones")
+
+	-- Expected value of the best monster this vacuum can hold out of `seen` wild ones in a
+	-- zone. Each one is rolled by spawnWeight and size weight; ones it can't hold count as 0.
+	local function expectedBest(zone: number, vacuumId: string, seen: number): number
+		local outcomes: { { value: number, p: number } } = {}
+		local totalWeight = 0
+		for _, m in Spawning.monstersInZone(zone) do
+			totalWeight += m.spawnWeight :: number
+		end
+		for _, m in Spawning.monstersInZone(zone) do
+			for _, size in Sizes do
+				local value = if Catching.canVacuum(vacuumId, size.id, m.rarity)
+					then m.baseValue * size.valueMultiplier
+					else 0
+				local p = (m.spawnWeight :: number) / totalWeight * size.weight / sizeTotal
+				table.insert(outcomes, { value = value, p = p })
+			end
+		end
+		table.sort(outcomes, function(a, b)
+			return a.value < b.value
+		end)
+		-- E[max] = sum of value x P(max is this value) = value x (F(v)^seen - F(below v)^seen)
+		local best, below = 0, 0
+		for _, o in outcomes do
+			local upTo = below + o.p
+			best += o.value * (upTo ^ seen - below ^ seen)
+			below = upTo
+		end
+		return best
+	end
+
+	-- Average catch-effect bonus from the Spirit Lens (Ghost) and Moonbeam (Werewolf).
+	local function catchBonus(lens: boolean, moonbeam: boolean): number
+		local chance = Effects.CatchChance / 100
+		local bonus = 1
+		if lens then
+			bonus += chance * (Effects.List.Ghost.multiplier - 1)
+		end
+		if moonbeam then
+			bonus += chance * (Effects.List.Werewolf.multiplier - 1)
+		end
+		return bonus
+	end
+
+	local function priceOf(id: string): number
+		for _, wing in Wings.List do
+			if wing.id == id then
+				return wing.price
+			end
+		end
+		return (Workshop.item(id) :: Shop.Item).price
+	end
+
+	-- The sheet's main curve: 3 hunters share a zone of 12, so each picks from about 4.
+	local hunters = 3
+	local seen = Spawning.aliveTarget(hunters) // hunters
+	local tripSeconds = 55 -- a full trip with selling takes 51-56 s in the sheet's simulation
+
+	check(
+		"a zone keeps 12 monsters for 1-3 hunters",
+		Spawning.aliveTarget(1) == 12 and Spawning.aliveTarget(3) == 12
+	)
+	check(
+		"a crowded zone keeps more monsters",
+		Spawning.aliveTarget(8) == 22 and Spawning.aliveTarget(30) == 24
+	)
+
+	-- Zone 1 with the Dust Buster: the best of 12 is worth tens of thousands, not hundreds.
+	local solo = expectedBest(1, "DustBuster", Zones.MaxAlive)
+	check("zone 1 Dust Buster: best of 12 is worth $40K-$70K a trip", solo >= 40_000 and solo <= 70_000)
+	local shared = expectedBest(1, "DustBuster", seen)
+	check(
+		"zone 1 Dust Buster: 3 hunters sharing earn $15K-$35K a trip",
+		shared >= 15_000 and shared <= 35_000
+	)
+
+	-- Each zone is worth about x4 the one before, with the same vacuum.
+	local stepsOk = true
+	for _, vacuumId in { "DustBuster", "PhantomVac", "VoidVac" } do
+		for zone = 2, 5 do
+			if
+				expectedBest(zone, vacuumId, Zones.MaxAlive)
+				< 3.5 * expectedBest(zone - 1, vacuumId, Zones.MaxAlive)
+			then
+				stepsOk = false
+			end
+		end
+	end
+	check("each zone's best of 12 is about x4 the zone before", stepsOk)
+
+	-- Every price is a positive round number (two significant digits); only starters are free.
+	local function round(price: number): boolean
+		local unit = 10 ^ math.max(math.floor(math.log10(price)) - 1, 0)
+		return price % unit == 0
+	end
+	local pricesOk = true
+	for _, list in { Shop.Workshop, Shop.Bakery } do
+		for _, item in list do
+			local starter = item.id == "DustBuster" or item.id == "CandleLamp"
+			if starter then
+				pricesOk = pricesOk and item.price == 0
+			else
+				pricesOk = pricesOk and item.price > 0 and round(item.price)
+			end
+		end
+	end
+	for _, wing in Wings.List do
+		if wing.order == 1 then
+			pricesOk = pricesOk and wing.price == 0
+		else
+			pricesOk = pricesOk and wing.price > 0 and round(wing.price)
+		end
+	end
+	check("every tool and wing price is a positive round number", pricesOk)
+	check(
+		"the Moonbeam's Werewolf beats the Spirit Lens's Ghost",
+		catchBonus(false, true) > catchBonus(true, false)
+	)
+
+	-- The upgrade order, and what a player earns per trip while saving for each step:
+	-- zone, vacuum, Spirit Lens, Moonbeam (wings owned = zone).
+	local order = {
+		{ id = "StrobeLight", zone = 1, vacuum = "DustBuster", lens = false, moonbeam = false },
+		{ id = "PhantomVac", zone = 1, vacuum = "DustBuster", lens = false, moonbeam = false },
+		{ id = "SpiritLens", zone = 1, vacuum = "PhantomVac", lens = false, moonbeam = false },
+		{ id = "Library", zone = 1, vacuum = "PhantomVac", lens = true, moonbeam = false },
+		{ id = "Ballroom", zone = 2, vacuum = "PhantomVac", lens = true, moonbeam = false },
+		{ id = "Moonbeam", zone = 3, vacuum = "PhantomVac", lens = true, moonbeam = false },
+		{ id = "VoidVac", zone = 3, vacuum = "PhantomVac", lens = true, moonbeam = true },
+	}
+	local rising, paced = true, true
+	local trips: { number } = {}
+	local totalTrips, libraryTrips = 0, 0
+	for i, step in order do
+		local wingBoost = 1 + (step.zone - 1) * Wings.ValueBoostPerWing
+		local perTrip = expectedBest(step.zone, step.vacuum, seen)
+			* catchBonus(step.lens, step.moonbeam)
+			* wingBoost
+		trips[i] = priceOf(step.id) / perTrip
+		totalTrips += trips[i]
+		if step.id == "Library" then
+			libraryTrips = totalTrips
+		end
+		if i > 1 then
+			rising = rising and priceOf(step.id) > priceOf(order[i - 1].id)
+			-- the sheet's curve: each step takes about 2-3x as long as the one before
+			local ratio = trips[i] / trips[i - 1]
+			paced = paced and ratio >= 1.5 and ratio <= 4
+		end
+	end
+	check("prices rise along the upgrade order", rising)
+	check("the Strobe Light takes about one trip", trips[1] <= 1.5)
+	check("each upgrade takes 1.5-4x as many trips as the one before", paced)
+	check("the Library comes inside the first hour", libraryTrips * tripSeconds / 60 <= 60)
+	local hours = totalTrips * tripSeconds / 3600
+	check("the launch tools last 4-20 hours", hours >= 4 and hours <= 20)
+	check(
+		"Nightmare monsters need the Phantom Vac",
+		not Catching.canVacuum("DustBuster", "Normal", "Nightmare")
+			and Catching.canVacuum("PhantomVac", "Normal", "Nightmare")
+	)
+	check(
+		"Eldritch monsters need the Void Vac",
+		not Catching.canVacuum("PhantomVac", "Normal", "Eldritch")
+			and Catching.canVacuum("VoidVac", "Normal", "Eldritch")
+	)
 end
 
 if failures > 0 then

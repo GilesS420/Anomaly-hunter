@@ -22,6 +22,12 @@ return {
 	List = Zones,
 	MaxHearts = 3,
 	CarryLimit = 1,
-	MaxAlive = 12, -- monsters roaming a zone at once (placeholder)
-	RespawnSeconds = 8, -- delay before a caught monster is replaced (placeholder)
+	-- Monsters roaming a zone at once: clamp(AliveBase + AlivePerHunter x hunters in the zone,
+	-- MaxAlive, MaxAliveCap), so 12 for 1-3 hunters and up to 24 when a zone is crowded
+	-- (Spawning.aliveTarget). Set by the balance sheet, docs in /mnt/project-files/balance.
+	MaxAlive = 12,
+	AliveBase = 6,
+	AlivePerHunter = 2,
+	MaxAliveCap = 24,
+	RespawnSeconds = 8, -- delay before a caught monster is replaced (balance sheet input)
 }
