@@ -1,5 +1,6 @@
 --!strict
--- Keeps each zone stocked with wandering monsters (Zones.MaxAlive each). Per zone it reads
+-- Keeps each zone stocked with wandering monsters (Spawning.aliveTarget: 12, more when the
+-- zone is crowded with hunters). Per zone it reads
 --   Workspace.Zones.<ZoneId>.RoamArea     a Part (or a Folder/Model of Parts) the monsters wander over
 --   Workspace.Zones.<ZoneId>.SpawnPoints  (older zones) parts; each one becomes a 30x30 area around it
 -- WorldBuilder makes all of this as grey placeholders if it's missing.
@@ -12,6 +13,7 @@
 -- it; only that hunter can catch it, and it leaves when they do or after LureSeconds.
 
 local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Catching = require(ReplicatedStorage.Shared.Util.Catching)
@@ -183,9 +185,22 @@ local function spawnOne(state: ZoneState): boolean
 	return true
 end
 
--- Tops the zone up to MaxAlive. When it's too crowded it tries again after RespawnSeconds.
+-- Hunters in this zone right now.
+local function huntersIn(zoneId: string): number
+	local count = 0
+	for _, player in Players:GetPlayers() do
+		if player:GetAttribute("Zone") == zoneId then
+			count += 1
+		end
+	end
+	return count
+end
+
+-- Tops the zone up to its alive target (it grows with the hunters in the zone and catches up
+-- as monsters leave). When it's too crowded it tries again after RespawnSeconds.
 function refill(state: ZoneState)
-	while state.alive < Zones.MaxAlive do
+	local target = Spawning.aliveTarget(huntersIn(state.zone.id))
+	while state.alive < target do
 		if not spawnOne(state) then
 			if not state.retrying and state.folder:IsDescendantOf(workspace) then
 				state.retrying = true

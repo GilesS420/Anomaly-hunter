@@ -34,8 +34,10 @@ local Rarities: { [string]: Rarity } = {
 		vacuumTier = 3,
 	},
 	Phantom = { id = "Phantom", order = 8, eventOnly = true },
-	Nightmare = { id = "Nightmare", order = 9, eventOnly = true },
-	Eldritch = { id = "Eldritch", order = 10, eventOnly = true },
+	-- Event rarities with big fixed values need a better vacuum, so their jackpots go to
+	-- players who have progressed (set by the balance sheet, docs in /mnt/project-files/balance).
+	Nightmare = { id = "Nightmare", order = 9, eventOnly = true, vacuumTier = 2 },
+	Eldritch = { id = "Eldritch", order = 10, eventOnly = true, vacuumTier = 3 },
 }
 
 return Rarities
