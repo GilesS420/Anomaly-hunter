@@ -4,6 +4,7 @@
 --   /money 1000000    adds money (a negative number takes some away; 5k, 2.5m and 1b work too)
 --   /wings 3          sets how many wings your mansion has (1 to 6) and rebuilds it
 --   /clearmonsters    empties your mansion
+--   /summon           starts the next Watcher event right away (Flicker, then Blood Moon)
 --   /give VoidVac     gives a Workshop item for free (tools are equipped; /give BaitBell 5 gives five)
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
 
@@ -21,6 +22,7 @@ local DataService = require(script.Parent.DataService)
 local HuntService = require(script.Parent.HuntService)
 local MansionService = require(script.Parent.MansionService)
 local Notify = require(script.Parent.Parent.Notify)
+local WatcherService = require(script.Parent.WatcherService)
 
 local DevService = {}
 
@@ -86,6 +88,12 @@ commands["/clearmonsters"] = function(player)
 	table.clear(data.monsters)
 	MansionService.rebuild(player)
 	Notify.toast(player, "Your mansion is empty now.")
+end
+
+commands["/summon"] = function(player)
+	if not WatcherService.summon() then
+		Notify.toast(player, "An event is already playing. Wait for it to end first.")
+	end
 end
 
 commands["/give"] = function(player, argument)
@@ -175,7 +183,7 @@ function DevService.start()
 		useTextChatCommands()
 	end
 	print(
-		`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /give <item> [count]`
+		`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /give <item> [count], /summon`
 	)
 end
 

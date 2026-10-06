@@ -24,13 +24,14 @@ local MansionService = require(script.Parent.MansionService)
 local Notify = require(script.Parent.Parent.Notify)
 local RoamService = require(script.Parent.RoamService)
 local SpawnService = require(script.Parent.SpawnService)
+local WatcherService = require(script.Parent.WatcherService)
 
 local CatchService = {}
 
 type Hold = {
 	model: Model,
 	name: string, -- monster's display name, for messages
-	zoneId: string, -- the zone the monster lives in; the hunter must stay in it
+	zoneId: string, -- the zone the monster lives in; the hunter must stay in it ("" = main area)
 	reach: number,
 	stunSeconds: number,
 	endTime: number, -- server time the meter is full
@@ -81,10 +82,17 @@ local function rootOf(player: Player): BasePart?
 end
 
 -- True while the hunter is alive and still in this zone (not knocked out, not gone home).
+-- zoneId "" is the main area (Watcher event monsters): the hunter must not be in a zone.
 local function isHunting(player: Player, zoneId: string): boolean
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	return humanoid ~= nil and humanoid.Health > 0 and player:GetAttribute("Zone") == zoneId
+	local wanted = if zoneId == "" then nil else zoneId
+	return humanoid ~= nil and humanoid.Health > 0 and player:GetAttribute("Zone") == wanted
+end
+
+-- A live wild monster: in a zone (SpawnService) or, during a Watcher event, in the main area.
+local function wildMonster(model: Model): SpawnService.Spawned?
+	return SpawnService.get(model) or WatcherService.get(model)
 end
 
 -- Studs from the hunter to where the monster really is (math.huge if either is missing).
@@ -150,12 +158,28 @@ local function finish(player: Player)
 	end
 
 	local equipped = { data.equipped.flashlight, data.equipped.vacuum, data.equipped.lens }
-	local caught = SpawnService.capture(model, equipped)
+	local inHub = hold.zoneId == ""
+	if inHub and not MansionService.hasRoom(player) then
+		RoamService.release(model, hold.stunSeconds)
+		Notify.toast(player, "Your mansion is full! Buy a new wing to catch more.")
+		State:FireClient(player, "Ended", { result = "Escaped", model = model })
+		return
+	end
+	local caught = if inHub
+		then WatcherService.capture(model, equipped)
+		else SpawnService.capture(model, equipped)
 	if not caught then
 		State:FireClient(player, "Ended", { result = "Gone", model = model })
 		return
 	end
-	HuntService.carry(player, caught)
+	-- Main-area catches fly straight home; zone catches are carried to the Exit.
+	local afterward = "Now bring it to the Exit."
+	if inHub then
+		MansionService.addMonster(player, caught)
+		afterward = "It flew straight home to your mansion!"
+	else
+		HuntService.carry(player, caught)
+	end
 
 	local bonus = ""
 	if #caught.effects > 0 then
@@ -165,7 +189,7 @@ local function finish(player: Player)
 		end
 		bonus = ` Bonus: {table.concat(names, " and ")}!`
 	end
-	Notify.toast(player, `Caught a {caught.size} {hold.name}!{bonus} Now bring it to the Exit.`)
+	Notify.toast(player, `Caught a {caught.size} {hold.name}!{bonus} {afterward}`)
 	State:FireClient(player, "Ended", { result = "Caught", monsterId = caught.monsterId, model = model })
 end
 
@@ -200,14 +224,15 @@ local function onStartCatch(player: Player, model: unknown)
 	pendingStart[player] = nil
 	lastStart[player] = now
 
-	-- 2. A live wild monster nobody else is catching, in the zone the hunter is in, and the
-	-- hunter is alive (a knocked-out hunter's body can't catch).
-	local spawned = SpawnService.get(model)
+	-- 2. A live wild monster nobody else is catching, in the zone the hunter is in (or both
+	-- in the main area), and the hunter is alive (a knocked-out hunter's body can't catch).
+	local spawned = wildMonster(model)
 	if not spawned then
 		return
 	end
 	local zone = Hunt.zoneByIndex(spawned.zone)
-	if not zone or not isHunting(player, zone.id) then
+	local zoneId = if spawned.zone == 0 then "" elseif zone then zone.id else nil
+	if not zoneId or not isHunting(player, zoneId) then
 		return
 	end
 	if spawned.reservedFor and spawned.reservedFor ~= player.UserId then
@@ -299,7 +324,7 @@ local function onStartCatch(player: Player, model: unknown)
 	local hold: Hold = {
 		model = model,
 		name = name,
-		zoneId = zone.id,
+		zoneId = zoneId,
 		reach = reach,
 		stunSeconds = if flashlight then flashlight.stunSeconds else 1,
 		endTime = serverNow + seconds,
@@ -326,7 +351,7 @@ end
 local function update()
 	local serverNow = workspace:GetServerTimeNow()
 	for player, hold in holds do
-		if SpawnService.get(hold.model) == nil then
+		if wildMonster(hold.model) == nil then
 			-- Gone (cleared by an event, or the zone was removed).
 			clear(player)
 			State:FireClient(player, "Ended", { result = "Gone", model = hold.model })
