@@ -1,5 +1,6 @@
 --!strict
--- Hunter's Workshop rules: the restock timer, what's in stock and what a player may buy.
+-- Shop rules: the restock timer, what's in stock and what a player may buy. Used by the
+-- Hunter's Workshop and, for the stock and timer, the Haunted Bakery.
 -- Stock is worked out from the 5-minute slot number alone, so every server shows the same
 -- items at the same time and a restock can't be re-rolled by rejoining. Pure functions so
 -- they can be tested outside Roblox.
@@ -31,6 +32,19 @@ end
 -- When the slot after this one starts (seconds, same clock as slotAt).
 function Workshop.restockAt(slot: number): number
 	return (slot + 1) * Shop.RestockSeconds
+end
+
+-- What a player bought since the last restock (item id -> how many), from their save's shop
+-- record. Clears it when a new restock has started. The Workshop and the Bakery share it.
+function Workshop.boughtThisSlot(
+	shop: { slot: number, bought: { [string]: number } },
+	slot: number
+): { [string]: number }
+	if shop.slot ~= slot then
+		shop.slot = slot
+		shop.bought = {}
+	end
+	return shop.bought
 end
 
 -- 32-bit FNV-1a hash. The multiply is split in two so it stays exact in a double.

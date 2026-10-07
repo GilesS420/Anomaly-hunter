@@ -263,7 +263,20 @@ end
 local function buildLandmarks(hub: Instance)
 	local landmarks = folderAt(hub, "Landmarks", "Hub.Landmarks")
 	for _, spot in Layout.Landmarks do
-		if not World.find(landmarks, spot.name) then
+		local existing = World.find(landmarks, spot.name)
+		if existing then
+			-- A placeholder saved into the place earlier keeps its old sign: drop the
+			-- "(coming soon)" once that landmark has opened.
+			local sign = existing:FindFirstChild("Label")
+			local opened = not string.find(spot.label, "(coming soon)", 1, true)
+			if sign and opened then
+				for _, line in sign:GetChildren() do
+					if line:IsA("TextLabel") and string.find(line.Text, "(coming soon)", 1, true) then
+						line.Text = spot.label
+					end
+				end
+			end
+		else
 			local color = landmarkColors[spot.name] or Color3.fromRGB(100, 100, 100)
 			local position = Vector3.new(spot.x, GroundTop + spot.height / 2, spot.z)
 			local part: Part

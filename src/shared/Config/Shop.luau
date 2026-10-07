@@ -16,21 +16,25 @@ export type Item = {
 	grantsEffect: string?,
 	singleUse: boolean?,
 	maxRarity: string?, -- Bait Bell: the rarest rarity it can bring
+	familiarity: number?, -- Bakery treats: how much of the Familiarity bar it fills (0 to 1)
 }
 
 local Shop = {}
 
 Shop.RestockSeconds = 5 * 60
 
--- How many of one single-use item (Bait Bell, Return Charm) a player can buy per restock.
+-- How many of one single-use item (Bait Bell, Return Charm, a treat) a player can buy per restock.
 -- Tools (vacuums, flashlights, lenses) are bought once and kept forever.
 Shop.ConsumablesPerRestock = 3
 
 -- Selling a monster of this rarity or rarer at the Collector asks "are you sure?" first.
 Shop.ConfirmSellFrom = "Legendary"
 
--- Food isn't built yet; prices are x100 like the monsters so they keep the same size
--- relative to what a monster sells for.
+-- Haunted Bakery treats. Each one feeds one monster, fills part of its Familiarity bar and
+-- gives it the treat's effect (a monster can't get an effect twice, and holds at most
+-- Effects.MaxSlots), so treats are for your best monsters. Prices are x100 like the monsters
+-- so they keep the same size relative to what a monster sells for. Everyday feeding is free
+-- (Feed all), see Config/Care.
 Shop.Bakery = {
 	{
 		id = "PumpkinCandy",
@@ -39,6 +43,7 @@ Shop.Bakery = {
 		price = 50_000,
 		restockChance = 80,
 		grantsEffect = "PumpkinHead",
+		familiarity = 0.1,
 	},
 	{
 		id = "EctoplasmPie",
@@ -47,6 +52,7 @@ Shop.Bakery = {
 		price = 2_500_000,
 		restockChance = 30,
 		grantsEffect = "Slimed",
+		familiarity = 0.25,
 	},
 	{
 		id = "CursedCake",
@@ -55,6 +61,7 @@ Shop.Bakery = {
 		price = 250_000_000,
 		restockChance = 2,
 		grantsEffect = "Cursed",
+		familiarity = 0.5,
 	},
 } :: { Item }
 

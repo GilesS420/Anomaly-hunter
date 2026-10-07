@@ -83,7 +83,7 @@ Layout.Landmarks = {
 	},
 	{
 		name = "Bakery",
-		label = "Haunted Bakery (coming soon)",
+		label = "Haunted Bakery",
 		x = -380,
 		z = -45,
 		width = 40,

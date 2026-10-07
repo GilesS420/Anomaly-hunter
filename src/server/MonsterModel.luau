@@ -1,6 +1,7 @@
 --!strict
 -- Builds the placeholder look of a monster: a glowing orb coloured by rarity with its name
--- floating above it. Used for wild monsters in zones and for the ones roaming a mansion.
+-- floating above it. Used for wild monsters in zones and for the ones roaming a mansion
+-- (those get a third line saying if they're fed, and glow dimmer while they're hungry).
 -- Real monster models can replace this later; everything else only needs a Model whose
 -- PrimaryPart is called "Body".
 
@@ -11,7 +12,15 @@ local Spawning = require(ReplicatedStorage.Shared.Util.Spawning)
 
 local MonsterModel = {}
 
-export type Info = { monsterId: string, rarity: string, size: string, effects: { string }?, owner: string? }
+export type Info = {
+	monsterId: string,
+	rarity: string,
+	size: string,
+	effects: { string }?,
+	owner: string?,
+	status: string?, -- mansion monsters: "Fed · 45% familiar" (see Util/Care.status)
+	hungry: boolean?, -- mansion monsters: dims the glow and puts the effects to sleep
+}
 
 -- Orb and label colour per rarity.
 local rarityColors: { [string]: Color3 } = {
@@ -36,9 +45,21 @@ function MonsterModel.radius(sizeId: string): number
 	return Spawning.radius(sizeId)
 end
 
+local FedColor = Color3.fromRGB(255, 190, 230)
+local HungryColor = Color3.fromRGB(255, 120, 70)
+
 -- One line of text in the name label.
-local function line(parent: Instance, text: string, color: Color3, y: number, height: number, bold: boolean)
+local function line(
+	parent: Instance,
+	name: string,
+	text: string,
+	color: Color3,
+	y: number,
+	height: number,
+	bold: boolean
+)
 	local label = Instance.new("TextLabel")
+	label.Name = name
 	label.BackgroundTransparency = 1
 	label.Position = UDim2.fromScale(0, y)
 	label.Size = UDim2.fromScale(1, height)
@@ -51,6 +72,44 @@ local function line(parent: Instance, text: string, color: Color3, y: number, he
 	stroke.Color = Color3.new(0, 0, 0)
 	stroke.Parent = label
 	label.Parent = parent
+end
+
+-- "Big Rare · Ghost, Werewolf" (effects fall asleep while the monster is hungry).
+local function detailsText(info: Info): string
+	local details = `{info.size} {info.rarity}`
+	local effects = info.effects
+	if effects and #effects > 0 then
+		local names = {}
+		for _, effectId in effects do
+			table.insert(names, Format.name(effectId))
+		end
+		local asleep = if info.hungry then " (asleep)" else ""
+		details ..= ` · {table.concat(names, ", ")}{asleep}`
+	end
+	return details
+end
+
+-- Updates the label and glow after a mansion monster was fed, got hungry or got an effect.
+function MonsterModel.refresh(model: Model, info: Info)
+	local body = model.PrimaryPart
+	if not body then
+		return
+	end
+	local billboard = body:FindFirstChild("Label")
+	local details = billboard and billboard:FindFirstChild("Details")
+	if details and details:IsA("TextLabel") then
+		details.Text = detailsText(info)
+	end
+	local status = billboard and billboard:FindFirstChild("Status")
+	if status and status:IsA("TextLabel") then
+		status.Text = info.status or ""
+		status.TextColor3 = if info.hungry then HungryColor else FedColor
+	end
+	body.Material = if info.hungry then Enum.Material.SmoothPlastic else Enum.Material.Neon
+	local light = body:FindFirstChildOfClass("PointLight")
+	if light then
+		light.Brightness = if info.hungry then 0.3 else 1.2
+	end
 end
 
 function MonsterModel.build(info: Info): Model
@@ -82,27 +141,25 @@ function MonsterModel.build(info: Info): Model
 	light.Shadows = false
 	light.Parent = body
 
-	-- "Wisp Jack" / "Big Rare · Ghost, Werewolf"
-	local details = `{info.size} {info.rarity}`
-	local effects = info.effects
-	if effects and #effects > 0 then
-		local names = {}
-		for _, effectId in effects do
-			table.insert(names, Format.name(effectId))
-		end
-		details ..= ` · {table.concat(names, ", ")}`
-	end
-
+	-- "Wisp Jack" / "Big Rare · Ghost, Werewolf" / mansion monsters: "Fed · 45% familiar"
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "Label"
 	billboard.Adornee = body
 	billboard.AlwaysOnTop = true
 	billboard.MaxDistance = 80
 	billboard.LightInfluence = 0
-	billboard.Size = UDim2.fromOffset(220, 46)
 	billboard.StudsOffset = Vector3.new(0, radius + 1.6, 0)
-	line(billboard, Format.name(info.monsterId), Color3.new(1, 1, 1), 0, 0.55, true)
-	line(billboard, details, color, 0.55, 0.45, false)
+	local name = Format.name(info.monsterId)
+	if info.status then
+		billboard.Size = UDim2.fromOffset(220, 66)
+		line(billboard, "Name", name, Color3.new(1, 1, 1), 0, 0.4, true)
+		line(billboard, "Details", "", color, 0.4, 0.3, false)
+		line(billboard, "Status", "", FedColor, 0.7, 0.3, false)
+	else
+		billboard.Size = UDim2.fromOffset(220, 46)
+		line(billboard, "Name", name, Color3.new(1, 1, 1), 0, 0.55, true)
+		line(billboard, "Details", "", color, 0.55, 0.45, false)
+	end
 	billboard.Parent = body
 
 	model:SetAttribute("MonsterId", info.monsterId)
@@ -111,6 +168,7 @@ function MonsterModel.build(info: Info): Model
 	if info.owner then
 		model:SetAttribute("Owner", info.owner)
 	end
+	MonsterModel.refresh(model, info)
 	return model
 end
 

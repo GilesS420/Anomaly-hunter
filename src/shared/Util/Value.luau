@@ -2,7 +2,8 @@
 -- Sell value of a caught monster:
 --   baseValue x size x effects x familiarity x wing boost
 -- Effect bonuses add up (1 + sum(multiplier - 1)). Combos replace their two
--- ingredients. Unfed monsters only sell for base value x size.
+-- ingredients. Unfed (hungry) monsters only sell for base value x size. Call Util/Care.settle
+-- first so familiarity and fed are up to date.
 
 local Effects = require("../Config/Effects")
 local Monsters = require("../Config/Monsters")
@@ -18,8 +19,10 @@ export type CaughtMonster = {
 	monsterId: string,
 	size: string,
 	effects: { string },
-	familiarity: number, -- 0 to 1
-	fed: boolean,
+	familiarity: number, -- 0 to 1, as of grownAt
+	fed: boolean, -- kept up to date by Util/Care.settle; hungry monsters sell for base x size
+	fedUntil: number?, -- os.time() when it gets hungry (set when it enters the mansion)
+	grownAt: number?, -- os.time() its familiarity was last brought up to date
 }
 
 local function sizeMultiplier(sizeId: string): number

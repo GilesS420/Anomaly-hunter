@@ -64,13 +64,8 @@ local function currentSlot(): number
 	return Workshop.slotAt(os.time())
 end
 
--- Buys since the last restock, cleared when a new restock has started.
 local function boughtThisSlot(data: DataService.Data, slot: number): { [string]: number }
-	if data.shop.slot ~= slot then
-		data.shop.slot = slot
-		data.shop.bought = {}
-	end
-	return data.shop.bought
+	return Workshop.boughtThisSlot(data.shop, slot)
 end
 
 local function viewFor(data: DataService.Data): View
@@ -199,7 +194,8 @@ function WorkshopService.start()
 		end
 	end)
 
-	-- Tell everyone when new stock arrives (players with the window open refresh by themselves).
+	-- Tell everyone when new stock arrives, for the Bakery too since both restock together
+	-- (players with a shop window open refresh by themselves).
 	task.spawn(function()
 		local slot = currentSlot()
 		while true do
@@ -208,7 +204,7 @@ function WorkshopService.start()
 			if now ~= slot then
 				slot = now
 				if #Players:GetPlayers() > 0 then
-					Notify.toastAll("The Hunter's Workshop has restocked!")
+					Notify.toastAll("The Workshop and the Bakery have restocked!")
 				end
 			end
 		end

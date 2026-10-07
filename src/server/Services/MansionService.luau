@@ -5,7 +5,8 @@
 --     Wings       a floor, four corner pillars and a name label for every owned wing
 --     NextWing    a see-through floor plus a sign: hold its prompt to buy that wing
 --     OwnerSign   "<name>'s Mansion" and "3/8 monsters", floating above the Foyer
---     Monsters    the owner's caught monsters, roaming around the owned wings
+--     Monsters    the owner's caught monsters, roaming around the owned wings (each label
+--                 says if it's fed and how familiar it is, see CareService)
 -- Wings are bought in order (the Foyer is free). Each one makes room for more monsters and
 -- opens a new zone. Nothing here needs building in Studio.
 
@@ -13,6 +14,8 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Care = require(ReplicatedStorage.Shared.Util.Care)
+local CareConfig = require(ReplicatedStorage.Shared.Config.Care)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
 local Layout = require(ReplicatedStorage.Shared.Config.Layout)
@@ -287,6 +290,19 @@ local function updateSign(state: State)
 	end
 end
 
+-- What the orb shows: name, size, rarity, effects and whether it's fed.
+local function infoFor(player: Player, caught: Value.CaughtMonster, rarity: string): MonsterModel.Info
+	return {
+		monsterId = caught.monsterId,
+		rarity = rarity,
+		size = caught.size,
+		effects = caught.effects,
+		owner = player.DisplayName,
+		status = Care.status(caught),
+		hungry = not caught.fed,
+	}
+end
+
 -- Puts one saved monster into the mansion as a roaming orb.
 local function spawnMonster(state: State, caught: Value.CaughtMonster)
 	if mansions[state.player] ~= state then
@@ -329,13 +345,7 @@ local function spawnMonster(state: State, caught: Value.CaughtMonster)
 	end
 	local at: Roam.Point = spot :: Roam.Point -- set on every path above
 
-	local model = MonsterModel.build({
-		monsterId = caught.monsterId,
-		rarity = monster.rarity,
-		size = caught.size,
-		effects = caught.effects,
-		owner = state.player.DisplayName,
-	})
+	local model = MonsterModel.build(infoFor(state.player, caught, monster.rarity))
 	model:SetAttribute("OwnerId", state.player.UserId)
 	model:SetAttribute("Uid", caught.uid)
 	RoamService.add(model, {
@@ -367,8 +377,10 @@ local function spawnAll(state: State, data: DataService.Data)
 end
 
 -- Fixes up a save before the mansion uses it: wings in range, every monster has a uid
--- (saves from before uids existed) and a list of effects.
-local function repair(data: DataService.Data)
+-- (saves from before uids existed), a list of effects and feeding times (saves from before
+-- feeding start out fed). Brings every monster's Familiarity up to date; when the player
+-- just joined and Config/Care.GrowsOffline is off, the time they were away doesn't count.
+local function repair(data: DataService.Data, joining: boolean)
 	if typeof(data.wingsOwned) ~= "number" or data.wingsOwned ~= data.wingsOwned then
 		data.wingsOwned = 1
 	end
@@ -382,6 +394,13 @@ local function repair(data: DataService.Data)
 				caught.effects = {}
 			end
 		end
+	end
+	local now = os.time()
+	for _, caught in data.monsters do
+		if joining and not CareConfig.GrowsOffline and caught.grownAt then
+			caught.grownAt = math.max(caught.grownAt, now)
+		end
+		Care.settle(caught, now)
 	end
 end
 
@@ -431,7 +450,7 @@ local function tryBuild(player: Player)
 	if not data or not plot then
 		return -- the other one calls this again when it's ready
 	end
-	repair(data)
+	repair(data, true)
 
 	local model = Instance.new("Model")
 	model.Name = plot.name
@@ -524,6 +543,7 @@ function MansionService.addMonster(player: Player, caught: Value.CaughtMonster):
 	if typeof(caught.uid) ~= "string" or caught.uid == "" then
 		caught.uid = HttpService:GenerateGUID(false)
 	end
+	Care.settle(caught, os.time()) -- arrives fed
 	table.insert(data.monsters, caught)
 	local state = mansions[player]
 	if state then
@@ -572,10 +592,34 @@ function MansionService.rebuild(player: Player)
 		tryBuild(player) -- not built yet: builds it if everything is ready
 		return
 	end
-	repair(data)
+	repair(data, false)
 	buildWings(state, data.wingsOwned)
 	spawnAll(state, data)
 	updateSign(state)
+end
+
+-- Updates every monster's label and glow from the save (after feeding, or as they get
+-- hungry). Settle them first (Util/Care.settle) so the labels show how they are right now.
+function MansionService.refreshMonsters(player: Player)
+	local state = mansions[player]
+	local data = DataService.get(player)
+	if not state or not data then
+		return
+	end
+	local byUid: { [string]: Value.CaughtMonster } = {}
+	for _, caught in data.monsters do
+		if caught.uid then
+			byUid[caught.uid] = caught
+		end
+	end
+	for _, child in state.monsters:GetChildren() do
+		local uid = child:GetAttribute("Uid")
+		local caught = if typeof(uid) == "string" then byUid[uid] else nil
+		local monster = if caught then Monsters[caught.monsterId] else nil
+		if child:IsA("Model") and caught and monster then
+			MonsterModel.refresh(child, infoFor(player, caught, monster.rarity))
+		end
+	end
 end
 
 function MansionService.start()
