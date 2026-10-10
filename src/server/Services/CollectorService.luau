@@ -1,8 +1,9 @@
 --!strict
 -- The Collector: sells the monsters roaming your mansion for money. Hold the prompt at
 -- Workspace.Hub.Landmarks.Collector to open the sell window. Prices come from
--- Util/Value.sellValue (size, effects, familiarity and wings all count). Monsters in the
--- Vault are never offered here.
+-- Util/Value.sellValue (size, effects, familiarity and wings all count; a hungry monster
+-- sells for base value x size, so the window says so). Monsters in the Vault are never
+-- offered here.
 --
 -- Remotes in ReplicatedStorage.CollectorRemotes:
 --   Open     server -> client (counter: Vector3)   the player used the Collector prompt
@@ -11,6 +12,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Care = require(ReplicatedStorage.Shared.Util.Care)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Rarities = require(ReplicatedStorage.Shared.Config.Rarities)
@@ -63,7 +65,9 @@ end
 local function offerFor(data: DataService.Data): Offer
 	local rows: { Row } = {}
 	local total = 0
+	local now = os.time()
 	for _, caught in data.monsters do
+		Care.settle(caught, now) -- up-to-date Familiarity, and hungry or not
 		local monster = Monsters[caught.monsterId]
 		local value = price(caught, data.wingsOwned)
 		if not monster or not caught.uid or value <= 0 then
@@ -77,6 +81,9 @@ local function offerFor(data: DataService.Data): Offer
 				table.insert(names, Format.name(effectId))
 			end
 			details ..= ` · {table.concat(names, ", ")}`
+		end
+		if not caught.fed then
+			details ..= " · Hungry: feed it to sell for more"
 		end
 		table.insert(rows, {
 			uid = caught.uid,
@@ -132,8 +139,10 @@ Sell.OnServerInvoke = function(player: Player, uids: unknown): Result
 	-- Price each one before it leaves the mansion (the wing boost needs the save as it is now).
 	local earned = 0
 	local priced: { [string]: number } = {}
+	local now = os.time()
 	for _, caught in data.monsters do
 		if caught.uid and wanted[caught.uid] then
+			Care.settle(caught, now)
 			priced[caught.uid] = price(caught, data.wingsOwned)
 		end
 	end

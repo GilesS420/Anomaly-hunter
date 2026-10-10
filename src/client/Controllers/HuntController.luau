@@ -3,9 +3,10 @@
 -- window, the top-right to the player list): your money, your hearts while you're in a zone, the
 -- monster you're carrying, a big "Return Charm" button (tap or click it; R works too on
 -- a keyboard) that takes you home, and in a zone a "Bait Bell" button (B) that brings a rarer
--- monster to you. Each button shows only if you own one. Everything shown comes from the
--- server: player attributes Zone / Hearts / Carrying / CarryingSize / ReturnCharms / BaitBells
--- and leaderstats.Money.
+-- monster to you. Each button shows only if you own one. Outside the zones a "Feed all"
+-- button shows when your monsters are (nearly) hungry; one tap feeds them all for free.
+-- Everything shown comes from the server: player attributes Zone / Hearts / Carrying /
+-- CarryingSize / ReturnCharms / BaitBells / Hungry / HungrySoon and leaderstats.Money.
 -- Messages ("Entering Murky Bayou") are toasts now, see ToastController.
 
 local Players = game:GetService("Players")
@@ -42,7 +43,10 @@ local function label(name: string, order: number, color: Color3, parent: Instanc
 	return text
 end
 
-local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, TextButton)
+local HungryColor = Color3.fromRGB(215, 95, 50)
+local HungrySoonColor = Color3.fromRGB(200, 150, 40)
+
+local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, TextButton, TextButton)
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "HuntUi"
 	gui.ResetOnSpawn = false
@@ -99,9 +103,10 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, TextButt
 	)
 	local bell =
 		itemButton("BaitBell", 5, Color3.fromRGB(190, 110, 50), if keys then "Bait Bell (B)" else "Bait Bell")
+	local feed = itemButton("FeedAll", 6, HungryColor, "Feed all")
 
 	gui.Parent = player:WaitForChild("PlayerGui")
-	return money, hearts, carrying, charm, bell
+	return money, hearts, carrying, charm, bell, feed
 end
 
 -- Keeps the money row in step with leaderstats.Money, which the server makes once your
@@ -139,7 +144,7 @@ local function watchMoney(money: TextLabel)
 end
 
 function HuntController.start()
-	local money, hearts, carrying, button, bell = buildUi()
+	local money, hearts, carrying, button, bell, feed = buildUi()
 	watchMoney(money)
 
 	local function refresh()
@@ -170,8 +175,33 @@ function HuntController.start()
 			local keyText = if UserInputService.KeyboardEnabled then " (B)" else ""
 			bell.Text = `Bait Bell x{bells}{keyText}`
 		end
+
+		-- Feed all: only at home, and only when a monster is hungry or nearly hungry.
+		local hungry = player:GetAttribute("Hungry")
+		local soon = player:GetAttribute("HungrySoon")
+		local hungryCount = if typeof(hungry) == "number" then hungry else 0
+		local soonCount = if typeof(soon) == "number" then soon else 0
+		feed.Visible = not inZone and soonCount > 0
+		if hungryCount > 0 then
+			feed.Text = `Feed all ({hungryCount} hungry)`
+			feed.BackgroundColor3 = HungryColor
+		else
+			feed.Text = `Feed all ({soonCount} hungry soon)`
+			feed.BackgroundColor3 = HungrySoonColor
+		end
 	end
-	for _, attribute in { "Zone", "Hearts", "Carrying", "CarryingSize", "ReturnCharms", "BaitBells" } do
+	for _, attribute in
+		{
+			"Zone",
+			"Hearts",
+			"Carrying",
+			"CarryingSize",
+			"ReturnCharms",
+			"BaitBells",
+			"Hungry",
+			"HungrySoon",
+		}
+	do
 		player:GetAttributeChangedSignal(attribute):Connect(refresh)
 	end
 	refresh()
@@ -202,6 +232,20 @@ function HuntController.start()
 	-- Activated works for mouse clicks and taps alike.
 	button.Activated:Connect(useCharm)
 	bell.Activated:Connect(ringBell)
+
+	-- Feed all is free; the server says how it went in a toast.
+	local lastFed = 0
+	feed.Activated:Connect(function()
+		if os.clock() - lastFed < 1 then
+			return
+		end
+		lastFed = os.clock()
+		local careRemotes = ReplicatedStorage:FindFirstChild("CareRemotes")
+		local remote = careRemotes and careRemotes:FindFirstChild("FeedAll")
+		if remote and remote:IsA("RemoteFunction") then
+			task.spawn(pcall, remote.InvokeServer, remote)
+		end
+	end)
 
 	-- Optional keyboard shortcuts.
 	UserInputService.InputBegan:Connect(function(input, processed)

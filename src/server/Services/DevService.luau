@@ -5,7 +5,10 @@
 --   /wings 3          sets how many wings your mansion has (1 to 6) and rebuilds it
 --   /clearmonsters    empties your mansion
 --   /summon           starts the next Watcher event right away (Flicker, then Blood Moon)
---   /give VoidVac     gives a Workshop item for free (tools are equipped; /give BaitBell 5 gives five)
+--   /give VoidVac     gives a Workshop item or Bakery treat for free (tools are equipped;
+--                     /give BaitBell 5 or /give PumpkinCandy 3 gives several)
+--   /skip 12          your monsters live 12 hours ahead: they grow Familiarity, and get
+--                     hungry after a day (/skip 25 makes them all hungry)
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
 
 local Players = game:GetService("Players")
@@ -18,6 +21,7 @@ local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Wings = require(ReplicatedStorage.Shared.Config.Wings)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
+local CareService = require(script.Parent.CareService)
 local DataService = require(script.Parent.DataService)
 local HuntService = require(script.Parent.HuntService)
 local MansionService = require(script.Parent.MansionService)
@@ -102,14 +106,16 @@ commands["/give"] = function(player, argument)
 	local item = nil
 	if itemId then
 		-- Any capitals: "/give voidvac" works too.
-		for _, candidate in Shop.Workshop do
-			if string.lower(candidate.id) == string.lower(itemId) then
-				item = candidate
+		for _, list in { Shop.Workshop, Shop.Bakery } do
+			for _, candidate in list do
+				if string.lower(candidate.id) == string.lower(itemId) then
+					item = candidate
+				end
 			end
 		end
 	end
 	if not data or not item then
-		Notify.toast(player, "Try: /give VoidVac, /give Moonbeam, /give SpiritLens or /give BaitBell 5")
+		Notify.toast(player, "Try: /give VoidVac, /give Moonbeam, /give BaitBell 5 or /give PumpkinCandy 3")
 		return
 	end
 	local count = math.clamp(math.floor(tonumber(countText) or 1), 1, 99)
@@ -124,6 +130,23 @@ commands["/give"] = function(player, argument)
 		Notify.toast(player, `You now have {data.inventory[item.id]} x {item.name}.`)
 	end
 	HuntService.refreshItems(player)
+end
+
+commands["/skip"] = function(player, argument)
+	local hours = tonumber(argument)
+	local data = DataService.get(player)
+	if not hours or hours <= 0 or not data then
+		Notify.toast(player, "Try: /skip 12 (hours; /skip 25 makes your monsters hungry)")
+		return
+	end
+	-- Moving every timestamp back is the same as that much time passing.
+	local seconds = math.floor(hours * 3600)
+	for _, caught in data.monsters do
+		caught.fedUntil = (caught.fedUntil or os.time()) - seconds
+		caught.grownAt = (caught.grownAt or os.time()) - seconds
+	end
+	CareService.refresh(player)
+	Notify.toast(player, `Your monsters skipped {hours} hours ahead.`)
 end
 
 -- Runs a chat message if it's one of the commands above.
@@ -183,7 +206,7 @@ function DevService.start()
 		useTextChatCommands()
 	end
 	print(
-		`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /give <item> [count], /summon`
+		`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /give <item> [count], /summon, /skip <hours>`
 	)
 end
 

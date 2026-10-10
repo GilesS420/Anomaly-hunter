@@ -16,6 +16,9 @@ local Events = require("../src/shared/Config/Events")
 local Watcher = require("../src/shared/Util/Watcher")
 local Shop = require("../src/shared/Config/Shop")
 local Workshop = require("../src/shared/Util/Workshop")
+local Care = require("../src/shared/Util/Care")
+local CareConfig = require("../src/shared/Config/Care")
+local Effects = require("../src/shared/Config/Effects")
 
 local failures = 0
 local function check(name: string, ok: boolean)
@@ -566,6 +569,95 @@ do
 		not Catching.canVacuum("PhantomVac", "Normal", "Eldritch")
 			and Catching.canVacuum("VoidVac", "Normal", "Eldritch")
 	)
+end
+
+-- Feeding and Familiarity (Util/Care).
+do
+	local fed = CareConfig.FedHours * 3600
+	local grow = CareConfig.FamiliarityHours * 3600
+	local t0 = 1_000_000
+	local m: any = {
+		monsterId = "Gravepup",
+		size = "Normal",
+		effects = {},
+		familiarity = 0,
+		fed = true,
+		fedUntil = t0 + fed,
+		grownAt = t0,
+	}
+	Care.settle(m, t0 + fed / 2)
+	check("Familiarity grows while fed", near(m.familiarity, math.min(fed / 2 / grow, 1)) and m.fed)
+	Care.settle(m, t0 + fed * 3)
+	local atHungry = math.min(fed / grow, 1)
+	check("Familiarity stops growing once hungry", near(m.familiarity, atHungry) and not m.fed)
+	Care.settle(m, t0 + fed * 5)
+	check("settling again while hungry changes nothing", near(m.familiarity, atHungry))
+	check("a hungry monster needs food", Care.needsFood(m, t0 + fed * 5))
+	check("a hungry monster sells for base x size", Value.sellValue(m, 3) == 10_000)
+
+	Care.feed(m, t0 + fed * 5)
+	check("feeding makes it fed for a day", m.fed and m.fedUntil == t0 + fed * 6)
+	check("a just-fed monster doesn't need food", not Care.needsFood(m, t0 + fed * 5))
+	check("hours left counts down", Care.hoursLeft(m, t0 + fed * 5) == CareConfig.FedHours)
+
+	local fresh: any = { monsterId = "Gloomlet", size = "Normal", effects = {}, familiarity = 0, fed = false }
+	Care.settle(fresh, t0)
+	check(
+		"a monster without timestamps starts fed",
+		fresh.fed and fresh.fedUntil == t0 + fed and fresh.grownAt == t0
+	)
+	Care.settle(fresh, t0 - 50)
+	check("a clock that went back never shrinks or regrows", fresh.familiarity == 0 and fresh.grownAt == t0)
+
+	check("percent rounds down cleanly", Care.percent({ familiarity = 0.29 } :: any) == 29)
+
+	-- Treats: refused rather than wasted, and combos free up a slot.
+	local candy = Care.treat("PumpkinCandy") :: Shop.Item
+	local cake = Care.treat("CursedCake") :: Shop.Item
+	local function withEffects(effects: { string }): any
+		return { monsterId = "Gravepup", size = "Normal", effects = effects, familiarity = 0.95, fed = false }
+	end
+	check("an unknown treat is refused", Care.canTreat(withEffects({}), Care.treat("VoidVac")) == "Unknown")
+	check("a treat isn't given twice", Care.canTreat(withEffects({ "PumpkinHead" }), candy) == "HasEffect")
+	check(
+		"a treat doesn't fit a monster with 3 effects",
+		Care.canTreat(withEffects({ "Ghost", "Mummy", "Possessed" }), candy) == "NoRoom"
+	)
+	check(
+		"a combo counts as one effect",
+		Care.canTreat(withEffects({ "Vampire", "Batty", "Ghost" }), candy) == "Ok"
+	)
+	check(
+		"a treat that completes a combo fits",
+		Care.canTreat(withEffects({ "Ghost", "Vampire", "Possessed" }), cake) == "Ok"
+	)
+	local treated = withEffects({ "Ghost" })
+	Care.giveTreat(treated, candy, t0)
+	check(
+		"a treat feeds, adds its effect and Familiarity (capped)",
+		treated.fed
+			and treated.fedUntil == t0 + fed
+			and treated.familiarity == 1
+			and treated.effects[2] == "PumpkinHead"
+	)
+
+	local treatsOk = true
+	for _, item in Shop.Bakery do
+		local effect = item.grantsEffect
+		treatsOk = treatsOk
+			and item.kind == "Food"
+			and (item.familiarity or 0) > 0
+			and (item.familiarity or 0) <= 1
+			and effect ~= nil
+			and Effects.List[effect] ~= nil
+			and Care.describe(item) ~= ""
+			and Care.treat(item.id) == item
+	end
+	check("every treat is food with Familiarity and a real effect", treatsOk)
+
+	local record = { slot = 5, bought = { PumpkinCandy = 2 } }
+	check("buys count within a restock", Workshop.boughtThisSlot(record, 5).PumpkinCandy == 2)
+	check("buys reset on the next restock", Workshop.boughtThisSlot(record, 6).PumpkinCandy == nil)
 end
 
 if failures > 0 then
