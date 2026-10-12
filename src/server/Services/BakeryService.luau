@@ -91,7 +91,7 @@ local function monsterRows(data: DataService.Data): { MonsterRow }
 		values[uid] = if ok then value else 0
 
 		local parts = {}
-		for _, effectId in caught.effects do
+		for _, effectId in Value.resolveEffects(caught.effects) do
 			table.insert(parts, Format.name(effectId))
 		end
 		local effects = if #parts > 0 then `{table.concat(parts, ", ")} · ` else ""

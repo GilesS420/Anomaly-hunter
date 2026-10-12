@@ -296,7 +296,7 @@ local function infoFor(player: Player, caught: Value.CaughtMonster, rarity: stri
 		monsterId = caught.monsterId,
 		rarity = rarity,
 		size = caught.size,
-		effects = caught.effects,
+		effects = Value.resolveEffects(caught.effects), -- combos show as one
 		owner = player.DisplayName,
 		status = Care.status(caught),
 		hungry = not caught.fed,

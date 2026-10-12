@@ -7,6 +7,7 @@
 --   /summon           starts the next Watcher event right away (Flicker, then Blood Moon)
 --   /give VoidVac     gives a Workshop item or Bakery treat for free (tools are equipped;
 --                     /give BaitBell 5 or /give PumpkinCandy 3 gives several)
+--   /haunt            every fed monster in your mansion picks up a roaming effect right now
 --   /skip 12          your monsters live 12 hours ahead: they grow Familiarity, and get
 --                     hungry after a day (/skip 25 makes them all hungry)
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
@@ -23,6 +24,7 @@ local Wings = require(ReplicatedStorage.Shared.Config.Wings)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local CareService = require(script.Parent.CareService)
 local DataService = require(script.Parent.DataService)
+local HauntService = require(script.Parent.HauntService)
 local HuntService = require(script.Parent.HuntService)
 local MansionService = require(script.Parent.MansionService)
 local Notify = require(script.Parent.Parent.Notify)
@@ -132,6 +134,13 @@ commands["/give"] = function(player, argument)
 	HuntService.refreshItems(player)
 end
 
+commands["/haunt"] = function(player)
+	local gained = HauntService.rollFor(player, true)
+	if gained == 0 then
+		Notify.toast(player, "No monster could take an effect (hungry, or no room left).")
+	end
+end
+
 commands["/skip"] = function(player, argument)
 	local hours = tonumber(argument)
 	local data = DataService.get(player)
@@ -206,7 +215,7 @@ function DevService.start()
 		useTextChatCommands()
 	end
 	print(
-		`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /give <item> [count], /summon, /skip <hours>`
+		`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /give <item> [count], /summon, /skip <hours>, /haunt`
 	)
 end
 

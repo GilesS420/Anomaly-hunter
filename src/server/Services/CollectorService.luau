@@ -77,7 +77,7 @@ local function offerFor(data: DataService.Data): Offer
 		local details = `{caught.size} {monster.rarity}`
 		if #caught.effects > 0 then
 			local names = {}
-			for _, effectId in caught.effects do
+			for _, effectId in Value.resolveEffects(caught.effects) do
 				table.insert(names, Format.name(effectId))
 			end
 			details ..= ` · {table.concat(names, ", ")}`

@@ -120,16 +120,25 @@ function CareService.giveTreat(player: Player, uid: unknown, itemId: unknown): (
 
 	-- "...and turned into a Banshee!" when the new effect completes a combo.
 	local result = ""
-	for _, effectId in Value.resolveEffects(caught.effects) do
-		if Effects.Combos[effectId] and not table.find(before, effectId) then
-			local article = if string.match(effectId, "^[AEIOU]") then "an" else "a"
-			result = ` and turned into {article} {effectId}`
-		end
-	end
-	if result == "" and item.grantsEffect then
+	local combo = Value.newCombo(before, Value.resolveEffects(caught.effects))
+	if combo then
+		CareService.discoverCombo(data, combo)
+		local article = if string.match(combo, "^[AEIOU]") then "an" else "a"
+		result = ` and turned into {article} {combo}`
+	elseif item.grantsEffect then
 		result = ` and got {Format.name(item.grantsEffect)}`
 	end
 	return true, `{name} ate the {item.name}{result}! Now {Care.percent(caught)}% familiar.`
+end
+
+-- Remembers a combo the player has made, for the Codex (data.codex.combos[id] = true).
+function CareService.discoverCombo(data: DataService.Data, comboId: string)
+	local combos = data.codex.combos
+	if typeof(combos) ~= "table" then
+		combos = {}
+		data.codex.combos = combos
+	end
+	combos[comboId] = true
 end
 
 FeedAll.OnServerInvoke = function(player: Player): string

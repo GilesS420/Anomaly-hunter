@@ -19,6 +19,7 @@ local Workshop = require("../src/shared/Util/Workshop")
 local Care = require("../src/shared/Util/Care")
 local CareConfig = require("../src/shared/Config/Care")
 local Effects = require("../src/shared/Config/Effects")
+local Haunting = require("../src/shared/Util/Haunting")
 
 local failures = 0
 local function check(name: string, ok: boolean)
@@ -658,6 +659,68 @@ do
 	local record = { slot = 5, bought = { PumpkinCandy = 2 } }
 	check("buys count within a restock", Workshop.boughtThisSlot(record, 5).PumpkinCandy == 2)
 	check("buys reset on the next restock", Workshop.boughtThisSlot(record, 6).PumpkinCandy == nil)
+end
+
+-- Roaming effects (Util/Haunting).
+do
+	local function monster(effects: { string }, fed: boolean): any
+		return { monsterId = "Gravepup", size = "Normal", effects = effects, familiarity = 0, fed = fed }
+	end
+	check(
+		"a new monster in the Foyer rolls at the base chance",
+		near(Haunting.chance(0, 1, nil), Effects.RoamChance)
+	)
+	check(
+		"Familiarity, wings and a Blood Moon raise the odds",
+		Haunting.chance(1, 1, nil) > Haunting.chance(0, 1, nil)
+			and Haunting.chance(0, 3, nil) > Haunting.chance(0, 1, nil)
+			and near(Haunting.chance(0, 1, 2), 2 * Effects.RoamChance)
+	)
+	check("the odds never pass 100%", Haunting.chance(1, 6, 1000) == 100)
+
+	local poolOk = true
+	for _, option in Haunting.pool(nil) do
+		poolOk = poolOk and Effects.List[option.id].source == "Roam" and option.weight > 0
+	end
+	check("the roam pool only holds Roam effects", poolOk and #Haunting.pool(nil) == 5)
+	local withEvent = Haunting.pool("Bloodmoon")
+	local hasEvent = false
+	for _, option in withEvent do
+		hasEvent = hasEvent or option.id == "Bloodmoon"
+	end
+	check("a live event adds its effect to the pool", hasEvent and #withEvent == 6)
+
+	local random = fakeRandom(11)
+	check("hungry monsters pick up nothing", Haunting.roll(monster({}, false), 1, nil, random, true) == nil)
+	local picked = Haunting.roll(monster({}, true), 1, nil, random, true)
+	check("a forced roll picks a Roam effect", picked ~= nil and Effects.List[picked].source == "Roam")
+	check(
+		"a full monster picks up nothing",
+		Haunting.roll(monster({ "Ghost", "Slimed", "PumpkinHead" }, true), 1, nil, random, true) == nil
+	)
+	-- Vampire on a monster with Batty and two more: only Vampire fits, because it merges into a Count.
+	local count = 0
+	for _ = 1, 50 do
+		local id = Haunting.roll(monster({ "Batty", "Ghost", "Slimed" }, true), 1, nil, random, true)
+		if id == "Vampire" then
+			count += 1
+		end
+	end
+	check("an effect that completes a combo still fits", count == 50)
+	check(
+		"a new combo is spotted",
+		Value.newCombo({ "Batty", "Ghost" }, Value.resolveEffects({ "Batty", "Ghost", "Vampire" })) == "Count"
+	)
+
+	-- About RoamChance% of plain rolls hit.
+	local hits = 0
+	local trials = 20000
+	for _ = 1, trials do
+		if Haunting.roll(monster({}, true), 1, nil, random) then
+			hits += 1
+		end
+	end
+	check("rolls hit about RoamChance% of the time", math.abs(hits / trials * 100 - Effects.RoamChance) < 0.6)
 end
 
 if failures > 0 then
