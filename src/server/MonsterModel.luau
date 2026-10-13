@@ -143,7 +143,16 @@ local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: 
 			else Enum.PartType.Block
 		part.Size = vector(piece.size, scale)
 		part.Color = Color3.fromRGB(piece.color[1], piece.color[2], piece.color[3])
-		part.Material = if piece.glow then Enum.Material.Neon else Enum.Material.Plastic
+		part.Material = if piece.glow
+			then Enum.Material.Neon
+			elseif look.wet then Enum.Material.SmoothPlastic
+			else Enum.Material.Plastic
+		if look.wet and not piece.glow then
+			part.Reflectance = 0.2 -- a wet sheen
+		end
+		if look.seeThrough and not piece.glow then
+			part.Transparency = look.seeThrough
+		end
 		part.TopSurface = Enum.SurfaceType.Studs -- the classic brick look
 		part.BottomSurface = Enum.SurfaceType.Inlet
 		part.Anchored = false
@@ -151,7 +160,7 @@ local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: 
 		part.CanTouch = false
 		part.CanQuery = false -- presses go to Body
 		part.Massless = true
-		part.CastShadow = not piece.glow
+		part.CastShadow = not piece.glow and not look.seeThrough
 
 		local centre = vector(piece.at, scale) + Vector3.new(0, lift, 0)
 		local rot = piece.rot
