@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Catching = require(ReplicatedStorage.Shared.Util.Catching)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
+local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Rarities = require(ReplicatedStorage.Shared.Config.Rarities)
 local Roam = require(ReplicatedStorage.Shared.Util.Roam)
 local Spawning = require(ReplicatedStorage.Shared.Util.Spawning)
@@ -267,6 +268,75 @@ local function rollSizeFor(tier: number): string
 	return "Normal"
 end
 
+-- Brings one monster close to the hunter, reserved for them (only they can catch it). It
+-- waits for them: gone when they leave the zone or the game, or after `seconds`. Nil if
+-- there's no room for it.
+local function bring(
+	player: Player,
+	state: ZoneState,
+	folder: Folder,
+	position: Vector3,
+	monster: Monsters.Monster,
+	size: string,
+	seconds: number
+): Model?
+	local radius = MonsterModel.radius(size)
+	local others = RoamService.bodies(state.group)
+	local point = Roam.findFreePoint(
+		rectsNear(state.rects, position.X, position.Z, LureDistance),
+		radius,
+		others,
+		random
+	) or Roam.findFreePoint(state.rects, radius, others, random)
+	if not point then
+		return nil
+	end
+
+	local zoneIndex = state.zone.index
+	local model = MonsterModel.build({ monsterId = monster.id, rarity = monster.rarity, size = size })
+	model:SetAttribute("Wild", true)
+	model:SetAttribute("Zone", zoneIndex)
+	model:SetAttribute("LuredBy", player.UserId)
+	local body = model.PrimaryPart
+	local light = body and body:FindFirstChildOfClass("PointLight")
+	if light then
+		light.Range *= 2 -- a bell's monster glows brighter so it's easy to spot
+		light.Brightness *= 2
+	end
+	live[model] = {
+		monsterId = monster.id,
+		rarity = monster.rarity,
+		size = size,
+		zone = zoneIndex,
+		reservedFor = player.UserId,
+	}
+	model.Destroying:Connect(function()
+		live[model] = nil
+	end)
+	RoamService.add(model, {
+		rects = state.rects,
+		radius = radius,
+		speed = 5, -- slower than the zone's own monsters
+		group = state.group,
+		at = Vector3.new(point.x, point.y + radius + 0.5, point.z),
+	})
+	model.Parent = folder
+
+	local zoneId = state.zone.id
+	task.spawn(function()
+		local deadline = os.clock() + seconds
+		while live[model] do
+			task.wait(1)
+			local away = player.Parent == nil or player:GetAttribute("Zone") ~= zoneId
+			if live[model] and (away or os.clock() >= deadline) and not RoamService.isHeld(model) then
+				live[model] = nil
+				model:Destroy()
+			end
+		end
+	end)
+	return model
+end
+
 -- Bait Bell: brings one rarer monster near the hunter in their zone. Returns whether it
 -- worked and a message for them. The caller uses up the bell only when it worked.
 function SpawnService.lure(player: Player, zoneIndex: number, vacuumId: string): (boolean, string)
@@ -297,69 +367,47 @@ function SpawnService.lure(player: Player, zoneIndex: number, vacuumId: string):
 		return false, "Only monsters too strong for your vacuum answered. Try a better vacuum!"
 	end
 	local size = rollSizeFor(tier)
-	local radius = MonsterModel.radius(size)
-	local others = RoamService.bodies(state.group)
-	local position = root.Position
-	local point = Roam.findFreePoint(
-		rectsNear(state.rects, position.X, position.Z, LureDistance),
-		radius,
-		others,
-		random
-	) or Roam.findFreePoint(state.rects, radius, others, random)
-	if not point then
+	local model = bring(player, state, folder, root.Position, monster, size, LureSeconds)
+	if not model then
 		return false, "It's too crowded here for anything to come. Try again in a moment."
 	end
-
-	local model = MonsterModel.build({ monsterId = monster.id, rarity = monster.rarity, size = size })
-	model:SetAttribute("Wild", true)
-	model:SetAttribute("Zone", zoneIndex)
-	model:SetAttribute("LuredBy", player.UserId)
-	local body = model.PrimaryPart
-	local light = body and body:FindFirstChildOfClass("PointLight")
-	if light then
-		light.Range *= 2 -- a bell's monster glows brighter so it's easy to spot
-		light.Brightness *= 2
-	end
-	live[model] = {
-		monsterId = monster.id,
-		rarity = monster.rarity,
-		size = size,
-		zone = zoneIndex,
-		reservedFor = player.UserId,
-	}
 	lures[player] = model
 	model.Destroying:Connect(function()
-		live[model] = nil
 		if lures[player] == model then
 			lures[player] = nil
-		end
-	end)
-	RoamService.add(model, {
-		rects = state.rects,
-		radius = radius,
-		speed = 5, -- slower than the zone's own monsters
-		group = state.group,
-		at = Vector3.new(point.x, point.y + radius + 0.5, point.z),
-	})
-	model.Parent = folder
-
-	-- It waits for its hunter: gone when they leave the zone or the game, or after LureSeconds.
-	local zoneId = state.zone.id
-	task.spawn(function()
-		local deadline = os.clock() + LureSeconds
-		while live[model] do
-			task.wait(1)
-			local away = player.Parent == nil or player:GetAttribute("Zone") ~= zoneId
-			if live[model] and (away or os.clock() >= deadline) and not RoamService.isHeld(model) then
-				live[model] = nil
-				model:Destroy()
-			end
 		end
 	end)
 
 	local sizeText = if size == "Normal" then "" else `{size} `
 	return true,
 		`A {sizeText}{monster.rarity} {Format.name(monster.id)} answers your bell! Only you can catch it.`
+end
+
+-- Studio only (DevService /spawn): brings this exact monster to the hunter in the zone they're
+-- in, reserved for them like a Bait Bell's monster but staying for 10 minutes. Any monster
+-- works in any zone, event monsters too.
+function SpawnService.spawnFor(player: Player, monsterId: string, size: string): (boolean, string)
+	local monster = Monsters[monsterId]
+	local zoneId = player:GetAttribute("Zone")
+	local state: ZoneState? = nil
+	for _, candidate in states do
+		if candidate.zone.id == zoneId then
+			state = candidate
+		end
+	end
+	local folder = if state then monstersFolder(state) else nil
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not monster then
+		return false, `There's no monster called {monsterId}.`
+	end
+	if not state or not folder or not root or not root:IsA("BasePart") then
+		return false, "Go into a zone first, then try again."
+	end
+	if not bring(player, state, folder, root.Position, monster, size, 600) then
+		return false, "It's too crowded here. Try again in a moment."
+	end
+	return true, `{Format.name(monster.id)} ({size} {monster.rarity}) is here. Only you can catch it.`
 end
 
 function SpawnService.start()
