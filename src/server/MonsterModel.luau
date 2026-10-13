@@ -43,9 +43,11 @@ function MonsterModel.color(rarityId: string): Color3
 	return rarityColors[rarityId] or Color3.new(1, 1, 1)
 end
 
--- Orb radius in studs for a size (Normal = 1.5).
-function MonsterModel.radius(sizeId: string): number
-	return Spawning.radius(sizeId)
+-- Orb radius in studs for a size (Normal = 1.5). Monsters whose look grows them (the Watcher
+-- event monsters) get a bigger orb, so they keep their distance and stand on the floor.
+function MonsterModel.radius(sizeId: string, monsterId: string?): number
+	local look = monsterId and Looks[monsterId]
+	return Spawning.radius(sizeId) * (if look and look.grow then look.grow else 1)
 end
 
 local FedColor = Color3.fromRGB(255, 190, 230)
@@ -126,7 +128,12 @@ end
 local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: number, radius: number)
 	-- Walkers are drawn with their feet at y = -2 (Normal size) but stand radius + 0.5 below
 	-- Body's centre (Roam places them that way), so shift them to keep their feet on the floor.
-	local lift = if look.gait == "walk" then 2 * scale - (radius + 0.5) else 0
+	-- Grown floaters (event monsters) would dangle into the floor the same way, so they're lifted
+	-- to hover a little above it.
+	local lift = if look.gait == "walk"
+		then 2 * scale - (radius + 0.5)
+		elseif look.grow then 2.4 * scale - (radius + 0.5)
+		else 0
 	for _, piece in look.pieces do
 		local part = Instance.new("Part")
 		part.Name = piece.name
@@ -136,7 +143,16 @@ local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: 
 			else Enum.PartType.Block
 		part.Size = vector(piece.size, scale)
 		part.Color = Color3.fromRGB(piece.color[1], piece.color[2], piece.color[3])
-		part.Material = if piece.glow then Enum.Material.Neon else Enum.Material.Plastic
+		part.Material = if piece.glow
+			then Enum.Material.Neon
+			elseif look.wet then Enum.Material.SmoothPlastic
+			else Enum.Material.Plastic
+		if look.wet and not piece.glow then
+			part.Reflectance = 0.2 -- a wet sheen
+		end
+		if look.seeThrough and not piece.glow then
+			part.Transparency = look.seeThrough
+		end
 		part.TopSurface = Enum.SurfaceType.Studs -- the classic brick look
 		part.BottomSurface = Enum.SurfaceType.Inlet
 		part.Anchored = false
@@ -144,7 +160,7 @@ local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: 
 		part.CanTouch = false
 		part.CanQuery = false -- presses go to Body
 		part.Massless = true
-		part.CastShadow = not piece.glow
+		part.CastShadow = not piece.glow and not look.seeThrough
 
 		local centre = vector(piece.at, scale) + Vector3.new(0, lift, 0)
 		local rot = piece.rot
@@ -164,9 +180,11 @@ local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: 
 			motor.C1 = CFrame.new(pivot)
 			-- Read by the client every frame to swing the part (RoamController).
 			motor:SetAttribute("SwingAxis", axes[joint.axis])
-			motor:SetAttribute("SwingAmp", math.rad(joint.amp))
+			motor:SetAttribute("SwingAmp", if joint.slide then joint.amp * scale else math.rad(joint.amp))
 			motor:SetAttribute("SwingSpeed", joint.speed)
 			motor:SetAttribute("SwingPhase", joint.phase or 0)
+			motor:SetAttribute("SwingSpin", joint.spin == true)
+			motor:SetAttribute("SwingSlide", joint.slide == true)
 			motor.Parent = part
 		else
 			local weld = Instance.new("Weld")
@@ -181,7 +199,7 @@ local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: 
 end
 
 function MonsterModel.build(info: Info): Model
-	local radius = MonsterModel.radius(info.size)
+	local radius = MonsterModel.radius(info.size, info.monsterId)
 	local color = MonsterModel.color(info.rarity)
 
 	local model = Instance.new("Model")

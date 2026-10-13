@@ -317,7 +317,7 @@ local function spawnMonster(state: State, caught: Value.CaughtMonster)
 	if #state.rects == 0 then
 		return -- no floors to stand on (layout missing; already warned)
 	end
-	local radius = MonsterModel.radius(caught.size)
+	local radius = MonsterModel.radius(caught.size, caught.monsterId)
 	local spot = Roam.findFreePoint(state.rects, radius, RoamService.bodies(state.group), random)
 	if not spot then
 		local data = DataService.get(state.player)

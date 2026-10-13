@@ -27,7 +27,16 @@ local IDLE_PACE = 0.35 -- limbs swing this much slower and smaller while standin
 local HOP_HEIGHT = 0.15 -- studs walkers bounce with each step
 local TAU = math.pi * 2
 
-type Swing = { motor: Motor6D, base: CFrame, axis: Vector3, amp: number, speed: number, phase: number }
+type Swing = {
+	motor: Motor6D,
+	base: CFrame,
+	axis: Vector3,
+	amp: number,
+	speed: number,
+	phase: number,
+	spin: boolean, -- turns round and round instead of swinging
+	slide: boolean, -- moves along the axis (amp in studs) instead of swinging
+}
 
 type State = {
 	phase: number, -- each monster bobs a little out of step with the others
@@ -63,6 +72,8 @@ local function findSwings(model: Model): { Swing }
 					amp = amp,
 					speed = speed,
 					phase = if typeof(phase) == "number" then phase else 0,
+					spin = motor:GetAttribute("SwingSpin") == true,
+					slide = motor:GetAttribute("SwingSlide") == true,
 				})
 			end
 		end
@@ -168,10 +179,15 @@ function RoamController.start()
 					state.swings = swings
 				end
 				for _, swing in swings :: { Swing } do
-					local angle = math.sin((state.clock * swing.speed + swing.phase) * TAU)
-						* swing.amp
-						* state.pace
-					swing.motor.C0 = swing.base * CFrame.fromAxisAngle(swing.axis, angle)
+					local angle = if swing.spin
+						then (state.clock * swing.speed + swing.phase) * TAU
+						else math.sin((state.clock * swing.speed + swing.phase) * TAU)
+							* swing.amp
+							* state.pace
+					swing.motor.C0 = if swing.slide
+						then CFrame.new(swing.axis * angle)
+							* swing.base -- along the monster's axis, even if tilted
+						else swing.base * CFrame.fromAxisAngle(swing.axis, angle)
 				end
 			end
 
