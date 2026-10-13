@@ -46,6 +46,7 @@ local PauseMin, PauseMax = 0.5, 2.5 -- rest between legs
 local RetrySeconds = 1 -- wait when no clear path was found (crowded)
 local Candidates = 8 -- targets tried per new leg
 local PathStep = 1 -- studs between the sample bodies placed along a path (small, so no gaps)
+local FloorSlack = 1.5 -- studs a leg may stray off the floor rectangles (bridges the 2-stud gap between wings)
 
 local random = Random.new()
 local roamers: { [Model]: Roamer } = {}
@@ -145,12 +146,19 @@ local function startLeg(roamer: Roamer, at: number): boolean
 		end
 	end
 
+	-- Stay on the open ground: no walking straight across the props between two patches of
+	-- it. One that's somehow off it already may walk back on.
+	local offFloor = not Roam.inside(roamer.rects, here.X, here.Z, -FloorSlack)
 	local close = nearby(roamer.rects, here.X, here.Z, roamer.radius)
 	for attempt = 1, Candidates do
 		-- Mostly short hops; the last tries look anywhere, so a crowded corner can't trap it.
 		local pool = if attempt <= Candidates - 2 and #close > 0 then close else roamer.rects
 		local point = Roam.findFreePoint(pool, roamer.radius, blocking, random, 12)
-		if point and Roam.pathClear(here.X, here.Z, point.x, point.z, roamer.radius, blocking) then
+		if
+			point
+			and Roam.pathClear(here.X, here.Z, point.x, point.z, roamer.radius, blocking)
+			and (offFloor or Roam.lineInside(roamer.rects, here.X, here.Z, point.x, point.z, FloorSlack))
+		then
 			local target = Vector3.new(point.x, point.y + roamer.radius + 0.5, point.z)
 			local distance = (target - here).Magnitude
 			roamer.from = here
