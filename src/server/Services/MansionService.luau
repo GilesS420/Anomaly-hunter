@@ -2,8 +2,8 @@
 -- Every player's mansion, built on their plot from placeholder blocks once their save has
 -- loaded and they have a plot:
 --   Workspace.Mansions.<PlotName>     a Model made here (removed when the owner leaves)
---     Wings       the Foyer room (walls, doors, lanterns, see Config/Rooms), and a floor,
---                 four corner pillars and a name label for every other owned wing
+--     Wings       a room per owned wing (walls, doors, lanterns, see Config/Rooms), or a
+--                 floor, four corner pillars and a name label for wings without a recipe yet
 --     NextWing    a see-through floor plus a sign: hold its prompt to buy that wing
 --     OwnerSign   "<name>'s Mansion" and "3/8 monsters", floating above the Foyer
 --     Monsters    the owner's caught monsters, roaming around the owned wings (each label
@@ -219,8 +219,8 @@ local function buildRoom(parts: { Rooms.Part }, base: CFrame, folder: Folder)
 	end
 end
 
--- A wing the player owns. The Foyer is a full room; the other wings are still placeholders
--- (a floor, corner pillars and the wing's name) until they get their own room recipe.
+-- A wing the player owns: a full room when it has a recipe in Config/Rooms, otherwise still a
+-- placeholder (a floor, corner pillars and the wing's name).
 local function buildOwnedWing(state: State, wing: Wings.Wing, owned: { [string]: boolean })
 	local spot = Layout.Wings[wing.id]
 	if not spot then
@@ -228,11 +228,12 @@ local function buildOwnedWing(state: State, wing: Wings.Wing, owned: { [string]:
 		return
 	end
 	local top = floorTop(state.plot)
-	if wing.id == "Foyer" then
+	local recipe = Rooms.ByWing[wing.id]
+	if recipe then
 		local folder = Instance.new("Folder")
 		folder.Name = wing.id
 		local base = CFrame.new(wingCentre(state.plot, wing.id, top)) * state.plot.frame.Rotation
-		buildRoom(Rooms.Foyer(spot.width, spot.depth, owned), base, folder)
+		buildRoom(recipe(spot.width, spot.depth, owned), base, folder)
 		folder.Parent = state.wings
 		return
 	end

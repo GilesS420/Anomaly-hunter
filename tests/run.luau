@@ -846,25 +846,39 @@ do
 		Neon = true,
 		Fabric = true,
 		SmoothPlastic = true,
+		Glass = true,
+		Marble = true,
 	}
-	local spot = Layout.Wings.Foyer
-	local function foyer(owned: { [string]: boolean })
-		local ok, names, boarded = true, {}, 0
-		for _, p in Rooms.Foyer(spot.width, spot.depth, owned) do
-			ok = ok and #p.size == 3 and #p.at == 3 and #p.color == 3 and materials[p.material] == true
-			ok = ok and math.abs(p.at[1]) <= spot.width / 2 and math.abs(p.at[3]) <= spot.depth / 2
-			ok = ok and names[p.name] == nil
-			names[p.name] = true
-			if string.find(p.name, "Boarded") then
-				boarded += 1
+	local all = { Foyer = true, Library = true, Ballroom = true, Attic = true, Crypt = true, Garden = true }
+	local expectBoarded = { Foyer = 6, Library = 2, Ballroom = 2 }
+	for wingId, recipe in Rooms.ByWing do
+		local spot = Layout.Wings[wingId]
+		local function build(owned: { [string]: boolean })
+			local ok, names, boarded = true, {}, 0
+			for _, p in recipe(spot.width, spot.depth, owned) do
+				ok = ok and #p.size == 3 and #p.at == 3 and #p.color == 3 and materials[p.material] == true
+				-- A threshold may reach over the 2-stud gap to the next floor.
+				ok = ok and math.abs(p.at[1]) <= spot.width / 2 + 2 and math.abs(p.at[3]) <= spot.depth / 2
+				ok = ok and p.at[2] - p.size[2] / 2 >= -1.01 and p.at[2] <= Rooms.WallHeight + 4
+				if names[p.name] then
+					ok = false
+					print(`  {wingId} has two parts named {p.name}`)
+				end
+				names[p.name] = true
+				if string.find(p.name, "Boarded") then
+					boarded += 1
+				end
 			end
+			return ok, boarded
 		end
-		return ok, boarded
+		local ok, shut = build({ Foyer = true })
+		local _, open = build(all)
+		check(`{wingId} parts are sized, named once and inside the room`, ok)
+		check(
+			`{wingId} doors are boarded until the next wing is bought`,
+			shut == expectBoarded[wingId] and open == 0
+		)
 	end
-	local ok, shut = foyer({ Foyer = true })
-	local _, open = foyer({ Foyer = true, Library = true, Ballroom = true, Garden = true })
-	check("Foyer parts are sized, named once and inside the floor", ok)
-	check("unowned wing doors are boarded up, owned ones open", shut == 6 and open == 0)
 end
 
 if failures > 0 then
