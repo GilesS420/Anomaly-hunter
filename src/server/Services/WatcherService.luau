@@ -315,7 +315,7 @@ end
 local function spawnOne(event: Events.WatcherEvent, rects: { Roam.Rect }): boolean
 	local monster = Watcher.rollMonster(event, random)
 	local size = Spawning.rollSize(random)
-	local radius = MonsterModel.radius(size.id)
+	local radius = MonsterModel.radius(size.id, monster.id)
 	local point = Roam.findFreePoint(rects, radius, RoamService.bodies(Group), random)
 	if not point then
 		return false

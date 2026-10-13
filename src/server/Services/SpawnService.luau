@@ -151,7 +151,7 @@ local function spawnOne(state: ZoneState): boolean
 
 	local monster = Spawning.rollMonster(state.zone.index, random)
 	local size = Spawning.rollSize(random)
-	local radius = MonsterModel.radius(size.id)
+	local radius = MonsterModel.radius(size.id, monster.id)
 	local point = Roam.findFreePoint(state.rects, radius, RoamService.bodies(state.group), random)
 	if not point then
 		return false
@@ -280,7 +280,7 @@ local function bring(
 	size: string,
 	seconds: number
 ): Model?
-	local radius = MonsterModel.radius(size)
+	local radius = MonsterModel.radius(size, monster.id)
 	local others = RoamService.bodies(state.group)
 	local point = Roam.findFreePoint(
 		rectsNear(state.rects, position.X, position.Z, LureDistance),

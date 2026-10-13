@@ -14,6 +14,7 @@
 --   speed  swings per second while it walks; standing still it swings slower and smaller
 --   phase  0..1, where in the swing it starts (0.5 = opposite of 0, for left/right legs)
 --   spin   true to turn round and round instead (speed = turns per second; amp is ignored)
+--   slide  true to move back and forth along the axis instead (amp = how far, in studs)
 
 export type Joint = {
 	axis: "X" | "Y" | "Z",
@@ -22,6 +23,7 @@ export type Joint = {
 	phase: number?,
 	pivot: { number }?,
 	spin: boolean?, -- turns round and round (speed = turns per second) instead of swinging
+	slide: boolean?, -- moves up and down its axis (amp in studs) instead of swinging
 }
 
 export type Piece = {
@@ -38,6 +40,7 @@ export type Piece = {
 export type Look = {
 	gait: "walk" | "float",
 	top: number, -- highest point, the name label floats above it
+	grow: number?, -- drawn this many times bigger than other monsters of its size (event monsters)
 	pieces: { Piece },
 }
 
@@ -80,6 +83,13 @@ end
 local function spin(piece: Piece): Piece
 	local joint = piece.joint :: Joint
 	joint.spin = true
+	return piece
+end
+
+-- Makes a limb slide up and down (or along its axis) instead of swinging; amp is in studs.
+local function slide(piece: Piece): Piece
+	local joint = piece.joint :: Joint
+	joint.slide = true
 	return piece
 end
 
@@ -1036,22 +1046,40 @@ local CircusCream = { 238, 222, 185 }
 local CircusTeal = { 40, 145, 145 }
 local Popcorn = { 250, 235, 160 }
 local Faded = { 110, 40, 60 }
+local PopRed = { 205, 35, 40 }
 
--- Zone 3, Common: a striped popcorn bucket with a toothy grin, waddling on little legs.
+-- Zone 3, Common: a striped popcorn bucket with a toothy grin, waddling on little legs. Its
+-- popcorn is heaped high, half of it soaked red, and red drips run down the bucket.
 Looks.Poplet = {
 	gait = "walk",
-	top = 0.7,
+	top = 1.3,
 	pieces = {
 		block("Bucket", { 1.4, 1.6, 1.4 }, { 0, -0.9, 0 }, CircusCream),
 		block("LeftStripe", { 0.25, 1.62, 1.42 }, { -0.45, -0.9, 0 }, CircusRed),
 		block("MiddleStripe", { 0.25, 1.62, 1.42 }, { 0, -0.9, 0 }, CircusRed),
 		block("RightStripe", { 0.25, 1.62, 1.42 }, { 0.45, -0.9, 0 }, CircusRed),
 		block("Rim", { 1.5, 0.15, 1.5 }, { 0, -0.15, 0 }, CircusRed),
-		block("Kernel1", { 0.5, 0.45, 0.5 }, { -0.35, 0.1, -0.3 }, Popcorn),
-		block("Kernel2", { 0.55, 0.5, 0.5 }, { 0.35, 0.15, 0.2 }, Popcorn),
-		block("Kernel3", { 0.5, 0.5, 0.5 }, { 0, 0.4, 0 }, Popcorn),
-		block("Kernel4", { 0.45, 0.45, 0.45 }, { -0.3, 0.2, 0.35 }, Popcorn),
-		block("Kernel5", { 0.4, 0.4, 0.4 }, { 0.4, 0.05, -0.38 }, Popcorn),
+		block("Kernel1", { 0.5, 0.45, 0.5 }, { -0.35, 0.25, -0.3 }, Popcorn),
+		block("Kernel2", { 0.55, 0.5, 0.5 }, { 0.35, 0.3, 0.2 }, PopRed),
+		block("Kernel3", { 0.55, 0.5, 0.55 }, { 0, 0.6, 0 }, Popcorn),
+		block("Kernel4", { 0.45, 0.45, 0.45 }, { -0.35, 0.3, 0.35 }, PopRed),
+		block("Kernel5", { 0.45, 0.4, 0.4 }, { 0.4, 0.2, -0.4 }, Popcorn),
+		block("Kernel6", { 0.4, 0.4, 0.4 }, { -0.15, 0.85, -0.15 }, PopRed),
+		block("Kernel7", { 0.4, 0.35, 0.4 }, { 0.25, 0.8, 0.25 }, Popcorn),
+		block("Kernel8", { 0.35, 0.35, 0.35 }, { 0.05, 1.1, 0.05 }, Popcorn),
+		block("Kernel9", { 0.4, 0.4, 0.4 }, { -0.55, 0.15, -0.05 }, Popcorn),
+		block("Kernel10", { 0.4, 0.4, 0.4 }, { 0.55, 0.15, -0.05 }, PopRed),
+		block("Kernel11", { 0.35, 0.3, 0.35 }, { 0.1, 0.3, -0.5 }, Popcorn),
+		block("Kernel12", { 0.35, 0.35, 0.35 }, { -0.1, 0.45, 0.5 }, Popcorn),
+		block("Kernel13", { 0.3, 0.3, 0.3 }, { 0.3, 0.6, -0.25 }, PopRed),
+		block("Kernel14", { 0.3, 0.3, 0.3 }, { -0.4, 0.6, 0.05 }, Popcorn),
+		tilt(block("SpillLeft", { 0.3, 0.3, 0.3 }, { -0.8, -0.2, 0.3 }, Popcorn), 0, 0, 30),
+		tilt(block("SpillRight", { 0.3, 0.3, 0.3 }, { 0.8, -0.3, -0.2 }, PopRed), 0, 0, -20),
+		block("DripLeft", { 0.12, 0.45, 0.05 }, { -0.55, -0.37, -0.73 }, PopRed),
+		block("DripLeftEnd", { 0.08, 0.1, 0.05 }, { -0.55, -0.65, -0.73 }, PopRed),
+		block("DripRight", { 0.12, 0.3, 0.05 }, { 0.55, -0.3, -0.73 }, PopRed),
+		block("DripBack", { 0.12, 0.6, 0.05 }, { 0.2, -0.45, 0.73 }, PopRed),
+		block("Mound", { 1.3, 0.3, 1.3 }, { 0, 0, 0 }, Popcorn),
 		block("LeftEye", { 0.28, 0.28, 0.05 }, { -0.3, -0.55, -0.73 }, Black),
 		block("RightEye", { 0.28, 0.28, 0.05 }, { 0.3, -0.55, -0.73 }, Black),
 		block("LeftPupil", { 0.1, 0.1, 0.05 }, { -0.3, -0.55, -0.76 }, Candle, true),
@@ -1066,40 +1094,69 @@ Looks.Poplet = {
 	},
 }
 
--- Zone 3, Common: a red carnival balloon with a painted-on grin, its string swaying below.
+-- Zone 3, Common: a sad red carnival balloon, crying glowing tears, its string swaying below.
 Looks.BalloonBoo = {
 	gait = "float",
 	top = 1.4,
 	pieces = {
 		block("Balloon", { 1.4, 1.6, 1.4 }, { 0, 0.5, 0 }, CircusRed),
 		block("BalloonTop", { 1, 0.25, 1 }, { 0, 1.4, 0 }, CircusRed),
-		block("Shine", { 0.25, 0.4, 0.05 }, { -0.4, 0.95, -0.72 }, White, true),
-		block("LeftEye", { 0.25, 0.32, 0.05 }, { -0.3, 0.7, -0.72 }, Black),
-		block("RightEye", { 0.25, 0.32, 0.05 }, { 0.3, 0.7, -0.72 }, Black),
-		block("Smile", { 0.8, 0.12, 0.05 }, { 0, 0.2, -0.72 }, Black),
-		block("SmileLeft", { 0.12, 0.25, 0.05 }, { -0.4, 0.3, -0.72 }, Black),
-		block("SmileRight", { 0.12, 0.25, 0.05 }, { 0.4, 0.3, -0.72 }, Black),
+		block("Shine", { 0.18, 0.3, 0.05 }, { 0.52, 1.1, -0.72 }, White, true),
+		block("ShineDot", { 0.1, 0.1, 0.05 }, { 0.52, 0.88, -0.72 }, White, true),
+		block("LeftEye", { 0.25, 0.3, 0.05 }, { -0.3, 0.65, -0.72 }, Black),
+		block("RightEye", { 0.25, 0.3, 0.05 }, { 0.3, 0.65, -0.72 }, Black),
+		block("LeftGlint", { 0.07, 0.07, 0.05 }, { -0.36, 0.73, -0.75 }, White),
+		block("RightGlint", { 0.07, 0.07, 0.05 }, { 0.24, 0.73, -0.75 }, White),
+		tilt(block("LeftBrow", { 0.36, 0.07, 0.05 }, { -0.3, 0.92, -0.72 }, Black), 0, 0, 22),
+		tilt(block("RightBrow", { 0.36, 0.07, 0.05 }, { 0.3, 0.92, -0.72 }, Black), 0, 0, -22),
+		block("Frown", { 0.5, 0.1, 0.05 }, { 0, 0.3, -0.72 }, Black),
+		block("FrownLeft", { 0.12, 0.2, 0.05 }, { -0.29, 0.2, -0.72 }, Black),
+		block("FrownRight", { 0.12, 0.2, 0.05 }, { 0.29, 0.2, -0.72 }, Black),
+		block("LeftTear", { 0.1, 0.3, 0.05 }, { -0.36, 0.38, -0.74 }, { 140, 200, 255 }, true),
+		block("LeftTearDrop", { 0.12, 0.12, 0.05 }, { -0.36, 0.13, -0.74 }, { 140, 200, 255 }, true),
+		block("RightTear", { 0.1, 0.18, 0.05 }, { 0.36, 0.43, -0.74 }, { 140, 200, 255 }, true),
+		block("Wrinkle", { 0.05, 0.4, 0.05 }, { -0.55, -0.05, -0.71 }, Faded),
 		block("Knot", { 0.3, 0.25, 0.3 }, { 0, -0.42, 0 }, Faded),
 		limb("String1", { 0.08, 0.6, 0.08 }, { 0, -0.85, 0 }, White, "X", 15, 1, 0, { 0, 0.3, 0 }),
 		limb("String2", { 0.08, 0.6, 0.08 }, { 0, -1.45, 0 }, White, "X", 20, 1, 0.2, { 0, 0.9, 0 }),
 	},
 }
 
--- Zone 3, Uncommon: a green gremlin in a bellhop cap, clutching a roll of tickets.
+-- Zone 3, Uncommon: a green gremlin in a carnival usher's uniform (gold-trimmed jacket, bow tie,
+-- pillbox cap), clutching a big roll of tickets that unspools as it waddles.
 local Gremlin = { 100, 140, 70 }
 local GremlinDark = { 70, 100, 50 }
 Looks.TicketGremlin = {
 	gait = "walk",
-	top = 0.75,
+	top = 0.85,
 	pieces = {
 		block("Body", { 1, 1, 0.8 }, { 0, -1, 0 }, Gremlin),
-		block("Vest", { 1.05, 0.55, 0.85 }, { 0, -0.85, 0 }, CircusRed),
-		block("VestButtons", { 0.1, 0.4, 0.05 }, { 0, -0.85, -0.45 }, Gold),
+		block("Jacket", { 1.05, 0.7, 0.85 }, { 0, -0.93, 0 }, CircusRed),
+		block("Collar", { 1.08, 0.12, 0.88 }, { 0, -0.62, 0 }, Gold),
+		block("JacketHem", { 1.07, 0.08, 0.87 }, { 0, -1.27, 0 }, Gold),
+		block("Shorts", { 1.02, 0.22, 0.82 }, { 0, -1.4, 0 }, Black),
+		block("BowTie", { 0.36, 0.14, 0.05 }, { 0, -0.7, -0.45 }, Black),
+		block("BowKnot", { 0.1, 0.1, 0.06 }, { 0, -0.7, -0.47 }, CircusRed),
+		block("Button1", { 0.08, 0.08, 0.05 }, { -0.15, -0.88, -0.45 }, Gold),
+		block("Button2", { 0.08, 0.08, 0.05 }, { 0.15, -0.88, -0.45 }, Gold),
+		block("Button3", { 0.08, 0.08, 0.05 }, { -0.15, -1.1, -0.45 }, Gold),
+		block("Button4", { 0.08, 0.08, 0.05 }, { 0.15, -1.1, -0.45 }, Gold),
+		block("Pocket", { 0.25, 0.18, 0.05 }, { -0.33, -0.95, -0.45 }, { 140, 25, 35 }),
+		block("PocketTicket", { 0.14, 0.18, 0.05 }, { -0.33, -0.82, -0.46 }, { 245, 205, 130 }),
+		block("LeftEpaulette", { 0.25, 0.1, 0.45 }, { -0.5, -0.6, 0 }, Gold),
+		block("RightEpaulette", { 0.25, 0.1, 0.45 }, { 0.5, -0.6, 0 }, Gold),
 		block("Head", { 1.1, 0.9, 0.9 }, { 0, -0.05, -0.05 }, Gremlin),
-		block("Cap", { 0.6, 0.3, 0.6 }, { 0, 0.55, 0 }, CircusRed),
+		block("Cap", { 0.6, 0.35, 0.6 }, { 0, 0.57, 0 }, CircusRed),
 		block("CapBand", { 0.62, 0.08, 0.62 }, { 0, 0.45, 0 }, Gold),
+		block("CapButton", { 0.15, 0.08, 0.15 }, { 0, 0.78, 0 }, Gold),
+		block("CapBadge", { 0.15, 0.15, 0.05 }, { 0, 0.6, -0.32 }, Gold),
+		block("ChinStrap", { 0.04, 0.5, 0.04 }, { 0.5, 0.2, -0.2 }, Black),
 		block("LeftEye", { 0.25, 0.22, 0.05 }, { -0.25, 0.08, -0.52 }, { 255, 230, 60 }, true),
 		block("RightEye", { 0.25, 0.22, 0.05 }, { 0.25, 0.08, -0.52 }, { 255, 230, 60 }, true),
+		block("LeftPupil", { 0.07, 0.15, 0.05 }, { -0.25, 0.08, -0.55 }, Black),
+		block("RightPupil", { 0.07, 0.15, 0.05 }, { 0.25, 0.08, -0.55 }, Black),
+		tilt(block("LeftBrow", { 0.3, 0.06, 0.05 }, { -0.25, 0.25, -0.52 }, GremlinDark), 0, 0, -20),
+		tilt(block("RightBrow", { 0.3, 0.06, 0.05 }, { 0.25, 0.25, -0.52 }, GremlinDark), 0, 0, 20),
 		block("Nose", { 0.2, 0.2, 0.2 }, { 0, -0.12, -0.6 }, GremlinDark),
 		block("Mouth", { 0.6, 0.12, 0.05 }, { 0, -0.32, -0.52 }, Black),
 		block("ToothLeft", { 0.1, 0.12, 0.05 }, { -0.18, -0.28, -0.55 }, White),
@@ -1126,29 +1183,120 @@ Looks.TicketGremlin = {
 			0,
 			20
 		),
-		limb("LeftArm", { 0.25, 0.7, 0.25 }, { -0.62, -1, 0 }, Gremlin, "X", 30, 2, 0.5, { 0, 0.35, 0 }),
-		limb("RightArm", { 0.25, 0.7, 0.25 }, { 0.62, -1, 0 }, Gremlin, "X", 30, 2, 0, { 0, 0.35, 0 }),
+		limb(
+			"LeftArm",
+			{ 0.25, 0.55, 0.25 },
+			{ -0.62, -0.92, 0 },
+			CircusRed,
+			"X",
+			30,
+			2,
+			0.5,
+			{ 0, 0.27, 0 }
+		),
+		limb("LeftCuff", { 0.27, 0.08, 0.27 }, { -0.62, -1.2, 0 }, Gold, "X", 30, 2, 0.5, { 0, 0.55, 0 }),
+		limb("LeftHand", { 0.22, 0.18, 0.22 }, { -0.62, -1.33, 0 }, Gremlin, "X", 30, 2, 0.5, { 0, 0.68, 0 }),
+		limb("RightArm", { 0.25, 0.55, 0.25 }, { 0.62, -0.92, 0 }, CircusRed, "X", 30, 2, 0, { 0, 0.27, 0 }),
+		limb("RightCuff", { 0.27, 0.08, 0.27 }, { 0.62, -1.2, 0 }, Gold, "X", 30, 2, 0, { 0, 0.55, 0 }),
+		limb("RightHand", { 0.22, 0.18, 0.22 }, { 0.62, -1.33, 0 }, Gremlin, "X", 30, 2, 0, { 0, 0.68, 0 }),
 		limb(
 			"TicketRoll",
-			{ 0.35, 0.35, 0.35 },
-			{ 0.62, -1.45, -0.1 },
+			{ 0.3, 0.5, 0.5 },
+			{ 0.72, -1.4, -0.25 },
+			{ 245, 205, 130 },
+			"X",
+			30,
+			2,
+			0,
+			{ -0.1, 0.75, 0.25 }
+		),
+		limb(
+			"RollEdgeLeft",
+			{ 0.04, 0.52, 0.52 },
+			{ 0.57, -1.4, -0.25 },
 			{ 230, 120, 60 },
 			"X",
 			30,
 			2,
 			0,
-			{ 0, 0.8, 0.1 }
+			{ 0.05, 0.75, 0.25 }
 		),
 		limb(
-			"Tickets",
-			{ 0.25, 0.05, 0.6 },
-			{ 0.62, -1.55, -0.45 },
-			{ 245, 200, 120 },
+			"RollEdgeRight",
+			{ 0.04, 0.52, 0.52 },
+			{ 0.87, -1.4, -0.25 },
+			{ 230, 120, 60 },
 			"X",
 			30,
 			2,
 			0,
-			{ 0, 0.9, 0.45 }
+			{ -0.25, 0.75, 0.25 }
+		),
+		limb(
+			"RollCore",
+			{ 0.34, 0.16, 0.16 },
+			{ 0.72, -1.4, -0.25 },
+			Wood,
+			"X",
+			30,
+			2,
+			0,
+			{ -0.1, 0.75, 0.25 }
+		),
+		limb(
+			"TicketStrip",
+			{ 0.24, 0.04, 0.5 },
+			{ 0.72, -1.63, -0.7 },
+			{ 245, 205, 130 },
+			"X",
+			30,
+			2,
+			0,
+			{ -0.1, 0.98, 0.7 }
+		),
+		limb(
+			"TicketEnd",
+			{ 0.24, 0.25, 0.04 },
+			{ 0.72, -1.76, -0.95 },
+			{ 245, 205, 130 },
+			"X",
+			30,
+			2,
+			0,
+			{ -0.1, 1.11, 0.95 }
+		),
+		limb(
+			"Perforation1",
+			{ 0.25, 0.05, 0.03 },
+			{ 0.72, -1.6, -0.6 },
+			{ 150, 110, 70 },
+			"X",
+			30,
+			2,
+			0,
+			{ -0.1, 0.95, 0.6 }
+		),
+		limb(
+			"Perforation2",
+			{ 0.25, 0.05, 0.03 },
+			{ 0.72, -1.6, -0.85 },
+			{ 150, 110, 70 },
+			"X",
+			30,
+			2,
+			0,
+			{ -0.1, 0.95, 0.85 }
+		),
+		limb(
+			"TicketPrint",
+			{ 0.14, 0.02, 0.12 },
+			{ 0.72, -1.6, -0.72 },
+			CircusRed,
+			"X",
+			30,
+			2,
+			0,
+			{ -0.1, 0.95, 0.72 }
 		),
 		limb("LeftLeg", { 0.3, 0.5, 0.3 }, { -0.3, -1.75, 0 }, GremlinDark, "X", 30, 2, 0, { 0, 0.25, 0 }),
 		limb("RightLeg", { 0.3, 0.5, 0.3 }, { 0.3, -1.75, 0 }, GremlinDark, "X", 30, 2, 0.5, { 0, 0.25, 0 }),
@@ -1156,97 +1304,436 @@ Looks.TicketGremlin = {
 }
 
 -- Zone 3, Uncommon: a chipped carousel horse that broke loose, still skewered on its golden pole.
+-- The pole runs right through it; the horse slides up and down it like on the ride, frozen
+-- mid-gallop, bleeding where the pole goes in and comes out.
 local CarouselWhite = { 235, 230, 220 }
 Looks.CarouselColt = {
 	gait = "walk",
-	top = 2.2,
+	top = 3.2,
 	pieces = {
-		block("Body", { 1.2, 1, 2.2 }, { 0, -0.5, 0.1 }, CarouselWhite),
-		block("Chip", { 0.05, 0.4, 0.5 }, { 0.62, -0.4, 0.5 }, { 120, 110, 100 }),
-		tilt(block("Neck", { 0.55, 1.1, 0.6 }, { 0, 0.25, -1.05 }, CarouselWhite), -30, 0, 0),
-		tilt(block("Mane", { 0.2, 1.1, 0.25 }, { 0, 0.45, -0.8 }, CircusTeal), -30, 0, 0),
-		tilt(block("Head", { 0.5, 0.5, 0.9 }, { 0, 0.75, -1.55 }, CarouselWhite), -25, 0, 0),
-		tilt(block("Muzzle", { 0.45, 0.35, 0.3 }, { 0, 0.55, -1.95 }, { 200, 190, 180 }), -25, 0, 0),
-		block("LeftEar", { 0.12, 0.3, 0.12 }, { -0.15, 1.1, -1.35 }, CarouselWhite),
-		block("RightEar", { 0.12, 0.3, 0.12 }, { 0.15, 1.1, -1.35 }, CarouselWhite),
-		block("LeftEye", { 0.06, 0.12, 0.12 }, { -0.26, 0.85, -1.6 }, { 255, 50, 50 }, true),
-		block("RightEye", { 0.06, 0.12, 0.12 }, { 0.26, 0.85, -1.6 }, { 255, 50, 50 }, true),
-		block("Saddle", { 1.25, 0.15, 0.8 }, { 0, 0.05, 0.1 }, CircusRed),
-		block("SaddleTrim", { 1.3, 0.08, 0.85 }, { 0, -0.05, 0.1 }, Gold),
-		block("Pole", { 0.2, 2.6, 0.2 }, { 0, 0.85, 0.1 }, Gold),
-		block("PoleStripe1", { 0.22, 0.15, 0.22 }, { 0, 0.6, 0.1 }, CircusRed),
-		block("PoleStripe2", { 0.22, 0.15, 0.22 }, { 0, 1.2, 0.1 }, CircusRed),
-		block("PoleStripe3", { 0.22, 0.15, 0.22 }, { 0, 1.8, 0.1 }, CircusRed),
-		block("PoleCap", { 0.35, 0.2, 0.35 }, { 0, 2.2, 0.1 }, Gold),
-		limb("Tail", { 0.25, 0.8, 0.25 }, { 0, -0.5, 1.3 }, CircusTeal, "X", 20, 2, 0, { 0, 0.4, 0 }),
-		limb(
-			"FrontLeftLeg",
-			{ 0.3, 0.8, 0.3 },
-			{ -0.35, -1.4, -0.75 },
-			CarouselWhite,
-			"X",
-			30,
-			2,
+		-- The pole stays put; everything else rides up and down it.
+		block("PoleBase", { 0.7, 0.2, 0.7 }, { 0, -1.9, 0.1 }, Gold),
+		block("Pole", { 0.2, 4.6, 0.2 }, { 0, 0.7, 0.1 }, Gold),
+		block("PoleStripe1", { 0.22, 0.15, 0.22 }, { 0, -1.45, 0.1 }, CircusRed),
+		block("PoleStripe2", { 0.22, 0.15, 0.22 }, { 0, 1.35, 0.1 }, CircusRed),
+		block("PoleStripe3", { 0.22, 0.15, 0.22 }, { 0, 1.95, 0.1 }, CircusRed),
+		block("PoleStripe4", { 0.22, 0.15, 0.22 }, { 0, 2.55, 0.1 }, CircusRed),
+		block("PoleBloodHigh", { 0.22, 0.6, 0.22 }, { 0, 0.55, 0.1 }, Blood),
+		block("PoleBloodLow", { 0.22, 0.6, 0.22 }, { 0, -1, 0.1 }, Blood),
+		block("PoleCap", { 0.4, 0.25, 0.4 }, { 0, 3.05, 0.1 }, Gold),
+		slide(
+			limb("Body", { 1.1, 0.95, 2.1 }, { 0, -0.3, 0.1 }, CarouselWhite, "Y", 0.35, 0.8, 0, { 0, 0, 0 })
+		),
+		slide(
+			limb(
+				"Chip",
+				{ 0.05, 0.4, 0.5 },
+				{ 0.57, -0.2, 0.5 },
+				{ 120, 110, 100 },
+				"Y",
+				0.35,
+				0.8,
+				0,
+				{ 0, 0, 0 }
+			)
+		),
+		slide(
+			limb(
+				"ChipLow",
+				{ 0.05, 0.25, 0.3 },
+				{ -0.57, -0.5, -0.4 },
+				{ 120, 110, 100 },
+				"Y",
+				0.35,
+				0.8,
+				0,
+				{ 0, 0, 0 }
+			)
+		),
+		slide(
+			limb("Saddle", { 1.15, 0.15, 0.8 }, { 0, 0.23, 0.1 }, CircusRed, "Y", 0.35, 0.8, 0, { 0, 0, 0 })
+		),
+		slide(
+			limb("SaddleTrim", { 1.2, 0.06, 0.85 }, { 0, 0.14, 0.1 }, Gold, "Y", 0.35, 0.8, 0, { 0, 0, 0 })
+		),
+		slide(
+			limb(
+				"WoundTop",
+				{ 0.42, 0.04, 0.42 },
+				{ 0, 0.32, 0.1 },
+				{ 110, 10, 15 },
+				"Y",
+				0.35,
+				0.8,
+				0,
+				{ 0, 0, 0 }
+			)
+		),
+		slide(
+			limb(
+				"BloodSaddleLeft",
+				{ 0.06, 0.45, 0.06 },
+				{ -0.6, 0.02, 0.2 },
+				Blood,
+				"Y",
+				0.35,
+				0.8,
+				0,
+				{ 0, 0, 0 }
+			)
+		),
+		slide(
+			limb(
+				"BloodSaddleRight",
+				{ 0.06, 0.3, 0.06 },
+				{ 0.6, 0.08, 0 },
+				Blood,
+				"Y",
+				0.35,
+				0.8,
+				0,
+				{ 0, 0, 0 }
+			)
+		),
+		slide(
+			limb(
+				"WoundBottom",
+				{ 0.42, 0.04, 0.42 },
+				{ 0, -0.79, 0.1 },
+				{ 110, 10, 15 },
+				"Y",
+				0.35,
+				0.8,
+				0,
+				{ 0, 0, 0 }
+			)
+		),
+		slide(
+			limb(
+				"BloodDrip",
+				{ 0.07, 0.3, 0.07 },
+				{ 0.14, -0.95, 0.1 },
+				Blood,
+				"Y",
+				0.35,
+				0.8,
+				0,
+				{ 0, 0, 0 }
+			)
+		),
+		slide(
+			limb("BloodDrop", { 0.08, 0.1, 0.08 }, { 0.14, -1.2, 0.1 }, Blood, "Y", 0.35, 0.8, 0, { 0, 0, 0 })
+		),
+		tilt(
+			slide(
+				limb(
+					"Neck",
+					{ 0.5, 1.05, 0.55 },
+					{ 0, 0.42, -0.9 },
+					CarouselWhite,
+					"Y",
+					0.35,
+					0.8,
+					0,
+					{ 0, 0, 0 }
+				)
+			),
+			-30,
 			0,
-			{ 0, 0.4, 0 }
+			0
 		),
-		limb(
-			"FrontLeftHoof",
-			{ 0.34, 0.2, 0.34 },
-			{ -0.35, -1.9, -0.75 },
-			Gold,
-			"X",
-			30,
-			2,
+		tilt(
+			slide(
+				limb(
+					"Mane",
+					{ 0.2, 1.1, 0.25 },
+					{ 0, 0.62, -0.68 },
+					CircusTeal,
+					"Y",
+					0.35,
+					0.8,
+					0,
+					{ 0, 0, 0 }
+				)
+			),
+			-30,
 			0,
-			{ 0, 0.9, 0 }
+			0
 		),
-		limb(
-			"FrontRightLeg",
-			{ 0.3, 0.8, 0.3 },
-			{ 0.35, -1.4, -0.75 },
-			CarouselWhite,
-			"X",
-			30,
-			2,
-			0.5,
-			{ 0, 0.4, 0 }
-		),
-		limb(
-			"FrontRightHoof",
-			{ 0.34, 0.2, 0.34 },
-			{ 0.35, -1.9, -0.75 },
-			Gold,
-			"X",
-			30,
-			2,
-			0.5,
-			{ 0, 0.9, 0 }
-		),
-		limb(
-			"BackLeftLeg",
-			{ 0.3, 0.8, 0.3 },
-			{ -0.35, -1.4, 0.9 },
-			CarouselWhite,
-			"X",
-			30,
-			2,
-			0.5,
-			{ 0, 0.4, 0 }
-		),
-		limb("BackLeftHoof", { 0.34, 0.2, 0.34 }, { -0.35, -1.9, 0.9 }, Gold, "X", 30, 2, 0.5, { 0, 0.9, 0 }),
-		limb(
-			"BackRightLeg",
-			{ 0.3, 0.8, 0.3 },
-			{ 0.35, -1.4, 0.9 },
-			CarouselWhite,
-			"X",
-			30,
-			2,
+		tilt(
+			slide(
+				limb(
+					"Head",
+					{ 0.5, 0.5, 0.9 },
+					{ 0, 0.95, -1.4 },
+					CarouselWhite,
+					"Y",
+					0.35,
+					0.8,
+					0,
+					{ 0, 0, 0 }
+				)
+			),
+			-25,
 			0,
-			{ 0, 0.4, 0 }
+			0
 		),
-		limb("BackRightHoof", { 0.34, 0.2, 0.34 }, { 0.35, -1.9, 0.9 }, Gold, "X", 30, 2, 0, { 0, 0.9, 0 }),
+		tilt(
+			slide(
+				limb(
+					"Muzzle",
+					{ 0.45, 0.35, 0.3 },
+					{ 0, 0.75, -1.8 },
+					{ 200, 190, 180 },
+					"Y",
+					0.35,
+					0.8,
+					0,
+					{ 0, 0, 0 }
+				)
+			),
+			-25,
+			0,
+			0
+		),
+		tilt(
+			slide(
+				limb("Bridle", { 0.54, 0.08, 0.4 }, { 0, 0.88, -1.55 }, Gold, "Y", 0.35, 0.8, 0, { 0, 0, 0 })
+			),
+			-25,
+			0,
+			0
+		),
+		slide(limb("Teeth", { 0.38, 0.08, 0.06 }, { 0, 0.6, -1.97 }, White, "Y", 0.35, 0.8, 0, { 0, 0, 0 })),
+		slide(
+			limb(
+				"MouthBlood",
+				{ 0.06, 0.25, 0.06 },
+				{ 0.12, 0.45, -1.95 },
+				Blood,
+				"Y",
+				0.35,
+				0.8,
+				0,
+				{ 0, 0, 0 }
+			)
+		),
+		slide(
+			limb(
+				"LeftEar",
+				{ 0.12, 0.3, 0.12 },
+				{ -0.15, 1.3, -1.2 },
+				CarouselWhite,
+				"Y",
+				0.35,
+				0.8,
+				0,
+				{ 0, 0, 0 }
+			)
+		),
+		slide(
+			limb(
+				"RightEar",
+				{ 0.12, 0.3, 0.12 },
+				{ 0.15, 1.3, -1.2 },
+				CarouselWhite,
+				"Y",
+				0.35,
+				0.8,
+				0,
+				{ 0, 0, 0 }
+			)
+		),
+		slide(
+			limb(
+				"LeftEye",
+				{ 0.06, 0.12, 0.12 },
+				{ -0.26, 1.05, -1.45 },
+				{ 255, 50, 50 },
+				"Y",
+				0.35,
+				0.8,
+				0,
+				{ 0, 0, 0 },
+				true
+			)
+		),
+		slide(
+			limb(
+				"RightEye",
+				{ 0.06, 0.12, 0.12 },
+				{ 0.26, 1.05, -1.45 },
+				{ 255, 50, 50 },
+				"Y",
+				0.35,
+				0.8,
+				0,
+				{ 0, 0, 0 },
+				true
+			)
+		),
+		tilt(
+			slide(
+				limb(
+					"Tail",
+					{ 0.25, 0.8, 0.25 },
+					{ 0, -0.26, 1.41 },
+					CircusTeal,
+					"Y",
+					0.35,
+					0.8,
+					0,
+					{ 0, 0, 0 }
+				)
+			),
+			-40,
+			0,
+			0
+		),
+		tilt(
+			slide(
+				limb(
+					"FrontLeftLeg",
+					{ 0.28, 0.75, 0.28 },
+					{ -0.33, -0.891, -0.987 },
+					CarouselWhite,
+					"Y",
+					0.35,
+					0.8,
+					0,
+					{ 0, 0, 0 }
+				)
+			),
+			50,
+			0,
+			0
+		),
+		tilt(
+			slide(
+				limb(
+					"FrontLeftHoof",
+					{ 0.32, 0.2, 0.32 },
+					{ -0.33, -1.196, -1.351 },
+					Gold,
+					"Y",
+					0.35,
+					0.8,
+					0,
+					{ 0, 0, 0 }
+				)
+			),
+			50,
+			0,
+			0
+		),
+		tilt(
+			slide(
+				limb(
+					"FrontRightLeg",
+					{ 0.28, 0.75, 0.28 },
+					{ 0.33, -0.975, -0.887 },
+					CarouselWhite,
+					"Y",
+					0.35,
+					0.8,
+					0,
+					{ 0, 0, 0 }
+				)
+			),
+			30,
+			0,
+			0
+		),
+		tilt(
+			slide(
+				limb(
+					"FrontRightHoof",
+					{ 0.32, 0.2, 0.32 },
+					{ 0.33, -1.386, -1.125 },
+					Gold,
+					"Y",
+					0.35,
+					0.8,
+					0,
+					{ 0, 0, 0 }
+				)
+			),
+			30,
+			0,
+			0
+		),
+		tilt(
+			slide(
+				limb(
+					"BackLeftLeg",
+					{ 0.28, 0.75, 0.28 },
+					{ -0.33, -0.957, 1.065 },
+					CarouselWhite,
+					"Y",
+					0.35,
+					0.8,
+					0,
+					{ 0, 0, 0 }
+				)
+			),
+			-35,
+			0,
+			0
+		),
+		tilt(
+			slide(
+				limb(
+					"BackLeftHoof",
+					{ 0.32, 0.2, 0.32 },
+					{ -0.33, -1.346, 1.338 },
+					Gold,
+					"Y",
+					0.35,
+					0.8,
+					0,
+					{ 0, 0, 0 }
+				)
+			),
+			-35,
+			0,
+			0
+		),
+		tilt(
+			slide(
+				limb(
+					"BackRightLeg",
+					{ 0.28, 0.75, 0.28 },
+					{ 0.33, -1.012, 0.947 },
+					CarouselWhite,
+					"Y",
+					0.35,
+					0.8,
+					0,
+					{ 0, 0, 0 }
+				)
+			),
+			-15,
+			0,
+			0
+		),
+		tilt(
+			slide(
+				limb(
+					"BackRightHoof",
+					{ 0.32, 0.2, 0.32 },
+					{ 0.33, -1.471, 1.07 },
+					Gold,
+					"Y",
+					0.35,
+					0.8,
+					0,
+					{ 0, 0, 0 }
+				)
+			),
+			-15,
+			0,
+			0
+		),
 	},
 }
 
@@ -1334,50 +1821,239 @@ Looks.JesterJinx = {
 	},
 }
 
--- Zone 3, Epic: a cracked funhouse mirror whose reflection grins back, with shards circling it.
-local MirrorGlass = { 175, 195, 215 }
+-- Zone 3, Epic: a cracked funhouse mirror in an ornate gold frame. The thing in the glass grins
+-- back with hollow eyes and bloody teeth, its claws curl round the frame as it climbs out, and
+-- jagged shards of glass circle it.
+local MirrorGlass = { 185, 205, 225 }
 local Magenta = { 255, 70, 200 }
+local GoldDark = { 190, 145, 50 }
+local Reflection = { 235, 245, 255 }
+local Crack = { 50, 55, 65 }
+local ClawGrey = { 160, 160, 175 }
 Looks.MirrorGrin = {
 	gait = "float",
-	top = 1.9,
+	top = 2.1,
 	pieces = {
-		block("Frame", { 1.8, 2.6, 0.3 }, { 0, 0.2, 0 }, Gold),
-		block("Glass", { 1.4, 2.2, 0.1 }, { 0, 0.2, -0.16 }, MirrorGlass),
-		block("Crest", { 0.8, 0.4, 0.3 }, { 0, 1.65, 0 }, Gold),
-		block("LeftFinial", { 0.3, 0.3, 0.3 }, { -0.9, 1.55, 0 }, Gold),
-		block("RightFinial", { 0.3, 0.3, 0.3 }, { 0.9, 1.55, 0 }, Gold),
-		block("Gem", { 0.2, 0.2, 0.1 }, { 0, 1.65, -0.18 }, Magenta, true),
-		block("LeftEye", { 0.28, 0.2, 0.05 }, { -0.35, 0.65, -0.23 }, Magenta, true),
-		block("RightEye", { 0.28, 0.2, 0.05 }, { 0.35, 0.65, -0.23 }, Magenta, true),
-		block("Grin", { 1.1, 0.25, 0.05 }, { 0, -0.1, -0.22 }, Black),
-		block("Teeth", { 1, 0.08, 0.05 }, { 0, -0.02, -0.25 }, White),
-		block("GrinLeft", { 0.12, 0.3, 0.05 }, { -0.55, 0.05, -0.22 }, Black),
-		block("GrinRight", { 0.12, 0.3, 0.05 }, { 0.55, 0.05, -0.22 }, Black),
-		tilt(block("CrackTop", { 0.05, 0.9, 0.05 }, { 0.35, 0.9, -0.22 }, { 60, 60, 70 }), 0, 0, 30),
-		tilt(block("CrackBottom", { 0.05, 0.7, 0.05 }, { -0.4, -0.6, -0.22 }, { 60, 60, 70 }), 0, 0, -25),
+		block("Frame", { 2, 2.8, 0.3 }, { 0, 0.2, 0 }, Gold),
+		block("FrameInner", { 1.7, 2.5, 0.05 }, { 0, 0.2, -0.16 }, GoldDark),
+		block("Glass", { 1.5, 2.3, 0.1 }, { 0, 0.2, -0.17 }, MirrorGlass),
+		block("Backing", { 1.8, 2.6, 0.1 }, { 0, 0.2, 0.18 }, Wood),
+		block("Crest", { 1, 0.45, 0.3 }, { 0, 1.75, 0 }, Gold),
+		block("CrestTop", { 0.4, 0.25, 0.3 }, { 0, 2.05, 0 }, Gold),
+		block("Gem", { 0.22, 0.22, 0.1 }, { 0, 1.75, -0.18 }, Magenta, true),
+		block("TopLeftKnob", { 0.35, 0.35, 0.35 }, { -1, 1.6, 0 }, Gold),
+		block("TopRightKnob", { 0.35, 0.35, 0.35 }, { 1, 1.6, 0 }, Gold),
+		block("BottomLeftKnob", { 0.35, 0.35, 0.35 }, { -1, -1.2, 0 }, Gold),
+		block("BottomRightKnob", { 0.35, 0.35, 0.35 }, { 1, -1.2, 0 }, Gold),
+		block("LeftScroll", { 0.2, 0.7, 0.35 }, { -1.05, 0.2, 0 }, GoldDark),
+		block("RightScroll", { 0.2, 0.7, 0.35 }, { 1.05, 0.2, 0 }, GoldDark),
+		block("Bottom", { 0.8, 0.3, 0.3 }, { 0, -1.3, 0 }, Gold),
+		block("BottomPoint", { 0.3, 0.25, 0.3 }, { 0, -1.55, 0 }, Gold),
+		-- The glass: a silvery shine, and the face of the thing living in it.
+		tilt(block("Shine1", { 0.12, 0.8, 0.03 }, { -0.45, 1.0, -0.23 }, Reflection), 0, 0, -35),
+		tilt(block("Shine2", { 0.07, 0.5, 0.03 }, { -0.25, 1.1, -0.23 }, Reflection), 0, 0, -35),
+		tilt(block("Shine3", { 0.07, 0.4, 0.03 }, { 0.5, -0.75, -0.23 }, Reflection), 0, 0, -35),
+		block("LeftSocket", { 0.42, 0.32, 0.05 }, { -0.35, 0.65, -0.24 }, Black),
+		block("RightSocket", { 0.42, 0.32, 0.05 }, { 0.35, 0.65, -0.24 }, Black),
+		block("LeftEye", { 0.13, 0.13, 0.05 }, { -0.35, 0.65, -0.27 }, Magenta, true),
+		block("RightEye", { 0.13, 0.13, 0.05 }, { 0.35, 0.65, -0.27 }, Magenta, true),
+		tilt(block("LeftBrow", { 0.45, 0.08, 0.05 }, { -0.35, 0.88, -0.24 }, Black), 0, 0, -20),
+		tilt(block("RightBrow", { 0.45, 0.08, 0.05 }, { 0.35, 0.88, -0.24 }, Black), 0, 0, 20),
+		block("Grin", { 1.2, 0.45, 0.05 }, { 0, -0.15, -0.24 }, Black),
+		block("GrinLeft", { 0.14, 0.35, 0.05 }, { -0.62, 0.1, -0.24 }, Black),
+		block("GrinRight", { 0.14, 0.35, 0.05 }, { 0.62, 0.1, -0.24 }, Black),
+		block("TopTooth1", { 0.15, 0.2, 0.05 }, { -0.48, -0.02, -0.27 }, White),
+		block("TopTooth2", { 0.15, 0.2, 0.05 }, { -0.24, -0.02, -0.27 }, White),
+		block("TopTooth3", { 0.15, 0.2, 0.05 }, { 0, -0.02, -0.27 }, White),
+		block("TopTooth4", { 0.15, 0.2, 0.05 }, { 0.24, -0.02, -0.27 }, White),
+		block("TopTooth5", { 0.15, 0.2, 0.05 }, { 0.48, -0.02, -0.27 }, White),
+		block("BottomTooth1", { 0.15, 0.18, 0.05 }, { -0.36, -0.29, -0.27 }, White),
+		block("BottomTooth2", { 0.15, 0.18, 0.05 }, { -0.12, -0.29, -0.27 }, White),
+		block("BottomTooth3", { 0.15, 0.18, 0.05 }, { 0.12, -0.29, -0.27 }, White),
+		block("BottomTooth4", { 0.15, 0.18, 0.05 }, { 0.36, -0.29, -0.27 }, White),
+		block("BloodDrip1", { 0.08, 0.45, 0.05 }, { 0.2, -0.58, -0.26 }, Blood),
+		block("BloodDrip2", { 0.08, 0.3, 0.05 }, { -0.3, -0.5, -0.26 }, Blood),
+		block("BloodDrop", { 0.1, 0.1, 0.05 }, { 0.2, -0.88, -0.26 }, Blood),
+		block("Impact", { 0.14, 0.14, 0.04 }, { 0.42, 1.0, -0.24 }, Crack),
+		tilt(block("Crack1", { 0.05, 0.6, 0.03 }, { 0.25, 0.75, -0.24 }, Crack), 0, 0, 35),
+		tilt(block("Crack2", { 0.05, 0.5, 0.03 }, { 0.6, 1.2, -0.24 }, Crack), 0, 0, -55),
+		tilt(block("Crack3", { 0.05, 0.45, 0.03 }, { 0.2, 1.12, -0.24 }, Crack), 0, 0, 75),
+		tilt(block("Crack4", { 0.05, 0.5, 0.03 }, { 0.6, 0.75, -0.24 }, Crack), 0, 0, -25),
+		tilt(block("Crack5", { 0.05, 0.8, 0.03 }, { -0.45, -0.75, -0.24 }, Crack), 0, 0, -25),
+		-- Claws gripping the frame from inside the glass.
+		block("LeftClaw1", { 0.4, 0.07, 0.07 }, { -0.95, 0.5, -0.2 }, ClawGrey),
+		block("LeftClaw2", { 0.45, 0.07, 0.07 }, { -0.95, 0.35, -0.2 }, ClawGrey),
+		block("LeftClaw3", { 0.4, 0.07, 0.07 }, { -0.95, 0.2, -0.2 }, ClawGrey),
+		block("RightClaw1", { 0.4, 0.07, 0.07 }, { 0.95, -0.4, -0.2 }, ClawGrey),
+		block("RightClaw2", { 0.45, 0.07, 0.07 }, { 0.95, -0.55, -0.2 }, ClawGrey),
+		block("RightClaw3", { 0.4, 0.07, 0.07 }, { 0.95, -0.7, -0.2 }, ClawGrey),
+		-- Four jagged shards circling the mirror, one of them bloody.
 		spin(
-			limb("Shard1", { 0.3, 0.45, 0.05 }, { 1.4, 0.4, 0 }, MirrorGlass, "Y", 0, 0.3, 0, { -1.4, 0, 0 })
+			limb("Shard1", { 0.3, 0.5, 0.06 }, { 1.6, 0.6, 0 }, MirrorGlass, "Y", 0, 0.25, 0, { -1.6, 0, 0 })
+		),
+		spin(
+			limb(
+				"Shard1Point",
+				{ 0.15, 0.3, 0.06 },
+				{ 1.67, 0.98, 0 },
+				MirrorGlass,
+				"Y",
+				0,
+				0.25,
+				0,
+				{ -1.67, 0, 0 }
+			)
+		),
+		spin(
+			limb(
+				"Shard1Chip",
+				{ 0.12, 0.15, 0.06 },
+				{ 1.5, 0.28, 0 },
+				MirrorGlass,
+				"Y",
+				0,
+				0.25,
+				0,
+				{ -1.5, 0, 0 }
+			)
+		),
+		spin(
+			limb(
+				"Shard1Edge",
+				{ 0.05, 0.5, 0.07 },
+				{ 1.44, 0.6, 0 },
+				Reflection,
+				"Y",
+				0,
+				0.25,
+				0,
+				{ -1.44, 0, 0 }
+			)
 		),
 		spin(
 			limb(
 				"Shard2",
-				{ 0.25, 0.35, 0.05 },
-				{ -1.4, -0.2, 0 },
+				{ 0.28, 0.45, 0.06 },
+				{ -1.6, -0.2, 0 },
 				MirrorGlass,
 				"Y",
 				0,
-				0.3,
+				0.25,
 				0,
-				{ 1.4, 0, 0 }
+				{ 1.6, 0, 0 }
 			)
 		),
 		spin(
-			limb("Shard3", { 0.2, 0.3, 0.05 }, { 0, 0.9, 1.3 }, MirrorGlass, "Y", 0, 0.3, 0, { 0, 0, -1.3 })
+			limb(
+				"Shard2Point",
+				{ 0.12, 0.25, 0.06 },
+				{ -1.68, -0.55, 0 },
+				MirrorGlass,
+				"Y",
+				0,
+				0.25,
+				0,
+				{ 1.68, 0, 0 }
+			)
+		),
+		spin(
+			limb(
+				"Shard2Chip",
+				{ 0.12, 0.12, 0.06 },
+				{ -1.5, 0.1, 0 },
+				MirrorGlass,
+				"Y",
+				0,
+				0.25,
+				0,
+				{ 1.5, 0, 0 }
+			)
+		),
+		spin(
+			limb(
+				"Shard2Blood",
+				{ 0.1, 0.12, 0.07 },
+				{ -1.68, -0.72, 0 },
+				Blood,
+				"Y",
+				0,
+				0.25,
+				0,
+				{ 1.68, 0, 0 }
+			)
+		),
+		spin(
+			limb("Shard3", { 0.45, 0.3, 0.06 }, { 0, 1.1, 1.5 }, MirrorGlass, "Y", 0, 0.25, 0, { 0, 0, -1.5 })
+		),
+		spin(
+			limb(
+				"Shard3Point",
+				{ 0.25, 0.14, 0.06 },
+				{ 0.32, 1.17, 1.5 },
+				MirrorGlass,
+				"Y",
+				0,
+				0.25,
+				0,
+				{ -0.32, 0, -1.5 }
+			)
+		),
+		spin(
+			limb(
+				"Shard3Chip",
+				{ 0.14, 0.12, 0.06 },
+				{ -0.28, 1, 1.5 },
+				MirrorGlass,
+				"Y",
+				0,
+				0.25,
+				0,
+				{ 0.28, 0, -1.5 }
+			)
+		),
+		spin(
+			limb(
+				"Shard4",
+				{ 0.25, 0.4, 0.06 },
+				{ -1.1, 1.25, -1.1 },
+				MirrorGlass,
+				"Y",
+				0,
+				0.25,
+				0,
+				{ 1.1, 0, 1.1 }
+			)
+		),
+		spin(
+			limb(
+				"Shard4Point",
+				{ 0.12, 0.22, 0.06 },
+				{ -1.04, 1.55, -1.1 },
+				MirrorGlass,
+				"Y",
+				0,
+				0.25,
+				0,
+				{ 1.04, 0, 1.1 }
+			)
+		),
+		spin(
+			limb(
+				"Shard4Blood",
+				{ 0.1, 0.1, 0.07 },
+				{ -1.04, 1.7, -1.1 },
+				Blood,
+				"Y",
+				0,
+				0.25,
+				0,
+				{ 1.04, 0, 1.1 }
+			)
 		),
 	},
 }
 
--- Zone 3, Legendary: the sinister ringmaster in a red tailcoat and top hat, cracking his whip.
+-- Zone 3, Legendary: the sinister ringmaster in a red tailcoat and top hat, swinging a cane.
 local Tailcoat = { 160, 25, 35 }
 local Glove = { 240, 240, 235 }
 Looks.TheRingmaster = {
@@ -1421,28 +2097,6 @@ Looks.TheRingmaster = {
 		limb("LeftGlove", { 0.35, 0.3, 0.35 }, { -0.82, -1.05, 0 }, Glove, "X", 28, 1.5, 0.5, { 0, 1.2, 0 }),
 		limb("RightArm", { 0.32, 1.1, 0.32 }, { 0.82, -0.35, 0 }, Tailcoat, "X", 28, 1.5, 0, { 0, 0.5, 0 }),
 		limb("RightGlove", { 0.35, 0.3, 0.35 }, { 0.82, -1.05, 0 }, Glove, "X", 28, 1.5, 0, { 0, 1.2, 0 }),
-		limb(
-			"WhipHandle",
-			{ 0.15, 0.5, 0.15 },
-			{ 0.82, -1.35, -0.15 },
-			Wood,
-			"X",
-			28,
-			1.5,
-			0,
-			{ 0, 1.5, 0.15 }
-		),
-		limb(
-			"WhipLash",
-			{ 0.08, 0.08, 1.3 },
-			{ 0.82, -1.55, -0.85 },
-			Leather,
-			"X",
-			28,
-			1.5,
-			0,
-			{ 0, 1.7, 0.85 }
-		),
 		limb("LeftLeg", { 0.4, 0.9, 0.4 }, { -0.28, -1.45, 0 }, Black, "X", 26, 1.5, 0, { 0, 0.45, 0 }),
 		limb(
 			"LeftBoot",
@@ -1467,61 +2121,123 @@ Looks.TheRingmaster = {
 			0.5,
 			{ 0, 0.875, 0.05 }
 		),
+
+		limb("Cane", { 0.1, 0.95, 0.1 }, { 0.82, -1.5, -0.24 }, Black, "X", 28, 1.5, 0, { 0, 1.65, 0.24 }),
+		limb(
+			"CaneTip",
+			{ 0.13, 0.1, 0.13 },
+			{ 0.82, -1.93, -0.24 },
+			Silver,
+			"X",
+			28,
+			1.5,
+			0,
+			{ 0, 2.08, 0.24 }
+		),
+		limb(
+			"CaneKnob",
+			{ 0.22, 0.22, 0.22 },
+			{ 0.82, -0.86, -0.24 },
+			Gold,
+			"X",
+			28,
+			1.5,
+			0,
+			{ 0, 1.01, 0.24 }
+		),
 	},
 }
 
--- Zone 3, Mythic: the big top come alive. Its entrance is a mouth full of teeth, two windows
--- glow like eyes, and the flaps beside its mouth open and shut as it scuttles along.
+-- Zone 3, Mythic: the big top come alive: a striped circus tent with a pointed roof and a
+-- scalloped trim. Its entrance is a mouth full of teeth, two lit windows glare like eyes, and
+-- the tent flaps beside its mouth open and shut as it scuttles along on its tent pegs.
 Looks.BigTopTerror = {
 	gait = "walk",
-	top = 1.5,
+	top = 2.1,
 	pieces = {
 		block("Walls", { 2.4, 1.4, 2.4 }, { 0, -1.1, 0 }, CircusCream),
-		block("Stripe1", { 0.35, 1.42, 2.42 }, { -0.9, -1.1, 0 }, CircusRed),
-		block("Stripe2", { 0.35, 1.42, 2.42 }, { 0.9, -1.1, 0 }, CircusRed),
-		block("Stripe3", { 2.42, 1.42, 0.35 }, { 0, -1.1, 0.9 }, CircusRed),
-		block("RoofLow", { 2.6, 0.4, 2.6 }, { 0, -0.2, 0 }, CircusRed),
-		block("RoofMiddle", { 1.8, 0.4, 1.8 }, { 0, 0.2, 0 }, CircusCream),
-		block("RoofTop", { 1, 0.4, 1 }, { 0, 0.6, 0 }, CircusRed),
-		block("Spire", { 0.2, 0.6, 0.2 }, { 0, 1.1, 0 }, Gold),
-		limb("Flag", { 0.5, 0.3, 0.05 }, { 0.35, 1.25, 0 }, CircusTeal, "Y", 30, 2, 0, { -0.25, 0, 0 }),
-		block("LeftWindow", { 0.4, 0.35, 0.05 }, { -0.5, -0.55, -1.22 }, Candle, true),
-		block("RightWindow", { 0.4, 0.35, 0.05 }, { 0.5, -0.55, -1.22 }, Candle, true),
-		block("Mouth", { 1.1, 0.8, 0.05 }, { 0, -1.25, -1.22 }, Black),
-		block("Tongue", { 0.7, 0.1, 0.5 }, { 0, -1.6, -1.05 }, Blood),
-		block("TopTooth1", { 0.2, 0.22, 0.05 }, { -0.4, -0.97, -1.25 }, White),
-		block("TopTooth2", { 0.2, 0.22, 0.05 }, { -0.13, -0.97, -1.25 }, White),
-		block("TopTooth3", { 0.2, 0.22, 0.05 }, { 0.13, -0.97, -1.25 }, White),
-		block("TopTooth4", { 0.2, 0.22, 0.05 }, { 0.4, -0.97, -1.25 }, White),
-		block("BottomTooth1", { 0.2, 0.2, 0.05 }, { -0.27, -1.55, -1.25 }, White),
-		block("BottomTooth2", { 0.2, 0.2, 0.05 }, { 0.27, -1.55, -1.25 }, White),
+		block("Stripe1", { 0.3, 1.42, 2.42 }, { -0.95, -1.1, 0 }, CircusRed),
+		block("Stripe2", { 0.3, 1.42, 2.42 }, { 0.95, -1.1, 0 }, CircusRed),
+		block("Stripe3", { 2.42, 1.42, 0.3 }, { 0, -1.1, 0.95 }, CircusRed),
+		block("Stripe4", { 2.42, 1.42, 0.3 }, { 0, -1.1, -0.6 }, CircusRed),
+		block("Stripe5", { 0.3, 1.42, 2.42 }, { 0, -1.1, 0.3 }, CircusRed),
+		block("RoofEdge", { 2.9, 0.1, 2.9 }, { 0, -0.38, 0 }, Gold),
+		tilt(block("RoofFront1", { 2.4, 0.12, 0.601 }, { 0, -0.188, -1.225 }, CircusRed), -50.5, 0, 0),
+		tilt(block("RoofBack1", { 2.4, 0.12, 0.601 }, { 0, -0.188, 1.225 }, CircusRed), 50.5, 0, 0),
+		tilt(block("RoofLeft1", { 0.601, 0.12, 2.4 }, { -1.225, -0.188, 0 }, CircusCream), 0, 0, 50.5),
+		tilt(block("RoofRight1", { 0.601, 0.12, 2.4 }, { 1.225, -0.188, 0 }, CircusCream), 0, 0, -50.5),
+		tilt(block("RoofFront2", { 1.7, 0.12, 0.601 }, { 0, 0.238, -0.875 }, CircusRed), -50.5, 0, 0),
+		tilt(block("RoofBack2", { 1.7, 0.12, 0.601 }, { 0, 0.238, 0.875 }, CircusRed), 50.5, 0, 0),
+		tilt(block("RoofLeft2", { 0.601, 0.12, 1.7 }, { -0.875, 0.238, 0 }, CircusCream), 0, 0, 50.5),
+		tilt(block("RoofRight2", { 0.601, 0.12, 1.7 }, { 0.875, 0.238, 0 }, CircusCream), 0, 0, -50.5),
+		tilt(block("RoofFront3", { 1, 0.12, 0.601 }, { 0, 0.662, -0.525 }, CircusRed), -50.5, 0, 0),
+		tilt(block("RoofBack3", { 1, 0.12, 0.601 }, { 0, 0.662, 0.525 }, CircusRed), 50.5, 0, 0),
+		tilt(block("RoofLeft3", { 0.601, 0.12, 1 }, { -0.525, 0.662, 0 }, CircusCream), 0, 0, 50.5),
+		tilt(block("RoofRight3", { 0.601, 0.12, 1 }, { 0.525, 0.662, 0 }, CircusCream), 0, 0, -50.5),
+		tilt(block("RoofFront4", { 0.3, 0.12, 0.601 }, { 0, 1.088, -0.175 }, CircusRed), -50.5, 0, 0),
+		tilt(block("RoofBack4", { 0.3, 0.12, 0.601 }, { 0, 1.088, 0.175 }, CircusRed), 50.5, 0, 0),
+		tilt(block("RoofLeft4", { 0.601, 0.12, 0.3 }, { -0.175, 1.088, 0 }, CircusCream), 0, 0, 50.5),
+		tilt(block("RoofRight4", { 0.601, 0.12, 0.3 }, { 0.175, 1.088, 0 }, CircusCream), 0, 0, -50.5),
+		tilt(block("TrimFront1", { 0.32, 0.32, 0.08 }, { -1.05, -0.48, -1.42 }, CircusCream), 0, 0, 45),
+		tilt(block("TrimBack1", { 0.32, 0.32, 0.08 }, { -1.05, -0.48, 1.42 }, CircusCream), 0, 0, 45),
+		tilt(block("TrimLeft1", { 0.08, 0.32, 0.32 }, { -1.42, -0.48, -1.05 }, CircusRed), 45, 0, 0),
+		tilt(block("TrimRight1", { 0.08, 0.32, 0.32 }, { 1.42, -0.48, -1.05 }, CircusRed), 45, 0, 0),
+		tilt(block("TrimFront2", { 0.32, 0.32, 0.08 }, { -0.35, -0.48, -1.42 }, Gold), 0, 0, 45),
+		tilt(block("TrimBack2", { 0.32, 0.32, 0.08 }, { -0.35, -0.48, 1.42 }, Gold), 0, 0, 45),
+		tilt(block("TrimLeft2", { 0.08, 0.32, 0.32 }, { -1.42, -0.48, -0.35 }, Gold), 45, 0, 0),
+		tilt(block("TrimRight2", { 0.08, 0.32, 0.32 }, { 1.42, -0.48, -0.35 }, Gold), 45, 0, 0),
+		tilt(block("TrimFront3", { 0.32, 0.32, 0.08 }, { 0.35, -0.48, -1.42 }, CircusCream), 0, 0, 45),
+		tilt(block("TrimBack3", { 0.32, 0.32, 0.08 }, { 0.35, -0.48, 1.42 }, CircusCream), 0, 0, 45),
+		tilt(block("TrimLeft3", { 0.08, 0.32, 0.32 }, { -1.42, -0.48, 0.35 }, CircusRed), 45, 0, 0),
+		tilt(block("TrimRight3", { 0.08, 0.32, 0.32 }, { 1.42, -0.48, 0.35 }, CircusRed), 45, 0, 0),
+		tilt(block("TrimFront4", { 0.32, 0.32, 0.08 }, { 1.05, -0.48, -1.42 }, Gold), 0, 0, 45),
+		tilt(block("TrimBack4", { 0.32, 0.32, 0.08 }, { 1.05, -0.48, 1.42 }, Gold), 0, 0, 45),
+		tilt(block("TrimLeft4", { 0.08, 0.32, 0.32 }, { -1.42, -0.48, 1.05 }, Gold), 45, 0, 0),
+		tilt(block("TrimRight4", { 0.08, 0.32, 0.32 }, { 1.42, -0.48, 1.05 }, Gold), 45, 0, 0),
+		block("Peak", { 0.3, 0.25, 0.3 }, { 0, 1.35, 0 }, Gold),
+		block("TopPole", { 0.12, 0.7, 0.12 }, { 0, 1.75, 0 }, Gold),
+		block("TopKnob", { 0.2, 0.2, 0.2 }, { 0, 2.1, 0 }, Gold),
+		limb("Flag", { 0.55, 0.3, 0.05 }, { 0.33, 1.9, 0 }, CircusTeal, "Y", 30, 2, 0, { -0.27, 0, 0 }),
+		block("LeftWindow", { 0.4, 0.3, 0.05 }, { -0.5, -0.82, -1.22 }, Candle, true),
+		block("RightWindow", { 0.4, 0.3, 0.05 }, { 0.5, -0.82, -1.22 }, Candle, true),
+		tilt(block("LeftBrow", { 0.5, 0.08, 0.05 }, { -0.5, -0.62, -1.23 }, Black), 0, 0, -18),
+		tilt(block("RightBrow", { 0.5, 0.08, 0.05 }, { 0.5, -0.62, -1.23 }, Black), 0, 0, 18),
+		block("Mouth", { 1, 0.72, 0.05 }, { 0, -1.42, -1.22 }, Black),
+		block("Tongue", { 0.6, 0.1, 0.5 }, { 0, -1.73, -1.05 }, Blood),
+		block("TopTooth1", { 0.18, 0.22, 0.05 }, { -0.36, -1.15, -1.25 }, White),
+		block("TopTooth2", { 0.18, 0.22, 0.05 }, { -0.12, -1.15, -1.25 }, White),
+		block("TopTooth3", { 0.18, 0.22, 0.05 }, { 0.12, -1.15, -1.25 }, White),
+		block("TopTooth4", { 0.18, 0.22, 0.05 }, { 0.36, -1.15, -1.25 }, White),
+		block("BottomTooth1", { 0.18, 0.2, 0.05 }, { -0.24, -1.68, -1.25 }, White),
+		block("BottomTooth2", { 0.18, 0.2, 0.05 }, { 0.24, -1.68, -1.25 }, White),
+		block("Drool", { 0.07, 0.3, 0.05 }, { 0.3, -1.4, -1.26 }, Blood),
 		limb(
 			"LeftFlap",
-			{ 0.45, 1, 0.08 },
-			{ -0.8, -1.2, -1.26 },
-			CircusCream,
+			{ 0.4, 0.95, 0.08 },
+			{ -0.72, -1.3, -1.26 },
+			CircusRed,
 			"Y",
 			30,
 			1.5,
 			0,
-			{ -0.22, 0, 0 }
+			{ -0.2, 0, 0 }
 		),
 		limb(
 			"RightFlap",
-			{ 0.45, 1, 0.08 },
-			{ 0.8, -1.2, -1.26 },
-			CircusCream,
+			{ 0.4, 0.95, 0.08 },
+			{ 0.72, -1.3, -1.26 },
+			CircusRed,
 			"Y",
 			-30,
 			1.5,
 			0,
-			{ 0.22, 0, 0 }
+			{ 0.2, 0, 0 }
 		),
-		limb("FrontLeftPeg", { 0.35, 0.2, 0.35 }, { -0.8, -1.9, -0.8 }, Wood, "X", 35, 2.5, 0, { 0, 0.1, 0 }),
+		limb("FrontLeftPeg", { 0.3, 0.2, 0.3 }, { -0.95, -1.9, -0.95 }, Wood, "X", 35, 2.5, 0, { 0, 0.1, 0 }),
 		limb(
 			"FrontRightPeg",
-			{ 0.35, 0.2, 0.35 },
-			{ 0.8, -1.9, -0.8 },
+			{ 0.3, 0.2, 0.3 },
+			{ 0.95, -1.9, -0.95 },
 			Wood,
 			"X",
 			35,
@@ -1529,104 +2245,811 @@ Looks.BigTopTerror = {
 			0.5,
 			{ 0, 0.1, 0 }
 		),
-		limb("BackLeftPeg", { 0.35, 0.2, 0.35 }, { -0.8, -1.9, 0.8 }, Wood, "X", 35, 2.5, 0.5, { 0, 0.1, 0 }),
-		limb("BackRightPeg", { 0.35, 0.2, 0.35 }, { 0.8, -1.9, 0.8 }, Wood, "X", 35, 2.5, 0, { 0, 0.1, 0 }),
+		limb("BackLeftPeg", { 0.3, 0.2, 0.3 }, { -0.95, -1.9, 0.95 }, Wood, "X", 35, 2.5, 0.5, { 0, 0.1, 0 }),
+		limb("BackRightPeg", { 0.3, 0.2, 0.3 }, { 0.95, -1.9, 0.95 }, Wood, "X", 35, 2.5, 0, { 0, 0.1, 0 }),
 	},
 }
 
--- Zone 3, Divine: a little golden carousel that floats and turns, horses and all.
-local Pastel = { 255, 200, 230 }
+-- Zone 3, Divine: the carousel itself, alive. It stalks on six golden spider legs; its column is
+-- a throat of flesh with one great eye, fangs hang from its canopy, and skeletal horses with
+-- burning eyes still turn round it, skewered on their poles.
+local CarouselFlesh = { 120, 25, 35 }
+local GoldLeg = { 200, 150, 50 }
 Looks.GoldenCarousel = {
-	gait = "float",
-	top = 2.3,
+	gait = "walk",
+	top = 2.6,
 	pieces = {
-		block("Platform", { 2.4, 0.3, 2.4 }, { 0, -1.3, 0 }, Gold),
-		block("PlatformTrim", { 2.5, 0.1, 2.5 }, { 0, -1.15, 0 }, CircusRed),
-		block("Column", { 0.35, 2.4, 0.35 }, { 0, -0.1, 0 }, Gold),
-		block("LeftEye", { 0.1, 0.1, 0.05 }, { -0.08, 0.3, -0.19 }, Candle, true),
-		block("RightEye", { 0.1, 0.1, 0.05 }, { 0.08, 0.3, -0.19 }, Candle, true),
-		block("Canopy", { 2.6, 0.3, 2.6 }, { 0, 1.1, 0 }, CircusCream),
-		block("CanopyTrim", { 2.7, 0.12, 2.7 }, { 0, 0.92, 0 }, Gold),
-		block("Roof", { 1.6, 0.4, 1.6 }, { 0, 1.45, 0 }, CircusRed),
-		block("RoofTop", { 0.6, 0.4, 0.6 }, { 0, 1.8, 0 }, Gold),
-		block("Star", { 0.3, 0.3, 0.3 }, { 0, 2.15, 0 }, Candle, true),
-		block("Bulb1", { 0.15, 0.15, 0.15 }, { -1.25, 0.85, -1.25 }, Candle, true),
-		block("Bulb2", { 0.15, 0.15, 0.15 }, { 1.25, 0.85, -1.25 }, Candle, true),
-		block("Bulb3", { 0.15, 0.15, 0.15 }, { -1.25, 0.85, 1.25 }, Candle, true),
-		block("Bulb4", { 0.15, 0.15, 0.15 }, { 1.25, 0.85, 1.25 }, Candle, true),
-		-- Four horses on poles, turning round the column.
-		spin(limb("Horse1", { 0.3, 0.4, 0.7 }, { 0.85, -0.4, 0 }, White, "Y", 0, 0.25, 0, { -0.85, 0, 0 })),
+		block("Platform", { 2.6, 0.3, 2.6 }, { 0, -0.55, 0 }, Gold),
+		block("PlatformTrim", { 2.7, 0.1, 2.7 }, { 0, -0.72, 0 }, CircusRed),
+		block("Underbelly", { 2.2, 0.2, 2.2 }, { 0, -0.82, 0 }, CarouselFlesh),
+		block("Throat", { 0.9, 1.7, 0.9 }, { 0, 0.45, 0 }, CarouselFlesh),
+		block("ThroatRing1", { 0.95, 0.1, 0.95 }, { 0, 0, 0 }, Gold),
+		block("ThroatRing2", { 0.95, 0.1, 0.95 }, { 0, 1.05, 0 }, Gold),
+		block("Eye", { 0.75, 0.7, 0.1 }, { 0, 0.55, -0.48 }, Bone),
+		block("Iris", { 0.42, 0.42, 0.05 }, { 0, 0.55, -0.55 }, Gold, true),
+		block("Pupil", { 0.1, 0.36, 0.05 }, { 0, 0.55, -0.58 }, Black),
+		tilt(block("Vein1", { 0.04, 0.25, 0.04 }, { 0.2, 0.72, -0.54 }, Blood), 0, 0, 40),
+		tilt(block("Vein2", { 0.04, 0.22, 0.04 }, { -0.2, 0.38, -0.54 }, Blood), 0, 0, 40),
+		block("Canopy", { 2.8, 0.3, 2.8 }, { 0, 1.45, 0 }, CircusRed),
+		block("Maw", { 2.7, 0.05, 2.7 }, { 0, 1.2, 0 }, Black),
+		block("CanopyTrim", { 2.9, 0.12, 2.9 }, { 0, 1.27, 0 }, Gold),
+		block("Roof", { 1.8, 0.35, 1.8 }, { 0, 1.77, 0 }, CircusCream),
+		block("RoofTop", { 1, 0.35, 1 }, { 0, 2.1, 0 }, Gold),
+		block("Star", { 0.3, 0.3, 0.3 }, { 0, 2.42, 0 }, Candle, true),
+		block("Bulb1", { 0.18, 0.18, 0.18 }, { 1.4, 1.45, 1.4 }, RedEye, true),
+		block("Bulb2", { 0.18, 0.18, 0.18 }, { -1.4, 1.45, 1.4 }, RedEye, true),
+		block("Bulb3", { 0.18, 0.18, 0.18 }, { 1.4, 1.45, -1.4 }, RedEye, true),
+		block("Bulb4", { 0.18, 0.18, 0.18 }, { -1.4, 1.45, -1.4 }, RedEye, true),
+		block("Fang1", { 0.2, 0.6, 0.2 }, { -0.9, 0.95, -1.35 }, Bone),
+		block("Fang2", { 0.2, 0.6, 0.2 }, { -1.35, 0.95, -0.9 }, Bone),
+		block("Fang3", { 0.2, 0.6, 0.2 }, { 0, 0.95, -1.35 }, Bone),
+		block("Fang4", { 0.2, 0.6, 0.2 }, { -1.35, 0.95, 0 }, Bone),
+		block("Fang5", { 0.2, 0.6, 0.2 }, { 0.9, 0.95, -1.35 }, Bone),
+		block("Fang6", { 0.2, 0.6, 0.2 }, { -1.35, 0.95, 0.9 }, Bone),
+		block("Fang7", { 0.2, 0.6, 0.2 }, { -0.9, 0.95, 1.35 }, Bone),
+		block("Fang8", { 0.2, 0.6, 0.2 }, { 1.35, 0.95, -0.9 }, Bone),
+		block("Fang9", { 0.2, 0.6, 0.2 }, { 0, 0.95, 1.35 }, Bone),
+		block("Fang10", { 0.2, 0.6, 0.2 }, { 1.35, 0.95, 0 }, Bone),
+		block("Fang11", { 0.2, 0.6, 0.2 }, { 0.9, 0.95, 1.35 }, Bone),
+		block("Fang12", { 0.2, 0.6, 0.2 }, { 1.35, 0.95, 0.9 }, Bone),
+		block("FangBlood1", { 0.21, 0.12, 0.21 }, { -0.9, 0.7, -1.35 }, Blood),
+		block("FangBlood2", { 0.21, 0.12, 0.21 }, { 0.9, 0.7, -1.35 }, Blood),
+		block("FangBlood3", { 0.21, 0.12, 0.21 }, { 1.35, 0.7, 0 }, Blood),
+		block("FangBlood4", { 0.21, 0.12, 0.21 }, { -1.35, 0.7, 0.9 }, Blood),
+		limb(
+			"FrontLeftHip",
+			{ 0.45, 0.22, 0.22 },
+			{ -1.35, -0.65, -0.85 },
+			Gold,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ 0.2, 0, 0 }
+		),
+		limb(
+			"FrontLeftRiser",
+			{ 0.22, 1.1, 0.22 },
+			{ -1.55, -0.15, -0.85 },
+			GoldLeg,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ 0.4, -0.5, 0 }
+		),
+		limb(
+			"FrontLeftKnee",
+			{ 0.65, 0.22, 0.22 },
+			{ -1.8, 0.4, -0.85 },
+			GoldLeg,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ 0.65, -1.05, 0 }
+		),
+		limb(
+			"FrontLeftSpike",
+			{ 0.14, 0.45, 0.14 },
+			{ -2, 0.72, -0.85 },
+			Bone,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ 0.85, -1.37, 0 }
+		),
+		limb(
+			"FrontLeftShin",
+			{ 0.22, 2.3, 0.22 },
+			{ -2.12, -0.8, -0.85 },
+			Black,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ 0.97, 0.15, 0 }
+		),
+		limb(
+			"FrontLeftBand",
+			{ 0.26, 0.12, 0.26 },
+			{ -2.12, -0.2, -0.85 },
+			Gold,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ 0.97, -0.45, 0 }
+		),
+		limb(
+			"FrontLeftClaw",
+			{ 0.14, 0.12, 0.3 },
+			{ -2.12, -1.94, -0.85 },
+			Bone,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ 0.97, 1.29, 0 }
+		),
+		limb(
+			"MiddleLeftHip",
+			{ 0.45, 0.22, 0.22 },
+			{ -1.35, -0.65, 0 },
+			Gold,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ 0.2, 0, 0 }
+		),
+		limb(
+			"MiddleLeftRiser",
+			{ 0.22, 1.1, 0.22 },
+			{ -1.55, -0.15, 0 },
+			GoldLeg,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ 0.4, -0.5, 0 }
+		),
+		limb(
+			"MiddleLeftKnee",
+			{ 0.65, 0.22, 0.22 },
+			{ -1.8, 0.4, 0 },
+			GoldLeg,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ 0.65, -1.05, 0 }
+		),
+		limb(
+			"MiddleLeftSpike",
+			{ 0.14, 0.45, 0.14 },
+			{ -2, 0.72, 0 },
+			Bone,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ 0.85, -1.37, 0 }
+		),
+		limb(
+			"MiddleLeftShin",
+			{ 0.22, 2.3, 0.22 },
+			{ -2.12, -0.8, 0 },
+			Black,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ 0.97, 0.15, 0 }
+		),
+		limb(
+			"MiddleLeftBand",
+			{ 0.26, 0.12, 0.26 },
+			{ -2.12, -0.2, 0 },
+			Gold,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ 0.97, -0.45, 0 }
+		),
+		limb(
+			"MiddleLeftClaw",
+			{ 0.14, 0.12, 0.3 },
+			{ -2.12, -1.94, 0 },
+			Bone,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ 0.97, 1.29, 0 }
+		),
+		limb(
+			"BackLeftHip",
+			{ 0.45, 0.22, 0.22 },
+			{ -1.35, -0.65, 0.85 },
+			Gold,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ 0.2, 0, 0 }
+		),
+		limb(
+			"BackLeftRiser",
+			{ 0.22, 1.1, 0.22 },
+			{ -1.55, -0.15, 0.85 },
+			GoldLeg,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ 0.4, -0.5, 0 }
+		),
+		limb(
+			"BackLeftKnee",
+			{ 0.65, 0.22, 0.22 },
+			{ -1.8, 0.4, 0.85 },
+			GoldLeg,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ 0.65, -1.05, 0 }
+		),
+		limb(
+			"BackLeftSpike",
+			{ 0.14, 0.45, 0.14 },
+			{ -2, 0.72, 0.85 },
+			Bone,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ 0.85, -1.37, 0 }
+		),
+		limb(
+			"BackLeftShin",
+			{ 0.22, 2.3, 0.22 },
+			{ -2.12, -0.8, 0.85 },
+			Black,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ 0.97, 0.15, 0 }
+		),
+		limb(
+			"BackLeftBand",
+			{ 0.26, 0.12, 0.26 },
+			{ -2.12, -0.2, 0.85 },
+			Gold,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ 0.97, -0.45, 0 }
+		),
+		limb(
+			"BackLeftClaw",
+			{ 0.14, 0.12, 0.3 },
+			{ -2.12, -1.94, 0.85 },
+			Bone,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ 0.97, 1.29, 0 }
+		),
+		limb(
+			"FrontRightHip",
+			{ 0.45, 0.22, 0.22 },
+			{ 1.35, -0.65, -0.85 },
+			Gold,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ -0.2, 0, 0 }
+		),
+		limb(
+			"FrontRightRiser",
+			{ 0.22, 1.1, 0.22 },
+			{ 1.55, -0.15, -0.85 },
+			GoldLeg,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ -0.4, -0.5, 0 }
+		),
+		limb(
+			"FrontRightKnee",
+			{ 0.65, 0.22, 0.22 },
+			{ 1.8, 0.4, -0.85 },
+			GoldLeg,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ -0.65, -1.05, 0 }
+		),
+		limb(
+			"FrontRightSpike",
+			{ 0.14, 0.45, 0.14 },
+			{ 2, 0.72, -0.85 },
+			Bone,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ -0.85, -1.37, 0 }
+		),
+		limb(
+			"FrontRightShin",
+			{ 0.22, 2.3, 0.22 },
+			{ 2.12, -0.8, -0.85 },
+			Black,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ -0.97, 0.15, 0 }
+		),
+		limb(
+			"FrontRightBand",
+			{ 0.26, 0.12, 0.26 },
+			{ 2.12, -0.2, -0.85 },
+			Gold,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ -0.97, -0.45, 0 }
+		),
+		limb(
+			"FrontRightClaw",
+			{ 0.14, 0.12, 0.3 },
+			{ 2.12, -1.94, -0.85 },
+			Bone,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ -0.97, 1.29, 0 }
+		),
+		limb(
+			"MiddleRightHip",
+			{ 0.45, 0.22, 0.22 },
+			{ 1.35, -0.65, 0 },
+			Gold,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ -0.2, 0, 0 }
+		),
+		limb(
+			"MiddleRightRiser",
+			{ 0.22, 1.1, 0.22 },
+			{ 1.55, -0.15, 0 },
+			GoldLeg,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ -0.4, -0.5, 0 }
+		),
+		limb(
+			"MiddleRightKnee",
+			{ 0.65, 0.22, 0.22 },
+			{ 1.8, 0.4, 0 },
+			GoldLeg,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ -0.65, -1.05, 0 }
+		),
+		limb(
+			"MiddleRightSpike",
+			{ 0.14, 0.45, 0.14 },
+			{ 2, 0.72, 0 },
+			Bone,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ -0.85, -1.37, 0 }
+		),
+		limb(
+			"MiddleRightShin",
+			{ 0.22, 2.3, 0.22 },
+			{ 2.12, -0.8, 0 },
+			Black,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ -0.97, 0.15, 0 }
+		),
+		limb(
+			"MiddleRightBand",
+			{ 0.26, 0.12, 0.26 },
+			{ 2.12, -0.2, 0 },
+			Gold,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ -0.97, -0.45, 0 }
+		),
+		limb(
+			"MiddleRightClaw",
+			{ 0.14, 0.12, 0.3 },
+			{ 2.12, -1.94, 0 },
+			Bone,
+			"Y",
+			18,
+			1.6,
+			0,
+			{ -0.97, 1.29, 0 }
+		),
+		limb(
+			"BackRightHip",
+			{ 0.45, 0.22, 0.22 },
+			{ 1.35, -0.65, 0.85 },
+			Gold,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ -0.2, 0, 0 }
+		),
+		limb(
+			"BackRightRiser",
+			{ 0.22, 1.1, 0.22 },
+			{ 1.55, -0.15, 0.85 },
+			GoldLeg,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ -0.4, -0.5, 0 }
+		),
+		limb(
+			"BackRightKnee",
+			{ 0.65, 0.22, 0.22 },
+			{ 1.8, 0.4, 0.85 },
+			GoldLeg,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ -0.65, -1.05, 0 }
+		),
+		limb(
+			"BackRightSpike",
+			{ 0.14, 0.45, 0.14 },
+			{ 2, 0.72, 0.85 },
+			Bone,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ -0.85, -1.37, 0 }
+		),
+		limb(
+			"BackRightShin",
+			{ 0.22, 2.3, 0.22 },
+			{ 2.12, -0.8, 0.85 },
+			Black,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ -0.97, 0.15, 0 }
+		),
+		limb(
+			"BackRightBand",
+			{ 0.26, 0.12, 0.26 },
+			{ 2.12, -0.2, 0.85 },
+			Gold,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ -0.97, -0.45, 0 }
+		),
+		limb(
+			"BackRightClaw",
+			{ 0.14, 0.12, 0.3 },
+			{ 2.12, -1.94, 0.85 },
+			Bone,
+			"Y",
+			18,
+			1.6,
+			0.5,
+			{ -0.97, 1.29, 0 }
+		),
+		spin(limb("Horse1", { 0.3, 0.35, 0.75 }, { 1, 0.15, 0 }, Bone, "Y", 0, 0.2, 0, { -1, 0, -0 })),
+		spin(
+			limb("Horse1Head", { 0.24, 0.32, 0.36 }, { 1, 0.4, -0.45 }, Bone, "Y", 0, 0.2, 0, { -1, 0, 0.45 })
+		),
 		spin(
 			limb(
-				"Horse1Head",
-				{ 0.22, 0.3, 0.3 },
-				{ 0.85, -0.15, -0.4 },
-				White,
+				"Horse1LeftEye",
+				{ 0.05, 0.08, 0.08 },
+				{ 0.875, 0.45, -0.5 },
+				RedEye,
 				"Y",
 				0,
-				0.25,
+				0.2,
 				0,
-				{ -0.85, 0, 0.4 }
+				{ -0.875, 0, 0.5 },
+				true
 			)
 		),
 		spin(
-			limb("Horse1Pole", { 0.08, 2, 0.08 }, { 0.85, -0.1, 0 }, Gold, "Y", 0, 0.25, 0, { -0.85, 0, 0 })
-		),
-		spin(limb("Horse2", { 0.3, 0.4, 0.7 }, { -0.85, -0.4, 0 }, Pastel, "Y", 0, 0.25, 0, { 0.85, 0, 0 })),
-		spin(
 			limb(
-				"Horse2Head",
-				{ 0.22, 0.3, 0.3 },
-				{ -0.85, -0.15, 0.4 },
-				Pastel,
+				"Horse1RightEye",
+				{ 0.05, 0.08, 0.08 },
+				{ 1.125, 0.45, -0.5 },
+				RedEye,
 				"Y",
 				0,
-				0.25,
+				0.2,
 				0,
-				{ 0.85, 0, -0.4 }
+				{ -1.125, 0, 0.5 },
+				true
 			)
 		),
 		spin(
-			limb("Horse2Pole", { 0.08, 2, 0.08 }, { -0.85, -0.1, 0 }, Gold, "Y", 0, 0.25, 0, { 0.85, 0, 0 })
-		),
-		spin(
-			limb("Horse3", { 0.7, 0.4, 0.3 }, { 0, -0.4, 0.85 }, Moonglow, "Y", 0, 0.25, 0, { 0, 0, -0.85 })
-		),
-		spin(
 			limb(
-				"Horse3Head",
-				{ 0.3, 0.3, 0.22 },
-				{ 0.4, -0.15, 0.85 },
-				Moonglow,
+				"Horse1Ribs",
+				{ 0.32, 0.2, 0.08 },
+				{ 1, 0.12, 0.05 },
+				Black,
 				"Y",
 				0,
-				0.25,
+				0.2,
 				0,
-				{ -0.4, 0, -0.85 }
+				{ -1, 0, -0.05 }
 			)
 		),
 		spin(
-			limb("Horse3Pole", { 0.08, 2, 0.08 }, { 0, -0.1, 0.85 }, Gold, "Y", 0, 0.25, 0, { 0, 0, -0.85 })
-		),
-		spin(
-			limb("Horse4", { 0.7, 0.4, 0.3 }, { 0, -0.4, -0.85 }, CircusTeal, "Y", 0, 0.25, 0, { 0, 0, 0.85 })
-		),
-		spin(
 			limb(
-				"Horse4Head",
-				{ 0.3, 0.3, 0.22 },
-				{ -0.4, -0.15, -0.85 },
-				CircusTeal,
+				"Horse1FrontLeg",
+				{ 0.08, 0.35, 0.08 },
+				{ 1, -0.18, -0.25 },
+				Bone,
 				"Y",
 				0,
-				0.25,
+				0.2,
 				0,
-				{ 0.4, 0, 0.85 }
+				{ -1, 0, 0.25 }
 			)
 		),
 		spin(
-			limb("Horse4Pole", { 0.08, 2, 0.08 }, { 0, -0.1, -0.85 }, Gold, "Y", 0, 0.25, 0, { 0, 0, 0.85 })
+			limb(
+				"Horse1BackLeg",
+				{ 0.08, 0.35, 0.08 },
+				{ 1, -0.18, 0.25 },
+				Bone,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ -1, 0, -0.25 }
+			)
 		),
+		spin(limb("Horse1Pole", { 0.08, 1.65, 0.08 }, { 1, 0.42, 0 }, Gold, "Y", 0, 0.2, 0, { -1, 0, -0 })),
+		spin(limb("Horse1Blood", { 0.1, 0.2, 0.1 }, { 1, 0.4, 0 }, Blood, "Y", 0, 0.2, 0, { -1, 0, -0 })),
+		spin(limb("Horse2", { 0.75, 0.35, 0.3 }, { 0, 0.15, -1 }, Bone, "Y", 0, 0.2, 0, { -0, 0, 1 })),
+		spin(
+			limb("Horse2Head", { 0.36, 0.32, 0.24 }, { -0.45, 0.4, -1 }, Bone, "Y", 0, 0.2, 0, { 0.45, 0, 1 })
+		),
+		spin(
+			limb(
+				"Horse2LeftEye",
+				{ 0.08, 0.08, 0.05 },
+				{ -0.5, 0.45, -0.875 },
+				RedEye,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ 0.5, 0, 0.875 },
+				true
+			)
+		),
+		spin(
+			limb(
+				"Horse2RightEye",
+				{ 0.08, 0.08, 0.05 },
+				{ -0.5, 0.45, -1.125 },
+				RedEye,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ 0.5, 0, 1.125 },
+				true
+			)
+		),
+		spin(
+			limb(
+				"Horse2Ribs",
+				{ 0.08, 0.2, 0.32 },
+				{ 0.05, 0.12, -1 },
+				Black,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ -0.05, 0, 1 }
+			)
+		),
+		spin(
+			limb(
+				"Horse2FrontLeg",
+				{ 0.08, 0.35, 0.08 },
+				{ -0.25, -0.18, -1 },
+				Bone,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ 0.25, 0, 1 }
+			)
+		),
+		spin(
+			limb(
+				"Horse2BackLeg",
+				{ 0.08, 0.35, 0.08 },
+				{ 0.25, -0.18, -1 },
+				Bone,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ -0.25, 0, 1 }
+			)
+		),
+		spin(limb("Horse2Pole", { 0.08, 1.65, 0.08 }, { 0, 0.42, -1 }, Gold, "Y", 0, 0.2, 0, { -0, 0, 1 })),
+		spin(limb("Horse2Blood", { 0.1, 0.2, 0.1 }, { 0, 0.4, -1 }, Blood, "Y", 0, 0.2, 0, { -0, 0, 1 })),
+		spin(limb("Horse3", { 0.3, 0.35, 0.75 }, { -1, 0.15, -0 }, Bone, "Y", 0, 0.2, 0, { 1, 0, 0 })),
+		spin(
+			limb("Horse3Head", { 0.24, 0.32, 0.36 }, { -1, 0.4, 0.45 }, Bone, "Y", 0, 0.2, 0, { 1, 0, -0.45 })
+		),
+		spin(
+			limb(
+				"Horse3LeftEye",
+				{ 0.05, 0.08, 0.08 },
+				{ -0.875, 0.45, 0.5 },
+				RedEye,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ 0.875, 0, -0.5 },
+				true
+			)
+		),
+		spin(
+			limb(
+				"Horse3RightEye",
+				{ 0.05, 0.08, 0.08 },
+				{ -1.125, 0.45, 0.5 },
+				RedEye,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ 1.125, 0, -0.5 },
+				true
+			)
+		),
+		spin(
+			limb(
+				"Horse3Ribs",
+				{ 0.32, 0.2, 0.08 },
+				{ -1, 0.12, -0.05 },
+				Black,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ 1, 0, 0.05 }
+			)
+		),
+		spin(
+			limb(
+				"Horse3FrontLeg",
+				{ 0.08, 0.35, 0.08 },
+				{ -1, -0.18, 0.25 },
+				Bone,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ 1, 0, -0.25 }
+			)
+		),
+		spin(
+			limb(
+				"Horse3BackLeg",
+				{ 0.08, 0.35, 0.08 },
+				{ -1, -0.18, -0.25 },
+				Bone,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ 1, 0, 0.25 }
+			)
+		),
+		spin(limb("Horse3Pole", { 0.08, 1.65, 0.08 }, { -1, 0.42, -0 }, Gold, "Y", 0, 0.2, 0, { 1, 0, 0 })),
+		spin(limb("Horse3Blood", { 0.1, 0.2, 0.1 }, { -1, 0.4, -0 }, Blood, "Y", 0, 0.2, 0, { 1, 0, 0 })),
+		spin(limb("Horse4", { 0.75, 0.35, 0.3 }, { -0, 0.15, 1 }, Bone, "Y", 0, 0.2, 0, { 0, 0, -1 })),
+		spin(
+			limb("Horse4Head", { 0.36, 0.32, 0.24 }, { 0.45, 0.4, 1 }, Bone, "Y", 0, 0.2, 0, { -0.45, 0, -1 })
+		),
+		spin(
+			limb(
+				"Horse4LeftEye",
+				{ 0.08, 0.08, 0.05 },
+				{ 0.5, 0.45, 0.875 },
+				RedEye,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ -0.5, 0, -0.875 },
+				true
+			)
+		),
+		spin(
+			limb(
+				"Horse4RightEye",
+				{ 0.08, 0.08, 0.05 },
+				{ 0.5, 0.45, 1.125 },
+				RedEye,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ -0.5, 0, -1.125 },
+				true
+			)
+		),
+		spin(
+			limb(
+				"Horse4Ribs",
+				{ 0.08, 0.2, 0.32 },
+				{ -0.05, 0.12, 1 },
+				Black,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ 0.05, 0, -1 }
+			)
+		),
+		spin(
+			limb(
+				"Horse4FrontLeg",
+				{ 0.08, 0.35, 0.08 },
+				{ 0.25, -0.18, 1 },
+				Bone,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ -0.25, 0, -1 }
+			)
+		),
+		spin(
+			limb(
+				"Horse4BackLeg",
+				{ 0.08, 0.35, 0.08 },
+				{ -0.25, -0.18, 1 },
+				Bone,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ 0.25, 0, -1 }
+			)
+		),
+		spin(limb("Horse4Pole", { 0.08, 1.65, 0.08 }, { -0, 0.42, 1 }, Gold, "Y", 0, 0.2, 0, { 0, 0, -1 })),
+		spin(limb("Horse4Blood", { 0.1, 0.2, 0.1 }, { -0, 0.4, 1 }, Blood, "Y", 0, 0.2, 0, { 0, 0, -1 })),
 	},
 }
 
@@ -1641,18 +3064,64 @@ local Flesh = { 70, 35, 80 }
 Looks.Flickerwick = {
 	gait = "float",
 	top = 1.15,
+	grow = 2,
 	pieces = {
 		block("Wax", { 0.9, 1.6, 0.9 }, { 0, -0.4, 0 }, { 240, 235, 220 }),
 		block("Drip1", { 0.2, 0.5, 0.05 }, { 0.3, 0.15, -0.47 }, { 240, 235, 220 }),
 		block("Drip2", { 0.2, 0.35, 0.05 }, { -0.3, 0.2, -0.47 }, { 240, 235, 220 }),
 		block("Wick", { 0.1, 0.2, 0.1 }, { 0, 0.5, 0 }, Black),
 		limb("Flame", { 0.4, 0.6, 0.4 }, { 0, 0.85, 0 }, Candle, "Z", 15, 4, 0, { 0, -0.3, 0 }, true),
-		block("LeftEye", { 0.2, 0.25, 0.05 }, { -0.2, 0, -0.47 }, Black),
-		block("RightEye", { 0.2, 0.25, 0.05 }, { 0.2, 0, -0.47 }, Black),
-		block("Mouth", { 0.22, 0.28, 0.05 }, { 0, -0.45, -0.47 }, Black),
 		block("Dish", { 1.4, 0.2, 1.4 }, { 0, -1.3, 0 }, Bronze),
 		block("Handle", { 0.12, 0.4, 0.3 }, { 0.76, -1.2, 0 }, Bronze),
 		limb("Wisp", { 0.5, 0.6, 0.5 }, { 0, -1.7, 0 }, Phantom, "X", 20, 1, 0, { 0, 0.3, 0 }, true),
+		block("LeftSocket", { 0.25, 0.3, 0.05 }, { -0.2, 0, -0.47 }, Black),
+		block("RightSocket", { 0.25, 0.3, 0.05 }, { 0.2, 0.05, -0.47 }, Black),
+		block("LeftEye", { 0.08, 0.08, 0.05 }, { -0.2, -0.02, -0.5 }, RedEye, true),
+		block("RightEye", { 0.08, 0.08, 0.05 }, { 0.2, 0.03, -0.5 }, RedEye, true),
+		tilt(block("Brow", { 0.7, 0.08, 0.05 }, { 0, 0.22, -0.47 }, { 200, 190, 170 }), 0, 0, -8),
+		block("Mouth", { 0.5, 0.38, 0.05 }, { 0, -0.48, -0.47 }, Black),
+		block("Tooth1", { 0.1, 0.14, 0.05 }, { -0.16, -0.35, -0.5 }, White),
+		block("Tooth2", { 0.1, 0.14, 0.05 }, { 0, -0.35, -0.5 }, White),
+		block("Tooth3", { 0.1, 0.14, 0.05 }, { 0.16, -0.35, -0.5 }, White),
+		block("LowTooth1", { 0.1, 0.14, 0.05 }, { -0.08, -0.6, -0.5 }, White),
+		block("LowTooth2", { 0.1, 0.14, 0.05 }, { 0.1, -0.6, -0.5 }, White),
+		block("BloodDrip1", { 0.12, 0.55, 0.05 }, { 0.08, -0.92, -0.47 }, Blood),
+		block("BloodDrip2", { 0.15, 0.4, 0.05 }, { -0.35, 0.05, -0.48 }, Blood),
+		block("BloodDrip3", { 0.15, 0.6, 0.05 }, { 0.47, -0.4, 0.2 }, Blood),
+		limb(
+			"LeftArm",
+			{ 0.18, 0.7, 0.18 },
+			{ -0.58, -0.6, -0.1 },
+			{ 240, 235, 220 },
+			"X",
+			30,
+			1.2,
+			0.5,
+			{ 0, 0.35, 0 }
+		),
+		limb(
+			"LeftClaws",
+			{ 0.24, 0.2, 0.24 },
+			{ -0.58, -1.02, -0.1 },
+			Bone,
+			"X",
+			30,
+			1.2,
+			0.5,
+			{ 0, 0.77, 0 }
+		),
+		limb(
+			"RightArm",
+			{ 0.18, 0.7, 0.18 },
+			{ 0.58, -0.6, -0.1 },
+			{ 240, 235, 220 },
+			"X",
+			30,
+			1.2,
+			0,
+			{ 0, 0.35, 0 }
+		),
+		limb("RightClaws", { 0.24, 0.2, 0.24 }, { 0.58, -1.02, -0.1 }, Bone, "X", 30, 1.2, 0, { 0, 0.77, 0 }),
 	},
 }
 
@@ -1660,14 +3129,12 @@ Looks.Flickerwick = {
 Looks.StaticShade = {
 	gait = "float",
 	top = 1.55,
+	grow = 2,
 	pieces = {
 		block("Cabinet", { 1.8, 1.4, 1.2 }, { 0, 0, 0 }, Wood),
 		block("Screen", { 1.1, 1, 0.1 }, { -0.2, 0.05, -0.61 }, { 200, 210, 220 }, true),
 		block("StaticTop", { 1.05, 0.06, 0.05 }, { -0.2, 0.42, -0.67 }, { 120, 130, 140 }),
 		block("StaticBottom", { 1.05, 0.06, 0.05 }, { -0.2, -0.35, -0.67 }, { 120, 130, 140 }),
-		block("LeftEye", { 0.2, 0.2, 0.05 }, { -0.45, 0.2, -0.67 }, Black),
-		block("RightEye", { 0.2, 0.2, 0.05 }, { 0.05, 0.2, -0.67 }, Black),
-		block("Mouth", { 0.5, 0.1, 0.05 }, { -0.2, -0.15, -0.67 }, Black),
 		block("KnobTop", { 0.18, 0.18, 0.1 }, { 0.65, 0.3, -0.63 }, Iron),
 		block("KnobBottom", { 0.18, 0.18, 0.1 }, { 0.65, -0.1, -0.63 }, Iron),
 		tilt(
@@ -1694,6 +3161,71 @@ Looks.StaticShade = {
 		),
 		limb("Shadow", { 1.2, 0.8, 1 }, { 0, -1.1, 0 }, { 50, 50, 80 }, "X", 10, 1, 0, { 0, 0.4, 0 }),
 		limb("ShadowTail", { 0.6, 0.6, 0.6 }, { 0, -1.7, 0 }, { 40, 40, 65 }, "X", 20, 1, 0.3, { 0, 1, 0 }),
+		block("LeftEye", { 0.22, 0.26, 0.05 }, { -0.45, 0.18, -0.67 }, Black),
+		block("RightEye", { 0.22, 0.26, 0.05 }, { 0.05, 0.18, -0.67 }, Black),
+		block("LeftPupil", { 0.06, 0.06, 0.05 }, { -0.45, 0.18, -0.7 }, White, true),
+		block("RightPupil", { 0.06, 0.06, 0.05 }, { 0.05, 0.18, -0.7 }, White, true),
+		block("Mouth", { 0.3, 0.4, 0.05 }, { -0.2, -0.2, -0.67 }, Black),
+		block("HairLeft", { 0.15, 0.9, 0.04 }, { -0.68, 0.05, -0.69 }, Black),
+		block("HairRight", { 0.15, 0.7, 0.04 }, { 0.28, 0.12, -0.69 }, Black),
+		block("HairTop", { 1.05, 0.12, 0.04 }, { -0.2, 0.5, -0.69 }, Black),
+		block("BloodSmear", { 0.12, 0.6, 0.05 }, { 0.6, -0.4, -0.62 }, Blood),
+		limb(
+			"ReachArm",
+			{ 0.16, 0.16, 0.9 },
+			{ -0.2, -0.2, -1.05 },
+			{ 205, 210, 215 },
+			"X",
+			15,
+			0.8,
+			0,
+			{ 0, 0, 0.45 }
+		),
+		limb(
+			"ReachHand",
+			{ 0.26, 0.08, 0.24 },
+			{ -0.2, -0.2, -1.6 },
+			{ 205, 210, 215 },
+			"X",
+			15,
+			0.8,
+			0,
+			{ 0, 0, 1 }
+		),
+		limb(
+			"Finger1",
+			{ 0.05, 0.05, 0.22 },
+			{ -0.29, -0.2, -1.82 },
+			{ 205, 210, 215 },
+			"X",
+			15,
+			0.8,
+			0,
+			{ 0.09, 0, 1.22 }
+		),
+		limb(
+			"Finger2",
+			{ 0.05, 0.05, 0.26 },
+			{ -0.2, -0.2, -1.84 },
+			{ 205, 210, 215 },
+			"X",
+			15,
+			0.8,
+			0,
+			{ 0, 0, 1.24 }
+		),
+		limb(
+			"Finger3",
+			{ 0.05, 0.05, 0.22 },
+			{ -0.11, -0.2, -1.82 },
+			{ 205, 210, 215 },
+			"X",
+			15,
+			0.8,
+			0,
+			{ -0.09, 0, 1.22 }
+		),
+		limb("Nails", { 0.24, 0.05, 0.05 }, { -0.2, -0.2, -1.95 }, Blood, "X", 15, 0.8, 0, { 0, 0, 1.35 }),
 	},
 }
 
@@ -1703,12 +3235,10 @@ local Flame = { 255, 90, 60 }
 Looks.CrimsonWisp = {
 	gait = "float",
 	top = 1.55,
+	grow = 2,
 	pieces = {
 		block("Flames", { 1.4, 1, 1.4 }, { 0, -0.1, 0 }, DeepRed),
 		block("Core", { 1, 1, 1 }, { 0, 0.2, 0 }, { 255, 60, 60 }, true),
-		block("LeftEye", { 0.2, 0.25, 0.05 }, { -0.25, 0.35, -0.52 }, Black),
-		block("RightEye", { 0.2, 0.25, 0.05 }, { 0.25, 0.35, -0.52 }, Black),
-		block("Mouth", { 0.45, 0.1, 0.05 }, { 0, 0, -0.52 }, Black),
 		limb("TongueLeft", { 0.4, 0.8, 0.4 }, { -0.4, 0.9, 0 }, Flame, "Z", 15, 3, 0, { 0, -0.4, 0 }, true),
 		limb(
 			"TongueRight",
@@ -1762,6 +3292,29 @@ Looks.CrimsonWisp = {
 				true
 			)
 		),
+		tilt(block("LeftEye", { 0.3, 0.1, 0.05 }, { -0.25, 0.52, -0.53 }, Candle, true), 0, 0, -20),
+		tilt(block("RightEye", { 0.3, 0.1, 0.05 }, { 0.25, 0.52, -0.53 }, Candle, true), 0, 0, 20),
+		block("Mouth", { 0.65, 0.28, 0.05 }, { 0, 0.05, -0.72 }, Black),
+		block("Fang1", { 0.1, 0.16, 0.05 }, { -0.22, 0.13, -0.75 }, White),
+		block("Fang2", { 0.1, 0.16, 0.05 }, { 0, 0.13, -0.75 }, White),
+		block("Fang3", { 0.1, 0.16, 0.05 }, { 0.22, 0.13, -0.75 }, White),
+		block("LowFang1", { 0.1, 0.14, 0.05 }, { -0.11, -0.03, -0.75 }, White),
+		block("LowFang2", { 0.1, 0.14, 0.05 }, { 0.11, -0.03, -0.75 }, White),
+		limb("LeftArm", { 0.25, 0.7, 0.25 }, { -0.85, -0.15, 0 }, DeepRed, "Z", 20, 1.5, 0, { 0, 0.35, 0 }),
+		limb("LeftClaw", { 0.3, 0.25, 0.3 }, { -0.85, -0.6, 0 }, Flame, "Z", 20, 1.5, 0, { 0, 0.8, 0 }, true),
+		limb("RightArm", { 0.25, 0.7, 0.25 }, { 0.85, -0.15, 0 }, DeepRed, "Z", -20, 1.5, 0, { 0, 0.35, 0 }),
+		limb(
+			"RightClaw",
+			{ 0.3, 0.25, 0.3 },
+			{ 0.85, -0.6, 0 },
+			Flame,
+			"Z",
+			-20,
+			1.5,
+			0,
+			{ 0, 0.8, 0 },
+			true
+		),
 	},
 }
 
@@ -1771,6 +3324,7 @@ local GhostFurDark = { 100, 115, 150 }
 Looks.Moonhowler = {
 	gait = "walk",
 	top = 1.5,
+	grow = 2,
 	pieces = {
 		block("Torso", { 1.3, 1.3, 0.9 }, { 0, -0.4, 0 }, GhostFur),
 		block("Chest", { 0.9, 0.8, 0.1 }, { 0, -0.3, -0.48 }, { 200, 215, 235 }),
@@ -1858,6 +3412,95 @@ Looks.Moonhowler = {
 			0.5,
 			{ 0, 0.775, 0.2 }
 		),
+		tilt(block("LeftBrow", { 0.3, 0.08, 0.05 }, { -0.25, 0.92, -0.67 }, Black), 0, 0, -25),
+		tilt(block("RightBrow", { 0.3, 0.08, 0.05 }, { 0.25, 0.92, -0.67 }, Black), 0, 0, 25),
+		block("UpperTooth1", { 0.07, 0.12, 0.05 }, { -0.15, 0.28, -1.21 }, White),
+		block("UpperTooth2", { 0.07, 0.12, 0.05 }, { -0.05, 0.28, -1.21 }, White),
+		block("UpperTooth3", { 0.07, 0.12, 0.05 }, { 0.05, 0.28, -1.21 }, White),
+		block("UpperTooth4", { 0.07, 0.12, 0.05 }, { 0.15, 0.28, -1.21 }, White),
+		limb("Jaw", { 0.45, 0.15, 0.55 }, { 0, 0.18, -0.85 }, GhostFurDark, "X", 15, 1.5, 0, { 0, 0, 0.27 }),
+		limb("JawTeeth", { 0.38, 0.1, 0.05 }, { 0, 0.28, -1.1 }, White, "X", 15, 1.5, 0, { 0, -0.1, 0.52 }),
+		limb(
+			"JawBlood",
+			{ 0.08, 0.3, 0.06 },
+			{ 0.12, 0.02, -1.1 },
+			Blood,
+			"X",
+			15,
+			1.5,
+			0,
+			{ 0, 0.16, 0.52 }
+		),
+		block("SnoutBlood", { 0.52, 0.1, 0.3 }, { 0, 0.33, -1.02 }, Blood),
+		tilt(block("Bristle1", { 0.25, 0.5, 0.2 }, { 0, 0.55, 0.5 }, GhostFurDark), 40, 0, 0),
+		tilt(block("Bristle2", { 0.25, 0.5, 0.2 }, { 0, 0.15, 0.55 }, GhostFurDark), 40, 0, 0),
+		tilt(block("Bristle3", { 0.25, 0.45, 0.2 }, { 0, -0.25, 0.55 }, GhostFurDark), 40, 0, 0),
+		limb(
+			"LeftTalon1",
+			{ 0.07, 0.35, 0.07 },
+			{ -0.98, -1.55, -0.12 },
+			White,
+			"X",
+			35,
+			1.5,
+			0.5,
+			{ 0.13, 1.6, 0.12 }
+		),
+		limb(
+			"LeftTalon2",
+			{ 0.07, 0.35, 0.07 },
+			{ -0.85, -1.55, -0.12 },
+			White,
+			"X",
+			35,
+			1.5,
+			0.5,
+			{ 0, 1.6, 0.12 }
+		),
+		limb(
+			"LeftTalon3",
+			{ 0.07, 0.35, 0.07 },
+			{ -0.72, -1.55, -0.12 },
+			White,
+			"X",
+			35,
+			1.5,
+			0.5,
+			{ -0.13, 1.6, 0.12 }
+		),
+		limb(
+			"RightTalon1",
+			{ 0.07, 0.35, 0.07 },
+			{ 0.72, -1.55, -0.12 },
+			White,
+			"X",
+			35,
+			1.5,
+			0,
+			{ 0.13, 1.6, 0.12 }
+		),
+		limb(
+			"RightTalon2",
+			{ 0.07, 0.35, 0.07 },
+			{ 0.85, -1.55, -0.12 },
+			White,
+			"X",
+			35,
+			1.5,
+			0,
+			{ 0, 1.6, 0.12 }
+		),
+		limb(
+			"RightTalon3",
+			{ 0.07, 0.35, 0.07 },
+			{ 0.98, -1.55, -0.12 },
+			White,
+			"X",
+			35,
+			1.5,
+			0,
+			{ -0.13, 1.6, 0.12 }
+		),
 	},
 }
 
@@ -1867,6 +3510,7 @@ local Mailbox = { 70, 90, 130 }
 Looks.MailboxMimic = {
 	gait = "walk",
 	top = 1.05,
+	grow = 2,
 	pieces = {
 		block("Box", { 1.2, 1, 1.8 }, { 0, 0.2, 0 }, Mailbox),
 		block("Roof", { 1, 0.25, 1.8 }, { 0, 0.82, 0 }, Mailbox),
@@ -1894,6 +3538,58 @@ Looks.MailboxMimic = {
 		limb("Flag", { 0.1, 0.25, 0.45 }, { 0.65, 0.7, 0.1 }, CircusRed, "X", 25, 2, 0, { 0, 0, 0.22 }),
 		limb("LeftPost", { 0.3, 1.7, 0.3 }, { -0.25, -1.15, 0 }, Wood, "X", 25, 1.8, 0, { 0, 0.85, 0 }),
 		limb("RightPost", { 0.3, 1.7, 0.3 }, { 0.25, -1.15, 0 }, Wood, "X", 25, 1.8, 0.5, { 0, 0.85, 0 }),
+		block("SmallLeftEye", { 0.12, 0.12, 0.05 }, { -0.5, 0.62, -0.91 }, Nightmare, true),
+		block("SmallRightEye", { 0.12, 0.12, 0.05 }, { 0.5, 0.62, -0.91 }, Nightmare, true),
+		block("Drool1", { 0.06, 0.35, 0.05 }, { -0.12, 0.25, -0.91 }, Blood),
+		block("Drool2", { 0.06, 0.25, 0.05 }, { 0.35, 0.3, -0.91 }, Blood),
+		limb(
+			"LidTooth1",
+			{ 0.13, 0.2, 0.05 },
+			{ -0.4, 0.33, -1 },
+			White,
+			"X",
+			-25,
+			2,
+			0,
+			{ 0.4, -0.83, 0.05 }
+		),
+		limb(
+			"LidTooth2",
+			{ 0.13, 0.2, 0.05 },
+			{ -0.13, 0.33, -1 },
+			White,
+			"X",
+			-25,
+			2,
+			0,
+			{ 0.13, -0.83, 0.05 }
+		),
+		limb(
+			"LidTooth3",
+			{ 0.13, 0.2, 0.05 },
+			{ 0.13, 0.33, -1 },
+			White,
+			"X",
+			-25,
+			2,
+			0,
+			{ -0.13, -0.83, 0.05 }
+		),
+		limb(
+			"LidTooth4",
+			{ 0.13, 0.2, 0.05 },
+			{ 0.4, 0.33, -1 },
+			White,
+			"X",
+			-25,
+			2,
+			0,
+			{ -0.4, -0.83, 0.05 }
+		),
+		limb("LeftArm", { 0.12, 0.9, 0.12 }, { -0.68, -0.1, -0.2 }, Iron, "X", 35, 1.8, 0.5, { 0, 0.4, 0 }),
+		limb("LeftClaw", { 0.25, 0.25, 0.12 }, { -0.68, -0.6, -0.2 }, Bone, "X", 35, 1.8, 0.5, { 0, 0.9, 0 }),
+		limb("RightArm", { 0.12, 0.9, 0.12 }, { 0.68, -0.1, -0.2 }, Iron, "X", 35, 1.8, 0, { 0, 0.4, 0 }),
+		limb("RightClaw", { 0.25, 0.25, 0.12 }, { 0.68, -0.6, -0.2 }, Bone, "X", 35, 1.8, 0, { 0, 0.9, 0 }),
 	},
 }
 
@@ -1902,6 +3598,7 @@ local SickLight = { 210, 255, 140 }
 Looks.LamppostLurker = {
 	gait = "walk",
 	top = 2.9,
+	grow = 2,
 	pieces = {
 		block("Base", { 0.8, 0.25, 0.8 }, { 0, -0.9, 0 }, Iron),
 		block("Pole", { 0.3, 2.4, 0.3 }, { 0, 0.35, 0 }, Iron),
@@ -1910,15 +3607,98 @@ Looks.LamppostLurker = {
 		block("LampFrame", { 0.75, 0.1, 0.75 }, { 0, 1.62, 0 }, Iron),
 		block("Cap", { 0.9, 0.2, 0.9 }, { 0, 2.5, 0 }, Iron),
 		block("Spike", { 0.15, 0.3, 0.15 }, { 0, 2.75, 0 }, Iron),
-		block("LeftEye", { 0.15, 0.15, 0.05 }, { -0.15, 2.1, -0.37 }, Black),
-		block("RightEye", { 0.15, 0.15, 0.05 }, { 0.15, 2.1, -0.37 }, Black),
-		block("Mouth", { 0.35, 0.08, 0.05 }, { 0, 1.85, -0.37 }, Black),
 		limb("LeftArm", { 0.15, 1.8, 0.15 }, { -0.5, 0.4, -0.05 }, Iron, "X", 30, 1.2, 0.5, { 0, 0.9, 0 }),
-		limb("LeftClaw", { 0.3, 0.25, 0.3 }, { -0.5, -0.6, -0.05 }, Iron, "X", 30, 1.2, 0.5, { 0, 1.9, 0 }),
 		limb("RightArm", { 0.15, 1.8, 0.15 }, { 0.5, 0.4, -0.05 }, Iron, "X", 30, 1.2, 0, { 0, 0.9, 0 }),
-		limb("RightClaw", { 0.3, 0.25, 0.3 }, { 0.5, -0.6, -0.05 }, Iron, "X", 30, 1.2, 0, { 0, 1.9, 0 }),
 		limb("LeftLeg", { 0.25, 1, 0.25 }, { -0.2, -1.5, 0 }, Iron, "X", 30, 1.2, 0, { 0, 0.5, 0 }),
 		limb("RightLeg", { 0.25, 1, 0.25 }, { 0.2, -1.5, 0 }, Iron, "X", 30, 1.2, 0.5, { 0, 0.5, 0 }),
+		block("LeftEye", { 0.17, 0.22, 0.05 }, { -0.15, 2.12, -0.37 }, Black),
+		block("RightEye", { 0.17, 0.22, 0.05 }, { 0.15, 2.12, -0.37 }, Black),
+		block("LeftPupil", { 0.06, 0.06, 0.05 }, { -0.15, 2.1, -0.4 }, RedEye, true),
+		block("RightPupil", { 0.06, 0.06, 0.05 }, { 0.15, 2.1, -0.4 }, RedEye, true),
+		block("Mouth", { 0.5, 0.2, 0.05 }, { 0, 1.83, -0.37 }, Black),
+		block("Tooth1", { 0.08, 0.1, 0.05 }, { -0.16, 1.88, -0.4 }, White),
+		block("Tooth2", { 0.08, 0.1, 0.05 }, { 0, 1.88, -0.4 }, White),
+		block("Tooth3", { 0.08, 0.1, 0.05 }, { 0.16, 1.88, -0.4 }, White),
+		block("PoleBlood", { 0.32, 0.5, 0.32 }, { 0, 0.85, 0 }, Blood),
+		block("PoleBloodDrip", { 0.08, 0.4, 0.08 }, { 0.1, 0.45, -0.15 }, Blood),
+		limb(
+			"LeftFinger1",
+			{ 0.06, 0.5, 0.06 },
+			{ -0.6, -0.75, -0.05 },
+			Iron,
+			"X",
+			30,
+			1.2,
+			0.5,
+			{ 0.1, 2.05, 0 }
+		),
+		limb(
+			"LeftFinger2",
+			{ 0.06, 0.5, 0.06 },
+			{ -0.5, -0.75, -0.05 },
+			Iron,
+			"X",
+			30,
+			1.2,
+			0.5,
+			{ 0, 2.05, 0 }
+		),
+		limb(
+			"LeftFinger3",
+			{ 0.06, 0.5, 0.06 },
+			{ -0.4, -0.75, -0.05 },
+			Iron,
+			"X",
+			30,
+			1.2,
+			0.5,
+			{ -0.1, 2.05, 0 }
+		),
+		limb(
+			"RightFinger1",
+			{ 0.06, 0.5, 0.06 },
+			{ 0.4, -0.75, -0.05 },
+			Iron,
+			"X",
+			30,
+			1.2,
+			0,
+			{ 0.1, 2.05, 0 }
+		),
+		limb(
+			"RightFinger2",
+			{ 0.06, 0.5, 0.06 },
+			{ 0.5, -0.75, -0.05 },
+			Iron,
+			"X",
+			30,
+			1.2,
+			0,
+			{ 0, 2.05, 0 }
+		),
+		limb(
+			"RightFinger3",
+			{ 0.06, 0.5, 0.06 },
+			{ 0.6, -0.75, -0.05 },
+			Iron,
+			"X",
+			30,
+			1.2,
+			0,
+			{ -0.1, 2.05, 0 }
+		),
+		limb(
+			"LeftHand",
+			{ 0.28, 0.15, 0.2 },
+			{ -0.5, -0.52, -0.05 },
+			Iron,
+			"X",
+			30,
+			1.2,
+			0.5,
+			{ 0, 1.82, 0 }
+		),
+		limb("RightHand", { 0.28, 0.15, 0.2 }, { 0.5, -0.52, -0.05 }, Iron, "X", 30, 1.2, 0, { 0, 1.82, 0 }),
 	},
 }
 
@@ -1929,13 +3709,12 @@ local Lightning = { 255, 240, 120 }
 Looks.StormGremlin = {
 	gait = "walk",
 	top = 1.3,
+	grow = 2,
 	pieces = {
 		block("Body", { 1, 1, 0.8 }, { 0, -1, 0 }, StormSkin),
 		block("Head", { 1, 0.8, 0.8 }, { 0, -0.1, -0.05 }, StormSkin),
 		block("LeftEye", { 0.22, 0.22, 0.05 }, { -0.22, 0, -0.47 }, Spark, true),
 		block("RightEye", { 0.22, 0.22, 0.05 }, { 0.22, 0, -0.47 }, Spark, true),
-		block("Mouth", { 0.55, 0.12, 0.05 }, { 0, -0.3, -0.47 }, Black),
-		block("Fang", { 0.1, 0.12, 0.05 }, { 0.15, -0.26, -0.5 }, White),
 		tilt(block("LeftEar", { 0.55, 0.3, 0.1 }, { -0.7, 0.05, 0 }, StormSkin), 0, 0, -25),
 		tilt(block("RightEar", { 0.55, 0.3, 0.1 }, { 0.7, 0.05, 0 }, StormSkin), 0, 0, 25),
 		tilt(block("Spike1", { 0.15, 0.5, 0.15 }, { -0.25, 0.45, 0 }, Lightning, true), 0, 0, 20),
@@ -2006,6 +3785,17 @@ Looks.StormGremlin = {
 		),
 		limb("LeftLeg", { 0.3, 0.5, 0.3 }, { -0.3, -1.75, 0 }, StormSkin, "X", 30, 2.2, 0, { 0, 0.25, 0 }),
 		limb("RightLeg", { 0.3, 0.5, 0.3 }, { 0.3, -1.75, 0 }, StormSkin, "X", 30, 2.2, 0.5, { 0, 0.25, 0 }),
+		block("LeftPupil", { 0.06, 0.18, 0.05 }, { -0.22, 0, -0.5 }, Black),
+		block("RightPupil", { 0.06, 0.18, 0.05 }, { 0.22, 0, -0.5 }, Black),
+		block("Mouth", { 0.7, 0.22, 0.05 }, { 0, -0.3, -0.47 }, Black),
+		block("Fang1", { 0.08, 0.12, 0.05 }, { -0.25, -0.24, -0.5 }, White),
+		block("Fang2", { 0.08, 0.12, 0.05 }, { -0.08, -0.24, -0.5 }, White),
+		block("Fang3", { 0.08, 0.12, 0.05 }, { 0.08, -0.24, -0.5 }, White),
+		block("Fang4", { 0.08, 0.12, 0.05 }, { 0.25, -0.24, -0.5 }, White),
+		tilt(block("LeftHorn", { 0.14, 0.45, 0.14 }, { -0.42, 0.42, 0.15 }, Black), 0, 0, 30),
+		tilt(block("RightHorn", { 0.14, 0.45, 0.14 }, { 0.42, 0.42, 0.15 }, Black), 0, 0, -30),
+		tilt(block("Vein1", { 0.05, 0.6, 0.05 }, { -0.2, -1, -0.41 }, Spark, true), 0, 0, 25),
+		tilt(block("Vein2", { 0.05, 0.5, 0.05 }, { 0.2, -1.05, -0.41 }, Spark, true), 0, 0, -30),
 	},
 }
 
@@ -2016,6 +3806,7 @@ local DoorPanel = { 85, 25, 22 }
 Looks.Doorknocker = {
 	gait = "walk",
 	top = 1.5,
+	grow = 2,
 	pieces = {
 		block("Door", { 1.6, 2.8, 0.3 }, { 0, -0.2, 0 }, DoorWood),
 		block("Arch", { 1.2, 0.25, 0.3 }, { 0, 1.32, 0 }, DoorWood),
@@ -2027,7 +3818,6 @@ Looks.Doorknocker = {
 		block("RightEye", { 0.15, 0.15, 0.05 }, { 0.38, 0.75, -0.2 }, RedEye, true),
 		block("LionFace", { 0.4, 0.35, 0.06 }, { 0, 0.1, -0.19 }, Bronze),
 		limb("Knocker", { 0.5, 0.5, 0.08 }, { 0, -0.3, -0.22 }, Bronze, "X", 25, 2, 0, { 0, 0.25, 0 }),
-		block("MailSlot", { 0.5, 0.08, 0.05 }, { 0, -0.75, -0.18 }, Black),
 		block("Handle", { 0.12, 0.3, 0.15 }, { 0.6, -0.25, -0.22 }, Bronze),
 		limb("LeftArm", { 0.25, 1, 0.25 }, { -0.93, -0.4, 0 }, DoorPanel, "X", 30, 1.5, 0.5, { 0, 0.45, 0 }),
 		limb("LeftHand", { 0.3, 0.25, 0.3 }, { -0.93, -1, 0 }, Bronze, "X", 30, 1.5, 0.5, { 0, 1.05, 0 }),
@@ -2035,6 +3825,55 @@ Looks.Doorknocker = {
 		limb("RightHand", { 0.3, 0.25, 0.3 }, { 0.93, -1, 0 }, Bronze, "X", 30, 1.5, 0, { 0, 1.05, 0 }),
 		limb("LeftLeg", { 0.35, 0.4, 0.3 }, { -0.45, -1.8, 0 }, DoorPanel, "X", 30, 1.5, 0, { 0, 0.2, 0 }),
 		limb("RightLeg", { 0.35, 0.4, 0.3 }, { 0.45, -1.8, 0 }, DoorPanel, "X", 30, 1.5, 0.5, { 0, 0.2, 0 }),
+		block("Mouth", { 0.9, 0.3, 0.05 }, { 0, -0.78, -0.18 }, Black),
+		block("TopTooth1", { 0.12, 0.12, 0.05 }, { -0.33, -0.68, -0.21 }, White),
+		block("TopTooth2", { 0.12, 0.12, 0.05 }, { -0.11, -0.68, -0.21 }, White),
+		block("TopTooth3", { 0.12, 0.12, 0.05 }, { 0.11, -0.68, -0.21 }, White),
+		block("TopTooth4", { 0.12, 0.12, 0.05 }, { 0.33, -0.68, -0.21 }, White),
+		block("BottomTooth1", { 0.12, 0.12, 0.05 }, { -0.22, -0.88, -0.21 }, White),
+		block("BottomTooth2", { 0.12, 0.12, 0.05 }, { 0, -0.88, -0.21 }, White),
+		block("BottomTooth3", { 0.12, 0.12, 0.05 }, { 0.22, -0.88, -0.21 }, White),
+		block("BloodDrip1", { 0.08, 0.45, 0.05 }, { -0.25, -1.1, -0.19 }, Blood),
+		block("BloodDrip2", { 0.08, 0.3, 0.05 }, { 0.3, -1.05, -0.19 }, Blood),
+		tilt(block("Scratch1", { 0.04, 0.7, 0.04 }, { -0.45, 0.6, -0.2 }, Black), 0, 0, 20),
+		tilt(block("Scratch2", { 0.04, 0.7, 0.04 }, { -0.33, 0.6, -0.2 }, Black), 0, 0, 20),
+		tilt(block("Scratch3", { 0.04, 0.7, 0.04 }, { -0.21, 0.6, -0.2 }, Black), 0, 0, 20),
+		limb(
+			"LeftFinger1",
+			{ 0.06, 0.3, 0.06 },
+			{ -1.03, -1.25, 0 },
+			Bone,
+			"X",
+			30,
+			1.5,
+			0.5,
+			{ 0.1, 1.3, 0 }
+		),
+		limb("LeftFinger2", { 0.06, 0.3, 0.06 }, { -0.93, -1.25, 0 }, Bone, "X", 30, 1.5, 0.5, { 0, 1.3, 0 }),
+		limb(
+			"LeftFinger3",
+			{ 0.06, 0.3, 0.06 },
+			{ -0.83, -1.25, 0 },
+			Bone,
+			"X",
+			30,
+			1.5,
+			0.5,
+			{ -0.1, 1.3, 0 }
+		),
+		limb("RightFinger1", { 0.06, 0.3, 0.06 }, { 0.83, -1.25, 0 }, Bone, "X", 30, 1.5, 0, { 0.1, 1.3, 0 }),
+		limb("RightFinger2", { 0.06, 0.3, 0.06 }, { 0.93, -1.25, 0 }, Bone, "X", 30, 1.5, 0, { 0, 1.3, 0 }),
+		limb(
+			"RightFinger3",
+			{ 0.06, 0.3, 0.06 },
+			{ 1.03, -1.25, 0 },
+			Bone,
+			"X",
+			30,
+			1.5,
+			0,
+			{ -0.1, 1.3, 0 }
+		),
 	},
 }
 
@@ -2044,6 +3883,7 @@ local Vein = { 180, 30, 40 }
 Looks.Watcherling = {
 	gait = "float",
 	top = 1.3,
+	grow = 2,
 	pieces = {
 		block("Eyeball", { 1.4, 1.4, 1.4 }, { 0, 0.3, 0 }, Eyeball),
 		block("Iris", { 0.7, 0.7, 0.1 }, { 0, 0.3, -0.72 }, Eldritch, true),
@@ -2143,6 +3983,18 @@ Looks.Watcherling = {
 			{ 0, 1.3, 0 },
 			true
 		),
+		block("Maw", { 0.9, 0.25, 0.05 }, { 0, -0.25, -0.71 }, Black),
+		block("Tooth1", { 0.1, 0.12, 0.05 }, { -0.3, -0.18, -0.74 }, White),
+		block("Tooth2", { 0.1, 0.12, 0.05 }, { -0.1, -0.18, -0.74 }, White),
+		block("Tooth3", { 0.1, 0.12, 0.05 }, { 0.1, -0.18, -0.74 }, White),
+		block("Tooth4", { 0.1, 0.12, 0.05 }, { 0.3, -0.18, -0.74 }, White),
+		block("LowTooth1", { 0.1, 0.1, 0.05 }, { -0.2, -0.33, -0.74 }, White),
+		block("LowTooth2", { 0.1, 0.1, 0.05 }, { 0, -0.33, -0.74 }, White),
+		block("LowTooth3", { 0.1, 0.1, 0.05 }, { 0.2, -0.33, -0.74 }, White),
+		tilt(block("Vein3", { 0.06, 0.4, 0.05 }, { -0.5, 0.75, -0.71 }, Vein), 0, 0, -30),
+		tilt(block("Vein4", { 0.06, 0.4, 0.05 }, { 0.5, 0.05, -0.71 }, Vein), 0, 0, 40),
+		block("LidEye1", { 0.2, 0.15, 0.05 }, { -0.45, 1.05, -0.73 }, Eldritch, true),
+		block("LidEye2", { 0.2, 0.15, 0.05 }, { 0.45, 1.05, -0.73 }, Eldritch, true),
 	},
 }
 
@@ -2151,6 +4003,7 @@ Looks.Watcherling = {
 Looks.EyeOfTheWatcher = {
 	gait = "float",
 	top = 2,
+	grow = 2.5,
 	pieces = {
 		block("Socket", { 2, 2, 2 }, { 0, 0.4, 0 }, Flesh),
 		block("Eyeball", { 1.6, 1.6, 0.3 }, { 0, 0.4, -1 }, Eyeball),
@@ -2209,6 +4062,118 @@ Looks.EyeOfTheWatcher = {
 		limb("LeftTentacle", { 0.3, 1.2, 0.3 }, { -0.6, -1.15, 0 }, Flesh, "Z", 20, 1, 0, { 0, 0.6, 0 }),
 		limb("MiddleTentacle", { 0.3, 1.4, 0.3 }, { 0, -1.25, 0 }, Flesh, "X", 20, 1, 0.33, { 0, 0.7, 0 }),
 		limb("RightTentacle", { 0.3, 1.2, 0.3 }, { 0.6, -1.15, 0 }, Flesh, "Z", 20, 1, 0.66, { 0, 0.6, 0 }),
+		limb("Jaw", { 1.7, 0.35, 1.5 }, { 0, -0.75, -0.2 }, Flesh, "X", 12, 0.8, 0, { 0, 0, 0.7 }),
+		limb(
+			"JawTooth1",
+			{ 0.16, 0.28, 0.16 },
+			{ -0.6, -0.45, -0.85 },
+			White,
+			"X",
+			12,
+			0.8,
+			0,
+			{ 0.6, -0.3, 1.35 }
+		),
+		limb(
+			"JawTooth2",
+			{ 0.16, 0.28, 0.16 },
+			{ -0.3, -0.45, -0.85 },
+			White,
+			"X",
+			12,
+			0.8,
+			0,
+			{ 0.3, -0.3, 1.35 }
+		),
+		limb(
+			"JawTooth3",
+			{ 0.16, 0.28, 0.16 },
+			{ 0, -0.45, -0.85 },
+			White,
+			"X",
+			12,
+			0.8,
+			0,
+			{ 0, -0.3, 1.35 }
+		),
+		limb(
+			"JawTooth4",
+			{ 0.16, 0.28, 0.16 },
+			{ 0.3, -0.45, -0.85 },
+			White,
+			"X",
+			12,
+			0.8,
+			0,
+			{ -0.3, -0.3, 1.35 }
+		),
+		limb(
+			"JawTooth5",
+			{ 0.16, 0.28, 0.16 },
+			{ 0.6, -0.45, -0.85 },
+			White,
+			"X",
+			12,
+			0.8,
+			0,
+			{ -0.6, -0.3, 1.35 }
+		),
+		block("UpperTooth1", { 0.16, 0.26, 0.16 }, { -0.45, -0.55, -1.05 }, White),
+		block("UpperTooth2", { 0.16, 0.26, 0.16 }, { -0.15, -0.55, -1.05 }, White),
+		block("UpperTooth3", { 0.16, 0.26, 0.16 }, { 0.15, -0.55, -1.05 }, White),
+		block("UpperTooth4", { 0.16, 0.26, 0.16 }, { 0.45, -0.55, -1.05 }, White),
+		block("LeftTear", { 0.1, 0.5, 0.05 }, { -0.45, -0.05, -1.17 }, Blood),
+		block("RightTear", { 0.1, 0.35, 0.05 }, { 0.5, 0.02, -1.17 }, Blood),
+		tilt(block("Vein3", { 0.06, 0.5, 0.05 }, { -0.62, 0.8, -1.16 }, Vein), 0, 0, -40),
+		tilt(block("Vein4", { 0.06, 0.45, 0.05 }, { 0.62, 0.0, -1.16 }, Vein), 0, 0, 40),
+		tilt(block("SpikeBackLeft", { 0.25, 0.9, 0.25 }, { -0.5, 1.6, 0.7 }, Black), -25, 0, 25),
+		tilt(block("SpikeBackRight", { 0.25, 0.9, 0.25 }, { 0.5, 1.6, 0.7 }, Black), -25, 0, -25),
+		limb(
+			"FrontLeftTentacle",
+			{ 0.25, 1.1, 0.25 },
+			{ -0.75, -1.2, -0.6 },
+			Flesh,
+			"X",
+			25,
+			1,
+			0.2,
+			{ 0, 0.55, 0 }
+		),
+		limb(
+			"FrontRightTentacle",
+			{ 0.25, 1.1, 0.25 },
+			{ 0.75, -1.2, -0.6 },
+			Flesh,
+			"X",
+			25,
+			1,
+			0.7,
+			{ 0, 0.55, 0 }
+		),
+		limb(
+			"FrontLeftHook",
+			{ 0.2, 0.2, 0.2 },
+			{ -0.75, -1.85, -0.6 },
+			Eldritch,
+			"X",
+			25,
+			1,
+			0.2,
+			{ 0, 1.2, 0 },
+			true
+		),
+		limb(
+			"FrontRightHook",
+			{ 0.2, 0.2, 0.2 },
+			{ 0.75, -1.85, -0.6 },
+			Eldritch,
+			"X",
+			25,
+			1,
+			0.7,
+			{ 0, 1.2, 0 },
+			true
+		),
 	},
 }
 

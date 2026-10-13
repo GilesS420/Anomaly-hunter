@@ -35,6 +35,7 @@ type Swing = {
 	speed: number,
 	phase: number,
 	spin: boolean, -- turns round and round instead of swinging
+	slide: boolean, -- moves along the axis (amp in studs) instead of swinging
 }
 
 type State = {
@@ -72,6 +73,7 @@ local function findSwings(model: Model): { Swing }
 					speed = speed,
 					phase = if typeof(phase) == "number" then phase else 0,
 					spin = motor:GetAttribute("SwingSpin") == true,
+					slide = motor:GetAttribute("SwingSlide") == true,
 				})
 			end
 		end
@@ -182,7 +184,10 @@ function RoamController.start()
 						else math.sin((state.clock * swing.speed + swing.phase) * TAU)
 							* swing.amp
 							* state.pace
-					swing.motor.C0 = swing.base * CFrame.fromAxisAngle(swing.axis, angle)
+					swing.motor.C0 = if swing.slide
+						then CFrame.new(swing.axis * angle)
+							* swing.base -- along the monster's axis, even if tilted
+						else swing.base * CFrame.fromAxisAngle(swing.axis, angle)
 				end
 			end
 
