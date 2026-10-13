@@ -123,9 +123,21 @@ local function wallRun(parts: { Part }, side: string, length: number, openings: 
 	-- Crown moulding along the top.
 	local tx, tz = place(length / 2, 0)
 	part(parts, side .. "Crown", sized(length, 0.6, T + 0.6), { tx, H + 0.3, tz }, Trim, "Wood")
-	-- A chair rail where the panelling stops.
-	local rx, rz = place(length / 2, T / 2 + 0.15)
-	part(parts, side .. "Rail", sized(length, 0.25, 0.3), { rx, 3, rz }, Trim, "Wood")
+	-- A chair rail where the panelling stops, broken at every doorway (and its frame).
+	local railFrom = 0
+	local function rail(i: number, to: number)
+		if to - railFrom > 0.01 then
+			local rx, rz = place((railFrom + to) / 2, T / 2 + 0.15)
+			part(parts, `{side}Rail{i}`, sized(to - railFrom, 0.25, 0.3), { rx, 3, rz }, Trim, "Wood")
+		end
+	end
+	for i, opening in openings do
+		if opening.kind == "Door" then
+			rail(i, opening.from - 0.25)
+			railFrom = opening.to + 0.25
+		end
+	end
+	rail(#openings + 1, length)
 
 	for _, opening in openings do
 		local mid = (opening.from + opening.to) / 2
@@ -206,13 +218,13 @@ end
 -- against the wall) when the owner has that wing, shut with boards nailed across when not.
 local function door(parts: { Part }, wingId: string, x: number, z: number, along: string, open: boolean)
 	-- `along` is the axis the wall runs along ("X" for the back wall, "Z" for side walls).
-	local leafWidth, leafHeight = 3.5, 10
+	local leafWidth, leafHeight = 3.5, 10 -- two leaves fill the 8-wide doorway
 	local into = if along == "Z" then (if x < 0 then 1 else -1) else -1 -- room side of the wall
 	for i, s in { -1, 1 } do
 		local leaf: Part
 		if open then
 			-- Swung 90 degrees into the room, standing against the wall beside the frame.
-			local hinge = s * (leafWidth + 0.25)
+			local hinge = s * leafWidth -- just inside the door frame, clear of the jambs
 			if along == "Z" then
 				leaf = part(parts, `{wingId}DoorLeaf{i}`, { leafWidth, leafHeight, 0.4 }, {
 					x + into * (T / 2 + leafWidth / 2),
