@@ -12,6 +12,9 @@
 --                     hungry after a day (/skip 25 makes them all hungry)
 --   /calm             zone monsters leave you alone (type it again to let them attack)
 --   /attack           the closest monster in your zone attacks you right now
+--   /spawn Gravepup   brings that monster to you in the zone you're in (any monster, any zone;
+--                     add a size: /spawn TheBogKing Huge). Only you can catch it and it never
+--                     attacks. /spawn all brings every monster of the zone you're in.
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
 
 local Players = game:GetService("Players")
@@ -20,6 +23,9 @@ local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 
 local Format = require(ReplicatedStorage.Shared.Util.Format)
+local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
+local Sizes = require(ReplicatedStorage.Shared.Config.Sizes)
+local Zones = require(ReplicatedStorage.Shared.Config.Zones)
 local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Wings = require(ReplicatedStorage.Shared.Config.Wings)
@@ -31,6 +37,7 @@ local HuntService = require(script.Parent.HuntService)
 local MonsterAiService = require(script.Parent.MonsterAiService)
 local MansionService = require(script.Parent.MansionService)
 local Notify = require(script.Parent.Parent.Notify)
+local SpawnService = require(script.Parent.SpawnService)
 local WatcherService = require(script.Parent.WatcherService)
 
 local DevService = {}
@@ -174,6 +181,58 @@ commands["/attack"] = function(player)
 	if not MonsterAiService.provoke(player) then
 		Notify.toast(player, "Go into a zone first, with a monster in it.")
 	end
+end
+
+-- "the bog king", "TheBogKing" and "thebogking" all find TheBogKing.
+local function squash(text: string): string
+	return string.lower((string.gsub(text, "[%s_]", "")))
+end
+
+commands["/spawn"] = function(player, argument)
+	local words = string.split(argument or "", " ")
+	local sizeId = "Normal"
+	local last = words[#words]
+	for _, size in Sizes do
+		if #words > 1 and last and string.lower(size.id) == string.lower(last) then
+			sizeId = size.id
+			table.remove(words)
+		end
+	end
+	local wanted = squash(table.concat(words, ""))
+	if wanted == "" then
+		Notify.toast(player, "Try: /spawn Gravepup, /spawn TheBogKing Huge or /spawn all")
+		return
+	end
+
+	if wanted == "all" then
+		local zoneIndex = nil
+		for _, zone in Zones.List do
+			if zone.id == player:GetAttribute("Zone") then
+				zoneIndex = zone.index
+			end
+		end
+		if not zoneIndex then
+			Notify.toast(player, "Go into a zone first, then try /spawn all again.")
+			return
+		end
+		local count = 0
+		for _, monster in Monsters do
+			if monster.zone == zoneIndex and SpawnService.spawnFor(player, monster.id, sizeId) then
+				count += 1
+			end
+		end
+		Notify.toast(player, `{count} monsters came to you. Only you can catch them.`)
+		return
+	end
+
+	for id in Monsters do
+		if squash(id) == wanted then
+			local _, message = SpawnService.spawnFor(player, id, sizeId)
+			Notify.toast(player, message)
+			return
+		end
+	end
+	Notify.toast(player, `There's no monster called "{argument}". Try /spawn Gravepup`)
 end
 
 -- Runs a chat message if it's one of the commands above.
