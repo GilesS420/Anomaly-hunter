@@ -29,6 +29,7 @@ export type Piece = {
 	color: { number },
 	shape: ("Block" | "Ball" | "Cylinder")?,
 	glow: boolean?, -- neon, for eyes and other bits that shine in the dark
+	rot: { number }?, -- tilts the part, in degrees around X, Y, Z (a horse's neck, an arm held out)
 	joint: Joint?,
 }
 
@@ -71,6 +72,12 @@ local function limb(
 		glow = glow,
 		joint = { axis = axis, amp = amp, speed = speed, phase = phase, pivot = pivot },
 	}
+end
+
+-- Tilts a part (degrees around X, Y, Z). Around X, a negative angle leans its top forward.
+local function tilt(piece: Piece, x: number, y: number, z: number): Piece
+	piece.rot = { x, y, z }
+	return piece
 end
 
 -- Zone 1, Common: a shy little ghost blob that waves its stubby arms.
@@ -367,178 +374,338 @@ Looks.WispJack = {
 	},
 }
 
--- Zone 1, Epic: a gravestone that got up and walks, grinning.
+-- Zone 1, Epic: a headstone that got up and walks, grinning. Arched top with a cross, an
+-- engraved plate, cracks, moss and ivy, and an epitaph on the back too.
 local Stone = { 130, 128, 140 }
 local StoneDark = { 95, 92, 105 }
+local Engraving = { 60, 58, 68 }
+local Ivy = { 60, 120, 50 }
 local Purple = { 200, 110, 255 }
 Looks.Tombgrin = {
 	gait = "walk",
-	top = 1.7,
+	top = 2.6,
 	pieces = {
-		block("Slab", { 2, 2.6, 0.8 }, { 0, 0, 0 }, Stone),
-		block("Top", { 1.6, 0.4, 0.8 }, { 0, 1.5, 0 }, Stone),
-		block("Plate", { 1, 0.35, 0.1 }, { 0, 0.9, -0.45 }, StoneDark),
-		block("Crack", { 0.15, 0.8, 0.1 }, { 0.6, -0.8, -0.45 }, StoneDark),
-		block("Moss", { 0.8, 0.2, 0.85 }, { -0.5, 1.3, 0 }, Moss),
-		block("LeftEye", { 0.3, 0.3, 0.1 }, { -0.4, 0.35, -0.45 }, Purple, true),
-		block("RightEye", { 0.3, 0.3, 0.1 }, { 0.4, 0.35, -0.45 }, Purple, true),
-		block("Grin", { 1.1, 0.2, 0.1 }, { 0, -0.25, -0.45 }, Purple, true),
+		block("Slab", { 2, 2.2, 0.7 }, { 0, 0, 0 }, Stone),
+		block("ArchLow", { 1.6, 0.3, 0.7 }, { 0, 1.25, 0 }, Stone),
+		block("ArchHigh", { 1, 0.3, 0.7 }, { 0, 1.55, 0 }, Stone),
+		block("CrossPost", { 0.25, 0.9, 0.25 }, { 0, 2.15, 0 }, StoneDark),
+		block("CrossBar", { 0.75, 0.2, 0.25 }, { 0, 2.3, 0 }, StoneDark),
+		block("Plinth", { 2.4, 0.4, 1.1 }, { 0, -1.3, 0 }, StoneDark),
+		block("FrontGrass", { 0.6, 0.15, 0.2 }, { -0.7, -1.05, -0.45 }, Moss),
+		block("BackGrass", { 0.7, 0.15, 0.2 }, { 0.6, -1.05, 0.45 }, Moss),
+		-- Front: face, plate with an epitaph, a crack and a patch of moss.
+		block("LeftEye", { 0.3, 0.3, 0.1 }, { -0.4, 0.6, -0.38 }, Purple, true),
+		block("RightEye", { 0.3, 0.3, 0.1 }, { 0.4, 0.6, -0.38 }, Purple, true),
+		block("Grin", { 1.1, 0.2, 0.1 }, { 0, 0.1, -0.38 }, Purple, true),
+		block("Plate", { 1.3, 0.6, 0.08 }, { 0, -0.55, -0.38 }, Engraving),
+		block("PlateLineTop", { 0.9, 0.07, 0.05 }, { 0, -0.45, -0.43 }, Stone),
+		block("PlateLineBottom", { 0.7, 0.07, 0.05 }, { 0, -0.65, -0.43 }, Stone),
+		block("FrontCrack", { 0.1, 0.7, 0.05 }, { 0.7, 0.75, -0.37 }, Engraving),
+		block("FrontMoss", { 0.7, 0.2, 0.75 }, { -0.55, 1.1, 0 }, Moss),
+		-- Back: epitaph lines, a long crack and ivy growing up the side.
+		block("BackLine1", { 1.1, 0.07, 0.05 }, { 0, 0.5, 0.37 }, Engraving),
+		block("BackLine2", { 1.1, 0.07, 0.05 }, { 0, 0.3, 0.37 }, Engraving),
+		block("BackLine3", { 0.8, 0.07, 0.05 }, { 0, 0.1, 0.37 }, Engraving),
+		block("BackCrack", { 0.1, 1.1, 0.05 }, { -0.5, -0.35, 0.37 }, Engraving),
+		block("BackMoss", { 1, 0.35, 0.08 }, { 0.3, 0.95, 0.37 }, Moss),
+		block("IvyStem", { 0.1, 1.7, 0.1 }, { 0.8, 0.05, 0.4 }, Ivy),
+		block("IvyLeafTop", { 0.3, 0.15, 0.1 }, { 0.7, 0.55, 0.42 }, Ivy),
+		block("IvyLeafBottom", { 0.3, 0.15, 0.1 }, { 0.9, -0.3, 0.42 }, Ivy),
+		block("SideIvy", { 0.1, 1, 0.3 }, { 1.03, -0.3, 0.1 }, Ivy),
 		limb("LeftArm", { 0.4, 1, 0.4 }, { -1.2, -0.1, 0 }, StoneDark, "X", 30, 1.4, 0.5, { 0, 0.4, 0 }),
 		limb("RightArm", { 0.4, 1, 0.4 }, { 1.2, -0.1, 0 }, StoneDark, "X", 30, 1.4, 0, { 0, 0.4, 0 }),
-		limb("LeftLeg", { 0.5, 0.7, 0.5 }, { -0.5, -1.65, 0 }, StoneDark, "X", 25, 1.4, 0, { 0, 0.35, 0 }),
-		limb("RightLeg", { 0.5, 0.7, 0.5 }, { 0.5, -1.65, 0 }, StoneDark, "X", 25, 1.4, 0.5, { 0, 0.35, 0 }),
+		limb("LeftLeg", { 0.5, 0.5, 0.5 }, { -0.5, -1.75, 0 }, StoneDark, "X", 25, 1.4, 0, { 0, 0.25, 0 }),
+		limb("RightLeg", { 0.5, 0.5, 0.5 }, { 0.5, -1.75, 0 }, StoneDark, "X", 25, 1.4, 0.5, { 0, 0.25, 0 }),
 	},
 }
 
--- Zone 1, Legendary: the old graveyard keeper, a lantern in one hand and a shovel in the
--- other (they swing along with his arms).
-local Coat = { 60, 85, 60 }
-local Trousers = { 70, 50, 40 }
-local Skin = { 200, 205, 190 }
+-- Zone 1, Legendary: the old graveyard keeper. A gaunt grey face with sunken red eyes, a
+-- stitched grin and a scar; a lantern in one hand and a shovel in the other. Hands, lantern,
+-- shovel and boots share their arm's or leg's pivot, so they swing along with it.
+local Coat = { 50, 60, 50 }
+local Trousers = { 55, 45, 40 }
+local Corpse = { 165, 175, 160 }
 local Wood = { 120, 80, 45 }
+local Iron = { 45, 45, 50 }
+local Blood = { 140, 15, 20 }
+local RedEye = { 255, 40, 40 }
 Looks.TheGroundskeeper = {
 	gait = "walk",
-	top = 1.9,
+	top = 2,
 	pieces = {
 		block("Torso", { 1.4, 1.4, 0.8 }, { 0, -0.3, 0 }, Coat),
-		block("Head", { 0.9, 0.9, 0.9 }, { 0, 0.85, 0 }, Skin),
-		block("Beard", { 0.8, 0.4, 0.2 }, { 0, 0.55, -0.5 }, { 180, 180, 180 }),
-		block("LeftEye", { 0.18, 0.18, 0.1 }, { -0.2, 0.95, -0.47 }, Candle, true),
-		block("RightEye", { 0.18, 0.18, 0.1 }, { 0.2, 0.95, -0.47 }, Candle, true),
-		block("HatBrim", { 1.4, 0.15, 1.4 }, { 0, 1.35, 0 }, Trousers),
-		block("HatTop", { 0.9, 0.5, 0.9 }, { 0, 1.65, 0 }, Trousers),
-		limb("LeftArm", { 0.35, 1.3, 0.35 }, { -0.9, -0.4, 0 }, Coat, "X", 30, 1.4, 0.5, { 0, 0.55, 0 }),
-		limb("RightArm", { 0.35, 1.3, 0.35 }, { 0.9, -0.4, 0 }, Coat, "X", 30, 1.4, 0, { 0, 0.55, 0 }),
+		block("CoatTail", { 1.5, 0.4, 0.9 }, { 0, -0.9, 0 }, Coat),
+		block("Shirt", { 0.4, 0.7, 0.05 }, { 0, 0.05, -0.42 }, { 150, 140, 120 }),
+		block("TopButton", { 0.12, 0.12, 0.05 }, { 0, 0.15, -0.46 }, Iron),
+		block("LowButton", { 0.12, 0.12, 0.05 }, { 0, -0.15, -0.46 }, Iron),
+		block("Belt", { 1.45, 0.15, 0.85 }, { 0, -0.6, 0 }, Iron),
+		block("Buckle", { 0.25, 0.2, 0.05 }, { 0, -0.6, -0.45 }, { 180, 160, 90 }),
+		block("Patch", { 0.35, 0.35, 0.05 }, { 0.45, -0.2, -0.42 }, { 90, 70, 50 }),
+		block("Head", { 0.9, 0.9, 0.9 }, { 0, 0.85, -0.1 }, Corpse),
+		block("Nose", { 0.15, 0.25, 0.15 }, { 0, 0.85, -0.62 }, Corpse),
+		block("LeftSocket", { 0.25, 0.22, 0.05 }, { -0.2, 1, -0.57 }, Black),
+		block("RightSocket", { 0.25, 0.22, 0.05 }, { 0.2, 1, -0.57 }, Black),
+		block("LeftEye", { 0.1, 0.1, 0.05 }, { -0.2, 1, -0.6 }, RedEye, true),
+		block("RightEye", { 0.1, 0.1, 0.05 }, { 0.2, 1, -0.6 }, RedEye, true),
+		block("Mouth", { 0.55, 0.15, 0.05 }, { 0, 0.62, -0.57 }, Black),
+		block("ToothLeft", { 0.08, 0.1, 0.05 }, { -0.15, 0.66, -0.6 }, Bone),
+		block("ToothMiddle", { 0.08, 0.1, 0.05 }, { 0.02, 0.66, -0.6 }, Bone),
+		block("ToothRight", { 0.08, 0.1, 0.05 }, { 0.18, 0.66, -0.6 }, Bone),
+		block("Scar", { 0.06, 0.4, 0.05 }, { 0.32, 0.85, -0.57 }, Blood),
+		block("LeftHair", { 0.15, 0.3, 0.5 }, { -0.5, 1.05, 0 }, { 170, 170, 170 }),
+		block("RightHair", { 0.15, 0.3, 0.5 }, { 0.5, 1.05, 0 }, { 170, 170, 170 }),
+		block("HatBrim", { 1.5, 0.12, 1.5 }, { 0, 1.35, -0.1 }, Trousers),
+		block("HatTop", { 0.9, 0.55, 0.9 }, { 0, 1.68, -0.1 }, Trousers),
+		block("HatBand", { 0.95, 0.15, 0.95 }, { 0, 1.48, -0.1 }, Blood),
+		-- Right side: arm, hand and lantern.
+		limb("RightArm", { 0.35, 1.1, 0.35 }, { 0.9, -0.3, 0 }, Coat, "X", 30, 1.4, 0, { 0, 0.5, 0 }),
+		limb("RightHand", { 0.35, 0.3, 0.35 }, { 0.9, -1, 0 }, Corpse, "X", 30, 1.4, 0, { 0, 1.2, 0 }),
+		limb("LanternTop", { 0.5, 0.1, 0.5 }, { 0.9, -1.2, -0.05 }, Iron, "X", 30, 1.4, 0, { 0, 1.4, 0.05 }),
 		limb(
 			"Lantern",
-			{ 0.4, 0.5, 0.4 },
-			{ 0.9, -1.25, -0.1 },
+			{ 0.4, 0.45, 0.4 },
+			{ 0.9, -1.475, -0.05 },
 			Candle,
 			"X",
 			30,
 			1.4,
 			0,
-			{ 0, 1.4, 0.1 },
+			{ 0, 1.675, 0.05 },
 			true
 		),
-		limb("Shovel", { 0.15, 1.7, 0.15 }, { -0.9, -0.5, -0.3 }, Wood, "X", 30, 1.4, 0.5, { 0, 0.65, 0.3 }),
+		limb(
+			"LanternBase",
+			{ 0.5, 0.1, 0.5 },
+			{ 0.9, -1.75, -0.05 },
+			Iron,
+			"X",
+			30,
+			1.4,
+			0,
+			{ 0, 1.95, 0.05 }
+		),
+		-- Left side: arm, hand and shovel.
+		limb("LeftArm", { 0.35, 1.1, 0.35 }, { -0.9, -0.3, 0 }, Coat, "X", 30, 1.4, 0.5, { 0, 0.5, 0 }),
+		limb("LeftHand", { 0.35, 0.3, 0.35 }, { -0.9, -1, 0 }, Corpse, "X", 30, 1.4, 0.5, { 0, 1.2, 0 }),
+		limb("Shovel", { 0.15, 2, 0.15 }, { -0.9, -0.6, -0.25 }, Wood, "X", 30, 1.4, 0.5, { 0, 0.8, 0.25 }),
 		limb(
 			"ShovelBlade",
 			{ 0.5, 0.5, 0.1 },
-			{ -0.9, -1.6, -0.3 },
+			{ -0.9, -1.7, -0.25 },
 			Stone,
 			"X",
 			30,
 			1.4,
 			0.5,
-			{ 0, 1.75, 0.3 }
+			{ 0, 1.9, 0.25 }
 		),
-		limb("LeftLeg", { 0.45, 1, 0.45 }, { -0.3, -1.5, 0 }, Trousers, "X", 28, 1.4, 0, { 0, 0.5, 0 }),
-		limb("RightLeg", { 0.45, 1, 0.45 }, { 0.3, -1.5, 0 }, Trousers, "X", 28, 1.4, 0.5, { 0, 0.5, 0 }),
+		-- Legs with boots.
+		limb("LeftLeg", { 0.45, 0.8, 0.45 }, { -0.3, -1.45, 0 }, Trousers, "X", 28, 1.4, 0, { 0, 0.4, 0 }),
+		limb(
+			"LeftBoot",
+			{ 0.5, 0.25, 0.6 },
+			{ -0.3, -1.875, -0.05 },
+			Iron,
+			"X",
+			28,
+			1.4,
+			0,
+			{ 0, 0.825, 0.05 }
+		),
+		limb("RightLeg", { 0.45, 0.8, 0.45 }, { 0.3, -1.45, 0 }, Trousers, "X", 28, 1.4, 0.5, { 0, 0.4, 0 }),
+		limb(
+			"RightBoot",
+			{ 0.5, 0.25, 0.6 },
+			{ 0.3, -1.875, -0.05 },
+			Iron,
+			"X",
+			28,
+			1.4,
+			0.5,
+			{ 0, 0.825, 0.05 }
+		),
 	},
 }
 
--- Zone 1, Mythic: a headless rider on a black horse, holding up a burning pumpkin head.
-local Horse = { 35, 30, 40 }
-local Cloak = { 70, 40, 90 }
-local Ember = { 130, 255, 120 }
+-- Zone 1, Mythic: a headless rider on a black horse, holding his own carved pumpkin head out in
+-- front of him. The horse has a sloped neck, a long head, ears, a dark mane, a saddle and hooves.
+local Horse = { 52, 46, 56 }
+local HorseDark = { 28, 25, 32 }
+local Hoof = { 70, 65, 60 }
+local Leather = { 90, 55, 30 }
+local Cloak = { 40, 30, 50 }
+local Gold = { 255, 210, 80 }
 Looks.TheHeadlessRider = {
 	gait = "walk",
-	top = 1.7,
+	top = 2.2,
 	pieces = {
-		block("HorseBody", { 1.4, 1.2, 2.8 }, { 0, -0.2, 0.1 }, Horse),
-		block("HorseNeck", { 0.7, 1.2, 0.7 }, { 0, 0.6, -1.2 }, Horse),
-		block("HorseHead", { 0.7, 0.6, 1 }, { 0, 1.1, -1.75 }, Horse),
-		block("HorseLeftEye", { 0.1, 0.15, 0.15 }, { -0.36, 1.2, -1.95 }, { 255, 60, 60 }, true),
-		block("HorseRightEye", { 0.1, 0.15, 0.15 }, { 0.36, 1.2, -1.95 }, { 255, 60, 60 }, true),
-		block("Mane", { 0.2, 1.2, 0.5 }, { 0, 0.9, -1 }, Ember, true),
-		block("Saddle", { 1.5, 0.2, 1 }, { 0, 0.45, 0.3 }, { 120, 30, 40 }),
-		block("RiderBody", { 1, 1, 0.6 }, { 0, 1, 0.3 }, Cloak),
-		block("NeckFlame", { 0.5, 0.3, 0.5 }, { 0, 1.6, 0.3 }, Ember, true),
-		block("RiderArm", { 0.3, 0.3, 0.9 }, { 0.65, 1.2, -0.1 }, Cloak),
-		block("PumpkinHead", { 0.65, 0.6, 0.65 }, { 0.65, 1.55, -0.55 }, Pumpkin),
-		block("PumpkinEyes", { 0.4, 0.12, 0.1 }, { 0.65, 1.62, -0.9 }, Candle, true),
-		limb("Cape", { 1.1, 1.3, 0.15 }, { 0, 0.85, 0.7 }, Cloak, "X", 15, 2, 0, { 0, 0.65, 0 }),
-		limb("Tail", { 0.3, 1, 0.3 }, { 0, -0.3, 1.65 }, Ember, "X", 20, 2, 0, { 0, 0.5, 0 }, true),
+		-- The horse.
+		block("HorseBody", { 1.4, 1.2, 2.8 }, { 0, -0.2, 0.2 }, Horse),
+		block("HorseChest", { 1.3, 1, 0.4 }, { 0, -0.1, -1.3 }, Horse),
+		tilt(block("HorseNeck", { 0.7, 1.4, 0.8 }, { 0, 0.65, -1.45 }, Horse), -30, 0, 0),
+		tilt(block("Mane", { 0.25, 1.4, 0.3 }, { 0, 0.85, -1.1 }, HorseDark), -30, 0, 0),
+		tilt(block("HorseHead", { 0.6, 0.6, 1.1 }, { 0, 1.25, -2.15 }, Horse), -25, 0, 0),
+		tilt(block("Muzzle", { 0.55, 0.45, 0.35 }, { 0, 1.0, -2.6 }, HorseDark), -25, 0, 0),
+		block("LeftEar", { 0.15, 0.35, 0.15 }, { -0.2, 1.65, -1.9 }, Horse),
+		block("RightEar", { 0.15, 0.35, 0.15 }, { 0.2, 1.65, -1.9 }, Horse),
+		block("HorseLeftEye", { 0.06, 0.12, 0.15 }, { -0.31, 1.35, -2.15 }, { 255, 60, 60 }, true),
+		block("HorseRightEye", { 0.06, 0.12, 0.15 }, { 0.31, 1.35, -2.15 }, { 255, 60, 60 }, true),
+		block("Blanket", { 1.5, 0.1, 1.2 }, { 0, 0.42, 0.1 }, { 120, 25, 35 }),
+		block("Saddle", { 1.2, 0.2, 0.9 }, { 0, 0.55, 0.1 }, Leather),
+		limb("HorseTail", { 0.3, 1.1, 0.3 }, { 0, -0.2, 1.7 }, HorseDark, "X", 20, 2, 0, { 0, 0.55, 0 }),
+		limb("FrontLeftLeg", { 0.35, 1, 0.35 }, { -0.45, -1.3, -0.9 }, Horse, "X", 32, 2.2, 0, { 0, 0.5, 0 }),
 		limb(
-			"FrontLeftLeg",
-			{ 0.35, 1.2, 0.35 },
-			{ -0.45, -1.4, -0.9 },
-			Horse,
+			"FrontLeftHoof",
+			{ 0.42, 0.2, 0.42 },
+			{ -0.45, -1.9, -0.9 },
+			Hoof,
 			"X",
 			32,
 			2.2,
 			0,
-			{ 0, 0.6, 0 }
+			{ 0, 1.1, 0 }
 		),
 		limb(
 			"FrontRightLeg",
-			{ 0.35, 1.2, 0.35 },
-			{ 0.45, -1.4, -0.9 },
+			{ 0.35, 1, 0.35 },
+			{ 0.45, -1.3, -0.9 },
 			Horse,
 			"X",
 			32,
 			2.2,
 			0.5,
-			{ 0, 0.6, 0 }
+			{ 0, 0.5, 0 }
 		),
 		limb(
-			"BackLeftLeg",
-			{ 0.35, 1.2, 0.35 },
-			{ -0.45, -1.4, 1.1 },
-			Horse,
+			"FrontRightHoof",
+			{ 0.42, 0.2, 0.42 },
+			{ 0.45, -1.9, -0.9 },
+			Hoof,
 			"X",
 			32,
 			2.2,
 			0.5,
-			{ 0, 0.6, 0 }
+			{ 0, 1.1, 0 }
 		),
-		limb("BackRightLeg", { 0.35, 1.2, 0.35 }, { 0.45, -1.4, 1.1 }, Horse, "X", 32, 2.2, 0, { 0, 0.6, 0 }),
+		limb("BackLeftLeg", { 0.35, 1, 0.35 }, { -0.45, -1.3, 1.2 }, Horse, "X", 32, 2.2, 0.5, { 0, 0.5, 0 }),
+		limb(
+			"BackLeftHoof",
+			{ 0.42, 0.2, 0.42 },
+			{ -0.45, -1.9, 1.2 },
+			Hoof,
+			"X",
+			32,
+			2.2,
+			0.5,
+			{ 0, 1.1, 0 }
+		),
+		limb("BackRightLeg", { 0.35, 1, 0.35 }, { 0.45, -1.3, 1.2 }, Horse, "X", 32, 2.2, 0, { 0, 0.5, 0 }),
+		limb("BackRightHoof", { 0.42, 0.2, 0.42 }, { 0.45, -1.9, 1.2 }, Hoof, "X", 32, 2.2, 0, { 0, 1.1, 0 }),
+		-- The rider: no head, just a bloody stump above a tall torn collar.
+		block("LeftThigh", { 0.35, 0.35, 0.8 }, { -0.75, 0.6, -0.1 }, Cloak),
+		block("LeftShin", { 0.3, 0.8, 0.3 }, { -0.85, 0.15, -0.35 }, Black),
+		block("RightThigh", { 0.35, 0.35, 0.8 }, { 0.75, 0.6, -0.1 }, Cloak),
+		block("RightShin", { 0.3, 0.8, 0.3 }, { 0.85, 0.15, -0.35 }, Black),
+		block("RiderBody", { 1, 1.1, 0.6 }, { 0, 1.15, 0.1 }, Cloak),
+		block("Shoulders", { 1.3, 0.3, 0.65 }, { 0, 1.6, 0.1 }, Cloak),
+		block("Collar", { 0.8, 0.3, 0.6 }, { 0, 1.85, 0.1 }, { 90, 20, 30 }),
+		block("NeckStump", { 0.35, 0.15, 0.35 }, { 0, 2.05, 0.1 }, Blood),
+		block("Buttons", { 0.1, 0.6, 0.05 }, { 0, 1.15, -0.22 }, Gold),
+		limb("Cape", { 1.2, 1.5, 0.12 }, { 0, 1, 0.5 }, Cloak, "X", 15, 2, 0, { 0, 0.75, 0 }),
+		tilt(block("ReinArm", { 0.3, 0.9, 0.3 }, { -0.7, 1.15, -0.35 }, Cloak), -45, 0, 0),
+		block("HeadArm", { 0.3, 0.3, 1 }, { 0.75, 1.5, -0.4 }, Cloak),
+		block("Pumpkin", { 0.7, 0.6, 0.7 }, { 0.75, 1.55, -1.1 }, Pumpkin),
+		block("PumpkinStem", { 0.12, 0.2, 0.12 }, { 0.75, 1.95, -1.1 }, Ivy),
+		block("PumpkinLeftEye", { 0.15, 0.12, 0.05 }, { 0.6, 1.65, -1.47 }, Candle, true),
+		block("PumpkinRightEye", { 0.15, 0.12, 0.05 }, { 0.9, 1.65, -1.47 }, Candle, true),
+		block("PumpkinGrin", { 0.45, 0.1, 0.05 }, { 0.75, 1.4, -1.47 }, Candle, true),
 	},
 }
 
--- Zone 1, Divine: a glowing ghost lady in a long dress with two lanterns floating at her sides.
-local Dress = { 215, 230, 250 }
-local Hair = { 60, 70, 120 }
-local Gold = { 255, 210, 80 }
+-- Zone 1, Divine: a pale, bloodstained ghost lady in a torn white dress. Long black hair falls
+-- over her face, her eyes are empty and weep blood, and she holds a lantern out in front of her.
+local Dress = { 220, 220, 215 }
+local GhostSkin = { 220, 228, 232 }
+local Hair = { 20, 18, 24 }
 Looks.LadyOfLanterns = {
 	gait = "float",
-	top = 2.3,
+	top = 2.2,
 	pieces = {
-		block("Skirt", { 1.8, 1.6, 1.6 }, { 0, -0.6, 0 }, Dress),
-		block("Hem", { 2.2, 0.4, 2 }, { 0, -1.5, 0 }, Dress),
-		block("Bodice", { 1, 0.9, 0.7 }, { 0, 0.65, 0 }, { 190, 210, 245 }),
-		block("Head", { 0.8, 0.8, 0.8 }, { 0, 1.5, 0 }, { 235, 240, 255 }),
-		block("Hair", { 0.9, 1.2, 0.4 }, { 0, 1.3, 0.35 }, Hair),
-		block("Crown", { 0.9, 0.2, 0.9 }, { 0, 2, 0 }, Gold, true),
-		block("LeftEye", { 0.15, 0.15, 0.1 }, { -0.18, 1.55, -0.42 }, { 130, 220, 255 }, true),
-		block("RightEye", { 0.15, 0.15, 0.1 }, { 0.18, 1.55, -0.42 }, { 130, 220, 255 }, true),
-		limb("LeftArm", { 0.3, 1, 0.3 }, { -0.7, 0.55, 0 }, Dress, "Z", -20, 1, 0, { 0, 0.45, 0 }),
-		limb("RightArm", { 0.3, 1, 0.3 }, { 0.7, 0.55, 0 }, Dress, "Z", 20, 1, 0.5, { 0, 0.45, 0 }),
+		block("Bodice", { 1, 0.8, 0.7 }, { 0, 0.7, 0 }, Dress),
+		block("Waist", { 1.3, 1.4, 0.9 }, { 0, -0.2, 0 }, Dress),
+		block("Skirt", { 1.7, 1, 1.3 }, { 0, -1.3, 0 }, Dress),
 		limb(
-			"LeftLantern",
-			{ 0.45, 0.55, 0.45 },
-			{ -1.6, 0.6, -0.3 },
+			"FrontLeftRag",
+			{ 0.35, 0.45, 0.15 },
+			{ -0.55, -1.95, -0.55 },
+			Dress,
+			"X",
+			15,
+			1,
+			0,
+			{ 0, 0.22, 0 }
+		),
+		limb(
+			"FrontRightRag",
+			{ 0.4, 0.35, 0.15 },
+			{ 0.5, -1.9, -0.55 },
+			Dress,
+			"X",
+			15,
+			1,
+			0.3,
+			{ 0, 0.17, 0 }
+		),
+		limb("BackLeftRag", { 0.4, 0.4, 0.15 }, { -0.4, -1.92, 0.55 }, Dress, "X", 15, 1, 0.6, { 0, 0.2, 0 }),
+		limb(
+			"BackRightRag",
+			{ 0.35, 0.5, 0.15 },
+			{ 0.55, -1.97, 0.55 },
+			Dress,
+			"X",
+			15,
+			1,
+			0.8,
+			{ 0, 0.25, 0 }
+		),
+		block("ChestBlood", { 0.5, 0.4, 0.05 }, { 0.2, 0.75, -0.37 }, Blood),
+		block("WaistBlood", { 0.4, 0.6, 0.05 }, { -0.3, -0.35, -0.47 }, Blood),
+		block("SkirtBlood", { 0.6, 0.3, 0.05 }, { 0.3, -1.1, -0.67 }, Blood),
+		block("Head", { 0.8, 0.9, 0.8 }, { 0, 1.55, 0 }, GhostSkin),
+		block("LeftEye", { 0.2, 0.15, 0.05 }, { -0.18, 1.62, -0.42 }, Black),
+		block("RightEye", { 0.2, 0.15, 0.05 }, { 0.18, 1.62, -0.42 }, Black),
+		block("LeftPupil", { 0.06, 0.06, 0.05 }, { -0.18, 1.62, -0.45 }, White, true),
+		block("RightPupil", { 0.06, 0.06, 0.05 }, { 0.18, 1.62, -0.45 }, White, true),
+		block("LeftTear", { 0.06, 0.35, 0.05 }, { -0.18, 1.38, -0.43 }, Blood),
+		block("RightTear", { 0.06, 0.3, 0.05 }, { 0.2, 1.4, -0.43 }, Blood),
+		block("Mouth", { 0.25, 0.3, 0.05 }, { 0, 1.25, -0.42 }, Black),
+		block("ChinBlood", { 0.08, 0.35, 0.05 }, { 0.05, 1.0, -0.37 }, Blood),
+		block("HairTop", { 0.95, 0.25, 0.9 }, { 0, 2.05, 0 }, Hair),
+		block("HairBack", { 0.95, 1.7, 0.3 }, { 0, 1.15, 0.42 }, Hair),
+		block("HairLeft", { 0.15, 1.3, 0.5 }, { -0.47, 1.25, -0.05 }, Hair),
+		block("HairRight", { 0.15, 1.5, 0.5 }, { 0.47, 1.15, -0.05 }, Hair),
+		block("HairFront", { 0.2, 0.85, 0.06 }, { -0.28, 1.5, -0.44 }, Hair),
+		-- Right arm held out with the lantern hanging from the hand (it sways).
+		block("LanternArm", { 0.25, 0.25, 1 }, { 0.65, 0.85, -0.55 }, Dress),
+		block("LanternHand", { 0.3, 0.3, 0.3 }, { 0.65, 0.85, -1.15 }, Blood),
+		limb("Handle", { 0.06, 0.25, 0.06 }, { 0.65, 0.6, -1.15 }, Iron, "X", 12, 0.8, 0, { 0, 0.25, 0 }),
+		limb("LanternTop", { 0.5, 0.1, 0.5 }, { 0.65, 0.45, -1.15 }, Iron, "X", 12, 0.8, 0, { 0, 0.4, 0 }),
+		limb(
+			"Lantern",
+			{ 0.4, 0.5, 0.4 },
+			{ 0.65, 0.15, -1.15 },
 			Candle,
 			"X",
-			18,
+			12,
 			0.8,
 			0,
-			{ 0, 0.8, 0 },
+			{ 0, 0.7, 0 },
 			true
 		),
-		limb(
-			"RightLantern",
-			{ 0.45, 0.55, 0.45 },
-			{ 1.6, 0.6, -0.3 },
-			Candle,
-			"X",
-			18,
-			0.8,
-			0.5,
-			{ 0, 0.8, 0 },
-			true
-		),
+		limb("LanternBase", { 0.5, 0.1, 0.5 }, { 0.65, -0.15, -1.15 }, Iron, "X", 12, 0.8, 0, { 0, 1, 0 }),
+		-- Left arm hangs limp, ending in long bloody fingers.
+		limb("LimpArm", { 0.25, 1.2, 0.25 }, { -0.65, 0.25, 0 }, Dress, "Z", -8, 0.6, 0, { 0, 0.6, 0 }),
+		limb("Fingers", { 0.25, 0.4, 0.25 }, { -0.65, -0.55, 0 }, Blood, "Z", -8, 0.6, 0, { 0, 1.4, 0 }),
 	},
 }
 

@@ -147,7 +147,12 @@ local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: 
 		part.CastShadow = not piece.glow
 
 		local centre = vector(piece.at, scale) + Vector3.new(0, lift, 0)
-		part.CFrame = body.CFrame * CFrame.new(centre)
+		local rot = piece.rot
+		local place = CFrame.new(centre)
+		if rot then
+			place *= CFrame.fromOrientation(math.rad(rot[1]), math.rad(rot[2]), math.rad(rot[3]))
+		end
+		part.CFrame = body.CFrame * place
 		local joint = piece.joint
 		if joint then
 			local pivot = if joint.pivot then vector(joint.pivot, scale) else Vector3.zero
@@ -155,7 +160,7 @@ local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: 
 			motor.Name = piece.name
 			motor.Part0 = body
 			motor.Part1 = part
-			motor.C0 = CFrame.new(centre + pivot)
+			motor.C0 = place * CFrame.new(pivot)
 			motor.C1 = CFrame.new(pivot)
 			-- Read by the client every frame to swing the part (RoamController).
 			motor:SetAttribute("SwingAxis", axes[joint.axis])
@@ -167,7 +172,7 @@ local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: 
 			local weld = Instance.new("Weld")
 			weld.Part0 = body
 			weld.Part1 = part
-			weld.C0 = CFrame.new(centre)
+			weld.C0 = place
 			weld.Parent = part
 		end
 		part.Parent = model
