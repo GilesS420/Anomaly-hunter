@@ -1,13 +1,16 @@
 --!strict
--- Builds the placeholder look of a monster: a glowing orb coloured by rarity with its name
--- floating above it. Used for wild monsters in zones and for the ones roaming a mansion
--- (those get a third line saying if they're fed, and glow dimmer while they're hungry).
--- Real monster models can replace this later; everything else only needs a Model whose
--- PrimaryPart is called "Body".
+-- Builds how a monster looks, with its name floating above it. Used for wild monsters in
+-- zones and for the ones roaming a mansion (those get a third line saying if they're fed,
+-- and glow dimmer while they're hungry).
+-- Monsters with a look in Config/Looks are stud-style block models whose limbs are joined
+-- to Body with Motor6Ds (the client swings them, see RoamController); the rest are still a
+-- glowing orb coloured by rarity. Body is always the PrimaryPart and the part players press
+-- on to catch: for a block model it's an invisible ball around it.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Format = require(ReplicatedStorage.Shared.Util.Format)
+local Looks = require(ReplicatedStorage.Shared.Config.Looks)
 local Spawning = require(ReplicatedStorage.Shared.Util.Spawning)
 
 local MonsterModel = {}
@@ -112,6 +115,66 @@ function MonsterModel.refresh(model: Model, info: Info)
 	end
 end
 
+local axes = { X = Vector3.xAxis, Y = Vector3.yAxis, Z = Vector3.zAxis }
+
+local function vector(numbers: { number }, scale: number): Vector3
+	return Vector3.new(numbers[1], numbers[2], numbers[3]) * scale
+end
+
+-- Builds the blocks of a look around Body. Each part is welded (or, if it swings, joined with
+-- a Motor6D) to Body, so moving Body moves the whole monster.
+local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: number, radius: number)
+	-- Walkers are drawn with their feet at y = -2 (Normal size) but stand radius + 0.5 below
+	-- Body's centre (Roam places them that way), so shift them to keep their feet on the floor.
+	local lift = if look.gait == "walk" then 2 * scale - (radius + 0.5) else 0
+	for _, piece in look.pieces do
+		local part = Instance.new("Part")
+		part.Name = piece.name
+		part.Shape = if piece.shape == "Ball"
+			then Enum.PartType.Ball
+			elseif piece.shape == "Cylinder" then Enum.PartType.Cylinder
+			else Enum.PartType.Block
+		part.Size = vector(piece.size, scale)
+		part.Color = Color3.fromRGB(piece.color[1], piece.color[2], piece.color[3])
+		part.Material = if piece.glow then Enum.Material.Neon else Enum.Material.Plastic
+		part.TopSurface = Enum.SurfaceType.Studs -- the classic brick look
+		part.BottomSurface = Enum.SurfaceType.Inlet
+		part.Anchored = false
+		part.CanCollide = false
+		part.CanTouch = false
+		part.CanQuery = false -- presses go to Body
+		part.Massless = true
+		part.CastShadow = not piece.glow
+
+		local centre = vector(piece.at, scale) + Vector3.new(0, lift, 0)
+		part.CFrame = body.CFrame * CFrame.new(centre)
+		local joint = piece.joint
+		if joint then
+			local pivot = if joint.pivot then vector(joint.pivot, scale) else Vector3.zero
+			local motor = Instance.new("Motor6D")
+			motor.Name = piece.name
+			motor.Part0 = body
+			motor.Part1 = part
+			motor.C0 = CFrame.new(centre + pivot)
+			motor.C1 = CFrame.new(pivot)
+			-- Read by the client every frame to swing the part (RoamController).
+			motor:SetAttribute("SwingAxis", axes[joint.axis])
+			motor:SetAttribute("SwingAmp", math.rad(joint.amp))
+			motor:SetAttribute("SwingSpeed", joint.speed)
+			motor:SetAttribute("SwingPhase", joint.phase or 0)
+			motor.Parent = part
+		else
+			local weld = Instance.new("Weld")
+			weld.Part0 = body
+			weld.Part1 = part
+			weld.C0 = CFrame.new(centre)
+			weld.Parent = part
+		end
+		part.Parent = model
+	end
+	model:SetAttribute("Gait", look.gait)
+end
+
 function MonsterModel.build(info: Info): Model
 	local radius = MonsterModel.radius(info.size)
 	local color = MonsterModel.color(info.rarity)
@@ -134,6 +197,15 @@ function MonsterModel.build(info: Info): Model
 	body.Parent = model
 	model.PrimaryPart = body
 
+	local look = Looks[info.monsterId]
+	local scale = radius / Spawning.BaseRadius
+	local labelHeight = radius + 1.6
+	if look then
+		body.Transparency = 1 -- just the press target; the blocks are what players see
+		buildLook(model, body, look, scale, radius)
+		labelHeight = look.top * scale + 1.2
+	end
+
 	local light = Instance.new("PointLight")
 	light.Color = color
 	light.Range = 6 + radius * 2
@@ -148,7 +220,7 @@ function MonsterModel.build(info: Info): Model
 	billboard.AlwaysOnTop = true
 	billboard.MaxDistance = 80
 	billboard.LightInfluence = 0
-	billboard.StudsOffset = Vector3.new(0, radius + 1.6, 0)
+	billboard.StudsOffset = Vector3.new(0, labelHeight, 0)
 	local name = Format.name(info.monsterId)
 	if info.status then
 		billboard.Size = UDim2.fromOffset(220, 66)
