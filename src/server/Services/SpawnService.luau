@@ -219,6 +219,11 @@ function SpawnService.get(model: Model): Spawned?
 	return live[model]
 end
 
+-- Every live wild zone monster right now (read only: don't change the table).
+function SpawnService.all(): { [Model]: Spawned }
+	return live
+end
+
 -- Removes a caught monster from the zone and returns it as a save-ready entry, rolling any
 -- catch effects from the hunter's equipped tools. Returns nil if someone caught it first.
 function SpawnService.capture(model: Model, equippedItemIds: { string }): Value.CaughtMonster?
