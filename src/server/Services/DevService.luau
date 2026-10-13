@@ -11,6 +11,7 @@
 --   /skip 12          your monsters live 12 hours ahead: they grow Familiarity, and get
 --                     hungry after a day (/skip 25 makes them all hungry)
 --   /calm             zone monsters leave you alone (type it again to let them attack)
+--   /attack           the closest monster in your zone attacks you right now
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
 
 local Players = game:GetService("Players")
@@ -27,6 +28,7 @@ local CareService = require(script.Parent.CareService)
 local DataService = require(script.Parent.DataService)
 local HauntService = require(script.Parent.HauntService)
 local HuntService = require(script.Parent.HuntService)
+local MonsterAiService = require(script.Parent.MonsterAiService)
 local MansionService = require(script.Parent.MansionService)
 local Notify = require(script.Parent.Parent.Notify)
 local WatcherService = require(script.Parent.WatcherService)
@@ -168,6 +170,12 @@ commands["/calm"] = function(player)
 	)
 end
 
+commands["/attack"] = function(player)
+	if not MonsterAiService.provoke(player) then
+		Notify.toast(player, "Go into a zone first, with a monster in it.")
+	end
+end
+
 -- Runs a chat message if it's one of the commands above.
 local function run(player: Player, message: string)
 	local name, rest = string.match(message, "^%s*(/%S+)%s*(.-)%s*$")
@@ -225,7 +233,7 @@ function DevService.start()
 		useTextChatCommands()
 	end
 	print(
-		`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /give <item> [count], /summon, /skip <hours>, /haunt`
+		`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /give <item> [count], /summon, /skip <hours>, /haunt, /calm, /attack`
 	)
 end
 

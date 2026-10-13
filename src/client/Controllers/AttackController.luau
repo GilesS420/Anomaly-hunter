@@ -4,6 +4,7 @@
 --   yellow: blinds, purple: it's about to vanish) and a "!" over the monster. Step out of
 --   the shape before it disappears and the attack misses.
 --   when you get hit: Charge and Shockwave knock you back, Blind whites out the screen.
+--   when a monster that was after you misses: a quick green "Dodged!".
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -197,8 +198,43 @@ local function blind(seconds: number)
 	):Play()
 end
 
+local dodgedLabel: TextLabel? = nil
+
+local function dodged()
+	local label = dodgedLabel
+	if not label or not label.Parent then
+		local gui = Instance.new("ScreenGui")
+		gui.Name = "DodgedUi"
+		gui.ResetOnSpawn = false
+		gui.DisplayOrder = 6
+		local created = Instance.new("TextLabel")
+		created.AnchorPoint = Vector2.new(0.5, 0.5)
+		created.Position = UDim2.fromScale(0.5, 0.35)
+		created.Size = UDim2.fromScale(0.4, 0.08)
+		created.BackgroundTransparency = 1
+		created.Font = Enum.Font.GothamBlack
+		created.Text = "Dodged!"
+		created.TextScaled = true
+		created.TextColor3 = Color3.fromRGB(150, 255, 170)
+		created.TextTransparency = 1
+		created.TextStrokeTransparency = 1
+		created.Parent = gui
+		gui.Parent = player:WaitForChild("PlayerGui")
+		dodgedLabel = created
+		label = created
+	end
+	assert(label)
+	label.TextTransparency = 0
+	label.TextStrokeTransparency = 0.2
+	local fade = TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	TweenService:Create(label, fade, { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+end
+
 local function onHit(kind: string, seconds: number, pushX: number, pushZ: number)
-	if kind == "Blind" then
+	if kind == "Dodged" then
+		dodged()
+		return
+	elseif kind == "Blind" then
 		blind(seconds)
 		return
 	end

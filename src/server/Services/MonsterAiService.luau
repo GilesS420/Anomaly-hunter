@@ -8,11 +8,13 @@
 -- A monster you're catching is stunned by your flashlight and can't attack, but the others
 -- can, and a hit that costs a heart makes the catch get away. They keep attacking while you
 -- carry a catch; at 0 hearts you drop it and go home (HuntService.damage).
--- Players with the attribute Calm (Studio: /calm) are left alone.
+-- Players with the attribute Calm (Studio: /calm) are left alone, and Bait Bell monsters
+-- never attack. Studio /attack makes the closest monster attack you now (provoke).
 --
 -- Remotes in ReplicatedStorage.AttackRemotes:
 --   Warn  server -> clients in the zone (Warning)   draw the warning shape until hitTime
 --   Hit   server -> client (kind, seconds, pushX, pushZ)   you got hit: knockback or blind
+--         (kind "Dodged": it was after you and missed)
 -- Player attribute Slowed is true while a Slow attack holds you back.
 
 local Players = game:GetService("Players")
@@ -242,6 +244,8 @@ local function strike(
 	for _, target in hunters do
 		if Attacks.hits(attack, windup.mx, windup.mz, windup.ax, windup.az, target.x, target.z) then
 			hitPlayer(target.player, brain, attack, windup, target)
+		elseif target.player == brain.target then
+			Hit:FireClient(target.player, "Dodged", 0, 0, 0) -- it was after you and you got out
 		end
 	end
 end
@@ -298,6 +302,9 @@ local function step()
 	end
 
 	for model, spawned in SpawnService.all() do
+		if spawned.reservedFor then
+			continue -- a Bait Bell's monster came to be caught, not to fight
+		end
 		local brain = brainFor(model, spawned)
 		local attack = brain.attack
 		local zone = Hunt.zoneByIndex(spawned.zone)
@@ -383,6 +390,46 @@ local function step()
 			RoamService.moveTo(model, cx, cz, length / speed, 0.5)
 		end
 	end
+end
+
+-- Studio /attack: the closest monster in the hunter's zone winds up an attack on them right
+-- now, skipping its cooldown and the arrival grace. False if there is none to do it.
+function MonsterAiService.provoke(player: Player): boolean
+	local zone = Hunt.zoneById(player:GetAttribute("Zone"))
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not zone or not root or not root:IsA("BasePart") then
+		return false
+	end
+	local hunter: Target = { player = player, x = root.Position.X, z = root.Position.Z }
+	local best: Model? = nil
+	local bestDistance = math.huge
+	for model, spawned in SpawnService.all() do
+		local brain = brainFor(model, spawned)
+		local position = RoamService.position(model)
+		if
+			spawned.zone == zone.index
+			and not spawned.reservedFor
+			and brain.attack
+			and not brain.windup
+			and position
+			and not RoamService.isHeld(model)
+		then
+			local distance = math.sqrt((position.X - hunter.x) ^ 2 + (position.Z - hunter.z) ^ 2)
+			if distance < bestDistance then
+				best, bestDistance = model, distance
+			end
+		end
+	end
+	local brain = best and brains[best]
+	local attack = brain and brain.attack
+	if not best or not brain or not attack then
+		return false
+	end
+	lastHit[player] = nil
+	brain.target = player
+	windUp(best, brain, attack, zone.id, hunter)
+	return true
 end
 
 function MonsterAiService.start()
