@@ -1791,4 +1791,16 @@ Rooms.ByWing = {
 	Garden = Rooms.Garden,
 } :: { [string]: (width: number, depth: number, owned: { [string]: boolean }) -> { Part } }
 
+-- The building blocks, for other recipes in the same style (Config/Landmarks).
+Rooms.Kit = {
+	part = part,
+	lantern = lantern,
+	group = group,
+	dice = dice,
+	stick = stick,
+	candles = candles,
+	lampPost = lampPost,
+	deadTree = deadTree,
+}
+
 return Rooms
