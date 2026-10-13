@@ -10,6 +10,8 @@
 --   /haunt            every fed monster in your mansion picks up a roaming effect right now
 --   /skip 12          your monsters live 12 hours ahead: they grow Familiarity, and get
 --                     hungry after a day (/skip 25 makes them all hungry)
+--   /attack           the closest monster in your zone attacks you right now
+--   /peace            monsters stop attacking you (type it again to turn attacks back on)
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
 
 local Players = game:GetService("Players")
@@ -22,6 +24,7 @@ local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Wings = require(ReplicatedStorage.Shared.Config.Wings)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
+local AttackService = require(script.Parent.AttackService)
 local CareService = require(script.Parent.CareService)
 local DataService = require(script.Parent.DataService)
 local HauntService = require(script.Parent.HauntService)
@@ -158,6 +161,18 @@ commands["/skip"] = function(player, argument)
 	Notify.toast(player, `Your monsters skipped {hours} hours ahead.`)
 end
 
+commands["/attack"] = function(player)
+	if not AttackService.provoke(player) then
+		Notify.toast(player, "Go into a zone first (and wait until no monster is attacking you).")
+	end
+end
+
+commands["/peace"] = function(player)
+	local on = not AttackService.isPeaceful(player)
+	AttackService.setPeaceful(player, on)
+	Notify.toast(player, if on then "Monsters leave you alone now." else "Monsters attack you again.")
+end
+
 -- Runs a chat message if it's one of the commands above.
 local function run(player: Player, message: string)
 	local name, rest = string.match(message, "^%s*(/%S+)%s*(.-)%s*$")
@@ -215,7 +230,7 @@ function DevService.start()
 		useTextChatCommands()
 	end
 	print(
-		`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /give <item> [count], /summon, /skip <hours>, /haunt`
+		`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /give <item> [count], /summon, /skip <hours>, /haunt, /attack, /peace`
 	)
 end
 

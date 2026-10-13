@@ -281,6 +281,66 @@ function RoamService.release(model: Model, pauseSeconds: number)
 	roamer.pauseUntil = math.max(roamer.pauseUntil, now() + math.max(pauseSeconds, 0))
 end
 
+-- Stops the model where it is for `seconds` (a monster winding up an attack). Unlike hold,
+-- it isn't "held": catching still works and it wanders again by itself afterwards.
+function RoamService.freeze(model: Model, seconds: number)
+	local roamer = roamers[model]
+	if not roamer or roamer.held then
+		return
+	end
+	local at = now()
+	local here = currentPosition(roamer, at)
+	roamer.moving = false
+	roamer.from = here
+	roamer.to = here
+	roamer.startTime = at
+	roamer.endTime = at
+	roamer.pauseUntil = at + math.max(seconds, 0)
+	publish(roamer)
+	settle(roamer, here)
+end
+
+-- Sends the model straight to (x, z) at `speed` studs per second, ignoring the other orbs
+-- (a charging monster). It may end up off its floor; its next leg walks it back. Returns
+-- how many seconds the dash takes.
+function RoamService.dash(model: Model, x: number, z: number, speed: number): number
+	local roamer = roamers[model]
+	if not roamer or roamer.held then
+		return 0
+	end
+	local at = now()
+	local here = currentPosition(roamer, at)
+	local target = Vector3.new(x, centreY(roamer.rects, x, z, roamer.radius, here.Y), z)
+	local seconds = math.max((target - here).Magnitude / math.max(speed, 0.1), 0.05)
+	roamer.from = here
+	roamer.to = target
+	roamer.startTime = at
+	roamer.endTime = at + seconds
+	roamer.moving = true
+	publish(roamer)
+	return seconds
+end
+
+-- Moves the model to (x, z) at once and keeps it there for pauseSeconds (a monster popping
+-- up after vanishing).
+function RoamService.place(model: Model, x: number, z: number, pauseSeconds: number)
+	local roamer = roamers[model]
+	if not roamer or roamer.held then
+		return
+	end
+	local at = now()
+	local here = currentPosition(roamer, at)
+	local spot = Vector3.new(x, centreY(roamer.rects, x, z, roamer.radius, here.Y), z)
+	roamer.moving = false
+	roamer.from = spot
+	roamer.to = spot
+	roamer.startTime = at
+	roamer.endTime = at
+	roamer.pauseUntil = at + math.max(pauseSeconds, 0)
+	publish(roamer)
+	settle(roamer, spot)
+end
+
 function RoamService.isHeld(model: Model): boolean
 	local roamer = roamers[model]
 	return roamer ~= nil and roamer.held

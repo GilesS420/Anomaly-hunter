@@ -10,6 +10,7 @@ local HuntController = require(script.Controllers.HuntController)
 local CollectorController = require(script.Controllers.CollectorController)
 local WorkshopController = require(script.Controllers.WorkshopController)
 local BakeryController = require(script.Controllers.BakeryController)
+local AttackController = require(script.Controllers.AttackController)
 
 local controllers: { { start: () -> () } } = {
 	ToastController,
@@ -19,6 +20,7 @@ local controllers: { { start: () -> () } } = {
 	CollectorController,
 	WorkshopController,
 	BakeryController,
+	AttackController,
 }
 
 for _, controller in controllers do

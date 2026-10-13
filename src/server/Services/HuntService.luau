@@ -6,7 +6,7 @@
 --   Workspace.Hub.ReturnPoint         where hunters land in the hub if they have no plot
 --   Workspace.Zones.<ZoneId>.Arrival  a part where hunters arrive in the zone
 --   Workspace.Zones.<ZoneId>.Exit     a part; touching it takes you (and your catch) home
--- Monsters will hurt hunters once their AI exists (#6), through HuntService.damage.
+-- Monsters hurt hunters through HuntService.damage (see AttackService).
 --
 -- Remotes in ReplicatedStorage.HuntRemotes:
 --   UseReturnCharm  client -> server ()  (the Return Charm button)

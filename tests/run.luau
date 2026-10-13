@@ -20,6 +20,8 @@ local Care = require("../src/shared/Util/Care")
 local CareConfig = require("../src/shared/Config/Care")
 local Effects = require("../src/shared/Config/Effects")
 local Haunting = require("../src/shared/Util/Haunting")
+local AttackConfig = require("../src/shared/Config/Attacks")
+local Attacks = require("../src/shared/Util/Attacks")
 
 local failures = 0
 local function check(name: string, ok: boolean)
@@ -721,6 +723,65 @@ do
 		end
 	end
 	check("rolls hit about RoamChance% of the time", math.abs(hits / trials * 100 - Effects.RoamChance) < 0.6)
+end
+
+-- Monster attacks (#6).
+do
+	local missing = {}
+	for _, m in Monsters do
+		if m.zone and not AttackConfig.ByMonster[m.id] then
+			table.insert(missing, m.id)
+		end
+	end
+	check("every zone monster has its own attack", #missing == 0)
+	local unknown = 0
+	for id, kind in AttackConfig.ByMonster do
+		if not Monsters[id] or not AttackConfig.Kinds[kind] then
+			unknown += 1
+		end
+	end
+	check("attack list only names real monsters and attacks", unknown == 0)
+	local everyRarity = true
+	for id, rarity in Rarities do
+		if rarity.order and rarity.order <= 7 and not AttackConfig.Aggression[id] then
+			everyRarity = false
+		end
+	end
+	check("every zone rarity has an aggression", everyRarity)
+	local gentle = true
+	for _, kind in AttackConfig.Kinds do
+		if kind.damage > 1 then
+			gentle = false
+		end
+	end
+	check("no attack takes more than one heart", gentle)
+	-- Warnings are long enough to walk out of the circle (16 studs/s walking).
+	local dodgeable = true
+	for _, aggression in AttackConfig.Aggression do
+		if aggression.windup * 16 < AttackConfig.Kinds.Charge.hitRadius + 2 then
+			dodgeable = false
+		end
+	end
+	check("every warning can be walked out of", dodgeable)
+
+	check("unknown monster charges", Attacks.kindFor("Nobody") == "Charge")
+	check(
+		"unknown rarity is as calm as a Common",
+		Attacks.aggression("Nope").cooldown == AttackConfig.Aggression.Common.cooldown
+	)
+	local hunters = {
+		{ id = 1, x = 10, z = 0, ready = true },
+		{ id = 2, x = 5, z = 0, ready = false },
+		{ id = 3, x = 0, z = 8, ready = true },
+	}
+	check("picks the closest ready hunter", Attacks.pickTarget(0, 0, 20, hunters) == 3)
+	check("ignores hunters out of range", Attacks.pickTarget(0, 0, 6, hunters) == nil)
+	check("a hit inside the circle", Attacks.hits("Charge", 0, 0, 3, 0))
+	check("a dodge outside the circle", not Attacks.hits("Charge", 0, 0, 5, 0))
+	local px, pz = Attacks.popSpot(10, 0, 0, 0, 4)
+	check("vanish pops up on the side it came from", near(px, 4) and near(pz, 0))
+	local dx, dz = Attacks.pushDirection(0, 0, 0, -3)
+	check("knockback pushes away from the attack", near(dx, 0) and near(dz, -1))
 end
 
 if failures > 0 then
