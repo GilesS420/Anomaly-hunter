@@ -24,6 +24,8 @@ local AttackConfig = require("../src/shared/Config/Attacks")
 local Attacks = require("../src/shared/Util/Attacks")
 local Looks = require("../src/shared/Config/Looks")
 local Rooms = require("../src/shared/Config/Rooms")
+local Travel = require("../src/shared/Util/Travel")
+local TravelConfig = require("../src/shared/Config/Travel")
 
 local failures = 0
 local function check(name: string, ok: boolean)
@@ -888,6 +890,36 @@ do
 			shut == expectBoarded[wingId] and open == 0
 		)
 	end
+end
+
+-- Fast travel and the faster hub walk.
+do
+	local hub = TravelConfig.HubWalkSpeed
+	check("the hub walk is faster than normal", hub > 16)
+	check("Watcher Square is open hub", Travel.walkSpeed(false, 0, 0, 16, hub) == hub)
+	check("the Zone Gates are open hub", Travel.walkSpeed(false, 370, 0, 16, hub) == hub)
+	check("the Bakery is open hub", Travel.walkSpeed(false, -380, -45, 16, hub) == hub)
+	local onPlot = true
+	for _, plot in Layout.Plots do
+		onPlot = onPlot
+			and Travel.inPlot(plot.x, plot.z)
+			and Travel.walkSpeed(false, plot.x, plot.z, 16, hub) == 16
+	end
+	check("every mansion plot walks at normal speed", onPlot)
+	check("zones walk at normal speed", Travel.walkSpeed(true, 0, 1500, 16, hub) == 16)
+	local ids = {}
+	for _, destination in TravelConfig.Destinations do
+		ids[destination.id] = true
+	end
+	check(
+		"fast travel goes to the portals and both shops",
+		ids.Portals and ids.Bakery and ids.Workshop or false
+	)
+	local landmarks = {}
+	for _, spot in Layout.Landmarks do
+		landmarks[spot.name] = true
+	end
+	check("fast-travel shops are hub landmarks", landmarks.Bakery and landmarks.Workshop or false)
 end
 
 if failures > 0 then

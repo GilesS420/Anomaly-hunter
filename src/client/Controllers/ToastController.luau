@@ -27,11 +27,12 @@ local function buildUi(): Frame
 	gui.ResetOnSpawn = false
 	gui.DisplayOrder = 10 -- above the other HUD pieces
 
-	-- Centred near the top; 60% of the screen wide but never narrower than 280 pixels.
+	-- Centred near the top, just below the fast-travel buttons (TravelController); 60% of the
+	-- screen wide but never narrower than 280 pixels.
 	local holder = Instance.new("Frame")
 	holder.Name = "Toasts"
 	holder.AnchorPoint = Vector2.new(0.5, 0)
-	holder.Position = UDim2.new(0.5, 0, 0, 12)
+	holder.Position = UDim2.new(0.5, 0, 0, 60)
 	holder.Size = UDim2.new(0.6, 0, 0, (ROW_HEIGHT + 6) * MAX_TOASTS)
 	holder.BackgroundTransparency = 1
 	holder.Parent = gui
