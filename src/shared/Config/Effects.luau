@@ -9,6 +9,7 @@ export type Effect = {
 	multiplier: number,
 	source: Source,
 	from: string?, -- the food, tool or event that gives it
+	weight: number?, -- Roam effects: how often it's picked when a roll hits (rarer = smaller)
 }
 
 export type Combo = {
@@ -23,18 +24,29 @@ Effects.MaxSlots = 3
 -- Percent a Catch-effect tool (Spirit Lens, Moonbeam) applies its effect (balance sheet input).
 Effects.CatchChance = 25
 
+-- Roaming effects (Util/Haunting). Every RoamRollSeconds each fed monster in an online
+-- player's mansion rolls: RoamChance percent, raised by Familiarity (x(1 + bonus) at 100%),
+-- by every wing past the Foyer, and by a Watcher event's effectOddsMultiplier (Blood Moon x2).
+-- A hit picks a Roam effect by weight; while an event with an effect is live, that effect
+-- joins the pick with EventEffectWeight. Placeholders, tune in playtesting.
+Effects.RoamRollSeconds = 5 * 60
+Effects.RoamChance = 4
+Effects.RoamFamiliarityBonus = 1.5
+Effects.RoamOddsPerWing = 0.1
+Effects.EventEffectWeight = 25
+
 Effects.List = {
-	Cobwebbed = { id = "Cobwebbed", multiplier = 1.2, source = "Roam" },
+	Cobwebbed = { id = "Cobwebbed", multiplier = 1.2, source = "Roam", weight = 40 },
 	PumpkinHead = { id = "PumpkinHead", multiplier = 1.5, source = "Food", from = "PumpkinCandy" },
-	Possessed = { id = "Possessed", multiplier = 1.5, source = "Roam" },
+	Possessed = { id = "Possessed", multiplier = 1.5, source = "Roam", weight = 30 },
 	Slimed = { id = "Slimed", multiplier = 2, source = "Food", from = "EctoplasmPie" },
 	Poltergeist = { id = "Poltergeist", multiplier = 2, source = "Event", from = "Flicker" },
-	Vampire = { id = "Vampire", multiplier = 2.5, source = "Roam" },
-	Batty = { id = "Batty", multiplier = 3, source = "Roam" },
+	Vampire = { id = "Vampire", multiplier = 2.5, source = "Roam", weight = 15 },
+	Batty = { id = "Batty", multiplier = 3, source = "Roam", weight = 10 },
 	Ghost = { id = "Ghost", multiplier = 3, source = "Catch", from = "SpiritLens" },
 	-- x4 (not x3 like Ghost) so the Moonbeam has a perk of its own; set by the balance sheet.
 	Werewolf = { id = "Werewolf", multiplier = 4, source = "Catch", from = "Moonbeam" },
-	Mummy = { id = "Mummy", multiplier = 4, source = "Roam" },
+	Mummy = { id = "Mummy", multiplier = 4, source = "Roam", weight = 5 },
 	Cursed = { id = "Cursed", multiplier = 5, source = "Food", from = "CursedCake" },
 	Bloodmoon = { id = "Bloodmoon", multiplier = 6, source = "Event", from = "BloodMoon" },
 	Mimic = { id = "Mimic", multiplier = 8, source = "Event", from = "MimicNight" },

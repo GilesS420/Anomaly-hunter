@@ -53,6 +53,27 @@ function Value.resolveEffects(effectIds: { string }): { string }
 	return resolved
 end
 
+-- Whether one more effect fits on a monster: not one it already has, and the result (after
+-- combos merge) holds at most Effects.MaxSlots.
+function Value.fits(effectIds: { string }, effectId: string): "Ok" | "HasEffect" | "NoRoom"
+	if table.find(effectIds, effectId) then
+		return "HasEffect"
+	end
+	local after = table.clone(effectIds)
+	table.insert(after, effectId)
+	return if #Value.resolveEffects(after) > Effects.MaxSlots then "NoRoom" else "Ok"
+end
+
+-- The combo that appears in `after` but not in `before` (resolved effect lists), or nil.
+function Value.newCombo(before: { string }, after: { string }): string?
+	for _, effectId in after do
+		if Effects.Combos[effectId] and not table.find(before, effectId) then
+			return effectId
+		end
+	end
+	return nil
+end
+
 function Value.effectMultiplier(effectIds: { string }): number
 	local total = 1
 	for _, id in Value.resolveEffects(effectIds) do

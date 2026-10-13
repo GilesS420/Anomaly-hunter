@@ -72,14 +72,7 @@ function Care.canTreat(caught: Value.CaughtMonster, item: Shop.Item?): TreatChec
 	end
 	local effectId = item.grantsEffect
 	if effectId then
-		if table.find(caught.effects, effectId) then
-			return "HasEffect"
-		end
-		local after = table.clone(caught.effects)
-		table.insert(after, effectId)
-		if #Value.resolveEffects(after) > Effects.MaxSlots then
-			return "NoRoom"
-		end
+		return Value.fits(caught.effects, effectId)
 	end
 	return "Ok"
 end
