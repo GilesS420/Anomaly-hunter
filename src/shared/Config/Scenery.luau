@@ -984,6 +984,611 @@ local function murkyBayou(): { Part }
 	return parts
 end
 
+-- Where monsters roam in the carnival: the midway paths round the edge, up the middle and
+-- across, between four blocks of rides and stalls.
+local CarnivalPaths = {
+	{ x = 0, z = -51, width = 208, depth = 14 }, -- south midway, just inside the gate
+	{ x = 0, z = 96, width = 208, depth = 16 }, -- north midway
+	{ x = -97, z = 22, width = 14, depth = 132 }, -- west midway
+	{ x = 97, z = 22, width = 14, depth = 132 }, -- east midway
+	{ x = 0, z = 22, width = 16, depth = 132 }, -- the main midway up the middle
+	{ x = -49, z = 21, width = 82, depth = 14 }, -- across, west half
+	{ x = 49, z = 21, width = 82, depth = 14 }, -- across, east half
+}
+
+local Red = { 170, 38, 48 }
+local Cream = { 232, 216, 180 }
+local Teal = { 40, 140, 140 }
+local Purple = { 96, 56, 130 }
+local Rust = { 120, 70, 50 }
+local Gold = { 210, 170, 70 }
+local BulbColors =
+	{ { 255, 80, 80 }, { 255, 210, 90 }, { 90, 200, 255 }, { 180, 110, 255 }, { 120, 255, 140 } }
+
+-- A round slab or post: a cylinder of diameter `d`, `h` tall, standing upright.
+local function disc(
+	parts: { Part },
+	name: string,
+	at: { number },
+	d: number,
+	h: number,
+	color: { number },
+	material: string,
+	solid: boolean?
+): Part
+	local p = part(parts, name, { h, d, d }, at, color, material, solid)
+	p.shape = "Cylinder"
+	p.rot = { 0, 0, 90 }
+	return p
+end
+
+-- A striped cone of stacked discs, from `bottom` up: a tent or carousel roof.
+local function stripedCone(
+	parts: { Part },
+	name: string,
+	x: number,
+	z: number,
+	bottom: number,
+	sizes: { number },
+	h: number,
+	colors: { { number } }
+)
+	for i, d in sizes do
+		disc(
+			parts,
+			`{name}{i}`,
+			{ x, bottom + (i - 0.5) * h, z },
+			d,
+			h,
+			colors[(i - 1) % #colors + 1],
+			"Fabric",
+			true
+		)
+	end
+end
+
+-- A carousel horse round a pole (the pole runs between its two halves), facing local -z.
+local function horse(
+	add: (string, { number }, { number }, { number }, string, boolean?, number?) -> Part,
+	name: string,
+	hy: number,
+	coat: { number }
+)
+	add(name .. "Front", { 0.9, 1.2, 1.4 }, { 0, hy, -0.95 }, coat, "SmoothPlastic", true)
+	add(name .. "Back", { 0.9, 1.2, 1.4 }, { 0, hy, 0.95 }, coat, "SmoothPlastic", true)
+	add(name .. "Neck", { 0.6, 1.2, 0.6 }, { 0, hy + 1.2, -1.3 }, coat, "SmoothPlastic")
+	add(name .. "Head", { 0.7, 0.6, 1.2 }, { 0, hy + 2.1, -1.7 }, coat, "SmoothPlastic")
+	add(name .. "Saddle", { 0.95, 0.2, 0.8 }, { 0, hy + 0.7, 0.7 }, Red, "Fabric")
+	add(name .. "Tail", { 0.2, 0.9, 0.2 }, { 0, hy + 0.1, 1.75 }, { 60, 40, 30 }, "Fabric")
+	for i, leg in { { -0.3, -1.2 }, { 0.3, -1.2 }, { -0.3, 1.2 }, { 0.3, 1.2 } } do
+		add(`{name}Leg{i}`, { 0.25, 1.2, 0.25 }, { leg[1], hy - 1.2, leg[2] }, coat, "SmoothPlastic")
+	end
+end
+
+-- A game stall, its counter facing local -z: walls, a striped awning, a sign and prizes.
+local function stall(
+	parts: { Part },
+	name: string,
+	x: number,
+	z: number,
+	yaw: number,
+	label: string,
+	n: number
+)
+	local add = group(parts, { x, 0, z }, yaw, 0)
+	local wall = if n % 2 == 0 then Teal else Purple
+	add(name .. "Counter", { 6, 2.4, 1 }, { 0, 1.2, -2.5 }, Cream, "WoodPlanks", true)
+	add(name .. "Back", { 6, 6, 0.4 }, { 0, 3, 2.5 }, wall, "WoodPlanks", true)
+	add(name .. "Left", { 0.4, 6, 4.6 }, { -3.2, 3, 0 }, wall, "WoodPlanks", true)
+	add(name .. "Right", { 0.4, 6, 4.6 }, { 3.2, 3, 0 }, wall, "WoodPlanks", true)
+	add(name .. "Roof", { 7, 0.3, 6 }, { 0, 6.15, 0 }, Rust, "Metal", true)
+	for i = 1, 7 do
+		-- A torn awning on every third stall: two stripes gone.
+		if not (n % 3 == 0 and (i == 3 or i == 4)) then
+			add(
+				`{name}Awning{i}`,
+				{ 1, 0.2, 2 },
+				{ i - 4, 6.4, -3 },
+				if i % 2 == 0 then Cream else Red,
+				"Fabric"
+			)
+		end
+	end
+	local sign = add(name .. "Sign", { 5, 1.2, 0.2 }, { 0, 7.1, -2.5 }, Cream, "WoodPlanks")
+	sign.text = label
+	add(name .. "Shelf", { 5.6, 0.2, 0.6 }, { 0, 3.8, 2 }, Rust, "Wood")
+	for i, px in { -2, 0, 2 } do
+		local fur = if i == 2 then { 120, 90, 60 } else { 150, 110, 150 }
+		add(`{name}Teddy{i}`, { 0.8, 0.9, 0.6 }, { px, 4.35, 2 }, fur, "Fabric")
+		add(`{name}TeddyHead{i}`, { 0.6, 0.6, 0.5 }, { px, 5.1, 2 }, fur, "Fabric")
+	end
+	for i, px in { -0.5, 0, 0.5 } do
+		add(`{name}Bottle{i}`, { 0.3, 0.7, 0.3 }, { px, 2.75, -2.5 }, { 70, 110, 80 }, "Glass")
+	end
+	if n % 4 == 1 then
+		local bulb = add(name .. "Bulb", { 0.4, 0.4, 0.4 }, { 0, 5.8, -2.4 }, { 255, 210, 90 }, "Neon")
+		bulb.light = { color = { 255, 200, 120 }, range = 12, brightness = 0.8 }
+	end
+end
+
+-- The Abandoned Carnival: a dead carnival under tall cliffs. From the arrival pad you pass
+-- the ticket booth to a striped entrance arch; inside, dirt midways run round the edge, up the
+-- middle under strings of bulbs and across, between four blocks: the big top, a broken ferris
+-- wheel, a broken carousel and two rows of game stalls. Small extras fill the corners: a
+-- fortune teller's tent, a caravan, a strongman bell, a popcorn cart and balloons. Monsters
+-- roam the midways.
+local function abandonedCarnival(): { Part }
+	local parts: { Part } = {}
+	perimeterFence(parts)
+	cliffs(parts, 113, { 62, 54, 72 })
+	for i, r in CarnivalPaths do
+		part(parts, `Path{i}`, { r.width, 0.1, r.depth }, { r.x, 0.05, r.z }, { 92, 76, 58 }, "Ground")
+	end
+
+	-- The way in: past the ticket booth, under a striped arch with bulbs.
+	part(parts, "PathMain", { 8, 0.1, 30 }, { 0, 0.05, -73 }, StoneDark, "Cobblestone")
+	part(parts, "PathCross", { 39, 0.1, 6 }, { 4.5, 0.05, -91 }, StoneDark, "Cobblestone")
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		local x = side * 8
+		for b = 1, 5 do
+			part(
+				parts,
+				`Gate{tag}Band{b}`,
+				{ 2, 2, 2 },
+				{ x, b * 2 - 1, -62 },
+				if b % 2 == 0 then Cream else Red,
+				"WoodPlanks",
+				true
+			)
+		end
+		local ball = part(parts, `Gate{tag}Ball`, { 1.6, 1.6, 1.6 }, { x, 10.8, -62 }, Gold, "Metal", true)
+		ball.shape = "Ball"
+		Kit.lampPost(parts, `PathLamp{tag}`, side * 6.5, -80)
+		fenceRun(parts, `InnerFence{tag}`, side * 10, side * 106, -62)
+	end
+	part(parts, "GateBar", { 14, 1.2, 1 }, { 0, 9.4, -62 }, Teal, "WoodPlanks")
+	local sign = part(parts, "GateSign", { 12, 2.2, 0.3 }, { 0, 11.1, -62 }, Cream, "WoodPlanks")
+	sign.text = "Abandoned Carnival"
+	for i = 0, 5 do
+		local lit = i == 1 or i == 4
+		local bulb = part(
+			parts,
+			`GateBulb{i}`,
+			{ 0.4, 0.4, 0.4 },
+			{ -5 + i * 2, 12.4, -62 },
+			if lit then BulbColors[i % #BulbColors + 1] else { 70, 66, 60 },
+			if lit then "Neon" else "Glass"
+		)
+		if lit then
+			bulb.light = { color = BulbColors[i % #BulbColors + 1], range = 14, brightness = 0.8 }
+		end
+	end
+	local booth = group(parts, { 14, 0, -72 }, 0, 0)
+	booth("Booth", { 4, 6, 4 }, { 0, 3, 0 }, Red, "WoodPlanks", true)
+	booth("BoothWindow", { 2, 1.5, 0.1 }, { 0, 3.5, -2.05 }, Black, "SmoothPlastic")
+	booth("BoothLedge", { 3, 0.2, 0.6 }, { 0, 2.6, -2.3 }, Cream, "Wood", true)
+	local tickets = booth("BoothSign", { 3.6, 0.9, 0.1 }, { 0, 5.1, -2.05 }, Cream, "WoodPlanks")
+	tickets.text = "TICKETS"
+	local skull = booth("BoothSkull", { 0.9, 0.9, 0.9 }, { 0, 3.15, -2.56 }, Bone, "SmoothPlastic")
+	skull.solid = true
+	for i, ex in { -0.2, 0.2 } do
+		booth(`BoothSkullEye{i}`, { 0.25, 0.25, 0.05 }, { ex, 3.3, -3.035 }, Black, "SmoothPlastic")
+	end
+	for i, roof in { { 5, 0.4 }, { 3.5, 0.6 }, { 2, 0.6 } } do
+		local y = ({ 6.2, 6.7, 7.3 })[i]
+		booth(
+			`BoothRoof{i}`,
+			{ roof[1], roof[2], roof[1] },
+			{ 0, y, 0 },
+			if i % 2 == 0 then Cream else Red,
+			"Fabric",
+			true
+		)
+	end
+
+	-- The big top in the north-west: twelve striped wall panels, a doorway at the front, a
+	-- stepped striped roof and a flag.
+	local bx, bz = -50, 58
+	for i = 0, 11 do
+		local a = i * 30
+		local r = math.rad(a)
+		local color = if i % 2 == 0 then Red else Cream
+		if i == 6 then
+			local dark = part(
+				parts,
+				"BigTopDoorway",
+				{ 7.4, 7, 0.3 },
+				{ bx + 14 * math.sin(r), 3.5, bz + 14 * math.cos(r) },
+				Black,
+				"SmoothPlastic"
+			)
+			dark.rot = { 0, a, 0 }
+		else
+			-- One panel on the east side is torn down to half height.
+			local height = if i == 3 then 5 else 8
+			local panel = part(
+				parts,
+				`BigTopWall{i}`,
+				{ 8.5, height, 0.6 },
+				{ bx + 16.3 * math.sin(r), height / 2, bz + 16.3 * math.cos(r) },
+				color,
+				"Fabric",
+				true
+			)
+			panel.rot = { 0, a, 0 }
+		end
+	end
+	stripedCone(parts, "BigTopRoof", bx, bz, 8, { 35, 31, 27, 23, 19, 15, 11, 7, 3 }, 1.4, { Red, Cream })
+	part(parts, "BigTopFlagPole", { 0.3, 4, 0.3 }, { bx, 20.6 + 2, bz }, Iron, "Metal")
+	part(parts, "BigTopFlag", { 2.4, 1.4, 0.1 }, { bx + 1.35, 23.8, bz }, Purple, "Fabric")
+	local bigSign = part(parts, "BigTopSign", { 8, 1.6, 0.3 }, { bx, 8.8, bz - 17.65 }, Cream, "WoodPlanks")
+	bigSign.text = "The Big Top"
+
+	-- The broken carousel in the south-west: a round floor, a centre column, a striped roof,
+	-- horses on poles. Two poles stand bare, one is snapped, its horse lies on the ground.
+	local cx, cz = -50, -14
+	disc(parts, "CarouselFloor", { cx, 0.5, cz }, 22, 1, { 110, 80, 60 }, "WoodPlanks", true)
+	disc(parts, "CarouselColumn", { cx, 6, cz }, 3, 10, Gold, "Metal", true)
+	stripedCone(parts, "CarouselRoof", cx, cz, 11, { 26, 21, 16, 11, 6 }, 0.8, { Red, Cream, Teal })
+	for i = 1, 8 do
+		local a = 22.5 + (i - 1) * 45
+		local r = math.rad(a)
+		local px, pz = cx + 8 * math.sin(r), cz + 8 * math.cos(r)
+		if i == 8 then
+			part(parts, `CarouselPole{i}Low`, { 0.4, 3, 0.4 }, { px, 2.5, pz }, Gold, "Metal", true)
+			part(parts, `CarouselPole{i}High`, { 0.4, 3, 0.4 }, { px, 9.5, pz }, Gold, "Metal")
+		else
+			part(parts, `CarouselPole{i}`, { 0.4, 10, 0.4 }, { px, 6, pz }, Gold, "Metal", true)
+			if i <= 5 then
+				horse(
+					group(parts, { px, 0, pz }, a - 90, 0),
+					`Horse{i}`,
+					4,
+					if i % 2 == 0 then Cream else { 90, 70, 60 }
+				)
+			end
+		end
+	end
+	local fallen = math.rad(22.5 + 7 * 45 + 8)
+	horse(
+		group(parts, { cx + 14 * math.sin(fallen), 0.45, cz + 14 * math.cos(fallen) }, 40, 90),
+		"HorseFallen",
+		0,
+		Cream
+	)
+	part(parts, "CrateA", { 2.4, 2.4, 2.4 }, { -80, 1.2, 4 }, Plank, "WoodPlanks", true)
+	part(parts, "CrateB", { 2, 2, 2 }, { -80.3, 3.4, 3.8 }, Rust, "WoodPlanks", true)
+	disc(parts, "Barrel", { -76.5, 1.3, 5 }, 1.8, 2.6, Rust, "Wood", true)
+
+	-- The ferris wheel in the north-east, rusted still: a rim, spokes, a hub on two A-frames,
+	-- and gondolas hanging in front. One spoke and one gondola are gone; the gondola lies below.
+	local fx, fz, hubY = 50, 60, 22
+	for i = 0, 15 do
+		local b = i * 22.5
+		local r = math.rad(b)
+		local seg = part(
+			parts,
+			`WheelRim{i}`,
+			{ 7.16, 0.8, 0.8 },
+			{ fx + 18.4 * math.sin(r), hubY + 18.4 * math.cos(r), fz },
+			Rust,
+			"Metal",
+			true
+		)
+		seg.rot = { 0, 0, -b }
+	end
+	for i = 0, 7 do
+		if i ~= 5 then
+			local b = i * 45
+			local r = math.rad(b)
+			local spoke = part(
+				parts,
+				`WheelSpoke{i}`,
+				{ 16.5, 0.4, 0.4 },
+				{ fx + 9.75 * math.sin(r), hubY + 9.75 * math.cos(r), fz },
+				Rust,
+				"Metal"
+			)
+			spoke.rot = { 0, 0, 90 - b }
+		end
+	end
+	local hub = part(parts, "WheelHub", { 5.4, 3, 3 }, { fx, hubY, fz }, Iron, "Metal", true)
+	hub.shape = "Cylinder"
+	hub.rot = { 0, 90, 0 }
+	for _, zSide in { -1, 1 } do
+		local tag = if zSide < 0 then "Front" else "Back"
+		local lz = fz + zSide * 3.2
+		part(parts, `WheelBearing{tag}`, { 3, 3, 1 }, { fx, hubY, lz }, Iron, "Metal", true)
+		for _, xSide in { -1, 1 } do
+			local leg = `WheelLeg{tag}{if xSide < 0 then "Left" else "Right"}`
+			local from = { fx + xSide * 11, 0, lz }
+			local dx, dy = -xSide * 9.5, hubY - 1.5
+			local length = math.sqrt(dx * dx + dy * dy)
+			local up = math.deg(math.atan2(dy, math.abs(dx)))
+			Kit.stick(parts, leg, from, if xSide < 0 then 0 else 180, up, length, 1, Iron, "Metal")
+		end
+	end
+	for i = 0, 7 do
+		if i ~= 4 then
+			local b = 22.5 + i * 45
+			local r = math.rad(b)
+			local ax, ay = fx + 18.4 * math.sin(r), hubY + 18.4 * math.cos(r)
+			local car = if i % 2 == 0 then Teal else Red
+			part(parts, `Gondola{i}Pin`, { 0.3, 0.3, 1.3 }, { ax, ay, fz - 1.05 }, Iron, "Metal")
+			part(parts, `Gondola{i}Rod`, { 0.2, 0.8, 0.2 }, { ax, ay - 0.55, fz - 1.6 }, Iron, "Metal")
+			part(parts, `Gondola{i}Canopy`, { 3.2, 0.25, 2.2 }, { ax, ay - 1.075, fz - 1.6 }, car, "Metal")
+			for j, c in { { -1.4, -0.9 }, { 1.4, -0.9 }, { -1.4, 0.9 }, { 1.4, 0.9 } } do
+				part(
+					parts,
+					`Gondola{i}Post{j}`,
+					{ 0.15, 1, 0.15 },
+					{ ax + c[1], ay - 1.7, fz - 1.6 + c[2] },
+					Iron,
+					"Metal"
+				)
+			end
+			part(parts, `Gondola{i}Tub`, { 3, 1.4, 2 }, { ax, ay - 2.9, fz - 1.6 }, car, "Metal", true)
+		end
+	end
+	local wreck = part(parts, "GondolaFallen", { 3, 1.4, 2 }, { fx + 15, 0.9, fz - 9 }, Red, "Metal", true)
+	wreck.rot = { 0, 30, 12 }
+	local roofWreck = part(
+		parts,
+		"GondolaFallenCanopy",
+		{ 3.2, 0.25, 2.2 },
+		{ fx + 19, 0.2, fz - 7 },
+		Red,
+		"Metal"
+	)
+	roofWreck.rot = { 0, -20, 0 }
+	for i, b in { 0, 90, 180, 270 } do
+		local r = math.rad(b)
+		local lit = i == 2
+		local bulb = part(
+			parts,
+			`WheelBulb{i}`,
+			{ 0.4, 0.4, 0.4 },
+			{ fx + 18.4 * math.sin(r), hubY + 18.4 * math.cos(r), fz - 0.6 },
+			if lit then { 255, 80, 80 } else { 70, 66, 60 },
+			if lit then "Neon" else "Glass"
+		)
+		if lit then
+			bulb.light = { color = { 255, 80, 80 }, range = 16, brightness = 1 }
+		end
+	end
+
+	-- Two rows of game stalls in the south-east, one facing each midway.
+	local labels = {
+		"Ring Toss",
+		"Duck Pond",
+		"Hoop Shot",
+		"Lucky Darts",
+		"Bottle Smash",
+		"Win a Prize",
+		"Fishing Game",
+		"Balloon Pop",
+		"Guess Your Fate",
+		"Whack-a-Ghoul",
+	}
+	for i, x in { 18, 34, 50, 66, 82 } do
+		stall(parts, `StallSouth{i}`, x, -33, 0, labels[i], i)
+		stall(parts, `StallNorth{i}`, x, 4, 180, labels[i + 5], i + 5)
+	end
+
+	-- Small extras. A fortune teller's tent beside the main midway.
+	local tx, tz = -20, 70
+	disc(parts, "FortuneTent", { tx, 2, tz }, 8, 4, Purple, "Fabric", true)
+	stripedCone(parts, "FortuneRoof", tx, tz, 4, { 9, 6.5, 4, 1.5 }, 1, { Purple, Gold })
+	part(parts, "FortuneDoor", { 2, 3, 0.1 }, { tx, 1.5, tz - 4.05 }, Black, "SmoothPlastic")
+	local orb = part(parts, "FortuneOrb", { 0.8, 0.8, 0.8 }, { tx, 8.4, tz }, { 160, 110, 255 }, "Neon")
+	orb.shape = "Ball"
+	orb.light = { color = { 160, 110, 255 }, range = 12, brightness = 1 }
+	-- A caravan in the north-west corner.
+	local vx, vz = -80, 40
+	part(parts, "Caravan", { 8, 5, 4 }, { vx, 4, vz }, Purple, "WoodPlanks", true)
+	part(parts, "CaravanRoof", { 8.4, 0.6, 4.6 }, { vx, 6.8, vz }, Cream, "WoodPlanks", true)
+	part(parts, "CaravanRoofTop", { 7, 0.6, 3 }, { vx, 7.4, vz }, Cream, "WoodPlanks", true)
+	for i, w in { { -2.5, -2.25 }, { 2.5, -2.25 }, { -2.5, 2.25 }, { 2.5, 2.25 } } do
+		local wheel = part(
+			parts,
+			`CaravanWheel{i}`,
+			{ 0.5, 2.4, 2.4 },
+			{ vx + w[1], 1.2, vz + w[2] },
+			Rust,
+			"Wood",
+			true
+		)
+		wheel.shape = "Cylinder"
+		wheel.rot = { 0, 90, 0 }
+	end
+	local caravanWindow = part(
+		parts,
+		"CaravanWindow",
+		{ 1.6, 1.2, 0.1 },
+		{ vx + 2, 4.6, vz - 2.05 },
+		Glow,
+		"Neon"
+	)
+	caravanWindow.light = { color = Glow, range = 12, brightness = 0.7 }
+	part(parts, "CaravanDoor", { 1.6, 3, 0.1 }, { vx, 3.5, vz - 2.05 }, Black, "SmoothPlastic")
+	-- A strongman bell beside the ferris wheel.
+	local sx, sz = 20, 42
+	part(parts, "StrongmanBase", { 3, 0.6, 3 }, { sx, 0.3, sz }, Rust, "Wood", true)
+	part(parts, "StrongmanBoard", { 1, 12, 0.4 }, { sx, 6.6, sz }, Cream, "WoodPlanks", true)
+	part(parts, "StrongmanPuck", { 0.8, 0.4, 0.4 }, { sx, 3, sz - 0.4 }, Red, "Metal")
+	local bell = part(parts, "StrongmanBell", { 1.4, 1.4, 1.4 }, { sx, 13.3, sz }, Gold, "Metal", true)
+	bell.shape = "Ball"
+	part(parts, "StrongmanHammer", { 0.3, 0.3, 3 }, { sx + 2, 0.15, sz - 1 }, Plank, "Wood")
+	part(parts, "StrongmanHammerHead", { 1, 0.8, 0.8 }, { sx + 2, 0.4, sz - 2.9 }, Iron, "Metal")
+	-- A popcorn cart and two stands of faded balloons.
+	local px, pz = 80, 40
+	part(parts, "PopcornCart", { 3, 2, 2 }, { px, 1.5, pz }, Red, "WoodPlanks", true)
+	local glass = part(parts, "PopcornGlass", { 2.6, 2, 1.6 }, { px, 3.5, pz }, { 220, 220, 200 }, "Glass")
+	glass.transparency = 0.5
+	part(parts, "PopcornRoof", { 3.4, 0.3, 2.4 }, { px, 4.65, pz }, Cream, "Fabric", true)
+	for i, side in { -1, 1 } do
+		local wheel = part(
+			parts,
+			`PopcornWheel{i}`,
+			{ 0.3, 1, 1 },
+			{ px + side * 1, 0.5, pz - 1.15 },
+			Iron,
+			"Metal"
+		)
+		wheel.shape = "Cylinder"
+		wheel.rot = { 0, 90, 0 }
+	end
+	for s, spot in { { 82, 78 }, { -80, -36 } } do
+		part(parts, `Balloons{s}Weight`, { 2, 0.4, 0.4 }, { spot[1], 0.2, spot[2] }, Iron, "Metal")
+		for i, bx2 in { -0.7, 0, 0.7 } do
+			local top = if i == 2 then 6.8 else 5.4
+			part(
+				parts,
+				`Balloons{s}String{i}`,
+				{ 0.05, top - 0.4, 0.05 },
+				{ spot[1] + bx2, 0.4 + (top - 0.4) / 2, spot[2] },
+				Cream,
+				"Fabric"
+			)
+			local d = if s == 2 and i == 3 then 0.7 else 1.2
+			local balloon = part(
+				parts,
+				`Balloons{s}Balloon{i}`,
+				{ d, d, d },
+				{ spot[1] + bx2, top + d / 2, spot[2] },
+				BulbColors[(i + s) % #BulbColors + 1],
+				"SmoothPlastic"
+			)
+			balloon.shape = "Ball"
+		end
+	end
+
+	-- Clutter left behind in the open ground of all four blocks: crates, barrels, hay bales,
+	-- old signs and lost balloons.
+	local roll = dice(4243)
+	local busy = {
+		{ -72, -28, 36, 80 }, -- big top
+		{ -27, -13, 63, 77 }, -- fortune tent
+		{ -86, -72, 35, 45 }, -- caravan
+		{ -66, -34, -30, 2 }, -- carousel
+		{ -86, -70, 0, 8 }, -- crates by the carousel
+		{ 33, 67, 44, 76 }, -- ferris wheel
+		{ 58, 76, 46, 56 }, -- the fallen gondola
+		{ 16, 24, 38, 46 }, -- strongman
+		{ 76, 84, 37, 43 }, -- popcorn cart
+		{ 78, 86, 75, 81 }, -- balloons
+		{ -84, -76, -39, -33 }, -- balloons
+		{ 8, 90, -40, -26 }, -- south stalls
+		{ 8, 90, -3, 12 }, -- north stalls
+	}
+	local function free(x: number, z: number): boolean
+		for _, b in busy do
+			if x > b[1] - 2 and x < b[2] + 2 and z > b[3] - 2 and z < b[4] + 2 then
+				return false
+			end
+		end
+		return true
+	end
+	local SignWords = { "Closed", "This way!", "Keep Out", "Fun for all!", "No refunds", "Lost & Found" }
+	local clutter = 0
+	for _, area in { { -86, -14, -38, 10 }, { 14, 86, -38, 10 }, { -86, -14, 32, 84 }, { 14, 86, 32, 84 } } do
+		for x = area[1], area[2], 9 do
+			for z = area[3], area[4], 9 do
+				local ox, oz = x + (roll() - 0.5) * 3, z + (roll() - 0.5) * 3
+				local pick = roll()
+				if pick < 0.7 and free(ox, oz) then
+					clutter += 1
+					local name = `Clutter{clutter}`
+					local kind = math.floor(roll() * 5)
+					if kind == 0 then
+						part(
+							parts,
+							name .. "Crate",
+							{ 2.2, 2.2, 2.2 },
+							{ ox, 1.1, oz },
+							Plank,
+							"WoodPlanks",
+							true
+						)
+					elseif kind == 1 then
+						disc(parts, name .. "Barrel", { ox, 1.3, oz }, 1.8, 2.6, Rust, "Wood", true)
+					elseif kind == 2 then
+						local bale = part(
+							parts,
+							name .. "Hay",
+							{ 3, 1.6, 2 },
+							{ ox, 0.8, oz },
+							{ 176, 150, 80 },
+							"Fabric",
+							true
+						)
+						bale.rot = { 0, roll() * 90, 0 }
+					elseif kind == 3 then
+						part(parts, name .. "SignPost", { 0.3, 3, 0.3 }, { ox, 1.5, oz }, Plank, "Wood", true)
+						local board = part(
+							parts,
+							name .. "Sign",
+							{ 3, 1.2, 0.2 },
+							{ ox, 3.4, oz - 0.25 },
+							Cream,
+							"WoodPlanks"
+						)
+						board.text = SignWords[clutter % #SignWords + 1]
+						board.rot = { 0, 0, (roll() - 0.5) * 16 }
+					else
+						part(parts, name .. "Stake", { 0.3, 0.6, 0.3 }, { ox, 0.3, oz }, Plank, "Wood")
+						part(parts, name .. "String", { 0.05, 4.4, 0.05 }, { ox, 2.8, oz }, Cream, "Fabric")
+						local balloon = part(
+							parts,
+							name .. "Balloon",
+							{ 1.2, 1.2, 1.2 },
+							{ ox, 5.6, oz },
+							BulbColors[clutter % #BulbColors + 1],
+							"SmoothPlastic"
+						)
+						balloon.shape = "Ball"
+					end
+				end
+			end
+		end
+	end
+
+	-- Strings of bulbs across the main midway, most of them dead.
+	local n = 0
+	for _, z in { -38, -22, -6, 36, 52, 68, 84 } do
+		n += 1
+		for _, side in { -1, 1 } do
+			part(
+				parts,
+				`LightPole{n}{if side < 0 then "Left" else "Right"}`,
+				{ 0.4, 9, 0.4 },
+				{ side * 9.5, 4.5, z },
+				Iron,
+				"Metal",
+				true
+			)
+		end
+		part(parts, `LightWire{n}`, { 18.6, 0.1, 0.1 }, { 0, 8.8, z }, Black, "Metal")
+		for b, bx2 in { -8, -5, -2, 1, 4, 7 } do
+			local lit = (n + b) % 4 == 0
+			local color = BulbColors[(n + b) % #BulbColors + 1]
+			local bulb = part(
+				parts,
+				`LightBulb{n}x{b}`,
+				{ 0.3, 0.3, 0.3 },
+				{ bx2, 8.6, z },
+				if lit then color else { 70, 66, 60 },
+				if lit then "Neon" else "Glass"
+			)
+			if lit and b % 2 == 0 then
+				bulb.light = { color = color, range = 10, brightness = 0.6 }
+			end
+		end
+	end
+	return parts
+end
+
 Scenery.Zones = {
 	PumpkinGraveyard = {
 		parts = pumpkinGraveyard,
@@ -995,6 +1600,10 @@ Scenery.Zones = {
 		bed = BayouBed,
 		water = BayouPools,
 		waterDepth = BayouWater,
+	},
+	AbandonedCarnival = {
+		parts = abandonedCarnival,
+		roam = CarnivalPaths,
 	},
 } :: { [string]: Zone }
 

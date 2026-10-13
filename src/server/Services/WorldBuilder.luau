@@ -47,8 +47,8 @@ local themes: { [string]: Theme } = {
 		glow = Color3.fromRGB(80, 220, 110),
 	},
 	AbandonedCarnival = {
-		floor = Color3.fromRGB(62, 48, 80),
-		floorMaterial = Enum.Material.Cobblestone,
+		floor = Color3.fromRGB(58, 54, 42),
+		floorMaterial = Enum.Material.Grass,
 		wall = Color3.fromRGB(96, 56, 130),
 		glow = Color3.fromRGB(180, 90, 255),
 	},
