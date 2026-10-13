@@ -392,9 +392,26 @@ local function buildZone(zonesFolder: Instance, zone: Zones.Zone)
 	folder.Name = zone.id
 
 	local sizeX, sizeZ = Layout.ZoneSize.x, Layout.ZoneSize.z
-	local floor =
-		block("Floor", Vector3.new(sizeX, 2, sizeZ), at(0, top - 1, 0), theme.floor, theme.floorMaterial)
+	-- With water, the floor is the bottom of the pools and the scenery builds the ground.
+	local bed = if scenery and scenery.bed then scenery.bed else 0
+	local floor = block(
+		"Floor",
+		Vector3.new(sizeX, 2, sizeZ),
+		at(0, top - bed - 1, 0),
+		theme.floor,
+		theme.floorMaterial
+	)
 	floor.Parent = folder
+	if scenery and scenery.water then
+		local depth = scenery.waterDepth or 2
+		for _, pool in scenery.water do
+			workspace.Terrain:FillBlock(
+				at(pool.x, top - bed + depth / 2, pool.z),
+				Vector3.new(pool.width, depth, pool.depth),
+				Enum.Material.Water
+			)
+		end
+	end
 
 	-- Four see-through walls so nobody falls off the island.
 	local walls = Instance.new("Folder")
