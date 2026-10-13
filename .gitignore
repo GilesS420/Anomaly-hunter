@@ -3,3 +3,7 @@ Packages/
 *.rbxlx
 *.lock
 sourcemap.json
+aftman.exe
+rojo.exe
+.gitignore
+
