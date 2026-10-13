@@ -303,9 +303,15 @@ function Rooms.Foyer(width: number, depth: number, owned: { [string]: boolean })
 	part(parts, "Floor", { width, 1, depth }, { 0, -0.5, 0 }, FloorWood, "WoodPlanks", true)
 	part(parts, "FloorBorder", { width - 2, 0.04, depth - 2 }, { 0, 0.02, 0 }, FloorDark, "WoodPlanks")
 	part(parts, "FloorInlay", { width - 4, 0.06, depth - 4 }, { 0, 0.03, 0 }, FloorWood, "WoodPlanks")
-	part(parts, "Runner", { 7, 0.1, depth - 4 }, { 0, 0.08, 0 }, Rug, "Fabric")
-	part(parts, "RunnerTrimLeft", { 0.4, 0.12, depth - 4 }, { -3.3, 0.09, 0 }, Gold, "Fabric")
-	part(parts, "RunnerTrimRight", { 0.4, 0.12, depth - 4 }, { 3.3, 0.09, 0 }, Gold, "Fabric")
+	-- The runner stops at the square rug's edges (front and back halves) so they don't overlap.
+	local rugHalf = 6.3
+	local runnerLength = hd - 2 - rugHalf
+	for i, s in { -1, 1 } do
+		local z = s * (rugHalf + runnerLength / 2)
+		part(parts, `Runner{i}`, { 7, 0.1, runnerLength }, { 0, 0.08, z }, Rug, "Fabric")
+		part(parts, `RunnerTrimLeft{i}`, { 0.4, 0.12, runnerLength }, { -3.3, 0.09, z }, Gold, "Fabric")
+		part(parts, `RunnerTrimRight{i}`, { 0.4, 0.12, runnerLength }, { 3.3, 0.09, z }, Gold, "Fabric")
+	end
 	part(parts, "Rug", { 12, 0.1, 12 }, { 0, 0.1, 0 }, { 70, 18, 26 }, "Fabric")
 	part(parts, "RugTrim", { 12.6, 0.08, 12.6 }, { 0, 0.09, 0 }, Gold, "Fabric")
 
