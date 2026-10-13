@@ -459,7 +459,7 @@ function Rooms.Foyer(width: number, depth: number, owned: { [string]: boolean })
 	-- Two cross beams over the open top, and a crooked chandelier hanging between them.
 	part(parts, "BeamLeft", { 1, 1, depth - 2 }, { -8, H - 0.5, 0 }, Trim, "Wood")
 	part(parts, "BeamRight", { 1, 1, depth - 2 }, { 8, H - 0.5, 0 }, Trim, "Wood")
-	part(parts, "BeamCross", { 17, 1, 1 }, { 0, H - 0.5, 0 }, Trim, "Wood")
+	part(parts, "BeamCross", { 15, 1, 1 }, { 0, H - 0.5, 0 }, Trim, "Wood")
 	part(parts, "ChandelierChain", { 0.2, 3, 0.2 }, { 0, H - 2.5, 0 }, Iron, "Metal")
 	-- An iron square frame hanging a little crooked (one side dropped).
 	for i, bar in
@@ -768,7 +768,7 @@ local function wingShell(
 	wallLanterns(parts, hw, hd, lanternZ)
 	part(parts, "BeamLeft", { 1, 1, depth - 2 }, { -8, H - 0.5, 0 }, theme.trim or Trim, "Wood")
 	part(parts, "BeamRight", { 1, 1, depth - 2 }, { 8, H - 0.5, 0 }, theme.trim or Trim, "Wood")
-	part(parts, "BeamCross", { 17, 1, 1 }, { 0, H - 0.5, 0 }, theme.trim or Trim, "Wood")
+	part(parts, "BeamCross", { 15, 1, 1 }, { 0, H - 0.5, 0 }, theme.trim or Trim, "Wood")
 	cobwebs(parts, hw, hd)
 end
 
@@ -791,19 +791,20 @@ function Rooms.Library(width: number, depth: number, owned: { [string]: boolean 
 	)
 
 	-- Bookcases: two on each side wall, two on each side of the back door. A few lean.
-	local wallX = hw - T - 0.8
+	-- Bookcases stand just clear of the panelling and chair rail (0.3 out from the wall).
+	local wallX = hw - T - 1.15
 	for i, spot in { { -12, 0 }, { 12, -3 } } do
 		bookcase(parts, `ShelfLeft{i}`, { -wallX, 0, spot[1] }, -90, spot[2], 6, 11 + i)
 		bookcase(parts, `ShelfRight{i}`, { wallX, 0, spot[1] }, 90, -spot[2] * 0.5, 6, 21 + i)
 	end
-	local wallZ = hd - T - 0.8
+	local wallZ = hd - T - 1.15
 	for i, spot in { { -11, 6, 0 }, { 11, 6, 2.5 }, { -15.9, 3, 0 }, { 15.9, 3, 0 } } do
 		bookcase(parts, `ShelfBack{i}`, { spot[1], 0, wallZ }, 0, spot[3], spot[2], 31 + i)
 	end
 
 	-- A rolling ladder leaning on the back-right bookcase on the right wall.
 	local ladderTilt = 15
-	local footX = hw - T - 1.6 - 11 * math.sin(math.rad(ladderTilt))
+	local footX = wallX - 0.8 - 11 * math.sin(math.rad(ladderTilt))
 	for i, z in { 9.6, 11.2 } do
 		local rail = part(parts, `LadderRail{i}`, { 0.25, 11, 0.25 }, {
 			footX + 5.5 * math.sin(math.rad(ladderTilt)),
@@ -838,15 +839,15 @@ function Rooms.Library(width: number, depth: number, owned: { [string]: boolean 
 	part(parts, "FireplaceSideB", { 1.6, 6, 1.4 }, { fx + 0.8, 3, 3.3 }, FireStone, "Slate", true)
 	part(parts, "FireplaceLintel", { 1.6, 1, 8 }, { fx + 0.8, 5.5, 0 }, FireStone, "Slate", true)
 	part(parts, "Mantel", { 2.2, 0.4, 9 }, { fx + 1.1, 6.2, 0 }, { 50, 32, 24 }, "Wood")
-	part(parts, "Firebox", { 0.3, 5, 5.2 }, { fx + 0.15, 2.5, 0 }, Soot, "Slate")
-	part(parts, "Hearth", { 3, 0.2, 9 }, { fx + 1.5, 0.1, 0 }, { 60, 56, 62 }, "Slate")
-	part(parts, "Ash", { 1.2, 0.25, 3.2 }, { fx + 0.9, 0.3, 0 }, { 105, 100, 98 }, "Slate")
+	part(parts, "Firebox", { 0.3, 4.8, 5.2 }, { fx + 0.45, 2.6, 0 }, Soot, "Slate")
+	part(parts, "Hearth", { 2.4, 0.2, 9 }, { fx + 1.8, 0.1, 0 }, { 60, 56, 62 }, "Slate")
+	part(parts, "Ash", { 1.2, 0.25, 3.2 }, { fx + 1.2, 0.3, 0 }, { 105, 100, 98 }, "Slate")
 	for i, z in { -0.6, 0.6 } do
 		local log = part(
 			parts,
 			`BurntLog{i}`,
 			{ 0.6, 0.6, 3 },
-			{ fx + 1, 0.6, z * 0.4 },
+			{ fx + 1.2, 0.6, z * 0.4 },
 			{ 26, 20, 18 },
 			"Wood"
 		)
@@ -1081,31 +1082,73 @@ function Rooms.Ballroom(width: number, depth: number, owned: { [string]: boolean
 		piano(`PianoBenchLeg{i}`, { 0.25, 1.55, 0.25 }, { leg[1], 0.78, leg[2] }, Lacquer, "SmoothPlastic")
 	end
 
-	-- A tall mirror in the middle of the outer (right) wall, cracked across, with a ghostly face.
-	local mx = hw - T - 0.15
-	part(parts, "MirrorFrame", { 0.3, 9.5, 4.8 }, { mx, 6, 0 }, Gilt, "Metal")
-	part(parts, "MirrorFrameTop", { 0.4, 1, 3 }, { mx - 0.05, 11.2, 0 }, Gilt, "Metal")
-	part(parts, "MirrorGlass", { 0.32, 8.6, 3.9 }, { mx - 0.02, 6, 0 }, { 120, 130, 145 }, "Glass")
-	for i, crack in { { 7.2, 0.4, 35 }, { 5.4, -0.6, -50 }, { 8.4, -0.9, 70 } } do
-		local line = part(
-			parts,
-			`MirrorCrack{i}`,
-			{ 0.34, 0.12, 2.6 },
-			{ mx - 0.03, crack[1], crack[2] },
-			{ 40, 40, 48 },
-			"SmoothPlastic"
-		)
-		line.rot = { crack[3], 0, 0 }
+	-- A tall mirror standing against the outer (right) wall, in front of the chair rail, its glass
+	-- smashed into a spider web of cracks around one impact, a shard missing, a ghostly face.
+	local mx = hw - T - 0.5
+	local mirrorY = 4.85
+	part(parts, "MirrorFrame", { 0.3, 9.5, 4.8 }, { mx, mirrorY, 0 }, Gilt, "Metal", true)
+	part(parts, "MirrorFrameTop", { 0.4, 1, 3 }, { mx - 0.05, mirrorY + 5.2, 0 }, Gilt, "Metal")
+	part(parts, "MirrorGlass", { 0.32, 8.6, 3.9 }, { mx - 0.02, mirrorY, 0 }, { 120, 130, 145 }, "Glass")
+	local hitY, hitZ = mirrorY + 1.2, 0.5
+	local halfY, halfZ = 4.2, 1.85 -- keep cracks on the glass
+	for i, crack in
+		{
+			{ 10, 9 },
+			{ 55, 6 },
+			{ 100, 7 },
+			{ 140, 5 },
+			{ 190, 9 },
+			{ 235, 6 },
+			{ 280, 8 },
+			{ 320, 4 },
+			{ 165, 3 },
+		}
+	do
+		local angle = math.rad(crack[1])
+		local dy, dz = -math.sin(angle), math.cos(angle)
+		-- Shorten the line where it would run off the glass.
+		local length = crack[2]
+		if math.abs(dy) > 0.01 then
+			length = math.min(length, ((if dy > 0 then halfY else -halfY) + mirrorY - hitY) / dy)
+		end
+		if math.abs(dz) > 0.01 then
+			length = math.min(length, ((if dz > 0 then halfZ else -halfZ) - hitZ) / dz)
+		end
+		local line = part(parts, `MirrorCrack{i}`, { 0.34, 0.1, length }, {
+			mx - 0.03,
+			hitY + dy * length / 2,
+			hitZ + dz * length / 2,
+		}, { 40, 40, 48 }, "SmoothPlastic")
+		line.rot = { crack[1], 0, 0 }
 	end
-	local ghost = part(
+	-- A ring of short cracks around the impact.
+	for i = 0, 5 do
+		local angle = math.rad(i * 60 + 30)
+		local ring = part(parts, `MirrorRing{i}`, { 0.34, 0.08, 0.7 }, {
+			mx - 0.03,
+			hitY - math.sin(angle) * 0.8,
+			hitZ + math.cos(angle) * 0.8,
+		}, { 40, 40, 48 }, "SmoothPlastic")
+		ring.rot = { i * 60 + 120, 0, 0 }
+	end
+	part(
+		parts,
+		"MirrorShardGone",
+		{ 0.33, 0.9, 0.6 },
+		{ mx - 0.025, hitY - 0.5, hitZ + 0.45 },
+		{ 20, 18, 22 },
+		"SmoothPlastic"
+	).rot =
+		{ 25, 0, 0 }
+	part(
 		parts,
 		"MirrorGhost",
 		{ 0.33, 1.6, 1.2 },
-		{ mx - 0.04, 7.4, 0.5 },
+		{ mx - 0.04, mirrorY + 1.6, -0.6 },
 		{ 210, 225, 240 },
 		"Neon"
-	)
-	ghost.transparency = 0.75
+	).transparency =
+		0.75
 
 	-- Tattered red curtains either side of both windows (the inner ones a bit shorter, torn).
 	local Curtain = { 110, 22, 34 }
@@ -1113,12 +1156,12 @@ function Rooms.Ballroom(width: number, depth: number, owned: { [string]: boolean
 		for c, s in { -1, 1 } do
 			local long = if s * centre > 0 then 12 else 10.5
 			part(parts, `Curtain{w}_{c}`, { 0.3, long, 1.3 }, {
-				hw - T - 0.3,
+				hw - T - 0.6,
 				H - 1 - long / 2,
 				centre + s * 3.5,
 			}, Curtain, "Fabric")
 		end
-		part(parts, `CurtainRod{w}`, { 0.2, 0.2, 8.6 }, { hw - T - 0.3, H - 0.9, centre }, Gilt, "Metal")
+		part(parts, `CurtainRod{w}`, { 0.2, 0.2, 8.6 }, { hw - T - 0.6, H - 0.9, centre }, Gilt, "Metal")
 	end
 
 	-- Gilded chairs along the Foyer-side wall, facing the dance floor; one knocked over.
@@ -1133,9 +1176,9 @@ function Rooms.Ballroom(width: number, depth: number, owned: { [string]: boolean
 		end
 	end
 	local cx = -hw + T + 2
-	gildedChair("ChairA", { cx, 0, -14 }, 90, 0)
-	gildedChair("ChairB", { cx, 0, -10.5 }, 90, 0)
-	gildedChair("ChairC", { cx, 0, 10.5 }, 90, 0)
+	gildedChair("ChairA", { cx, 0, -14 }, -90, 0)
+	gildedChair("ChairB", { cx, 0, -10.5 }, -90, 0)
+	gildedChair("ChairC", { cx, 0, 10.5 }, -90, 0)
 	gildedChair("ChairFallen", { cx + 3, 0.9, 14 }, -120, 90)
 
 	return parts
