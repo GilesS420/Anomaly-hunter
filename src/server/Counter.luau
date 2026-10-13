@@ -19,7 +19,13 @@ function Counter.prompt(
 	objectText: string,
 	onTriggered: (Player) -> ()
 ): Attachment?
-	local part = World.partAt(workspace, "Hub", "Landmarks", landmark)
+	-- A built landmark is a Model whose PrimaryPart is the spot in front of its counter.
+	local found = World.find(World.find(World.find(workspace, "Hub"), "Landmarks"), landmark)
+	local part = if found
+			and found:IsA("Model")
+			and found.PrimaryPart
+		then found.PrimaryPart
+		else World.part(found)
 	if not part then
 		warn(`{objectText}: add a Part at Workspace > Hub > Landmarks > {landmark} so players can open it`)
 		return nil
