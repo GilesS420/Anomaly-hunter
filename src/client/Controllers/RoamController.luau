@@ -1,11 +1,12 @@
 --!strict
 -- Draws wandering monsters smoothly. The server only says "glide from A to B between these
 -- two times" (attributes RoamFrom, RoamTo, RoamStart, RoamEnd on every model tagged
--- "Roamer", see server/Services/RoamService.luau); every frame this works out where each orb
--- should be right now and moves it locally, with a gentle floating bob. An orb that is being
--- caught (HeldBy is set) trembles instead.
--- Only the model's PrimaryPart ("Body") is moved: a real monster model that replaces the orb
--- later should weld its other parts to Body (and leave them unanchored) so they follow.
+-- "Roamer", see server/Services/RoamService.luau); every frame this works out where each
+-- monster should be right now and moves it locally. Orbs float with a gentle bob; block
+-- monsters (Config/Looks) turn to face where they're going and swing their limbs, fast
+-- while walking and slow while they stand still. A monster that is being caught (HeldBy is
+-- set) trembles instead.
+-- Only the model's PrimaryPart ("Body") is moved; the other parts are joined to it and follow.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,13 +22,58 @@ local BOB_HEIGHT = 0.35 -- studs up and down
 local BOB_SPEED = 2
 local SHAKE = 0.12 -- studs of trembling while someone is catching it
 
+local TURN_SPEED = 8 -- how quickly a monster turns to face where it walks
+local IDLE_PACE = 0.35 -- limbs swing this much slower and smaller while standing still
+local HOP_HEIGHT = 0.15 -- studs walkers bounce with each step
+local TAU = math.pi * 2
+
+type Swing = { motor: Motor6D, base: CFrame, axis: Vector3, amp: number, speed: number, phase: number }
+
+type State = {
+	phase: number, -- each monster bobs a little out of step with the others
+	yaw: number,
+	clock: number, -- limb clock: runs fast while walking, slow while standing
+	pace: number, -- eases between IDLE_PACE and 1 so limbs never jump
+	swings: { Swing }?, -- nil until the model has streamed in
+}
+
 local random = Random.new()
-local phases: { [Model]: number } = {} -- each orb bobs a little out of step with the others
+local phases: { [Model]: State } = {}
 
 local function track(instance: Instance)
 	if instance:IsA("Model") then
-		phases[instance] = random:NextNumber(0, math.pi * 2)
+		phases[instance] = { phase = random:NextNumber(0, TAU), yaw = 0, clock = 0, pace = IDLE_PACE }
 	end
+end
+
+-- The swinging joints the server set up for a block monster (MonsterModel.buildLook).
+local function findSwings(model: Model): { Swing }
+	local swings: { Swing } = {}
+	for _, motor in model:GetDescendants() do
+		if motor:IsA("Motor6D") then
+			local axis = motor:GetAttribute("SwingAxis")
+			local amp = motor:GetAttribute("SwingAmp")
+			local speed = motor:GetAttribute("SwingSpeed")
+			local phase = motor:GetAttribute("SwingPhase")
+			if typeof(axis) == "Vector3" and typeof(amp) == "number" and typeof(speed) == "number" then
+				table.insert(swings, {
+					motor = motor,
+					base = motor.C0,
+					axis = axis,
+					amp = amp,
+					speed = speed,
+					phase = if typeof(phase) == "number" then phase else 0,
+				})
+			end
+		end
+	end
+	return swings
+end
+
+-- Turns from one angle toward another the short way round.
+local function turn(from: number, to: number, alpha: number): number
+	local delta = (to - from + math.pi) % TAU - math.pi
+	return from + delta * alpha
 end
 
 local function untrack(instance: Instance)
@@ -64,13 +110,13 @@ function RoamController.start()
 	local parts: { BasePart } = {}
 	local cframes: { CFrame } = {}
 
-	RunService.RenderStepped:Connect(function()
+	RunService.RenderStepped:Connect(function(dt: number)
 		local serverNow = workspace:GetServerTimeNow()
 		local clock = os.clock()
 		table.clear(parts)
 		table.clear(cframes)
 
-		for model, phase in phases do
+		for model, state in phases do
 			local body = model.PrimaryPart -- nil while it hasn't streamed in yet
 			if not body or not model.Parent then
 				continue
@@ -79,17 +125,61 @@ function RoamController.start()
 			if not position then
 				continue
 			end
-			if model:GetAttribute("HeldBy") ~= nil then
+			local gait = model:GetAttribute("Gait") -- nil for orbs
+			local held = model:GetAttribute("HeldBy") ~= nil
+
+			-- Walking = on a leg that hasn't arrived yet; face the way it's going.
+			local walking = false
+			local from = model:GetAttribute("RoamFrom")
+			local to = model:GetAttribute("RoamTo")
+			local endTime = model:GetAttribute("RoamEnd")
+			if typeof(from) == "Vector3" and typeof(to) == "Vector3" and typeof(endTime) == "number" then
+				local step = to - from
+				if serverNow < endTime and step.X * step.X + step.Z * step.Z > 0.01 then
+					walking = true
+					if gait then
+						state.yaw =
+							turn(state.yaw, math.atan2(-step.X, -step.Z), math.min(1, dt * TURN_SPEED))
+					end
+				end
+			end
+
+			local target = if walking and not held then 1 else IDLE_PACE
+			state.pace += (target - state.pace) * math.min(1, dt * 4)
+			state.clock += dt * state.pace
+
+			if held then
 				position += Vector3.new(
 					random:NextNumber(-SHAKE, SHAKE),
 					random:NextNumber(-SHAKE, SHAKE),
 					random:NextNumber(-SHAKE, SHAKE)
 				)
+			elseif gait == "walk" then
+				local hop = math.abs(math.sin(state.clock * TAU * 1.25 + state.phase))
+				position += Vector3.new(0, hop * HOP_HEIGHT * (state.pace - IDLE_PACE) / (1 - IDLE_PACE), 0)
 			else
-				position += Vector3.new(0, math.sin(clock * BOB_SPEED + phase) * BOB_HEIGHT, 0)
+				position += Vector3.new(0, math.sin(clock * BOB_SPEED + state.phase) * BOB_HEIGHT, 0)
 			end
+
+			if gait then
+				local swings = state.swings
+				if not swings then
+					swings = findSwings(model)
+					state.swings = swings
+				end
+				for _, swing in swings :: { Swing } do
+					local angle = math.sin((state.clock * swing.speed + swing.phase) * TAU)
+						* swing.amp
+						* state.pace
+					swing.motor.C0 = swing.base * CFrame.fromAxisAngle(swing.axis, angle)
+				end
+			end
+
 			table.insert(parts, body)
-			table.insert(cframes, CFrame.new(position) * body.CFrame.Rotation)
+			table.insert(
+				cframes,
+				if gait then CFrame.new(position) * CFrame.Angles(0, state.yaw, 0) else CFrame.new(position)
+			)
 		end
 
 		if #parts > 0 then

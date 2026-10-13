@@ -22,6 +22,7 @@ local Effects = require("../src/shared/Config/Effects")
 local Haunting = require("../src/shared/Util/Haunting")
 local AttackConfig = require("../src/shared/Config/Attacks")
 local Attacks = require("../src/shared/Util/Attacks")
+local Looks = require("../src/shared/Config/Looks")
 
 local failures = 0
 local function check(name: string, ok: boolean)
@@ -808,6 +809,27 @@ do
 	local outside = Roam.clamp(rects, 50, 0, 1)
 	check("clamp leaves an inside point alone", inside ~= nil and near(inside.x, 4) and near(inside.z, -2))
 	check("clamp pulls an outside point in", outside ~= nil and near(outside.x, 9) and near(outside.y, 3))
+end
+
+-- Monster looks: every look is for a real monster, every part has a size, and walkers
+-- feet touch y = -2 so they stand on the floor.
+do
+	local ok, feetOk = true, true
+	for id, look in Looks do
+		ok = ok and Monsters[id] ~= nil and #look.pieces > 0
+		local lowest = math.huge
+		for _, piece in look.pieces do
+			ok = ok and #piece.size == 3 and #piece.at == 3 and #piece.color == 3
+			ok = ok and piece.size[1] > 0 and piece.size[2] > 0 and piece.size[3] > 0
+			lowest = math.min(lowest, piece.at[2] - piece.size[2] / 2)
+		end
+		if look.gait == "walk" and not near(lowest, -2) then
+			feetOk = false
+			print(`  {id}'s feet are at {lowest}, not -2`)
+		end
+	end
+	check("every look is for a known monster and has sized parts", ok)
+	check("walkers stand on the floor", feetOk)
 end
 
 if failures > 0 then
