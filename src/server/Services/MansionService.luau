@@ -4,7 +4,8 @@
 --   Workspace.Mansions.<PlotName>     a Model made here (removed when the owner leaves)
 --     Wings       a room per owned wing (walls, doors, lanterns, see Config/Rooms), or a
 --                 floor, four corner pillars and a name label for wings without a recipe yet
---     NextWing    a see-through floor plus a sign: hold its prompt to buy that wing
+--     NextWing    a see-through floor plus a sign on that wing's boarded door: hold its
+--                 prompt to buy the wing
 --     OwnerSign   "<name>'s Mansion" and "3/8 monsters", floating above the Foyer
 --     Monsters    the owner's caught monsters, roaming around the owned wings (each label
 --                 says if it's fed and how familiar it is, see CareService)
@@ -297,15 +298,30 @@ local function buildNextWing(state: State, wing: Wings.Wing)
 	floor.Transparency = 0.7
 	ghost(floor)
 
-	-- The sign stands at the wing's front edge, its front facing the plot's front door.
-	local signPosition = wingFront(state.plot, wing.id, 1, top + 3.5)
-	local board = block(
-		"Sign",
-		Vector3.new(10, 6, 0.5),
-		CFrame.lookAt(signPosition, signPosition + state.plot.frame.LookVector),
-		Color3.fromRGB(60, 45, 35),
-		folder
-	)
+	-- The sign hangs on the wing's boarded-up door (in the room that leads to it), facing into
+	-- that room, so it's where the owner walks to. Without a door it stands at the wing's front
+	-- edge, facing the plot's front door.
+	local plate = state.wings:FindFirstChild(`{wing.id}Plate`, true)
+	local board: Part
+	if plate and plate:IsA("BasePart") then
+		board = block(
+			"Sign",
+			Vector3.new(6, 3.4, 0.3),
+			plate.CFrame * CFrame.new(0, -6.3, -0.65),
+			Color3.fromRGB(60, 45, 35),
+			folder
+		)
+		board.CanCollide = false
+	else
+		local signPosition = wingFront(state.plot, wing.id, 1, top + 3.5)
+		board = block(
+			"Sign",
+			Vector3.new(10, 6, 0.5),
+			CFrame.lookAt(signPosition, signPosition + state.plot.frame.LookVector),
+			Color3.fromRGB(60, 45, 35),
+			folder
+		)
+	end
 	board.Material = Enum.Material.Wood
 
 	if wing.launch then
