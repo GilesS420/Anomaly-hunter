@@ -366,6 +366,13 @@ local function update()
 	end
 end
 
+-- A monster hit the hunter: whatever they were catching gets away (message is toasted).
+function CatchService.interrupt(player: Player, message: string)
+	if holds[player] then
+		release(player, message)
+	end
+end
+
 function CatchService.start()
 	remotes.Parent = ReplicatedStorage
 

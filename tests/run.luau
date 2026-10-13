@@ -20,6 +20,8 @@ local Care = require("../src/shared/Util/Care")
 local CareConfig = require("../src/shared/Config/Care")
 local Effects = require("../src/shared/Config/Effects")
 local Haunting = require("../src/shared/Util/Haunting")
+local AttackConfig = require("../src/shared/Config/Attacks")
+local Attacks = require("../src/shared/Util/Attacks")
 
 local failures = 0
 local function check(name: string, ok: boolean)
@@ -721,6 +723,91 @@ do
 		end
 	end
 	check("rolls hit about RoamChance% of the time", math.abs(hits / trials * 100 - Effects.RoamChance) < 0.6)
+end
+
+-- Monster attacks (#6).
+do
+	-- Every zone monster has an attack of a known kind, and no attack is for a missing monster.
+	local allArmed = true
+	for _, m in Monsters do
+		if
+			m.zone
+			and not (AttackConfig.Monsters[m.id] and AttackConfig.Kinds[AttackConfig.Monsters[m.id].kind])
+		then
+			allArmed = false
+			print("  no attack for " .. m.id)
+		end
+	end
+	check("every zone monster has an attack", allArmed)
+	local noStrays = true
+	for id in AttackConfig.Monsters do
+		if not Monsters[id] then
+			noStrays = false
+			print("  attack for unknown monster " .. id)
+		end
+	end
+	check("every attack belongs to a monster", noStrays)
+	check("event monsters don't attack (yet)", Attacks.forMonster("Flickerwick", 8) == nil)
+
+	local gravepup = Attacks.forMonster("Gravepup", 3)
+	local wispJack = Attacks.forMonster("WispJack", 2)
+	local lady = Attacks.forMonster("LadyOfLanterns", 7)
+	local heron = Attacks.forMonster("MoonlitHeron", 7)
+	assert(gravepup and wispJack and lady and heron)
+	check("a charge costs a heart", gravepup.kind == "Charge" and gravepup.damage == 1)
+	check("a blind is harmless on a low rarity", wispJack.damage == 0)
+	check("a Divine blind costs a heart", lady.damage == 1)
+	check("a blink never costs a heart", heron.damage == 0)
+	check("rarer monsters attack more often", Attacks.cooldown(1) == 10 and Attacks.cooldown(5) == 6)
+	check("the cooldown has a floor", Attacks.cooldown(7) == AttackConfig.CooldownMin)
+
+	-- Targets: nearest hunter in reach, skipping hunters already busy with enough monsters.
+	local max = AttackConfig.MaxAttackersPerHunter
+	local hunters: { Attacks.Hunter } = {
+		{ x = 10, z = 0, attackers = max, mine = false },
+		{ x = 20, z = 0, attackers = 0, mine = false },
+		{ x = 500, z = 0, attackers = 0, mine = false },
+	}
+	check("a busy hunter is skipped", Attacks.pickTarget(0, 0, hunters) == 2)
+	hunters[1].mine = true
+	check("its own target still counts", Attacks.pickTarget(0, 0, hunters) == 1)
+	check("nobody close means no target", Attacks.pickTarget(1000, 1000, hunters) == nil)
+
+	-- Charge: a lane that runs a bit past the hunter; stepping sideways dodges it.
+	local ax, az = Attacks.aim(gravepup, 0, 0, 10, 0)
+	check("a charge runs past the hunter", near(ax, 16) and near(az, 0))
+	check("standing in the lane is a hit", Attacks.hits(gravepup, 0, 0, ax, az, 10, 0))
+	check(
+		"stepping out of the lane dodges it",
+		not Attacks.hits(gravepup, 0, 0, ax, az, 10, gravepup.radius + 1)
+	)
+	local px, pz = Attacks.pushDirection(gravepup, 0, 0, ax, az, 10, 2)
+	check("a charge pushes along the lane", near(px, 1) and near(pz, 0))
+
+	-- Throw: lands where you stood when the warning showed.
+	local bone = Attacks.forMonster("Mossbones", 2)
+	assert(bone)
+	local tx, tz = Attacks.aim(bone, 0, 0, 20, 5)
+	check("a throw lands on your old spot", near(tx, 20) and near(tz, 5))
+	check("a throw misses once you move away", not Attacks.hits(bone, 0, 0, tx, tz, 20 + bone.radius + 1, 5))
+
+	-- Shockwave: a ring around the monster.
+	local scream = Attacks.forMonster("TheGroundskeeper", 5)
+	assert(scream)
+	check("a shockwave hits close by", Attacks.hits(scream, 0, 0, 0, 0, scream.radius - 1, 0))
+	check("a shockwave misses further out", not Attacks.hits(scream, 0, 0, 0, 0, scream.radius + 1, 0))
+
+	-- Chasing stops inside the attack range.
+	local cx, cz = Attacks.chaseSpot(40, 0, 0, 0, gravepup.range)
+	check("a chase stops inside the range", cx <= gravepup.range and cx > 0 and near(cz, 0))
+	check("the hit message", Attacks.hitMessage("Gravepup", gravepup) == "Gravepup charged at you! -1 heart")
+
+	-- Roam.clamp keeps a target on the floor.
+	local rects = { Roam.rect(0, 0, 20, 20, 3) }
+	local inside = Roam.clamp(rects, 4, -2, 1)
+	local outside = Roam.clamp(rects, 50, 0, 1)
+	check("clamp leaves an inside point alone", inside ~= nil and near(inside.x, 4) and near(inside.z, -2))
+	check("clamp pulls an outside point in", outside ~= nil and near(outside.x, 9) and near(outside.y, 3))
 end
 
 if failures > 0 then

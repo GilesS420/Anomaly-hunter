@@ -10,6 +10,7 @@
 --   /haunt            every fed monster in your mansion picks up a roaming effect right now
 --   /skip 12          your monsters live 12 hours ahead: they grow Familiarity, and get
 --                     hungry after a day (/skip 25 makes them all hungry)
+--   /calm             zone monsters leave you alone (type it again to let them attack)
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
 
 local Players = game:GetService("Players")
@@ -156,6 +157,15 @@ commands["/skip"] = function(player, argument)
 	end
 	CareService.refresh(player)
 	Notify.toast(player, `Your monsters skipped {hours} hours ahead.`)
+end
+
+commands["/calm"] = function(player)
+	local calm = not player:GetAttribute("Calm")
+	player:SetAttribute("Calm", if calm then true else nil)
+	Notify.toast(
+		player,
+		if calm then "Monsters leave you alone now. /calm again to undo." else "Monsters attack you again."
+	)
 end
 
 -- Runs a chat message if it's one of the commands above.

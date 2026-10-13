@@ -176,7 +176,7 @@ local function step()
 				-- Arrived: rest a moment before the next leg.
 				roamer.moving = false
 				settle(roamer, roamer.to)
-				roamer.pauseUntil = at + random:NextNumber(PauseMin, PauseMax)
+				roamer.pauseUntil = math.max(roamer.pauseUntil, at + random:NextNumber(PauseMin, PauseMax))
 			end
 		elseif at >= roamer.pauseUntil then
 			if not startLeg(roamer, at) then
@@ -279,6 +279,78 @@ function RoamService.release(model: Model, pauseSeconds: number)
 	end
 	roamer.held = false
 	roamer.pauseUntil = math.max(roamer.pauseUntil, now() + math.max(pauseSeconds, 0))
+end
+
+-- Sends the model straight to (x, z) on its floor in `seconds` (a chase step or a Charge),
+-- then rests restSeconds. Ignores the other orbs: it's short, and an orb that ends up
+-- overlapping walks itself free on its next leg. False if it's held or not roaming.
+function RoamService.moveTo(model: Model, x: number, z: number, seconds: number, restSeconds: number): boolean
+	local roamer = roamers[model]
+	if not roamer or roamer.held then
+		return false
+	end
+	local point = Roam.clamp(roamer.rects, x, z, roamer.radius)
+	if not point then
+		return false
+	end
+	local at = now()
+	roamer.from = currentPosition(roamer, at)
+	roamer.to = Vector3.new(point.x, point.y + roamer.radius + 0.5, point.z)
+	roamer.startTime = at
+	roamer.endTime = at + math.max(seconds, 0.05)
+	roamer.moving = true
+	roamer.pauseUntil = roamer.endTime + restSeconds
+	publish(roamer)
+	return true
+end
+
+-- How fast the model wanders (studs per second), or nil if it isn't roaming.
+function RoamService.speed(model: Model): number?
+	local roamer = roamers[model]
+	return if roamer then roamer.speed else nil
+end
+
+-- Stops the model where it is now for `seconds` (winding up an attack). Not a hold: it can
+-- still be caught, and moveTo works straight away.
+function RoamService.stop(model: Model, seconds: number)
+	local roamer = roamers[model]
+	if not roamer or roamer.held then
+		return
+	end
+	local at = now()
+	local here = currentPosition(roamer, at)
+	roamer.moving = false
+	roamer.from = here
+	roamer.to = here
+	roamer.startTime = at
+	roamer.endTime = at
+	roamer.pauseUntil = at + seconds
+	publish(roamer)
+	settle(roamer, here)
+end
+
+-- Makes the model vanish and pop up at (x, z) (a Blink), then rest restSeconds.
+function RoamService.teleport(model: Model, x: number, z: number, restSeconds: number)
+	local roamer = roamers[model]
+	if not roamer or roamer.held then
+		return
+	end
+	local at = now()
+	local there = Vector3.new(x, centreY(roamer.rects, x, z, roamer.radius, roamer.to.Y), z)
+	roamer.moving = false
+	roamer.from = there
+	roamer.to = there
+	roamer.startTime = at
+	roamer.endTime = at
+	roamer.pauseUntil = at + restSeconds
+	publish(roamer)
+	settle(roamer, there)
+end
+
+-- The floor rectangles and orb radius of a roaming model (for picking spots near it).
+function RoamService.area(model: Model): ({ Roam.Rect }?, number)
+	local roamer = roamers[model]
+	return if roamer then roamer.rects else nil, if roamer then roamer.radius else 0
 end
 
 function RoamService.isHeld(model: Model): boolean

@@ -20,6 +20,7 @@ local WorkshopService = require(script.Services.WorkshopService)
 local CareService = require(script.Services.CareService)
 local BakeryService = require(script.Services.BakeryService)
 local HauntService = require(script.Services.HauntService)
+local MonsterAiService = require(script.Services.MonsterAiService)
 local DevService = require(script.Services.DevService)
 
 local services: { { name: string, start: () -> ...any } } = {
@@ -37,6 +38,7 @@ local services: { { name: string, start: () -> ...any } } = {
 	{ name = "CareService", start = CareService.start },
 	{ name = "BakeryService", start = BakeryService.start },
 	{ name = "HauntService", start = HauntService.start },
+	{ name = "MonsterAiService", start = MonsterAiService.start },
 	{ name = "DevService", start = DevService.start },
 }
 

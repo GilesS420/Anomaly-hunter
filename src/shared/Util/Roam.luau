@@ -143,4 +143,21 @@ function Roam.inside(rects: { Rect }, x: number, z: number, margin: number): boo
 	return false
 end
 
+-- The closest point to (x, z) that lies at least margin studs inside one of the rectangles
+-- (used to keep a chasing or charging monster on its floor). Nil if there are no rectangles.
+function Roam.clamp(rects: { Rect }, x: number, z: number, margin: number): Point?
+	local best: Point? = nil
+	local bestDistance = math.huge
+	for _, r in rects do
+		local inset = math.min(margin, (r.maxX - r.minX) / 2, (r.maxZ - r.minZ) / 2)
+		local cx = math.clamp(x, r.minX + inset, r.maxX - inset)
+		local cz = math.clamp(z, r.minZ + inset, r.maxZ - inset)
+		local distance = (cx - x) ^ 2 + (cz - z) ^ 2
+		if distance < bestDistance then
+			best, bestDistance = { x = cx, y = r.y, z = cz }, distance
+		end
+	end
+	return best
+end
+
 return Roam
