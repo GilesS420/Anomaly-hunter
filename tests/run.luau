@@ -857,6 +857,7 @@ do
 		Glass = true,
 		Marble = true,
 		Grass = true,
+		Marble = true,
 		Ground = true,
 		Cobblestone = true,
 	}
@@ -973,12 +974,16 @@ do
 		Cobblestone = true,
 		Ground = true,
 		Grass = true,
+		Marble = true,
 	}
 	local function valid(parts: { Rooms.Part }, limit: number): boolean
 		local ok, names = true, {}
 		for _, p in parts do
 			ok = ok and #p.size == 3 and #p.at == 3 and #p.color == 3 and materials[p.material] == true
-			ok = ok and math.abs(p.at[1]) <= limit and math.abs(p.at[3]) <= limit
+			if math.abs(p.at[1]) > limit or math.abs(p.at[3]) > limit then
+				ok = false
+				print(`  {p.name} is outside the fence`)
+			end
 			if names[p.name] then
 				ok = false
 				print(`  two parts named {p.name}`)
@@ -1010,11 +1015,21 @@ do
 		return math.abs(x - r.x) < r.width / 2 + pad and math.abs(z - r.z) < r.depth / 2 + pad
 	end
 	for id, zone in Scenery.Zones do
-		local parts = zone.parts()
+		local parts, cliffs = {}, {}
+		for _, p in zone.parts() do
+			table.insert(if string.find(p.name, "^Cliff") then cliffs else parts, p)
+		end
 		check(
 			`{id} parts are sized, named once and inside the fence`,
 			valid(parts, Layout.ZoneSize.x / 2 - 1)
 		)
+		local outside = #cliffs > 0
+		for _, p in cliffs do
+			local half = Layout.ZoneSize.x / 2
+			outside = outside
+				and (math.abs(p.at[1]) - p.size[1] / 2 >= half or math.abs(p.at[3]) - p.size[3] / 2 >= half)
+		end
+		check(`{id} cliffs ring the zone outside its walls`, outside)
 		local clear = true
 		for _, p in parts do
 			if p.solid and not string.find(p.name, "^Fence") then
@@ -1038,6 +1053,17 @@ do
 		end
 		check(`{id} roaming ground is inside the zone and clear of the arrival and exit`, roomy)
 	end
+end
+
+-- Roaming legs stay on the floor: a straight line between two patches of open ground may not
+-- cut across what's between them, but may step over a small gap between two floors.
+do
+	local L = { Roam.rect(-30, 0, 20, 100, 0), Roam.rect(30, 0, 20, 100, 0), Roam.rect(0, 45, 80, 10, 0) }
+	check("a leg along one patch stays on the floor", Roam.lineInside(L, -30, -40, -30, 40, 1.5))
+	check("a leg round the corner stays on the floor", Roam.lineInside(L, -30, 45, 30, 45, 1.5))
+	check("a leg straight across the props is refused", not Roam.lineInside(L, -30, -40, 30, -40, 1.5))
+	local wings = { Roam.rect(-21, 0, 40, 40, 0), Roam.rect(21, 0, 40, 40, 0) }
+	check("a leg may step over the gap between two wings", Roam.lineInside(wings, -30, 0, 30, 0, 1.5))
 end
 
 -- Fast travel and the faster hub walk.

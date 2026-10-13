@@ -143,6 +143,28 @@ function Roam.inside(rects: { Rect }, x: number, z: number, margin: number): boo
 	return false
 end
 
+-- True if the straight line from a to b stays on the rectangles the whole way, so a monster
+-- walking it never cuts across the props between two patches of open ground. `slack` lets
+-- the line run that far outside a rectangle (enough to step over a small gap between floors).
+function Roam.lineInside(
+	rects: { Rect },
+	ax: number,
+	az: number,
+	bx: number,
+	bz: number,
+	slack: number
+): boolean
+	local length = math.sqrt((bx - ax) ^ 2 + (bz - az) ^ 2)
+	local steps = math.max(1, math.ceil(length))
+	for i = 0, steps do
+		local t = i / steps
+		if not Roam.inside(rects, ax + (bx - ax) * t, az + (bz - az) * t, -slack) then
+			return false
+		end
+	end
+	return true
+end
+
 -- The closest point to (x, z) that lies at least margin studs inside one of the rectangles
 -- (used to keep a chasing or charging monster on its floor). Nil if there are no rectangles.
 function Roam.clamp(rects: { Rect }, x: number, z: number, margin: number): Point?

@@ -27,6 +27,7 @@ local Bark = { 52, 42, 36 }
 local Plank = { 96, 72, 50 }
 local Dirt = { 62, 44, 30 }
 local Black = { 12, 10, 12 }
+local Bone = { 200, 190, 165 }
 
 ------------------------------------------------------------------------------------------
 -- Portals
@@ -328,73 +329,182 @@ local function ruinedWall(
 	end
 end
 
--- The Pumpkin Graveyard: dead ground inside an iron fence. A stone archway welcomes hunters
--- off the arrival pad; crooked tombstones fill the west side, a pumpkin patch with a scarecrow
--- the east, a ruined chapel stands at the back left and the groundskeeper's shed with an open
--- grave at the back right. The middle stays open for the monsters.
+-- Tall, blocky cliffs all round the zone, just outside its invisible walls: they close the
+-- zone in and hide the other floating zones from view. Stepped blocks that never overlap.
+local Cliff = 110 -- where the cliffs start: the floor's edge, so no gap shows (the walls sit inside them)
+local function cliffs(parts: { Part }, seed: number, rock: { number })
+	local roll = dice(seed)
+	local n = 0
+	local function shade(): { number }
+		local d = math.floor((roll() - 0.5) * 18)
+		return { rock[1] + d, rock[2] + d, rock[3] + d }
+	end
+	-- One stretch of cliff: a base from far below the floor, a step on top, sometimes a peak.
+	local function stretch(cx: number, cz: number, along: number, deep: number, alongX: boolean)
+		n += 1
+		local height = 32 + roll() * 22
+		local function box(name: string, w: number, h: number, d: number, x: number, y: number, z: number)
+			local size = if alongX then { w, h, d } else { d, h, w }
+			local at = if alongX then { cx + x, y, cz + z } else { cx + z, y, cz + x }
+			part(parts, name, size, at, shade(), "Slate", true)
+		end
+		box(`Cliff{n}`, along, height + 30, deep, 0, (height - 30) / 2, 0)
+		local stepW, stepD = along * (0.5 + roll() * 0.3), deep * (0.4 + roll() * 0.3)
+		local stepH = 8 + roll() * 16
+		local sx = (roll() - 0.5) * (along - stepW)
+		local sz = (roll() - 0.5) * (deep - stepD)
+		box(`Cliff{n}Step`, stepW, stepH, stepD, sx, height + stepH / 2, sz)
+		if roll() < 0.45 then
+			local peakW, peakH = stepW * 0.45, 6 + roll() * 12
+			box(`Cliff{n}Peak`, peakW, peakH, stepD * 0.5, sx, height + stepH + peakH / 2, sz)
+		end
+	end
+	local deep, span, width = 26, 136, 16
+	local mid = Cliff + deep / 2
+	for x = -span + width / 2, span - width / 2, width do
+		stretch(x, -mid, width, deep, true)
+		stretch(x, mid, width, deep, true)
+	end
+	for z = -Cliff + width / 2, Cliff - width / 2, width do
+		stretch(-mid, z, width, deep, false)
+		stretch(mid, z, width, deep, false)
+	end
+end
+
+-- A low iron fence along z from x = `from` to `to` (both posts), rails on its +z side.
+local function fenceRun(parts: { Part }, name: string, from: number, to: number, z: number)
+	local count = 0
+	for x = from, to, (if to > from then 8 else -8) do
+		count += 1
+		part(parts, `{name}Post{count}`, { 0.6, 7, 0.6 }, { x, 3.5, z }, Iron, "Metal", true)
+		part(parts, `{name}Spike{count}`, { 0.3, 0.8, 0.3 }, { x, 7.4, z }, Iron, "Metal")
+	end
+	local last = from + (count - 1) * (if to > from then 8 else -8)
+	for r, y in { 2, 6 } do
+		part(
+			parts,
+			`{name}Rail{r}`,
+			{ math.abs(last - from) + 0.6, 0.3, 0.3 },
+			{ (from + last) / 2, y, z + 0.45 },
+			Iron,
+			"Metal"
+		)
+	end
+end
+
+-- Where monsters roam in the graveyard: the dirt paths between the blocks of graves.
+local GraveyardPaths = {
+	{ x = 0, z = -51, width = 208, depth = 14 }, -- south path, just inside the gate
+	{ x = 0, z = 96, width = 208, depth = 16 }, -- north path
+	{ x = -97, z = 22, width = 14, depth = 132 }, -- west path
+	{ x = 97, z = 22, width = 14, depth = 132 }, -- east path
+	{ x = 0, z = 22, width = 16, depth = 132 }, -- the avenue up the middle
+	{ x = -49, z = 21, width = 82, depth = 14 }, -- cross path, west half
+	{ x = 49, z = 21, width = 82, depth = 14 }, -- cross path, east half
+}
+
+-- The Pumpkin Graveyard: a walled-in graveyard under tall cliffs. From the arrival pad a
+-- cobbled path leads through an archway in an inner fence; inside, dirt paths run round the
+-- edge, up the middle and across, between four blocks of crooked graves. Tucked among the
+-- graves: a small ruined chapel, a mausoleum, a little pumpkin patch with a scarecrow, and the
+-- groundskeeper's shed with an open grave. Monsters roam the paths.
 local function pumpkinGraveyard(): { Part }
 	local parts: { Part } = {}
 	local roll = dice(1031)
 	perimeterFence(parts)
+	cliffs(parts, 77, { 58, 54, 66 })
 
-	-- The way in: a cobbled path from the arrival pad and the exit to the archway.
-	part(parts, "PathMain", { 8, 0.1, 40 }, { 0, 0.05, -70 }, StoneDark, "Cobblestone")
-	part(parts, "PathCross", { 39, 0.1, 6 }, { 4.5, 0.05, -93 }, StoneDark, "Cobblestone")
+	-- The paths, in packed dirt.
+	for i, r in GraveyardPaths do
+		part(parts, `Path{i}`, { r.width, 0.1, r.depth }, { r.x, 0.05, r.z }, { 58, 46, 36 }, "Ground")
+	end
+
+	-- The way in: a cobbled path from the arrival pad and the exit to the archway in the
+	-- inner fence.
+	part(parts, "PathMain", { 8, 0.1, 30 }, { 0, 0.05, -73 }, StoneDark, "Cobblestone")
+	part(parts, "PathCross", { 39, 0.1, 6 }, { 4.5, 0.05, -91 }, StoneDark, "Cobblestone")
 	for _, side in { -1, 1 } do
 		local tag = if side < 0 then "Left" else "Right"
-		local x = side * 7
-		part(parts, `GatePillar{tag}`, { 2, 9, 2 }, { x, 4.5, -70 }, MossStone, "Slate", true)
-		part(parts, `GateCap{tag}`, { 2.6, 0.5, 2.6 }, { x, 9.25, -70 }, StoneDark, "Slate", true)
-		jackOLantern(parts, `GatePumpkin{tag}`, x, 9.5, -70, 2.2, side > 0)
-		Kit.lampPost(parts, `PathLamp{tag}`, side * 6.5, -84)
+		local x = side * 8
+		part(parts, `GatePillar{tag}`, { 2, 9, 2 }, { x, 4.5, -62 }, MossStone, "Slate", true)
+		part(parts, `GateCap{tag}`, { 2.6, 0.5, 2.6 }, { x, 9.25, -62 }, StoneDark, "Slate", true)
+		jackOLantern(parts, `GatePumpkin{tag}`, x, 9.5, -62, 2.2, side > 0)
+		Kit.lampPost(parts, `PathLamp{tag}`, side * 6.5, -80)
+		fenceRun(parts, `InnerFence{tag}`, side * 10, side * 106, -62)
 	end
-	part(parts, "GateBar", { 12, 0.6, 0.6 }, { 0, 8.7, -70 }, Iron, "Metal", true)
+	part(parts, "GateBar", { 14, 0.6, 0.6 }, { 0, 8.7, -62 }, Iron, "Metal")
 	local sign = part(
 		parts,
 		"GateSign",
 		{ 10, 1.8, 0.3 },
-		{ 0, 7.5, -70.15 },
+		{ 0, 7.5, -62.15 },
 		{ 196, 170, 120 },
 		"WoodPlanks"
 	)
 	sign.text = "Pumpkin Graveyard"
 
-	-- Tombstones in crooked rows on the west side.
-	local n = 0
-	for z = -24, 40, 8 do
-		for x = -90, -62, 7 do
-			n += 1
-			local kind = math.floor(roll() * 3)
-			local yaw = (roll() - 0.5) * 20
-			local tilt = (roll() - 0.5) * 16
-			local add = group(parts, { x + (roll() - 0.5) * 2, 0, z }, yaw, tilt)
-			local color = if roll() < 0.3 then MossStone else Stone
-			if kind == 0 then
-				add(`Tomb{n}`, { 2.4, 3.2, 0.6 }, { 0, 1.6, 0 }, color, "Slate", true)
-				add(`Tomb{n}Top`, { 1.6, 0.5, 0.6 }, { 0, 3.45, 0 }, color, "Slate")
-			elseif kind == 1 then
-				add(`Tomb{n}`, { 0.7, 4, 0.6 }, { 0, 2, 0 }, color, "Slate", true)
-				add(`Tomb{n}ArmLeft`, { 0.95, 0.7, 0.6 }, { -0.825, 2.9, 0 }, color, "Slate")
-				add(`Tomb{n}ArmRight`, { 0.95, 0.7, 0.6 }, { 0.825, 2.9, 0 }, color, "Slate")
-			else
-				add(`Tomb{n}`, { 2, 2.2, 0.8 }, { 0, 1.1, 0 }, color, "Slate", true)
-			end
-			add(`Tomb{n}Mound`, { 2.2, 0.3, 3.4 }, { 0, 0.15, 2.2 }, Dirt, "Ground")
-		end
+	-- The small extras, each with the patch of ground it takes from the graves.
+	local taken: { { number } } = {} -- minX, maxX, minZ, maxZ
+	local function take(minX: number, maxX: number, minZ: number, maxZ: number)
+		table.insert(taken, { minX, maxX, minZ, maxZ })
 	end
 
-	-- The pumpkin patch on the east side: dirt, rows of pumpkins and a scarecrow.
-	part(parts, "PatchSoil", { 38, 0.2, 50 }, { 74, 0.1, 13 }, Dirt, "Ground")
+	-- A small ruined chapel in the north-west corner.
+	local cx = -76
+	take(-87, -65, 63, 87)
+	ruinedWall(parts, "ChapelFrontLeft", -84, -78.8, 66.8, false, { 7, 5 }, Stone)
+	ruinedWall(parts, "ChapelFrontRight", -73.2, -68, 66.8, false, { 6, 8 }, Stone)
+	ruinedWall(parts, "ChapelBack", -84, -68, 84, false, { 6, 10, 10, 7 }, Stone)
+	ruinedWall(parts, "ChapelLeft", 67.6, 83.2, -83.2, true, { 7, 0, 6, 8 }, Stone)
+	ruinedWall(parts, "ChapelRight", 67.6, 83.2, -68.8, true, { 5, 8, 0, 6 }, StoneDark)
+	part(parts, "ChapelFloor", { 12.8, 0.2, 15.6 }, { cx, 0.1, 75.4 }, StoneDark, "Slate")
+	part(parts, "ChapelCross", { 0.8, 3, 0.8 }, { cx - 2, 11.5, 84 }, Stone, "Slate")
+	part(parts, "ChapelCrossArmLeft", { 0.7, 0.7, 0.8 }, { cx - 3.15, 12, 84 }, Stone, "Slate")
+	part(parts, "ChapelCrossArmRight", { 0.7, 0.7, 0.8 }, { cx - 0.85, 12, 84 }, Stone, "Slate")
+	part(parts, "Altar", { 4, 2.4, 1.6 }, { cx, 1.4, 81.6 }, StoneDark, "Slate", true)
+	Kit.candles(parts, "AltarCandles", cx - 1, 2.6, 81.6, true)
+	Kit.candles(parts, "AltarCandlesRight", cx + 1, 2.6, 81.6, false)
+	local add = group(parts, { cx, 0.2, 74 }, 8, 0)
+	add("PewSeat", { 6, 0.4, 1.6 }, { 0, 1.4, 0 }, Plank, "WoodPlanks", true)
+	add("PewBack", { 6, 1.6, 0.3 }, { 0, 2.4, 0.65 }, Plank, "WoodPlanks", true)
+	add("PewLegLeft", { 0.4, 1.2, 1.4 }, { -2.6, 0.6, 0 }, Plank, "Wood", true)
+	add("PewLegRight", { 0.4, 1.2, 1.4 }, { 2.6, 0.6, 0 }, Plank, "Wood", true)
+
+	-- A stone mausoleum in the south-west corner.
+	local mx, mz = -78, -34
+	take(-86, -70, -42, -27)
+	part(parts, "Mausoleum", { 10, 7, 8 }, { mx, 3.5, mz }, Stone, "Slate", true)
+	part(parts, "MausoleumRoof", { 11, 0.6, 9 }, { mx, 7.3, mz }, StoneDark, "Slate", true)
+	part(parts, "MausoleumGable", { 8, 1, 6 }, { mx, 8.1, mz }, Stone, "Slate", true)
+	part(parts, "MausoleumGableTop", { 5, 1, 4 }, { mx, 9.1, mz }, Stone, "Slate", true)
+	part(parts, "MausoleumDoor", { 3, 4.2, 0.1 }, { mx, 2.5, mz - 4.05 }, Black, "SmoothPlastic")
+	part(parts, "MausoleumStep", { 6, 0.4, 1.2 }, { mx, 0.2, mz - 4.6 }, StoneDark, "Slate", true)
+	local plate = part(parts, "MausoleumPlate", { 4, 0.8, 0.1 }, { mx, 5.6, mz - 4.05 }, Bone, "Slate")
+	plate.text = "R.I.P."
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		part(
+			parts,
+			`MausoleumColumn{tag}`,
+			{ 0.8, 7, 0.8 },
+			{ mx + side * 3.5, 3.5, mz - 4.4 },
+			Bone,
+			"Marble",
+			true
+		)
+	end
+
+	-- A little pumpkin patch with a scarecrow in the north-east corner.
+	take(64, 88, 58, 86)
+	part(parts, "PatchSoil", { 20, 0.2, 16 }, { 76, 0.1, 74 }, Dirt, "Ground")
 	local p = 0
-	for row = 0, 5 do
-		local x = 58 + row * 6
-		part(parts, `PatchRow{row + 1}`, { 1.2, 0.4, 46 }, { x, 0.4, 13 }, { 50, 36, 24 }, "Ground")
-		for _, z in { 2, 10, 18, 26, 34 } do
+	for _, x in { 70, 76, 82 } do
+		part(parts, `PatchRow{x}`, { 1.2, 0.4, 14 }, { x, 0.4, 74 }, { 50, 36, 24 }, "Ground")
+		for _, z in { 70, 78 } do
 			p += 1
-			local size = 1.6 + roll() * 1.6
-			local carved = p % 5 == 2
-			if carved then
-				jackOLantern(parts, `Pumpkin{p}`, x, 0.6, z, size, p % 10 == 2)
+			local size = 1.8 + roll() * 1.4
+			if p % 3 == 1 then
+				jackOLantern(parts, `Pumpkin{p}`, x, 0.6, z, size, p == 1)
 			else
 				part(
 					parts,
@@ -407,26 +517,18 @@ local function pumpkinGraveyard(): { Part }
 				)
 				part(parts, `Pumpkin{p}Stem`, { 0.3, 0.4, 0.3 }, { x, 0.8 + size * 0.75, z }, Stem, "Wood")
 			end
-			part(
-				parts,
-				`Pumpkin{p}Leaf`,
-				{ 1.2, 0.15, 1 },
-				{ x + size * 0.55 + 0.6, 0.275, z + 1 },
-				Stem,
-				"Grass"
-			)
 		end
 	end
-	local sx, sz = 73, -6
-	part(parts, "ScarecrowPole", { 0.5, 3.5, 0.5 }, { sx, 1.95, sz }, Bark, "Wood", true)
-	part(parts, "Scarecrow", { 2.4, 3, 1.2 }, { sx, 5.2, sz }, { 120, 96, 60 }, "Fabric", true)
+	local sx, sz = 76, 63
+	part(parts, "ScarecrowPole", { 0.5, 3.5, 0.5 }, { sx, 1.75, sz }, Bark, "Wood", true)
+	part(parts, "Scarecrow", { 2.4, 3, 1.2 }, { sx, 5, sz }, { 120, 96, 60 }, "Fabric", true)
 	for _, side in { -1, 1 } do
 		local tag = if side < 0 then "Left" else "Right"
 		part(
 			parts,
 			`ScarecrowArm{tag}`,
 			{ 2.2, 0.8, 0.8 },
-			{ sx + side * 2.3, 6.1, sz },
+			{ sx + side * 2.3, 5.9, sz },
 			{ 90, 60, 80 },
 			"Fabric"
 		)
@@ -434,48 +536,18 @@ local function pumpkinGraveyard(): { Part }
 			parts,
 			`ScarecrowStraw{tag}`,
 			{ 0.6, 0.6, 0.6 },
-			{ sx + side * 3.7, 6.1, sz },
+			{ sx + side * 3.7, 5.9, sz },
 			{ 210, 180, 90 },
 			"Fabric"
 		)
 	end
-	jackOLantern(parts, "ScarecrowHead", sx, 6.7, sz, 2.2, true, true)
-	part(parts, "ScarecrowHatBrim", { 3, 0.2, 3 }, { sx, 8.56, sz }, Black, "Fabric")
-	part(parts, "ScarecrowHat", { 1.6, 1.4, 1.6 }, { sx, 9.36, sz }, Black, "Fabric")
+	jackOLantern(parts, "ScarecrowHead", sx, 6.5, sz, 2.2, true, true)
+	part(parts, "ScarecrowHatBrim", { 3, 0.2, 3 }, { sx, 8.36, sz }, Black, "Fabric")
+	part(parts, "ScarecrowHat", { 1.6, 1.4, 1.6 }, { sx, 9.16, sz }, Black, "Fabric")
 
-	-- The ruined chapel at the back left: broken stone walls, a stub of a bell tower, old
-	-- pews knocked askew and an altar with candles.
-	local cx, cz = -72, 76
-	ruinedWall(parts, "ChapelFront", cx - 12, cx - 3, cz - 14, false, { 9, 7, 8 }, Stone)
-	ruinedWall(parts, "ChapelFrontRight", cx + 3, cx + 12, cz - 14, false, { 6, 9, 4 }, Stone)
-	ruinedWall(parts, "ChapelBack", cx - 12, cx + 12, cz + 14, false, { 6, 10, 12, 12, 9, 5 }, Stone)
-	ruinedWall(parts, "ChapelLeft", cz - 13.2, cz + 13.2, cx - 12.8, true, { 8, 6, 0, 7, 9, 4 }, Stone)
-	ruinedWall(parts, "ChapelRight", cz - 13.2, cz + 13.2, cx + 12.8, true, { 3, 7, 8, 0, 5, 8 }, StoneDark)
-	part(parts, "ChapelFloor", { 24, 0.2, 26.4 }, { cx, 0.1, cz }, StoneDark, "Slate")
-	part(parts, "BellTower", { 6, 18, 6 }, { cx + 12.8 + 3.8, 9, cz - 11.2 }, Stone, "Slate", true)
-	part(
-		parts,
-		"BellTowerCap",
-		{ 6.8, 0.6, 6.8 },
-		{ cx + 12.8 + 3.8, 18.3, cz - 11.2 },
-		StoneDark,
-		"Slate",
-		true
-	)
-	part(parts, "BellTowerWindow", { 2, 3, 0.1 }, { cx + 12.8 + 3.8, 14, cz - 14.25 }, Black, "SmoothPlastic")
-	part(parts, "Altar", { 6, 3, 2.4 }, { cx, 1.7, cz + 11 }, StoneDark, "Slate", true)
-	Kit.candles(parts, "AltarCandles", cx - 1.8, 3.2, cz + 11, true)
-	Kit.candles(parts, "AltarCandlesRight", cx + 1.8, 3.2, cz + 11, false)
-	for i, at in { { -4, 2, 0 }, { 4, 2, -8 }, { -4, -6, 15 }, { 4, -6, -10 } } do
-		local add = group(parts, { cx + at[1], 0.2, cz + at[2] }, at[3], 0)
-		add(`Pew{i}Seat`, { 7, 0.4, 1.6 }, { 0, 1.4, 0 }, Plank, "WoodPlanks", true)
-		add(`Pew{i}Back`, { 7, 1.6, 0.3 }, { 0, 2.4, 0.65 }, Plank, "WoodPlanks", true)
-		add(`Pew{i}LegLeft`, { 0.4, 1.2, 1.4 }, { -3, 0.6, 0 }, Plank, "Wood", true)
-		add(`Pew{i}LegRight`, { 0.4, 1.2, 1.4 }, { 3, 0.6, 0 }, Plank, "Wood", true)
-	end
-
-	-- The groundskeeper's shed and an open grave, at the back right.
-	local hx, hz = 80, 84
+	-- The groundskeeper's shed and an open grave in the south-east corner.
+	take(56, 88, -42, -22)
+	local hx, hz = 78, -30
 	part(parts, "ShedBack", { 12, 8, 0.6 }, { hx, 4, hz + 4.7 }, Plank, "WoodPlanks", true)
 	part(parts, "ShedLeft", { 0.6, 8, 8.8 }, { hx - 5.7, 4, hz }, Plank, "WoodPlanks", true)
 	part(parts, "ShedRight", { 0.6, 8, 8.8 }, { hx + 5.7, 4, hz }, Plank, "WoodPlanks", true)
@@ -487,9 +559,9 @@ local function pumpkinGraveyard(): { Part }
 	local window = part(parts, "ShedWindow", { 1.8, 1.6, 0.1 }, { hx + 3.8, 5, hz - 5.05 }, Glow, "Neon")
 	window.light = { color = Glow, range = 14, brightness = 0.8 }
 	part(parts, "ShedDoorDark", { 4, 6.4, 0.1 }, { hx - 0.4, 3.2, hz - 4.45 }, Black, "SmoothPlastic")
-	local shovel = part(parts, "Shovel", { 0.25, 4.4, 0.25 }, { hx + 7, 2.15, hz - 3 }, Bark, "Wood")
+	local shovel = part(parts, "Shovel", { 0.25, 4.4, 0.25 }, { hx + 7, 2.15, hz + 2 }, Bark, "Wood")
 	shovel.rot = { 0, 0, 12 }
-	local gx, gz = 66, 74
+	local gx, gz = 64, -31
 	part(parts, "GravePit", { 3, 0.06, 6 }, { gx, 0.03, gz }, Black, "SmoothPlastic")
 	part(parts, "GraveRimLeft", { 0.6, 0.4, 6 }, { gx - 1.8, 0.2, gz }, Dirt, "Ground")
 	part(parts, "GraveRimRight", { 0.6, 0.4, 6 }, { gx + 1.8, 0.2, gz }, Dirt, "Ground")
@@ -498,18 +570,53 @@ local function pumpkinGraveyard(): { Part }
 	local lid = part(parts, "CoffinLid", { 2.4, 0.3, 5.6 }, { gx - 4.4, 0.15, gz }, Plank, "WoodPlanks")
 	lid.rot = { 0, 20, 0 }
 
-	-- Dead trees along the fence, outside the monsters' ground.
-	for i, spot in
-		{
-			{ -100, -45, 30 },
-			{ 100, -42, 160 },
-			{ -30, 101, 90 },
-			{ 34, 100, 260 },
-			{ -100, 46, 0 },
-			{ 101, 50, 200 },
-		}
-	do
+	-- Dead trees and lamp posts beside the avenue.
+	for i, spot in { { -15, 5, 30 }, { 15, 37, 200 }, { -45, 80, 120 }, { 45, -36, 300 } } do
+		take(spot[1] - 4, spot[1] + 4, spot[2] - 4, spot[2] + 4)
 		Kit.deadTree(parts, `Tree{i}`, spot[1], spot[2], spot[3])
+	end
+	for i, spot in { { -10.5, -38 }, { 10.5, -38 }, { -10.5, 60 }, { 10.5, 60 } } do
+		take(spot[1] - 2, spot[1] + 2, spot[2] - 2, spot[2] + 2)
+		Kit.lampPost(parts, `Lamp{i}`, spot[1], spot[2])
+	end
+
+	-- Graves fill the rest of the four blocks, in crooked rows.
+	local function free(x: number, z: number): boolean
+		for _, t in taken do
+			if x > t[1] - 1.5 and x < t[2] + 1.5 and z > t[3] - 1 and z < t[4] + 4 then
+				return false
+			end
+		end
+		return true
+	end
+	local n = 0
+	for _, rows in { { -38, 2 }, { 34, 74 } } do
+		for z = rows[1], rows[2], 8 do
+			for _, sideX in { -1, 1 } do
+				for col = 0, 10 do
+					local x = sideX * (14 + col * 7) + (roll() - 0.5) * 1.6
+					if free(x, z) then
+						n += 1
+						local kind = math.floor(roll() * 3)
+						local yaw = (roll() - 0.5) * 20
+						local tilt = (roll() - 0.5) * 16
+						local grave = group(parts, { x, 0, z }, yaw, tilt)
+						local color = if roll() < 0.3 then MossStone else Stone
+						if kind == 0 then
+							grave(`Tomb{n}`, { 2.4, 3.2, 0.6 }, { 0, 1.6, 0 }, color, "Slate", true)
+							grave(`Tomb{n}Top`, { 1.6, 0.5, 0.6 }, { 0, 3.45, 0 }, color, "Slate")
+						elseif kind == 1 then
+							grave(`Tomb{n}`, { 0.7, 4, 0.6 }, { 0, 2, 0 }, color, "Slate", true)
+							grave(`Tomb{n}ArmLeft`, { 0.95, 0.7, 0.6 }, { -0.825, 2.9, 0 }, color, "Slate")
+							grave(`Tomb{n}ArmRight`, { 0.95, 0.7, 0.6 }, { 0.825, 2.9, 0 }, color, "Slate")
+						else
+							grave(`Tomb{n}`, { 2, 2.2, 0.8 }, { 0, 1.1, 0 }, color, "Slate", true)
+						end
+						grave(`Tomb{n}Mound`, { 2.2, 0.3, 3.4 }, { 0, 0.15, 2.2 }, Dirt, "Ground")
+					end
+				end
+			end
+		end
 	end
 	return parts
 end
@@ -517,12 +624,7 @@ end
 Scenery.Zones = {
 	PumpkinGraveyard = {
 		parts = pumpkinGraveyard,
-		roam = {
-			{ x = 0, z = 20, width = 100, depth = 150 }, -- the open middle
-			{ x = 72.5, z = -35, width = 45, depth = 40 }, -- in front of the pumpkin patch
-			{ x = 72.5, z = 50, width = 45, depth = 20 }, -- between the patch and the shed
-			{ x = -72.5, z = -42.5, width = 45, depth = 25 }, -- in front of the tombstones
-		},
+		roam = GraveyardPaths,
 	},
 } :: { [string]: Zone }
 
