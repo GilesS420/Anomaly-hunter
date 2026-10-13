@@ -816,7 +816,8 @@ end
 do
 	local ok, feetOk = true, true
 	for id, look in Looks do
-		ok = ok and Monsters[id] ~= nil and #look.pieces > 0
+		-- #look catches parts written after `pieces` closed (they'd silently never be built)
+		ok = ok and Monsters[id] ~= nil and #look.pieces > 0 and #(look :: any) == 0
 		local lowest = math.huge
 		for _, piece in look.pieces do
 			ok = ok and #piece.size == 3 and #piece.at == 3 and #piece.color == 3
