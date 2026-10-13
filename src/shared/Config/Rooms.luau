@@ -69,25 +69,39 @@ end
 -- start (the front end for side walls, the left end for the back wall).
 type Opening = { from: number, to: number, bottom: number, top: number, kind: string, name: string }
 
--- Colours for a room's walls; the Foyer's are the defaults.
-export type Theme = { wall: { number }?, panel: { number }?, trim: { number }?, frame: { number }? }
+-- Colours (and materials) for a room's walls; the Foyer's are the defaults.
+export type Theme = {
+	wall: { number }?,
+	panel: { number }?,
+	trim: { number }?,
+	frame: { number }?,
+	wallMaterial: string?, -- "Plaster" unless set
+	panelMaterial: string?, -- "WoodPlanks" unless set
+	trimMaterial: string?, -- "Wood" unless set
+}
 
 local function wallRun(parts: { Part }, side: string, length: number, openings: { Opening }, theme: Theme?)
 	local wallColor = theme and theme.wall or Wall
 	local panelColor = theme and theme.panel or Panel
 	local trimColor = theme and theme.trim or Trim
 	local windowFrame = theme and theme.frame or WallDark
+	local wallMaterial = theme and theme.wallMaterial or "Plaster"
+	local panelMaterial = theme and theme.panelMaterial or "WoodPlanks"
+	local trimMaterial = theme and theme.trimMaterial or "Wood"
+	local alongX = side == "Back" or side == "Front"
 	-- Turns a distance along the wall and a thickness offset into room-local x, z.
 	local function place(along: number, inward: number): (number, number)
 		if side == "Left" then
 			return -length / 2 + T / 2 + inward, -length / 2 + along
 		elseif side == "Right" then
 			return length / 2 - T / 2 - inward, -length / 2 + along
+		elseif side == "Front" then
+			return -length / 2 + along, -length / 2 + T / 2 + inward
 		end
 		return -length / 2 + along, length / 2 - T / 2 - inward
 	end
 	local function sized(alongSize: number, height: number, depth: number): { number }
-		if side == "Back" then
+		if alongX then
 			return { alongSize, height, depth }
 		end
 		return { depth, height, alongSize }
@@ -103,7 +117,7 @@ local function wallRun(parts: { Part }, side: string, length: number, openings: 
 			sized(to - from, top - bottom, T),
 			{ x, (bottom + top) / 2, z },
 			wallColor,
-			"Plaster",
+			wallMaterial,
 			true
 		)
 		-- Dark wainscot panelling on the lower part, facing into the room.
@@ -113,7 +127,7 @@ local function wallRun(parts: { Part }, side: string, length: number, openings: 
 				px,
 				(bottom + math.min(top, 3)) / 2,
 				pz,
-			}, panelColor, "WoodPlanks")
+			}, panelColor, panelMaterial)
 		end
 	end
 
@@ -129,13 +143,20 @@ local function wallRun(parts: { Part }, side: string, length: number, openings: 
 
 	-- Crown moulding along the top.
 	local tx, tz = place(length / 2, 0)
-	part(parts, side .. "Crown", sized(length, 0.6, T + 0.6), { tx, H + 0.3, tz }, trimColor, "Wood")
+	part(parts, side .. "Crown", sized(length, 0.6, T + 0.6), { tx, H + 0.3, tz }, trimColor, trimMaterial)
 	-- A chair rail where the panelling stops, broken at every doorway (and its frame).
 	local railFrom = 0
 	local function rail(i: number, to: number)
 		if to - railFrom > 0.01 then
 			local rx, rz = place((railFrom + to) / 2, T / 2 + 0.15)
-			part(parts, `{side}Rail{i}`, sized(to - railFrom, 0.25, 0.3), { rx, 3, rz }, trimColor, "Wood")
+			part(
+				parts,
+				`{side}Rail{i}`,
+				sized(to - railFrom, 0.25, 0.3),
+				{ rx, 3, rz },
+				trimColor,
+				trimMaterial
+			)
 		end
 	end
 	for i, opening in openings do
@@ -158,26 +179,26 @@ local function wallRun(parts: { Part }, side: string, length: number, openings: 
 			fx1,
 			(opening.bottom + opening.top) / 2,
 			fz1,
-		}, frameColor, "Wood")
+		}, frameColor, trimMaterial)
 		part(parts, opening.name .. "JambB", sized(0.5, opening.top - opening.bottom, T + 0.4), {
 			fx2,
 			(opening.bottom + opening.top) / 2,
 			fz2,
-		}, frameColor, "Wood")
+		}, frameColor, trimMaterial)
 		part(
 			parts,
 			opening.name .. "Head",
 			sized(width + 1, 0.6, T + 0.4),
 			{ cx, opening.top + 0.3, cz },
 			frameColor,
-			"Wood"
+			trimMaterial
 		)
 		if opening.kind == "Window" then
 			part(parts, opening.name .. "Ledge", sized(width + 0.6, 0.3, T + 0.8), {
 				cx,
 				opening.bottom - 0.15,
 				cz,
-			}, frameColor, "Wood")
+			}, frameColor, trimMaterial)
 			-- One loose board nailed across, crooked: haunted, but you can still see in.
 			local board = part(
 				parts,
@@ -187,7 +208,7 @@ local function wallRun(parts: { Part }, side: string, length: number, openings: 
 				Board,
 				"WoodPlanks"
 			)
-			board.rot = if side == "Back" then { 0, 0, 14 } else { 14, 0, 0 }
+			board.rot = if alongX then { 0, 0, 14 } else { 14, 0, 0 }
 		end
 	end
 end
@@ -1184,11 +1205,590 @@ function Rooms.Ballroom(width: number, depth: number, owned: { [string]: boolean
 	return parts
 end
 
--- Room recipes by wing id. Wings without one are still placeholders in MansionService.
+-- The shell of a back-row wing (Attic, Crypt): floor, an open archway in the front wall from
+-- the wing in front of it (plus a threshold over the gap), the other three walls with their
+-- openings, corner pillars, lanterns and cobwebs. Rooms add their own ceiling beams.
+local function backShell(
+	parts: { Part },
+	width: number,
+	depth: number,
+	theme: Theme,
+	floor: { number },
+	floorMaterial: string,
+	fromWing: string,
+	walls: { Left: { Opening }, Right: { Opening }, Back: { Opening } }
+)
+	local hw, hd = width / 2, depth / 2
+	part(parts, "Floor", { width, 1, depth }, { 0, -0.5, 0 }, floor, floorMaterial, true)
+	part(parts, "Threshold", { 8, 1, 2 }, { 0, -0.5, -hd - 1 }, Stone, "Slate", true)
+	wallRun(parts, "Front", width, {
+		{
+			from = width / 2 - 4,
+			to = width / 2 + 4,
+			bottom = 0,
+			top = 10,
+			kind = "Door",
+			name = `{fromWing}Archway`,
+		},
+	}, theme)
+	wallRun(parts, "Left", depth, walls.Left, theme)
+	wallRun(parts, "Right", depth, walls.Right, theme)
+	wallRun(parts, "Back", width, walls.Back, theme)
+	cornerPillars(parts, hw, hd)
+	wallLanterns(parts, hw, hd, 6.5)
+	cobwebs(parts, hw, hd)
+end
+
+-- A window opening on a side or back wall, centred `centre` studs from the wall's middle.
+local function window(
+	name: string,
+	length: number,
+	centre: number,
+	width: number,
+	bottom: number,
+	top: number
+): Opening
+	return {
+		from = length / 2 + centre - width / 2,
+		to = length / 2 + centre + width / 2,
+		bottom = bottom,
+		top = top,
+		kind = "Window",
+		name = name,
+	}
+end
+
+-- A straight stick (rafter, branch) from point `from`, heading `yaw` degrees around Y and
+-- climbing `up` degrees, `length` long. Its long axis is the part's X.
+local function stick(
+	parts: { Part },
+	name: string,
+	from: { number },
+	yaw: number,
+	up: number,
+	length: number,
+	thick: number,
+	color: { number },
+	material: string
+): { number }
+	local y, u = math.rad(yaw), math.rad(up)
+	local dx, dy, dz = math.cos(u) * math.cos(y), math.sin(u), -math.cos(u) * math.sin(y)
+	local p = part(parts, name, { length, thick, thick }, {
+		from[1] + dx * length / 2,
+		from[2] + dy * length / 2,
+		from[3] + dz * length / 2,
+	}, color, material)
+	p.rot = { 0, yaw, up }
+	return { from[1] + dx * length, from[2] + dy * length, from[3] + dz * length }
+end
+
+-- A shape draped in a dusty white sheet: the lump, a wider hem at the floor and a fold on top.
+local function sheeted(parts: { Part }, name: string, at: { number }, size: { number }, yaw: number)
+	local add = group(parts, at, yaw, 0)
+	local Sheet, SheetShade = { 196, 192, 182 }, { 168, 164, 156 }
+	add(name, { size[1], size[2] - 0.4, size[3] }, { 0, 0.4 + (size[2] - 0.4) / 2, 0 }, Sheet, "Fabric", true)
+	add(name .. "Hem", { size[1] + 0.4, 0.4, size[3] + 0.4 }, { 0, 0.2, 0 }, SheetShade, "Fabric")
+	add(
+		name .. "Fold",
+		{ size[1] * 0.7, 0.25, size[3] * 0.8 },
+		{ 0.15, size[2] + 0.12, 0.1 },
+		SheetShade,
+		"Fabric",
+		false,
+		4
+	)
+end
+
+-- The Attic (behind the Library): bare plank walls, a pitched frame of rafters over the open
+-- top, furniture under dusty sheets, an old rocking horse with red eyes, trunks, a dress form
+-- and stacked boxes.
+function Rooms.Attic(width: number, depth: number, owned: { [string]: boolean }): { Part }
+	local parts: { Part } = {}
+	local hw = width / 2
+	local Beam = { 66, 48, 34 }
+	backShell(
+		parts,
+		width,
+		depth,
+		{
+			wall = { 56, 44, 36 },
+			panel = { 40, 30, 24 },
+			trim = { 70, 52, 38 },
+			frame = { 44, 34, 28 },
+			wallMaterial = "WoodPlanks",
+		},
+		{ 62, 48, 36 },
+		"WoodPlanks",
+		"Library",
+		{
+			Left = { window("LeftWindow", depth, 0, 5, 5, 10) },
+			Right = { window("RightWindow", depth, 0, 5, 5, 10) },
+			Back = { window("BackWindow", width, 0, 6, 5, 11) },
+		}
+	)
+
+	-- The pitched roof frame: pairs of rafters from the wall tops up to a ridge beam.
+	local rise, run = 5, hw - T / 2
+	local length = math.sqrt(rise * rise + run * run)
+	local pitch = math.deg(math.atan(rise / run))
+	for i, z in { -15, -7.5, 0, 7.5, 15 } do
+		stick(parts, `RafterLeft{i}`, { -run, H + 1, z }, 0, pitch, length, 0.8, Beam, "Wood")
+		stick(parts, `RafterRight{i}`, { run, H + 1, z }, 180, pitch, length, 0.8, Beam, "Wood")
+	end
+	part(parts, "RidgeBeam", { 1.2, 1.2, depth - 4 }, { 0, H + 1 + rise, 0 }, Beam, "Wood")
+
+	-- Furniture under sheets along the walls.
+	sheeted(parts, "SheetWardrobe", { -14, 0, 15.5 }, { 4, 8, 2.4 }, 0)
+	sheeted(parts, "SheetArmchair", { -15, 0, 6 }, { 3, 3.6, 3 }, -70)
+	sheeted(parts, "SheetTable", { 9, 0, 13 }, { 6, 3.2, 4 }, 8)
+	sheeted(parts, "SheetMirror", { 15.5, 0, 14.5 }, { 3, 6.5, 1 }, 35)
+
+	-- The rocking horse: faded cream body and red saddle on stepped rockers, glowing red eyes.
+	local horse = group(parts, { -6, 0, -5 }, 35, 0)
+	local Cream, Faded, Mane = { 205, 192, 170 }, { 150, 40, 40 }, { 50, 36, 30 }
+	for i, sx in { -0.7, 0.7 } do
+		horse(`RockerMid{i}`, { 0.25, 0.25, 2.4 }, { sx, 0.15, 0 }, Mane, "Wood")
+		horse(`RockerFront{i}`, { 0.25, 0.25, 1.2 }, { sx, 0.35, -1.75 }, Mane, "Wood")
+		horse(`RockerBack{i}`, { 0.25, 0.25, 1.2 }, { sx, 0.35, 1.75 }, Mane, "Wood")
+		horse(`RockerTipFront{i}`, { 0.25, 0.25, 0.5 }, { sx, 0.6, -2.55 }, Mane, "Wood")
+		horse(`RockerTipBack{i}`, { 0.25, 0.25, 0.5 }, { sx, 0.6, 2.55 }, Mane, "Wood")
+		for j, sz in { -1.1, 1.1 } do
+			horse(`HorseLeg{i}_{j}`, { 0.3, 1.6, 0.3 }, { sx * 0.6, 1.07, sz }, Cream, "Wood")
+		end
+	end
+	horse("HorseBody", { 1.2, 1, 3 }, { 0, 2.35, 0 }, Cream, "Wood", true)
+	horse("HorseSaddle", { 1.3, 0.2, 1 }, { 0, 2.95, 0.1 }, Faded, "Fabric")
+	horse("HorseNeck", { 0.8, 1.4, 0.8 }, { 0, 3.3, -1.3 }, Cream, "Wood")
+	horse("HorseHead", { 0.8, 0.9, 1.6 }, { 0, 4.1, -1.8 }, Cream, "Wood")
+	horse("HorseMane", { 0.3, 1.5, 0.6 }, { 0, 3.6, -0.95 }, Mane, "Fabric")
+	horse("HorseEyeL", { 0.1, 0.2, 0.2 }, { -0.45, 4.25, -2.1 }, { 255, 40, 40 }, "Neon")
+	horse("HorseEyeR", { 0.1, 0.2, 0.2 }, { 0.45, 4.25, -2.1 }, { 255, 40, 40 }, "Neon")
+	horse("HorseTail", { 0.3, 1.2, 0.3 }, { 0, 2.1, 1.65 }, Mane, "Fabric")
+	horse("HorseHandle", { 1.4, 0.2, 0.2 }, { 0, 4, -1.5 }, Mane, "Wood")
+
+	-- Two old trunks against the right wall, and a creepy dress form in the corner.
+	local TrunkWood, Band = { 70, 44, 30 }, { 130, 100, 50 }
+	for i, z in { -10, -5.5 } do
+		local trunk = group(parts, { hw - T - 1.6, 0, z }, 90, 0)
+		trunk(`Trunk{i}`, { 3.6, 1.8, 2.2 }, { 0, 0.9, 0 }, TrunkWood, "WoodPlanks", true)
+		trunk(`TrunkLid{i}`, { 3.7, 0.5, 2.3 }, { 0, 2.05, 0 }, TrunkWood, "Wood")
+		trunk(`TrunkBandA{i}`, { 0.25, 2.35, 2.35 }, { -1.2, 1.17, 0 }, Band, "Metal")
+		trunk(`TrunkBandB{i}`, { 0.25, 2.35, 2.35 }, { 1.2, 1.17, 0 }, Band, "Metal")
+		trunk(`TrunkLock{i}`, { 0.4, 0.5, 0.15 }, { 0, 1.75, -1.2 }, Band, "Metal")
+	end
+	local form = group(parts, { 13, 0, -14.5 }, -30, 0)
+	form("DressFormFoot", { 1.6, 0.2, 1.6 }, { 0, 0.1, 0 }, Mane, "Wood")
+	form("DressFormPole", { 0.25, 3, 0.25 }, { 0, 1.7, 0 }, Mane, "Wood")
+	form("DressFormTorso", { 1.6, 2.4, 1 }, { 0, 4.3, 0 }, { 60, 50, 62 }, "Fabric")
+	form("DressFormWaist", { 1.2, 0.5, 0.8 }, { 0, 3, 0 }, { 60, 50, 62 }, "Fabric")
+	form("DressFormNeck", { 0.5, 0.6, 0.5 }, { 0, 5.8, 0 }, Mane, "Wood")
+
+	-- A stack of boxes in the front-left corner.
+	local Box = { 120, 92, 62 }
+	part(parts, "BoxA", { 2.4, 2, 2.2 }, { -15.5, 1, -14.5 }, Box, "Wood", true)
+	part(parts, "BoxB", { 2.2, 1.8, 2 }, { -12.9, 0.9, -15 }, { 108, 82, 56 }, "Wood", true)
+	part(parts, "BoxC", { 1.8, 1.4, 1.8 }, { -15.3, 2.7, -14.4 }, { 132, 102, 70 }, "Wood").rot = { 0, 18, 0 }
+	return parts
+end
+
+-- A cluster of candles of different heights with one light.
+local function candles(parts: { Part }, name: string, x: number, y: number, z: number, light: boolean)
+	for i, c in { { -0.35, 1.1, 0.1 }, { 0.3, 0.7, -0.2 }, { 0.05, 0.5, 0.4 }, { -0.1, 0.9, -0.45 } } do
+		part(
+			parts,
+			`{name}{i}`,
+			{ 0.3, c[2], 0.3 },
+			{ x + c[1], y + c[2] / 2, z + c[3] },
+			{ 225, 220, 200 },
+			"SmoothPlastic"
+		)
+		local flame = part(
+			parts,
+			`{name}Flame{i}`,
+			{ 0.18, 0.28, 0.18 },
+			{ x + c[1], y + c[2] + 0.14, z + c[3] },
+			LanternGlow,
+			"Neon"
+		)
+		if i == 1 and light then
+			flame.light = { color = { 255, 170, 80 }, range = 12, brightness = 0.8 }
+		end
+	end
+end
+
+-- The Crypt (behind the Ballroom): stone walls and floor, stone coffins with their heads to
+-- the walls (one lid pushed open, green light and a bony hand inside), skulls in wall niches,
+-- candles, chains hanging from stone ribs, and an iron gate in the back wall with a sickly
+-- green glow behind it.
+function Rooms.Crypt(width: number, depth: number, owned: { [string]: boolean }): { Part }
+	local parts: { Part } = {}
+	local hw, hd = width / 2, depth / 2
+	local CoffinStone, CoffinDark, Bone, Green =
+		{ 88, 86, 92 }, { 66, 64, 70 }, { 215, 205, 180 }, { 90, 255, 140 }
+	local gateW, gateTop = 6, 9
+	backShell(
+		parts,
+		width,
+		depth,
+		{
+			wall = { 50, 52, 56 },
+			panel = { 38, 40, 44 },
+			trim = { 70, 72, 76 },
+			frame = { 44, 46, 50 },
+			wallMaterial = "Slate",
+			panelMaterial = "Slate",
+			trimMaterial = "Slate",
+		},
+		{ 40, 42, 46 },
+		"Slate",
+		"Ballroom",
+		{
+			Left = {},
+			Right = {},
+			Back = {
+				{
+					from = hw - gateW / 2,
+					to = hw + gateW / 2,
+					bottom = 0,
+					top = gateTop,
+					kind = "Door",
+					name = "GreenGate",
+				},
+			},
+		}
+	)
+
+	-- Stone ribs across the open top, with chains hanging down.
+	for i, z in { -8, 8 } do
+		part(parts, `Rib{i}`, { width - 2 * T, 1, 1 }, { 0, H - 0.5, z }, CoffinDark, "Slate")
+		for j, x in { -9, -3, 4, 10 } do
+			local long = 2 + ((i + j) % 3)
+			part(parts, `Chain{i}_{j}`, { 0.2, long, 0.2 }, { x, H - 1 - long / 2, z }, Iron, "Metal")
+		end
+	end
+
+	-- The gate: iron bars in the opening, a green glow behind, chains and a padlock.
+	local gz = hd - T / 2
+	local glow = part(parts, "GateGlow", { gateW, gateTop, 0.2 }, { 0, gateTop / 2, hd - 0.1 }, Green, "Neon")
+	glow.transparency = 0.25
+	glow.light = { color = { 90, 255, 140 }, range = 22, brightness = 1.2 }
+	for i = 0, 7 do
+		local x = -gateW / 2 + 0.4 + i * (gateW - 0.8) / 7
+		part(parts, `GateBar{i}`, { 0.25, 7.6, 0.25 }, { x, 3.8, gz - 0.2 }, Iron, "Metal", true)
+		part(parts, `GateSpike{i}`, { 0.35, 0.5, 0.35 }, { x, 7.85, gz - 0.2 }, Iron, "Metal")
+	end
+	for i, y in { 1.2, 4.6, 7.6 } do
+		part(parts, `GateRail{i}`, { gateW - 0.5, 0.3, 0.3 }, { 0, y, gz - 0.2 }, Iron, "Metal")
+	end
+	for i, tilt in { 30, -30 } do
+		local chain = part(
+			parts,
+			`GateChain{i}`,
+			{ 3.4, 0.2, 0.15 },
+			{ 0, 4.2, gz - 0.45 },
+			{ 70, 70, 76 },
+			"Metal"
+		)
+		chain.rot = { 0, 0, tilt }
+	end
+	part(parts, "GatePadlock", { 0.7, 0.8, 0.3 }, { 0, 3.9, gz - 0.6 }, Brass, "Metal")
+
+	-- Stone coffins with their heads against the side walls.
+	local function coffin(name: string, x: number, z: number, open: boolean)
+		local s = if x < 0 then -1 else 1 -- which wall the head is against
+		part(parts, name .. "Plinth", { 7.4, 0.4, 3.8 }, { x, 0.2, z }, CoffinDark, "Slate", true)
+		part(parts, name, { 7, 2, 3.4 }, { x, 1.4, z }, CoffinStone, "Slate", true)
+		if open then
+			part(parts, name .. "Inside", { 6.4, 0.05, 2.8 }, { x, 2.42, z }, { 16, 16, 18 }, "Slate")
+			local inside = part(parts, name .. "Glow", { 5.6, 0.05, 2.2 }, { x, 2.45, z }, Green, "Neon")
+			inside.transparency = 0.35
+			inside.light = { color = { 90, 255, 140 }, range = 10, brightness = 0.8 }
+			-- The lid pushed half off, resting crooked on the far edge.
+			local lid = part(
+				parts,
+				name .. "Lid",
+				{ 7.2, 0.5, 3.6 },
+				{ x - s * 0.6, 2.67, z + 1.6 },
+				CoffinStone,
+				"Slate"
+			)
+			lid.rot = { 0, 14, 0 }
+			-- A bony hand reaching over the edge.
+			part(
+				parts,
+				name .. "HandBone",
+				{ 0.3, 0.3, 1.2 },
+				{ x - s * 1.2, 2.6, z - 1.5 },
+				Bone,
+				"SmoothPlastic"
+			)
+			for f = 1, 3 do
+				part(parts, `{name}Finger{f}`, { 0.12, 0.6, 0.12 }, {
+					x - s * 1.2 + (f - 2) * 0.18,
+					2.3,
+					z - 2.05,
+				}, Bone, "SmoothPlastic")
+			end
+		else
+			part(parts, name .. "Lid", { 7.2, 0.5, 3.6 }, { x, 2.65, z }, CoffinStone, "Slate")
+			part(parts, name .. "CrossLong", { 3, 0.12, 0.4 }, { x - s * 0.3, 2.96, z }, CoffinDark, "Slate")
+			part(
+				parts,
+				name .. "CrossShort",
+				{ 0.4, 0.12, 1.8 },
+				{ x + s * 0.5, 2.96, z },
+				CoffinDark,
+				"Slate"
+			)
+		end
+	end
+	local cx = hw - T - 0.4 - 3.7
+	coffin("CoffinRightA", cx, -10, false)
+	coffin("CoffinRightB", cx, 0.5, true)
+	coffin("CoffinRightC", cx, 11, false)
+	coffin("CoffinLeftA", -cx, -10, false)
+	coffin("CoffinLeftB", -cx, 11, false)
+
+	-- Niches with skulls above the coffins, and candles between them.
+	for i, spot in { { -1, -10 }, { -1, 11 }, { 1, -10 }, { 1, 0.5 }, { 1, 11 } } do
+		local x = spot[1] * (hw - T - 0.08)
+		part(parts, `Niche{i}`, { 0.15, 1.6, 2.2 }, { x, 9.5, spot[2] }, { 18, 18, 20 }, "Slate")
+		part(
+			parts,
+			`NicheShelf{i}`,
+			{ 0.8, 0.2, 2.4 },
+			{ x - spot[1] * 0.4, 8.6, spot[2] },
+			CoffinDark,
+			"Slate"
+		)
+		part(
+			parts,
+			`Skull{i}`,
+			{ 0.8, 0.75, 0.8 },
+			{ x - spot[1] * 0.5, 9.08, spot[2] },
+			Bone,
+			"SmoothPlastic"
+		)
+		part(
+			parts,
+			`SkullEyes{i}`,
+			{ 0.1, 0.2, 0.55 },
+			{ x - spot[1] * 0.92, 9.15, spot[2] },
+			{ 18, 18, 20 },
+			"SmoothPlastic"
+		)
+	end
+	candles(parts, "CandlesGateL", -4.5, 0, hd - T - 1, true)
+	candles(parts, "CandlesGateR", 4.5, 0, hd - T - 1, false)
+	candles(parts, "CandlesLeft", -cx + 1, 0, 3, true)
+	candles(parts, "CandlesCoffin", cx + 1.5, 2.9, 11, false)
+	return parts
+end
+
+-- A lamp post: an iron post with a lantern on top.
+local function lampPost(parts: { Part }, name: string, x: number, z: number)
+	part(parts, name .. "Base", { 1, 0.6, 1 }, { x, 0.3, z }, Iron, "Metal", true)
+	part(parts, name .. "Post", { 0.4, 6.4, 0.4 }, { x, 3.5, z }, Iron, "Metal", true)
+	lantern(parts, name, x, 7.4, z, { 0, 0 })
+end
+
+-- A dead tree: a leaning trunk and bare, crooked branches.
+local function deadTree(parts: { Part }, name: string, x: number, z: number, turn: number)
+	local Bark = { 52, 42, 36 }
+	part(parts, name .. "Roots", { 2.4, 0.6, 2.4 }, { x, 0.3, z }, Bark, "Wood", true)
+	local top = stick(parts, name .. "Trunk", { x, 0, z }, turn, 82, 8, 1.4, Bark, "Wood")
+	local mid = { x + (top[1] - x) * 0.6, top[2] * 0.6, z + (top[3] - z) * 0.6 }
+	stick(parts, name .. "BranchA", mid, turn + 70, 35, 4, 0.6, Bark, "Wood")
+	local b = stick(parts, name .. "BranchB", top, turn - 50, 40, 4.5, 0.6, Bark, "Wood")
+	stick(parts, name .. "BranchC", top, turn + 140, 25, 4, 0.5, Bark, "Wood")
+	stick(parts, name .. "TwigA", b, turn - 10, 60, 2, 0.3, Bark, "Wood")
+	stick(parts, name .. "TwigB", b, turn - 100, 10, 1.8, 0.3, Bark, "Wood")
+	stick(parts, name .. "BranchD", mid, turn - 160, 20, 3, 0.5, Bark, "Wood")
+end
+
+-- The Garden (behind the Foyer): an outdoor room of dead grass inside tall hedges, a dry
+-- fountain with a headless angel, cobbled paths, two dead trees, gravestones in rows and
+-- iron lamp posts. The front hedge has a gap under an iron arch facing the Foyer's back door.
+function Rooms.Garden(width: number, depth: number, owned: { [string]: boolean }): { Part }
+	local parts: { Part } = {}
+	local hw, hd = width / 2, depth / 2
+	local Hedge, Cobble, Dirt = { 30, 44, 30 }, { 72, 70, 74 }, { 58, 44, 32 }
+	local FountainStone = { 104, 102, 108 }
+	part(parts, "Floor", { width, 1, depth }, { 0, -0.5, 0 }, { 50, 54, 36 }, "Grass", true)
+	part(parts, "Threshold", { 8, 1, 2 }, { 0, -0.5, -hd - 1 }, Stone, "Slate", true)
+	cornerPillars(parts, hw, hd)
+
+	-- Hedges between the corner pillars, with a gap at the front under an iron arch.
+	local inner = hw - 2.5 -- where the pillar bases stop
+	part(parts, "HedgeLeft", { 2, 4.5, 2 * inner }, { -hw + 1.5, 2.25, 0 }, Hedge, "Grass", true)
+	part(parts, "HedgeRight", { 2, 4.5, 2 * inner }, { hw - 1.5, 2.25, 0 }, Hedge, "Grass", true)
+	part(parts, "HedgeBack", { 2 * inner, 4.5, 2 }, { 0, 2.25, hd - 1.5 }, Hedge, "Grass", true)
+	local gap = 4.5
+	for i, s in { -1, 1 } do
+		part(
+			parts,
+			`HedgeFront{i}`,
+			{ inner - gap, 4.5, 2 },
+			{ s * (gap + inner) / 2, 2.25, -hd + 1.5 },
+			Hedge,
+			"Grass",
+			true
+		)
+		part(
+			parts,
+			`ArchPost{i}`,
+			{ 0.6, 7.5, 0.6 },
+			{ s * (gap - 0.3), 3.75, -hd + 1.5 },
+			Iron,
+			"Metal",
+			true
+		)
+	end
+	part(parts, "ArchTop", { 2 * gap, 0.5, 0.5 }, { 0, 7.75, -hd + 1.5 }, Iron, "Metal")
+	part(parts, "ArchCrest", { gap, 0.4, 0.4 }, { 0, 8.45, -hd + 1.5 }, Iron, "Metal")
+	part(parts, "ArchSpike", { 0.4, 1, 0.4 }, { 0, 9.1, -hd + 1.5 }, Iron, "Metal")
+
+	-- Cobbled path from the arch to the fountain, and a square path around it.
+	local fz = 2 -- fountain centre
+	part(
+		parts,
+		"PathFront",
+		{ 3, 0.1, hd - 0.5 + fz - 8 },
+		{ 0, 0.05, (-hd + 0.5 + fz - 8) / 2 },
+		Cobble,
+		"Cobblestone"
+	)
+	for i, side in { { 0, -1 }, { 0, 1 }, { -1, 0 }, { 1, 0 } } do
+		local size = if side[1] == 0 then { 16, 0.1, 2 } else { 2, 0.1, 12 }
+		part(parts, `PathRing{i}`, size, { side[1] * 7, 0.05, fz + side[2] * 7 }, Cobble, "Cobblestone")
+	end
+
+	-- The dry fountain: a square basin with cracked dirt and dead leaves, a pedestal and bowl,
+	-- and a weeping angel whose head has broken off (it lies in the basin).
+	for i, side in { { 0, -1 }, { 0, 1 }, { -1, 0 }, { 1, 0 } } do
+		local size = if side[1] == 0 then { 11.6, 1.5, 0.8 } else { 0.8, 1.5, 10 }
+		part(
+			parts,
+			`Basin{i}`,
+			size,
+			{ side[1] * 5.4, 0.75, fz + side[2] * 5.4 },
+			FountainStone,
+			"Slate",
+			true
+		)
+	end
+	part(parts, "BasinDirt", { 10, 0.2, 10 }, { 0, 0.1, fz }, Dirt, "Ground")
+	for i, crack in { { -2, 1, 30 }, { 2.5, -1.5, -40 }, { 1, 3, 75 } } do
+		local line = part(
+			parts,
+			`BasinCrack{i}`,
+			{ 3, 0.04, 0.12 },
+			{ crack[1], 0.21, fz + crack[2] },
+			{ 30, 22, 16 },
+			"Ground"
+		)
+		line.rot = { 0, crack[3], 0 }
+	end
+	local roll = dice(5)
+	for i = 1, 8 do
+		local leaf = part(parts, `DeadLeaf{i}`, { 0.5, 0.05, 0.35 }, {
+			roll() * 8 - 4,
+			0.23,
+			fz + roll() * 8 - 4,
+		}, if i % 2 == 0 then { 120, 70, 30 } else { 90, 54, 30 }, "Fabric")
+		leaf.rot = { 0, roll() * 180, 0 }
+	end
+	part(parts, "Pedestal", { 1.4, 3, 1.4 }, { 0, 1.7, fz }, FountainStone, "Slate", true)
+	part(parts, "Bowl", { 4, 0.6, 4 }, { 0, 3.5, fz }, FountainStone, "Slate")
+	part(parts, "BowlRim", { 4.4, 0.3, 4.4 }, { 0, 3.95, fz }, { 92, 96, 84 }, "Slate")
+	part(parts, "AngelBody", { 1, 2.4, 0.8 }, { 0, 5.3, fz }, FountainStone, "Slate")
+	part(parts, "AngelNeck", { 0.4, 0.3, 0.4 }, { 0, 6.65, fz }, FountainStone, "Slate")
+	for i, s in { -1, 1 } do
+		local wing = part(
+			parts,
+			`AngelWing{i}`,
+			{ 0.25, 2.2, 1.4 },
+			{ s * 0.65, 5.7, fz + 0.6 },
+			FountainStone,
+			"Slate"
+		)
+		wing.rot = { -20, s * 25, 0 }
+		local arm = part(
+			parts,
+			`AngelArm{i}`,
+			{ 0.3, 1.4, 0.3 },
+			{ s * 0.25, 5.9, fz - 0.55 },
+			FountainStone,
+			"Slate"
+		)
+		arm.rot = { 50, 0, s * -15 } -- hands over its face, weeping
+	end
+	part(parts, "AngelHead", { 0.8, 0.8, 0.8 }, { 2.4, 0.6, fz - 2.5 }, FountainStone, "Slate").rot =
+		{ 20, 35, 70 }
+	part(parts, "Moss", { 1.2, 0.08, 1.4 }, { -1.2, 4.14, fz + 0.8 }, { 60, 84, 46 }, "Grass")
+
+	-- Two dead trees at the front corners.
+	deadTree(parts, "TreeLeft", -13, -12, 20)
+	deadTree(parts, "TreeRight", 13.5, -13, 160)
+
+	-- Gravestones in rows at the back, some crooked, each with a mound of dirt in front.
+	-- A gravestone leaning `lean` degrees forward (+) or back (-), pivoting at the ground.
+	local function grave(name: string, x: number, z: number, kind: number, lean: number)
+		part(parts, name .. "Mound", { 1.8, 0.3, 3 }, { x, 0.15, z - 1.9 }, Dirt, "Ground")
+		local a = math.rad(-lean)
+		local function piece(
+			suffix: string,
+			size: { number },
+			height: number,
+			color: { number },
+			solid: boolean?
+		)
+			-- `height` is the piece's centre above the ground before leaning.
+			local p = part(parts, name .. suffix, size, {
+				x,
+				height * math.cos(a),
+				z + height * math.sin(a),
+			}, color, "Slate", solid)
+			if lean ~= 0 then
+				p.rot = { -lean, 0, 0 }
+			end
+		end
+		if kind == 1 then
+			piece("", { 2, 2.6, 0.5 }, 1.3, Stone, true)
+			piece("Top", { 1.4, 0.4, 0.5 }, 2.8, Stone)
+		elseif kind == 2 then
+			piece("", { 0.5, 3, 0.4 }, 1.5, StoneDark, true)
+			piece("Arm", { 1.8, 0.5, 0.4 }, 2.2, StoneDark)
+		else
+			piece("", { 1.6, 1.8, 0.6 }, 0.9, { 82, 80, 88 }, true)
+		end
+	end
+	grave("GraveA", -15, 14, 1, 0)
+	grave("GraveB", -11, 14.5, 2, 6)
+	grave("GraveC", -7, 14, 3, -4)
+	grave("GraveD", 7, 14, 1, -3)
+	grave("GraveE", 11, 14.5, 3, 0)
+	grave("GraveF", 15, 14, 2, -8)
+	grave("GraveG", -14, 8, 3, 5)
+	grave("GraveH", -10, 8.5, 1, 0)
+	grave("GraveI", 10, 8.5, 2, 0)
+	grave("GraveJ", 14, 8, 1, 7)
+
+	-- Lamp posts beside the path and behind the fountain.
+	lampPost(parts, "LampLeft", -3.2, -13)
+	lampPost(parts, "LampRight", 3.2, -13)
+	lampPost(parts, "LampBack", 0, 15)
+	return parts
+end
+
+-- Room recipes by wing id. A wing without one is built as a placeholder by MansionService.
 Rooms.ByWing = {
 	Foyer = Rooms.Foyer,
 	Library = Rooms.Library,
 	Ballroom = Rooms.Ballroom,
+	Attic = Rooms.Attic,
+	Crypt = Rooms.Crypt,
+	Garden = Rooms.Garden,
 } :: { [string]: (width: number, depth: number, owned: { [string]: boolean }) -> { Part } }
 
 return Rooms
