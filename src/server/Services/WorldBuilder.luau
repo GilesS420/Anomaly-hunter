@@ -5,16 +5,20 @@
 --   Workspace.Hub.Ground             the oval floor of the hub
 --   Workspace.Hub.Plots.Plot1..8     mansion plots (each built one by one if missing)
 --   Workspace.Hub.ZoneGates.<ZoneId> a glowing gate per zone
+--   Workspace.Hub.GateArches.<ZoneId> the stone archway round each gate (Config/Scenery); locked
+--                                    zones get a boarded-up arch with no gate
 --   Workspace.Hub.ReturnPoint        where hunters land when they have no plot
 --   Workspace.Hub.Landmarks.<Name>   Watcher Square, Collector, Trading Booth, Bakery, Workshop
 --                                    (the ones with a recipe in Config/Landmarks are built in full)
---   Workspace.Zones.<ZoneId>         a floating island per zone (only if that zone folder is missing)
+--   Workspace.Zones.<ZoneId>         a floating island per zone (only if that zone folder is missing),
+--                                    with its scenery from Config/Scenery when it has one
 -- Positions and sizes come from Shared.Config.Layout.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Landmarks = require(ReplicatedStorage.Shared.Config.Landmarks)
 local Layout = require(ReplicatedStorage.Shared.Config.Layout)
+local Scenery = require(ReplicatedStorage.Shared.Config.Scenery)
 local Zones = require(ReplicatedStorage.Shared.Config.Zones)
 local Recipe = require(script.Parent.Parent.Recipe)
 local World = require(script.Parent.Parent.World)
@@ -215,6 +219,31 @@ local function buildPlots(hub: Instance)
 	end
 end
 
+-- Builds a recipe into a new Model named `name`, placed relative to `base`.
+local function recipeModel(name: string, parts: { any }, base: CFrame, parent: Instance): Model
+	local model = Instance.new("Model")
+	model.Name = name
+	Recipe.build(parts, base, model)
+	model.Parent = parent
+	return model
+end
+
+-- The archway round each zone gate, facing the hub (west) like the gate. Zones that haven't
+-- launched get a boarded-up arch and no gate.
+local function buildArches(hub: Instance)
+	local arches = folderAt(hub, "GateArches", "Hub.GateArches")
+	local size = Layout.GateSize
+	for _, zone in Zones.List do
+		local spot = Layout.Gates[zone.index]
+		if spot and not World.find(arches, zone.id) then
+			local ground = Vector3.new(spot.x, GroundTop, spot.z)
+			local parts = Scenery.Arch(zone.id, size.width, size.height, size.thickness, not zone.launch)
+			recipeModel(zone.id, parts, CFrame.lookAt(ground, ground - Vector3.xAxis), arches)
+			table.insert(built, `Hub.GateArches.{zone.id}`)
+		end
+	end
+end
+
 local function buildGates(hub: Instance)
 	local gates = folderAt(hub, "ZoneGates", "Hub.ZoneGates")
 	local size = Layout.GateSize
@@ -243,6 +272,7 @@ local function buildGates(hub: Instance)
 			table.insert(built, `Hub.ZoneGates.{zone.id}`)
 		end
 	end
+	buildArches(hub)
 end
 
 local function buildReturnPoint(hub: Instance)
@@ -332,6 +362,18 @@ local function buildLandmarks(hub: Instance)
 	end
 end
 
+-- A plain island an earlier version built (floor, walls, roam area, arrival and exit and
+-- nothing else). If one was saved into the place, it makes way for the new zone.
+local placeholderParts = { Floor = true, Walls = true, RoamArea = true, Arrival = true, Exit = true }
+local function isPlaceholderZone(folder: Instance): boolean
+	for _, child in folder:GetChildren() do
+		if not placeholderParts[child.Name] then
+			return false
+		end
+	end
+	return true
+end
+
 -- A floating island for a zone. Zone-local (x, z) is an offset from Layout.Zones[index];
 -- +z runs away from the arrival side.
 local function buildZone(zonesFolder: Instance, zone: Zones.Zone)
@@ -345,6 +387,7 @@ local function buildZone(zonesFolder: Instance, zone: Zones.Zone)
 		return CFrame.new(center.x + x, y, center.z + z)
 	end
 
+	local scenery = Scenery.Zones[zone.id]
 	local folder = Instance.new("Folder")
 	folder.Name = zone.id
 
@@ -366,24 +409,34 @@ local function buildZone(zonesFolder: Instance, zone: Zones.Zone)
 	}
 	for _, spec in wallSpecs do
 		local wall = block(spec.name, spec.size, spec.cframe, theme.wall, Enum.Material.Glass)
-		wall.Transparency = 0.5
+		-- With scenery, its fence is what you see; the wall only stops you falling off.
+		wall.Transparency = if scenery then 1 else 0.5
 		wall.CastShadow = false
 		wall.Parent = walls
 	end
 	walls.Parent = folder
 
-	-- Where monsters wander: invisible, top flush with the floor.
-	local roam = Layout.ZoneRoamArea
-	local roamArea = block(
-		"RoamArea",
-		Vector3.new(roam.width, 1, roam.depth),
-		at(roam.x, top - 0.5, roam.z),
-		theme.glow,
-		Enum.Material.SmoothPlastic
-	)
-	roamArea.Transparency = 1
-	ghost(roamArea)
-	roamArea.Parent = folder
+	-- Where monsters wander: invisible, top flush with the floor. With scenery, a few
+	-- rectangles of open ground between the props (SpawnService uses every part inside).
+	local rects = if scenery then scenery.roam else { Layout.ZoneRoamArea }
+	local roamFolder: Instance = folder
+	if scenery then
+		roamFolder = Instance.new("Folder")
+		roamFolder.Name = "RoamArea"
+		roamFolder.Parent = folder
+	end
+	for i, roam in rects do
+		local roamArea = block(
+			if scenery then `Ground{i}` else "RoamArea",
+			Vector3.new(roam.width, 1, roam.depth),
+			at(roam.x, top - 0.5, roam.z),
+			theme.glow,
+			Enum.Material.SmoothPlastic
+		)
+		roamArea.Transparency = 1
+		ghost(roamArea)
+		roamArea.Parent = roamFolder
+	end
 
 	-- Where hunters appear: a flat glowing pad.
 	local arrivalSpot = Layout.ZoneArrival
@@ -415,6 +468,20 @@ local function buildZone(zonesFolder: Instance, zone: Zones.Zone)
 	label(exit, "Exit — bring your catch home", nil, 8, 120)
 	exit.Parent = folder
 
+	-- The archway round the exit, matching this zone's gate in the hub.
+	local exitGround = at(exitSpot.x, top, exitSpot.z).Position
+	local portal = Scenery.ExitPortal
+	recipeModel(
+		"ExitArch",
+		Scenery.Arch(zone.id, portal.width, portal.height, portal.thickness, false),
+		CFrame.lookAt(exitGround, exitGround + Vector3.zAxis),
+		folder
+	)
+
+	if scenery then
+		recipeModel("Scenery", scenery.parts(), at(0, top, 0), folder)
+	end
+
 	folder.Parent = zonesFolder
 	table.insert(built, `Zones.{zone.id}`)
 end
@@ -434,7 +501,12 @@ function WorldBuilder.start()
 
 	local zonesFolder = folderAt(workspace, "Zones", "Zones")
 	for _, zone in Zones.List do
-		if zone.launch and not World.find(zonesFolder, zone.id) then
+		local existing = World.find(zonesFolder, zone.id)
+		if existing and zone.launch and isPlaceholderZone(existing) then
+			existing:Destroy()
+			existing = nil
+		end
+		if zone.launch and not existing then
 			buildZone(zonesFolder, zone)
 		end
 	end

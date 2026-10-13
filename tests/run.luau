@@ -25,6 +25,7 @@ local Attacks = require("../src/shared/Util/Attacks")
 local Landmarks = require("../src/shared/Config/Landmarks")
 local Looks = require("../src/shared/Config/Looks")
 local Rooms = require("../src/shared/Config/Rooms")
+local Scenery = require("../src/shared/Config/Scenery")
 local Travel = require("../src/shared/Util/Travel")
 local TravelConfig = require("../src/shared/Config/Travel")
 
@@ -954,6 +955,89 @@ do
 		end
 	end
 	check("the middle of Watcher Square is clear for the Watcher's meter", clear)
+end
+
+-- Portals and zone scenery: every part is sized, uses a real material and is named once,
+-- zone props stay inside the fence and off the ground monsters roam, and that ground stays
+-- clear of the arrival pad and the exit.
+do
+	local materials = {
+		WoodPlanks = true,
+		Wood = true,
+		Slate = true,
+		Metal = true,
+		Neon = true,
+		Fabric = true,
+		SmoothPlastic = true,
+		Glass = true,
+		Cobblestone = true,
+		Ground = true,
+		Grass = true,
+	}
+	local function valid(parts: { Rooms.Part }, limit: number): boolean
+		local ok, names = true, {}
+		for _, p in parts do
+			ok = ok and #p.size == 3 and #p.at == 3 and #p.color == 3 and materials[p.material] == true
+			ok = ok and math.abs(p.at[1]) <= limit and math.abs(p.at[3]) <= limit
+			if names[p.name] then
+				ok = false
+				print(`  two parts named {p.name}`)
+			end
+			names[p.name] = true
+		end
+		return ok
+	end
+	local hub, exit = Scenery.HubPortal, Scenery.ExitPortal
+	check(
+		"the hub portal matches the gate size",
+		hub.width == Layout.GateSize.width
+			and hub.height == Layout.GateSize.height
+			and hub.thickness == Layout.GateSize.thickness
+	)
+	for _, zone in require("../src/shared/Config/Zones").List do
+		check(
+			`{zone.id} arches are sized and named once`,
+			valid(Scenery.Arch(zone.id, hub.width, hub.height, hub.thickness, not zone.launch), 20)
+				and valid(Scenery.Arch(zone.id, exit.width, exit.height, exit.thickness, false), 20)
+		)
+	end
+	local function inside(
+		x: number,
+		z: number,
+		r: { x: number, z: number, width: number, depth: number },
+		pad: number
+	)
+		return math.abs(x - r.x) < r.width / 2 + pad and math.abs(z - r.z) < r.depth / 2 + pad
+	end
+	for id, zone in Scenery.Zones do
+		local parts = zone.parts()
+		check(
+			`{id} parts are sized, named once and inside the fence`,
+			valid(parts, Layout.ZoneSize.x / 2 - 1)
+		)
+		local clear = true
+		for _, p in parts do
+			if p.solid and not string.find(p.name, "^Fence") then
+				local reach = math.max(p.size[1], p.size[3]) / 2
+				for _, r in zone.roam do
+					if inside(p.at[1], p.at[3], r, reach) then
+						clear = false
+						print(`  {id}: {p.name} stands on the monsters' ground`)
+					end
+				end
+			end
+		end
+		check(`{id} props stay off the monsters' ground`, clear)
+		local roomy = true
+		for _, r in zone.roam do
+			roomy = roomy
+				and math.abs(r.x) + r.width / 2 <= Layout.ZoneSize.x / 2
+				and math.abs(r.z) + r.depth / 2 <= Layout.ZoneSize.z / 2
+				and not inside(Layout.ZoneArrival.x, Layout.ZoneArrival.z, r, 5)
+				and not inside(Layout.ZoneExit.x, Layout.ZoneExit.z, r, 5)
+		end
+		check(`{id} roaming ground is inside the zone and clear of the arrival and exit`, roomy)
+	end
 end
 
 -- Fast travel and the faster hub walk.
