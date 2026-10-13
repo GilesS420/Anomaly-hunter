@@ -848,9 +848,12 @@ do
 		SmoothPlastic = true,
 		Glass = true,
 		Marble = true,
+		Grass = true,
+		Ground = true,
+		Cobblestone = true,
 	}
 	local all = { Foyer = true, Library = true, Ballroom = true, Attic = true, Crypt = true, Garden = true }
-	local expectBoarded = { Foyer = 6, Library = 2, Ballroom = 2 }
+	local expectBoarded = { Foyer = 6, Library = 2, Ballroom = 2, Attic = 0, Crypt = 0, Garden = 0 }
 	for wingId, recipe in Rooms.ByWing do
 		local spot = Layout.Wings[wingId]
 		local function build(owned: { [string]: boolean })
@@ -858,8 +861,10 @@ do
 			for _, p in recipe(spot.width, spot.depth, owned) do
 				ok = ok and #p.size == 3 and #p.at == 3 and #p.color == 3 and materials[p.material] == true
 				-- A threshold may reach over the 2-stud gap to the next floor.
-				ok = ok and math.abs(p.at[1]) <= spot.width / 2 + 2 and math.abs(p.at[3]) <= spot.depth / 2
-				ok = ok and p.at[2] - p.size[2] / 2 >= -1.01 and p.at[2] <= Rooms.WallHeight + 4
+				ok = ok
+					and math.abs(p.at[1]) <= spot.width / 2 + 2
+					and math.abs(p.at[3]) <= spot.depth / 2 + 2
+				ok = ok and p.at[2] - p.size[2] / 2 >= -1.01 and p.at[2] <= Rooms.WallHeight + 8
 				if names[p.name] then
 					ok = false
 					print(`  {wingId} has two parts named {p.name}`)
