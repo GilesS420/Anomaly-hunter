@@ -589,7 +589,7 @@ local function pumpkinGraveyard(): { Part }
 		end
 		return true
 	end
-	local n = 0
+	local n, pumpkins = 0, 0
 	for _, rows in { { -38, 2 }, { 34, 74 } } do
 		for z = rows[1], rows[2], 8 do
 			for _, sideX in { -1, 1 } do
@@ -613,6 +613,13 @@ local function pumpkinGraveyard(): { Part }
 							grave(`Tomb{n}`, { 2, 2.2, 0.8 }, { 0, 1.1, 0 }, color, "Slate", true)
 						end
 						grave(`Tomb{n}Mound`, { 2.2, 0.3, 3.4 }, { 0, 0.15, 2.2 }, Dirt, "Ground")
+					end
+					-- Now and then a pumpkin in the gap behind the grave, a few of them lit.
+					local px, pz = sideX * (17.5 + col * 7), z + 5.8
+					if col < 10 and roll() < 0.22 and free(px, pz) then
+						pumpkins += 1
+						local size = 1.2 + roll() * 0.6
+						jackOLantern(parts, `GravePumpkin{pumpkins}`, px, 0, pz, size, roll() < 0.3)
 					end
 				end
 			end
