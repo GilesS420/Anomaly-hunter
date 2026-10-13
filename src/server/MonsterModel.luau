@@ -167,6 +167,7 @@ local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: 
 			motor:SetAttribute("SwingAmp", math.rad(joint.amp))
 			motor:SetAttribute("SwingSpeed", joint.speed)
 			motor:SetAttribute("SwingPhase", joint.phase or 0)
+			motor:SetAttribute("SwingSpin", joint.spin == true)
 			motor.Parent = part
 		else
 			local weld = Instance.new("Weld")

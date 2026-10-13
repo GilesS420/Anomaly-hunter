@@ -13,6 +13,7 @@
 --   amp    how far it swings, in degrees (use a negative amp to mirror the other side)
 --   speed  swings per second while it walks; standing still it swings slower and smaller
 --   phase  0..1, where in the swing it starts (0.5 = opposite of 0, for left/right legs)
+--   spin   true to turn round and round instead (speed = turns per second; amp is ignored)
 
 export type Joint = {
 	axis: "X" | "Y" | "Z",
@@ -20,6 +21,7 @@ export type Joint = {
 	speed: number,
 	phase: number?,
 	pivot: { number }?,
+	spin: boolean?, -- turns round and round (speed = turns per second) instead of swinging
 }
 
 export type Piece = {
@@ -72,6 +74,13 @@ local function limb(
 		glow = glow,
 		joint = { axis = axis, amp = amp, speed = speed, phase = phase, pivot = pivot },
 	}
+end
+
+-- Makes a limb turn round and round its pivot instead of swinging (a carousel, orbiting bits).
+local function spin(piece: Piece): Piece
+	local joint = piece.joint :: Joint
+	joint.spin = true
+	return piece
 end
 
 -- Tilts a part (degrees around X, Y, Z). Around X, a negative angle leans its top forward.
@@ -1018,6 +1027,1188 @@ Looks.MoonlitHeron = {
 		limb("RightWing", { 0.15, 0.8, 1.6 }, { 0.58, 0.15, 0.2 }, Silver, "Z", 25, 1, 0, { -0.07, 0.4, 0 }),
 		limb("LeftLeg", { 0.15, 1.6, 0.15 }, { -0.25, -1.2, 0 }, Gold, "X", 25, 1, 0, { 0, 0.8, 0 }),
 		limb("RightLeg", { 0.15, 1.6, 0.15 }, { 0.25, -1.2, 0 }, Gold, "X", 25, 1, 0.5, { 0, 0.8, 0 }),
+	},
+}
+
+-- Zone 3: Abandoned Carnival. Faded circus stripes, chipped paint and sinister grins.
+local CircusRed = { 185, 40, 50 }
+local CircusCream = { 238, 222, 185 }
+local CircusTeal = { 40, 145, 145 }
+local Popcorn = { 250, 235, 160 }
+local Faded = { 110, 40, 60 }
+
+-- Zone 3, Common: a striped popcorn bucket with a toothy grin, waddling on little legs.
+Looks.Poplet = {
+	gait = "walk",
+	top = 0.7,
+	pieces = {
+		block("Bucket", { 1.4, 1.6, 1.4 }, { 0, -0.9, 0 }, CircusCream),
+		block("LeftStripe", { 0.25, 1.62, 1.42 }, { -0.45, -0.9, 0 }, CircusRed),
+		block("MiddleStripe", { 0.25, 1.62, 1.42 }, { 0, -0.9, 0 }, CircusRed),
+		block("RightStripe", { 0.25, 1.62, 1.42 }, { 0.45, -0.9, 0 }, CircusRed),
+		block("Rim", { 1.5, 0.15, 1.5 }, { 0, -0.15, 0 }, CircusRed),
+		block("Kernel1", { 0.5, 0.45, 0.5 }, { -0.35, 0.1, -0.3 }, Popcorn),
+		block("Kernel2", { 0.55, 0.5, 0.5 }, { 0.35, 0.15, 0.2 }, Popcorn),
+		block("Kernel3", { 0.5, 0.5, 0.5 }, { 0, 0.4, 0 }, Popcorn),
+		block("Kernel4", { 0.45, 0.45, 0.45 }, { -0.3, 0.2, 0.35 }, Popcorn),
+		block("Kernel5", { 0.4, 0.4, 0.4 }, { 0.4, 0.05, -0.38 }, Popcorn),
+		block("LeftEye", { 0.28, 0.28, 0.05 }, { -0.3, -0.55, -0.73 }, Black),
+		block("RightEye", { 0.28, 0.28, 0.05 }, { 0.3, -0.55, -0.73 }, Black),
+		block("LeftPupil", { 0.1, 0.1, 0.05 }, { -0.3, -0.55, -0.76 }, Candle, true),
+		block("RightPupil", { 0.1, 0.1, 0.05 }, { 0.3, -0.55, -0.76 }, Candle, true),
+		block("Mouth", { 0.7, 0.18, 0.05 }, { 0, -1.05, -0.73 }, Black),
+		block("ToothLeft", { 0.12, 0.12, 0.05 }, { -0.2, -1, -0.76 }, White),
+		block("ToothRight", { 0.12, 0.12, 0.05 }, { 0.15, -1, -0.76 }, White),
+		limb("LeftArm", { 0.2, 0.6, 0.2 }, { -0.82, -0.9, 0 }, CircusCream, "X", 35, 2.5, 0.5, { 0, 0.3, 0 }),
+		limb("RightArm", { 0.2, 0.6, 0.2 }, { 0.82, -0.9, 0 }, CircusCream, "X", 35, 2.5, 0, { 0, 0.3, 0 }),
+		limb("LeftLeg", { 0.25, 0.3, 0.25 }, { -0.35, -1.85, 0 }, Black, "X", 30, 2.5, 0, { 0, 0.15, 0 }),
+		limb("RightLeg", { 0.25, 0.3, 0.25 }, { 0.35, -1.85, 0 }, Black, "X", 30, 2.5, 0.5, { 0, 0.15, 0 }),
+	},
+}
+
+-- Zone 3, Common: a red carnival balloon with a painted-on grin, its string swaying below.
+Looks.BalloonBoo = {
+	gait = "float",
+	top = 1.4,
+	pieces = {
+		block("Balloon", { 1.4, 1.6, 1.4 }, { 0, 0.5, 0 }, CircusRed),
+		block("BalloonTop", { 1, 0.25, 1 }, { 0, 1.4, 0 }, CircusRed),
+		block("Shine", { 0.25, 0.4, 0.05 }, { -0.4, 0.95, -0.72 }, White, true),
+		block("LeftEye", { 0.25, 0.32, 0.05 }, { -0.3, 0.7, -0.72 }, Black),
+		block("RightEye", { 0.25, 0.32, 0.05 }, { 0.3, 0.7, -0.72 }, Black),
+		block("Smile", { 0.8, 0.12, 0.05 }, { 0, 0.2, -0.72 }, Black),
+		block("SmileLeft", { 0.12, 0.25, 0.05 }, { -0.4, 0.3, -0.72 }, Black),
+		block("SmileRight", { 0.12, 0.25, 0.05 }, { 0.4, 0.3, -0.72 }, Black),
+		block("Knot", { 0.3, 0.25, 0.3 }, { 0, -0.42, 0 }, Faded),
+		limb("String1", { 0.08, 0.6, 0.08 }, { 0, -0.85, 0 }, White, "X", 15, 1, 0, { 0, 0.3, 0 }),
+		limb("String2", { 0.08, 0.6, 0.08 }, { 0, -1.45, 0 }, White, "X", 20, 1, 0.2, { 0, 0.9, 0 }),
+	},
+}
+
+-- Zone 3, Uncommon: a green gremlin in a bellhop cap, clutching a roll of tickets.
+local Gremlin = { 100, 140, 70 }
+local GremlinDark = { 70, 100, 50 }
+Looks.TicketGremlin = {
+	gait = "walk",
+	top = 0.75,
+	pieces = {
+		block("Body", { 1, 1, 0.8 }, { 0, -1, 0 }, Gremlin),
+		block("Vest", { 1.05, 0.55, 0.85 }, { 0, -0.85, 0 }, CircusRed),
+		block("VestButtons", { 0.1, 0.4, 0.05 }, { 0, -0.85, -0.45 }, Gold),
+		block("Head", { 1.1, 0.9, 0.9 }, { 0, -0.05, -0.05 }, Gremlin),
+		block("Cap", { 0.6, 0.3, 0.6 }, { 0, 0.55, 0 }, CircusRed),
+		block("CapBand", { 0.62, 0.08, 0.62 }, { 0, 0.45, 0 }, Gold),
+		block("LeftEye", { 0.25, 0.22, 0.05 }, { -0.25, 0.08, -0.52 }, { 255, 230, 60 }, true),
+		block("RightEye", { 0.25, 0.22, 0.05 }, { 0.25, 0.08, -0.52 }, { 255, 230, 60 }, true),
+		block("Nose", { 0.2, 0.2, 0.2 }, { 0, -0.12, -0.6 }, GremlinDark),
+		block("Mouth", { 0.6, 0.12, 0.05 }, { 0, -0.32, -0.52 }, Black),
+		block("ToothLeft", { 0.1, 0.12, 0.05 }, { -0.18, -0.28, -0.55 }, White),
+		block("ToothRight", { 0.1, 0.12, 0.05 }, { 0.18, -0.28, -0.55 }, White),
+		tilt(
+			limb("LeftEar", { 0.6, 0.35, 0.12 }, { -0.8, 0.1, 0 }, GremlinDark, "Z", 10, 2, 0, { 0.3, 0, 0 }),
+			0,
+			0,
+			-20
+		),
+		tilt(
+			limb(
+				"RightEar",
+				{ 0.6, 0.35, 0.12 },
+				{ 0.8, 0.1, 0 },
+				GremlinDark,
+				"Z",
+				-10,
+				2,
+				0,
+				{ -0.3, 0, 0 }
+			),
+			0,
+			0,
+			20
+		),
+		limb("LeftArm", { 0.25, 0.7, 0.25 }, { -0.62, -1, 0 }, Gremlin, "X", 30, 2, 0.5, { 0, 0.35, 0 }),
+		limb("RightArm", { 0.25, 0.7, 0.25 }, { 0.62, -1, 0 }, Gremlin, "X", 30, 2, 0, { 0, 0.35, 0 }),
+		limb(
+			"TicketRoll",
+			{ 0.35, 0.35, 0.35 },
+			{ 0.62, -1.45, -0.1 },
+			{ 230, 120, 60 },
+			"X",
+			30,
+			2,
+			0,
+			{ 0, 0.8, 0.1 }
+		),
+		limb(
+			"Tickets",
+			{ 0.25, 0.05, 0.6 },
+			{ 0.62, -1.55, -0.45 },
+			{ 245, 200, 120 },
+			"X",
+			30,
+			2,
+			0,
+			{ 0, 0.9, 0.45 }
+		),
+		limb("LeftLeg", { 0.3, 0.5, 0.3 }, { -0.3, -1.75, 0 }, GremlinDark, "X", 30, 2, 0, { 0, 0.25, 0 }),
+		limb("RightLeg", { 0.3, 0.5, 0.3 }, { 0.3, -1.75, 0 }, GremlinDark, "X", 30, 2, 0.5, { 0, 0.25, 0 }),
+	},
+}
+
+-- Zone 3, Uncommon: a chipped carousel horse that broke loose, still skewered on its golden pole.
+local CarouselWhite = { 235, 230, 220 }
+Looks.CarouselColt = {
+	gait = "walk",
+	top = 2.2,
+	pieces = {
+		block("Body", { 1.2, 1, 2.2 }, { 0, -0.5, 0.1 }, CarouselWhite),
+		block("Chip", { 0.05, 0.4, 0.5 }, { 0.62, -0.4, 0.5 }, { 120, 110, 100 }),
+		tilt(block("Neck", { 0.55, 1.1, 0.6 }, { 0, 0.25, -1.05 }, CarouselWhite), -30, 0, 0),
+		tilt(block("Mane", { 0.2, 1.1, 0.25 }, { 0, 0.45, -0.8 }, CircusTeal), -30, 0, 0),
+		tilt(block("Head", { 0.5, 0.5, 0.9 }, { 0, 0.75, -1.55 }, CarouselWhite), -25, 0, 0),
+		tilt(block("Muzzle", { 0.45, 0.35, 0.3 }, { 0, 0.55, -1.95 }, { 200, 190, 180 }), -25, 0, 0),
+		block("LeftEar", { 0.12, 0.3, 0.12 }, { -0.15, 1.1, -1.35 }, CarouselWhite),
+		block("RightEar", { 0.12, 0.3, 0.12 }, { 0.15, 1.1, -1.35 }, CarouselWhite),
+		block("LeftEye", { 0.06, 0.12, 0.12 }, { -0.26, 0.85, -1.6 }, { 255, 50, 50 }, true),
+		block("RightEye", { 0.06, 0.12, 0.12 }, { 0.26, 0.85, -1.6 }, { 255, 50, 50 }, true),
+		block("Saddle", { 1.25, 0.15, 0.8 }, { 0, 0.05, 0.1 }, CircusRed),
+		block("SaddleTrim", { 1.3, 0.08, 0.85 }, { 0, -0.05, 0.1 }, Gold),
+		block("Pole", { 0.2, 2.6, 0.2 }, { 0, 0.85, 0.1 }, Gold),
+		block("PoleStripe1", { 0.22, 0.15, 0.22 }, { 0, 0.6, 0.1 }, CircusRed),
+		block("PoleStripe2", { 0.22, 0.15, 0.22 }, { 0, 1.2, 0.1 }, CircusRed),
+		block("PoleStripe3", { 0.22, 0.15, 0.22 }, { 0, 1.8, 0.1 }, CircusRed),
+		block("PoleCap", { 0.35, 0.2, 0.35 }, { 0, 2.2, 0.1 }, Gold),
+		limb("Tail", { 0.25, 0.8, 0.25 }, { 0, -0.5, 1.3 }, CircusTeal, "X", 20, 2, 0, { 0, 0.4, 0 }),
+		limb(
+			"FrontLeftLeg",
+			{ 0.3, 0.8, 0.3 },
+			{ -0.35, -1.4, -0.75 },
+			CarouselWhite,
+			"X",
+			30,
+			2,
+			0,
+			{ 0, 0.4, 0 }
+		),
+		limb(
+			"FrontLeftHoof",
+			{ 0.34, 0.2, 0.34 },
+			{ -0.35, -1.9, -0.75 },
+			Gold,
+			"X",
+			30,
+			2,
+			0,
+			{ 0, 0.9, 0 }
+		),
+		limb(
+			"FrontRightLeg",
+			{ 0.3, 0.8, 0.3 },
+			{ 0.35, -1.4, -0.75 },
+			CarouselWhite,
+			"X",
+			30,
+			2,
+			0.5,
+			{ 0, 0.4, 0 }
+		),
+		limb(
+			"FrontRightHoof",
+			{ 0.34, 0.2, 0.34 },
+			{ 0.35, -1.9, -0.75 },
+			Gold,
+			"X",
+			30,
+			2,
+			0.5,
+			{ 0, 0.9, 0 }
+		),
+		limb(
+			"BackLeftLeg",
+			{ 0.3, 0.8, 0.3 },
+			{ -0.35, -1.4, 0.9 },
+			CarouselWhite,
+			"X",
+			30,
+			2,
+			0.5,
+			{ 0, 0.4, 0 }
+		),
+		limb("BackLeftHoof", { 0.34, 0.2, 0.34 }, { -0.35, -1.9, 0.9 }, Gold, "X", 30, 2, 0.5, { 0, 0.9, 0 }),
+		limb(
+			"BackRightLeg",
+			{ 0.3, 0.8, 0.3 },
+			{ 0.35, -1.4, 0.9 },
+			CarouselWhite,
+			"X",
+			30,
+			2,
+			0,
+			{ 0, 0.4, 0 }
+		),
+		limb("BackRightHoof", { 0.34, 0.2, 0.34 }, { 0.35, -1.9, 0.9 }, Gold, "X", 30, 2, 0, { 0, 0.9, 0 }),
+	},
+}
+
+-- Zone 3, Rare: a pale-faced jester in a two-colour suit and a belled two-tipped hat.
+local JesterPurple = { 90, 40, 130 }
+local Clown = { 240, 238, 230 }
+Looks.JesterJinx = {
+	gait = "walk",
+	top = 1.8,
+	pieces = {
+		block("LeftHalf", { 0.55, 1.1, 0.6 }, { -0.275, -0.55, 0 }, CircusRed),
+		block("RightHalf", { 0.55, 1.1, 0.6 }, { 0.275, -0.55, 0 }, JesterPurple),
+		tilt(block("Diamond", { 0.3, 0.3, 0.05 }, { 0, -0.5, -0.32 }, Gold), 0, 0, 45),
+		block("Ruff", { 1.3, 0.25, 0.8 }, { 0, 0.07, 0 }, Clown),
+		block("Head", { 0.8, 0.8, 0.8 }, { 0, 0.6, 0 }, Clown),
+		tilt(block("LeftEye", { 0.18, 0.18, 0.05 }, { -0.18, 0.72, -0.42 }, Black), 0, 0, 45),
+		tilt(block("RightEye", { 0.18, 0.18, 0.05 }, { 0.18, 0.72, -0.42 }, Black), 0, 0, 45),
+		block("LeftPupil", { 0.06, 0.06, 0.05 }, { -0.18, 0.72, -0.45 }, RedEye, true),
+		block("RightPupil", { 0.06, 0.06, 0.05 }, { 0.18, 0.72, -0.45 }, RedEye, true),
+		block("Nose", { 0.15, 0.15, 0.15 }, { 0, 0.55, -0.47 }, CircusRed),
+		block("Grin", { 0.5, 0.1, 0.05 }, { 0, 0.38, -0.42 }, CircusRed),
+		block("GrinLeft", { 0.1, 0.18, 0.05 }, { -0.28, 0.45, -0.42 }, CircusRed),
+		block("GrinRight", { 0.1, 0.18, 0.05 }, { 0.28, 0.45, -0.42 }, CircusRed),
+		block("HatBase", { 0.85, 0.25, 0.85 }, { 0, 1.1, 0 }, JesterPurple),
+		tilt(block("LeftTip", { 0.3, 0.8, 0.3 }, { -0.45, 1.4, 0 }, CircusRed), 0, 0, 40),
+		tilt(block("RightTip", { 0.3, 0.8, 0.3 }, { 0.45, 1.4, 0 }, JesterPurple), 0, 0, -40),
+		limb("LeftBell", { 0.2, 0.2, 0.2 }, { -0.75, 1.65, 0 }, Gold, "Z", 15, 2, 0, { 0.1, -0.1, 0 }),
+		limb("RightBell", { 0.2, 0.2, 0.2 }, { 0.75, 1.65, 0 }, Gold, "Z", 15, 2, 0.5, { -0.1, -0.1, 0 }),
+		limb(
+			"LeftArm",
+			{ 0.28, 1, 0.28 },
+			{ -0.72, -0.5, 0 },
+			JesterPurple,
+			"X",
+			35,
+			1.8,
+			0.5,
+			{ 0, 0.45, 0 }
+		),
+		limb("RightArm", { 0.28, 1, 0.28 }, { 0.72, -0.5, 0 }, CircusRed, "X", 35, 1.8, 0, { 0, 0.45, 0 }),
+		limb(
+			"LeftLeg",
+			{ 0.35, 0.9, 0.35 },
+			{ -0.28, -1.55, 0 },
+			JesterPurple,
+			"X",
+			30,
+			1.8,
+			0,
+			{ 0, 0.45, 0 }
+		),
+		limb(
+			"LeftShoe",
+			{ 0.3, 0.2, 0.5 },
+			{ -0.28, -1.9, -0.15 },
+			CircusRed,
+			"X",
+			30,
+			1.8,
+			0,
+			{ 0, 0.8, 0.15 }
+		),
+		limb(
+			"RightLeg",
+			{ 0.35, 0.9, 0.35 },
+			{ 0.28, -1.55, 0 },
+			CircusRed,
+			"X",
+			30,
+			1.8,
+			0.5,
+			{ 0, 0.45, 0 }
+		),
+		limb(
+			"RightShoe",
+			{ 0.3, 0.2, 0.5 },
+			{ 0.28, -1.9, -0.15 },
+			JesterPurple,
+			"X",
+			30,
+			1.8,
+			0.5,
+			{ 0, 0.8, 0.15 }
+		),
+	},
+}
+
+-- Zone 3, Epic: a cracked funhouse mirror whose reflection grins back, with shards circling it.
+local MirrorGlass = { 175, 195, 215 }
+local Magenta = { 255, 70, 200 }
+Looks.MirrorGrin = {
+	gait = "float",
+	top = 1.9,
+	pieces = {
+		block("Frame", { 1.8, 2.6, 0.3 }, { 0, 0.2, 0 }, Gold),
+		block("Glass", { 1.4, 2.2, 0.1 }, { 0, 0.2, -0.16 }, MirrorGlass),
+		block("Crest", { 0.8, 0.4, 0.3 }, { 0, 1.65, 0 }, Gold),
+		block("LeftFinial", { 0.3, 0.3, 0.3 }, { -0.9, 1.55, 0 }, Gold),
+		block("RightFinial", { 0.3, 0.3, 0.3 }, { 0.9, 1.55, 0 }, Gold),
+		block("Gem", { 0.2, 0.2, 0.1 }, { 0, 1.65, -0.18 }, Magenta, true),
+		block("LeftEye", { 0.28, 0.2, 0.05 }, { -0.35, 0.65, -0.23 }, Magenta, true),
+		block("RightEye", { 0.28, 0.2, 0.05 }, { 0.35, 0.65, -0.23 }, Magenta, true),
+		block("Grin", { 1.1, 0.25, 0.05 }, { 0, -0.1, -0.22 }, Black),
+		block("Teeth", { 1, 0.08, 0.05 }, { 0, -0.02, -0.25 }, White),
+		block("GrinLeft", { 0.12, 0.3, 0.05 }, { -0.55, 0.05, -0.22 }, Black),
+		block("GrinRight", { 0.12, 0.3, 0.05 }, { 0.55, 0.05, -0.22 }, Black),
+		tilt(block("CrackTop", { 0.05, 0.9, 0.05 }, { 0.35, 0.9, -0.22 }, { 60, 60, 70 }), 0, 0, 30),
+		tilt(block("CrackBottom", { 0.05, 0.7, 0.05 }, { -0.4, -0.6, -0.22 }, { 60, 60, 70 }), 0, 0, -25),
+		spin(
+			limb("Shard1", { 0.3, 0.45, 0.05 }, { 1.4, 0.4, 0 }, MirrorGlass, "Y", 0, 0.3, 0, { -1.4, 0, 0 })
+		),
+		spin(
+			limb(
+				"Shard2",
+				{ 0.25, 0.35, 0.05 },
+				{ -1.4, -0.2, 0 },
+				MirrorGlass,
+				"Y",
+				0,
+				0.3,
+				0,
+				{ 1.4, 0, 0 }
+			)
+		),
+		spin(
+			limb("Shard3", { 0.2, 0.3, 0.05 }, { 0, 0.9, 1.3 }, MirrorGlass, "Y", 0, 0.3, 0, { 0, 0, -1.3 })
+		),
+	},
+}
+
+-- Zone 3, Legendary: the sinister ringmaster in a red tailcoat and top hat, cracking his whip.
+local Tailcoat = { 160, 25, 35 }
+local Glove = { 240, 240, 235 }
+Looks.TheRingmaster = {
+	gait = "walk",
+	top = 2.2,
+	pieces = {
+		block("Coat", { 1.3, 1.3, 0.75 }, { 0, -0.35, 0 }, Tailcoat),
+		block("Shirt", { 0.45, 0.8, 0.05 }, { 0, -0.1, -0.4 }, Glove),
+		block("BowTie", { 0.4, 0.15, 0.05 }, { 0, 0.22, -0.43 }, Black),
+		block("Button1", { 0.1, 0.1, 0.05 }, { -0.33, 0, -0.4 }, Gold),
+		block("Button2", { 0.1, 0.1, 0.05 }, { 0.33, 0, -0.4 }, Gold),
+		block("Button3", { 0.1, 0.1, 0.05 }, { -0.33, -0.35, -0.4 }, Gold),
+		block("Button4", { 0.1, 0.1, 0.05 }, { 0.33, -0.35, -0.4 }, Gold),
+		block("LeftEpaulette", { 0.4, 0.15, 0.6 }, { -0.6, 0.35, 0 }, Gold),
+		block("RightEpaulette", { 0.4, 0.15, 0.6 }, { 0.6, 0.35, 0 }, Gold),
+		block("Head", { 0.85, 0.85, 0.85 }, { 0, 0.75, 0 }, { 225, 218, 205 }),
+		block("LeftSocket", { 0.22, 0.18, 0.05 }, { -0.2, 0.85, -0.44 }, Black),
+		block("RightSocket", { 0.22, 0.18, 0.05 }, { 0.2, 0.85, -0.44 }, Black),
+		block("LeftEye", { 0.08, 0.08, 0.05 }, { -0.2, 0.85, -0.47 }, RedEye, true),
+		block("RightEye", { 0.08, 0.08, 0.05 }, { 0.2, 0.85, -0.47 }, RedEye, true),
+		block("Mustache", { 0.7, 0.12, 0.08 }, { 0, 0.6, -0.46 }, Black),
+		block("MustacheLeft", { 0.12, 0.2, 0.08 }, { -0.38, 0.68, -0.46 }, Black),
+		block("MustacheRight", { 0.12, 0.2, 0.08 }, { 0.38, 0.68, -0.46 }, Black),
+		block("Grin", { 0.4, 0.08, 0.05 }, { 0, 0.45, -0.44 }, Black),
+		block("HatBrim", { 1.2, 0.1, 1.2 }, { 0, 1.22, 0 }, Black),
+		block("HatCrown", { 0.8, 0.9, 0.8 }, { 0, 1.72, 0 }, Black),
+		block("HatBand", { 0.85, 0.15, 0.85 }, { 0, 1.36, 0 }, Tailcoat),
+		limb("LeftTail", { 0.5, 0.8, 0.1 }, { -0.3, -1.35, 0.35 }, Tailcoat, "X", 15, 1.5, 0, { 0, 0.4, 0 }),
+		limb(
+			"RightTail",
+			{ 0.5, 0.8, 0.1 },
+			{ 0.3, -1.35, 0.35 },
+			Tailcoat,
+			"X",
+			15,
+			1.5,
+			0.5,
+			{ 0, 0.4, 0 }
+		),
+		limb("LeftArm", { 0.32, 1.1, 0.32 }, { -0.82, -0.35, 0 }, Tailcoat, "X", 28, 1.5, 0.5, { 0, 0.5, 0 }),
+		limb("LeftGlove", { 0.35, 0.3, 0.35 }, { -0.82, -1.05, 0 }, Glove, "X", 28, 1.5, 0.5, { 0, 1.2, 0 }),
+		limb("RightArm", { 0.32, 1.1, 0.32 }, { 0.82, -0.35, 0 }, Tailcoat, "X", 28, 1.5, 0, { 0, 0.5, 0 }),
+		limb("RightGlove", { 0.35, 0.3, 0.35 }, { 0.82, -1.05, 0 }, Glove, "X", 28, 1.5, 0, { 0, 1.2, 0 }),
+		limb(
+			"WhipHandle",
+			{ 0.15, 0.5, 0.15 },
+			{ 0.82, -1.35, -0.15 },
+			Wood,
+			"X",
+			28,
+			1.5,
+			0,
+			{ 0, 1.5, 0.15 }
+		),
+		limb(
+			"WhipLash",
+			{ 0.08, 0.08, 1.3 },
+			{ 0.82, -1.55, -0.85 },
+			Leather,
+			"X",
+			28,
+			1.5,
+			0,
+			{ 0, 1.7, 0.85 }
+		),
+		limb("LeftLeg", { 0.4, 0.9, 0.4 }, { -0.28, -1.45, 0 }, Black, "X", 26, 1.5, 0, { 0, 0.45, 0 }),
+		limb(
+			"LeftBoot",
+			{ 0.45, 0.25, 0.6 },
+			{ -0.28, -1.875, -0.05 },
+			Iron,
+			"X",
+			26,
+			1.5,
+			0,
+			{ 0, 0.875, 0.05 }
+		),
+		limb("RightLeg", { 0.4, 0.9, 0.4 }, { 0.28, -1.45, 0 }, Black, "X", 26, 1.5, 0.5, { 0, 0.45, 0 }),
+		limb(
+			"RightBoot",
+			{ 0.45, 0.25, 0.6 },
+			{ 0.28, -1.875, -0.05 },
+			Iron,
+			"X",
+			26,
+			1.5,
+			0.5,
+			{ 0, 0.875, 0.05 }
+		),
+	},
+}
+
+-- Zone 3, Mythic: the big top come alive. Its entrance is a mouth full of teeth, two windows
+-- glow like eyes, and the flaps beside its mouth open and shut as it scuttles along.
+Looks.BigTopTerror = {
+	gait = "walk",
+	top = 1.5,
+	pieces = {
+		block("Walls", { 2.4, 1.4, 2.4 }, { 0, -1.1, 0 }, CircusCream),
+		block("Stripe1", { 0.35, 1.42, 2.42 }, { -0.9, -1.1, 0 }, CircusRed),
+		block("Stripe2", { 0.35, 1.42, 2.42 }, { 0.9, -1.1, 0 }, CircusRed),
+		block("Stripe3", { 2.42, 1.42, 0.35 }, { 0, -1.1, 0.9 }, CircusRed),
+		block("RoofLow", { 2.6, 0.4, 2.6 }, { 0, -0.2, 0 }, CircusRed),
+		block("RoofMiddle", { 1.8, 0.4, 1.8 }, { 0, 0.2, 0 }, CircusCream),
+		block("RoofTop", { 1, 0.4, 1 }, { 0, 0.6, 0 }, CircusRed),
+		block("Spire", { 0.2, 0.6, 0.2 }, { 0, 1.1, 0 }, Gold),
+		limb("Flag", { 0.5, 0.3, 0.05 }, { 0.35, 1.25, 0 }, CircusTeal, "Y", 30, 2, 0, { -0.25, 0, 0 }),
+		block("LeftWindow", { 0.4, 0.35, 0.05 }, { -0.5, -0.55, -1.22 }, Candle, true),
+		block("RightWindow", { 0.4, 0.35, 0.05 }, { 0.5, -0.55, -1.22 }, Candle, true),
+		block("Mouth", { 1.1, 0.8, 0.05 }, { 0, -1.25, -1.22 }, Black),
+		block("Tongue", { 0.7, 0.1, 0.5 }, { 0, -1.6, -1.05 }, Blood),
+		block("TopTooth1", { 0.2, 0.22, 0.05 }, { -0.4, -0.97, -1.25 }, White),
+		block("TopTooth2", { 0.2, 0.22, 0.05 }, { -0.13, -0.97, -1.25 }, White),
+		block("TopTooth3", { 0.2, 0.22, 0.05 }, { 0.13, -0.97, -1.25 }, White),
+		block("TopTooth4", { 0.2, 0.22, 0.05 }, { 0.4, -0.97, -1.25 }, White),
+		block("BottomTooth1", { 0.2, 0.2, 0.05 }, { -0.27, -1.55, -1.25 }, White),
+		block("BottomTooth2", { 0.2, 0.2, 0.05 }, { 0.27, -1.55, -1.25 }, White),
+		limb(
+			"LeftFlap",
+			{ 0.45, 1, 0.08 },
+			{ -0.8, -1.2, -1.26 },
+			CircusCream,
+			"Y",
+			30,
+			1.5,
+			0,
+			{ -0.22, 0, 0 }
+		),
+		limb(
+			"RightFlap",
+			{ 0.45, 1, 0.08 },
+			{ 0.8, -1.2, -1.26 },
+			CircusCream,
+			"Y",
+			-30,
+			1.5,
+			0,
+			{ 0.22, 0, 0 }
+		),
+		limb("FrontLeftPeg", { 0.35, 0.2, 0.35 }, { -0.8, -1.9, -0.8 }, Wood, "X", 35, 2.5, 0, { 0, 0.1, 0 }),
+		limb(
+			"FrontRightPeg",
+			{ 0.35, 0.2, 0.35 },
+			{ 0.8, -1.9, -0.8 },
+			Wood,
+			"X",
+			35,
+			2.5,
+			0.5,
+			{ 0, 0.1, 0 }
+		),
+		limb("BackLeftPeg", { 0.35, 0.2, 0.35 }, { -0.8, -1.9, 0.8 }, Wood, "X", 35, 2.5, 0.5, { 0, 0.1, 0 }),
+		limb("BackRightPeg", { 0.35, 0.2, 0.35 }, { 0.8, -1.9, 0.8 }, Wood, "X", 35, 2.5, 0, { 0, 0.1, 0 }),
+	},
+}
+
+-- Zone 3, Divine: a little golden carousel that floats and turns, horses and all.
+local Pastel = { 255, 200, 230 }
+Looks.GoldenCarousel = {
+	gait = "float",
+	top = 2.3,
+	pieces = {
+		block("Platform", { 2.4, 0.3, 2.4 }, { 0, -1.3, 0 }, Gold),
+		block("PlatformTrim", { 2.5, 0.1, 2.5 }, { 0, -1.15, 0 }, CircusRed),
+		block("Column", { 0.35, 2.4, 0.35 }, { 0, -0.1, 0 }, Gold),
+		block("LeftEye", { 0.1, 0.1, 0.05 }, { -0.08, 0.3, -0.19 }, Candle, true),
+		block("RightEye", { 0.1, 0.1, 0.05 }, { 0.08, 0.3, -0.19 }, Candle, true),
+		block("Canopy", { 2.6, 0.3, 2.6 }, { 0, 1.1, 0 }, CircusCream),
+		block("CanopyTrim", { 2.7, 0.12, 2.7 }, { 0, 0.92, 0 }, Gold),
+		block("Roof", { 1.6, 0.4, 1.6 }, { 0, 1.45, 0 }, CircusRed),
+		block("RoofTop", { 0.6, 0.4, 0.6 }, { 0, 1.8, 0 }, Gold),
+		block("Star", { 0.3, 0.3, 0.3 }, { 0, 2.15, 0 }, Candle, true),
+		block("Bulb1", { 0.15, 0.15, 0.15 }, { -1.25, 0.85, -1.25 }, Candle, true),
+		block("Bulb2", { 0.15, 0.15, 0.15 }, { 1.25, 0.85, -1.25 }, Candle, true),
+		block("Bulb3", { 0.15, 0.15, 0.15 }, { -1.25, 0.85, 1.25 }, Candle, true),
+		block("Bulb4", { 0.15, 0.15, 0.15 }, { 1.25, 0.85, 1.25 }, Candle, true),
+		-- Four horses on poles, turning round the column.
+		spin(limb("Horse1", { 0.3, 0.4, 0.7 }, { 0.85, -0.4, 0 }, White, "Y", 0, 0.25, 0, { -0.85, 0, 0 })),
+		spin(
+			limb(
+				"Horse1Head",
+				{ 0.22, 0.3, 0.3 },
+				{ 0.85, -0.15, -0.4 },
+				White,
+				"Y",
+				0,
+				0.25,
+				0,
+				{ -0.85, 0, 0.4 }
+			)
+		),
+		spin(
+			limb("Horse1Pole", { 0.08, 2, 0.08 }, { 0.85, -0.1, 0 }, Gold, "Y", 0, 0.25, 0, { -0.85, 0, 0 })
+		),
+		spin(limb("Horse2", { 0.3, 0.4, 0.7 }, { -0.85, -0.4, 0 }, Pastel, "Y", 0, 0.25, 0, { 0.85, 0, 0 })),
+		spin(
+			limb(
+				"Horse2Head",
+				{ 0.22, 0.3, 0.3 },
+				{ -0.85, -0.15, 0.4 },
+				Pastel,
+				"Y",
+				0,
+				0.25,
+				0,
+				{ 0.85, 0, -0.4 }
+			)
+		),
+		spin(
+			limb("Horse2Pole", { 0.08, 2, 0.08 }, { -0.85, -0.1, 0 }, Gold, "Y", 0, 0.25, 0, { 0.85, 0, 0 })
+		),
+		spin(
+			limb("Horse3", { 0.7, 0.4, 0.3 }, { 0, -0.4, 0.85 }, Moonglow, "Y", 0, 0.25, 0, { 0, 0, -0.85 })
+		),
+		spin(
+			limb(
+				"Horse3Head",
+				{ 0.3, 0.3, 0.22 },
+				{ 0.4, -0.15, 0.85 },
+				Moonglow,
+				"Y",
+				0,
+				0.25,
+				0,
+				{ -0.4, 0, -0.85 }
+			)
+		),
+		spin(
+			limb("Horse3Pole", { 0.08, 2, 0.08 }, { 0, -0.1, 0.85 }, Gold, "Y", 0, 0.25, 0, { 0, 0, -0.85 })
+		),
+		spin(
+			limb("Horse4", { 0.7, 0.4, 0.3 }, { 0, -0.4, -0.85 }, CircusTeal, "Y", 0, 0.25, 0, { 0, 0, 0.85 })
+		),
+		spin(
+			limb(
+				"Horse4Head",
+				{ 0.3, 0.3, 0.22 },
+				{ -0.4, -0.15, -0.85 },
+				CircusTeal,
+				"Y",
+				0,
+				0.25,
+				0,
+				{ 0.4, 0, 0.85 }
+			)
+		),
+		spin(
+			limb("Horse4Pole", { 0.08, 2, 0.08 }, { 0, -0.1, -0.85 }, Gold, "Y", 0, 0.25, 0, { 0, 0, 0.85 })
+		),
+	},
+}
+
+-- Watcher event monsters: they only appear in the main area during a Watcher event.
+local Phantom = { 200, 215, 255 }
+local PhantomDark = { 120, 135, 190 }
+local Nightmare = { 230, 40, 150 }
+local Eldritch = { 40, 255, 200 }
+local Flesh = { 70, 35, 80 }
+
+-- Flicker, Phantom: a haunted candle with a carved face and a flickering flame.
+Looks.Flickerwick = {
+	gait = "float",
+	top = 1.15,
+	pieces = {
+		block("Wax", { 0.9, 1.6, 0.9 }, { 0, -0.4, 0 }, { 240, 235, 220 }),
+		block("Drip1", { 0.2, 0.5, 0.05 }, { 0.3, 0.15, -0.47 }, { 240, 235, 220 }),
+		block("Drip2", { 0.2, 0.35, 0.05 }, { -0.3, 0.2, -0.47 }, { 240, 235, 220 }),
+		block("Wick", { 0.1, 0.2, 0.1 }, { 0, 0.5, 0 }, Black),
+		limb("Flame", { 0.4, 0.6, 0.4 }, { 0, 0.85, 0 }, Candle, "Z", 15, 4, 0, { 0, -0.3, 0 }, true),
+		block("LeftEye", { 0.2, 0.25, 0.05 }, { -0.2, 0, -0.47 }, Black),
+		block("RightEye", { 0.2, 0.25, 0.05 }, { 0.2, 0, -0.47 }, Black),
+		block("Mouth", { 0.22, 0.28, 0.05 }, { 0, -0.45, -0.47 }, Black),
+		block("Dish", { 1.4, 0.2, 1.4 }, { 0, -1.3, 0 }, Bronze),
+		block("Handle", { 0.12, 0.4, 0.3 }, { 0.76, -1.2, 0 }, Bronze),
+		limb("Wisp", { 0.5, 0.6, 0.5 }, { 0, -1.7, 0 }, Phantom, "X", 20, 1, 0, { 0, 0.3, 0 }, true),
+	},
+}
+
+-- Flicker, Phantom: an old television haunted by a shadow; its static face stares out.
+Looks.StaticShade = {
+	gait = "float",
+	top = 1.55,
+	pieces = {
+		block("Cabinet", { 1.8, 1.4, 1.2 }, { 0, 0, 0 }, Wood),
+		block("Screen", { 1.1, 1, 0.1 }, { -0.2, 0.05, -0.61 }, { 200, 210, 220 }, true),
+		block("StaticTop", { 1.05, 0.06, 0.05 }, { -0.2, 0.42, -0.67 }, { 120, 130, 140 }),
+		block("StaticBottom", { 1.05, 0.06, 0.05 }, { -0.2, -0.35, -0.67 }, { 120, 130, 140 }),
+		block("LeftEye", { 0.2, 0.2, 0.05 }, { -0.45, 0.2, -0.67 }, Black),
+		block("RightEye", { 0.2, 0.2, 0.05 }, { 0.05, 0.2, -0.67 }, Black),
+		block("Mouth", { 0.5, 0.1, 0.05 }, { -0.2, -0.15, -0.67 }, Black),
+		block("KnobTop", { 0.18, 0.18, 0.1 }, { 0.65, 0.3, -0.63 }, Iron),
+		block("KnobBottom", { 0.18, 0.18, 0.1 }, { 0.65, -0.1, -0.63 }, Iron),
+		tilt(
+			limb("LeftAntenna", { 0.06, 0.9, 0.06 }, { -0.3, 1.1, 0 }, Iron, "Z", 10, 1.5, 0, { 0, -0.45, 0 }),
+			0,
+			0,
+			25
+		),
+		tilt(
+			limb(
+				"RightAntenna",
+				{ 0.06, 0.9, 0.06 },
+				{ 0.3, 1.1, 0 },
+				Iron,
+				"Z",
+				10,
+				1.5,
+				0.5,
+				{ 0, -0.45, 0 }
+			),
+			0,
+			0,
+			-25
+		),
+		limb("Shadow", { 1.2, 0.8, 1 }, { 0, -1.1, 0 }, { 50, 50, 80 }, "X", 10, 1, 0, { 0, 0.4, 0 }),
+		limb("ShadowTail", { 0.6, 0.6, 0.6 }, { 0, -1.7, 0 }, { 40, 40, 65 }, "X", 20, 1, 0.3, { 0, 1, 0 }),
+	},
+}
+
+-- Blood Moon, Phantom: a spirit of blood-red fire with flickering flame tongues and embers.
+local DeepRed = { 150, 20, 30 }
+local Flame = { 255, 90, 60 }
+Looks.CrimsonWisp = {
+	gait = "float",
+	top = 1.55,
+	pieces = {
+		block("Flames", { 1.4, 1, 1.4 }, { 0, -0.1, 0 }, DeepRed),
+		block("Core", { 1, 1, 1 }, { 0, 0.2, 0 }, { 255, 60, 60 }, true),
+		block("LeftEye", { 0.2, 0.25, 0.05 }, { -0.25, 0.35, -0.52 }, Black),
+		block("RightEye", { 0.2, 0.25, 0.05 }, { 0.25, 0.35, -0.52 }, Black),
+		block("Mouth", { 0.45, 0.1, 0.05 }, { 0, 0, -0.52 }, Black),
+		limb("TongueLeft", { 0.4, 0.8, 0.4 }, { -0.4, 0.9, 0 }, Flame, "Z", 15, 3, 0, { 0, -0.4, 0 }, true),
+		limb(
+			"TongueRight",
+			{ 0.35, 0.7, 0.35 },
+			{ 0.4, 0.8, 0.2 },
+			Flame,
+			"Z",
+			15,
+			3,
+			0.4,
+			{ 0, -0.35, 0 },
+			true
+		),
+		limb(
+			"TongueMiddle",
+			{ 0.35, 0.9, 0.35 },
+			{ 0, 1.1, -0.1 },
+			Candle,
+			"X",
+			12,
+			3,
+			0.7,
+			{ 0, -0.45, 0 },
+			true
+		),
+		limb("Tail", { 0.5, 0.7, 0.5 }, { 0, -0.95, 0 }, DeepRed, "X", 20, 1.5, 0, { 0, 0.35, 0 }),
+		limb(
+			"TailTip",
+			{ 0.3, 0.5, 0.3 },
+			{ 0.1, -1.5, 0.1 },
+			Flame,
+			"X",
+			20,
+			1.5,
+			0,
+			{ -0.1, 0.9, -0.1 },
+			true
+		),
+		spin(limb("Ember1", { 0.2, 0.2, 0.2 }, { 1.2, 0.3, 0 }, Flame, "Y", 0, 0.5, 0, { -1.2, 0, 0 }, true)),
+		spin(
+			limb(
+				"Ember2",
+				{ 0.15, 0.15, 0.15 },
+				{ -1.1, 0.7, 0 },
+				Candle,
+				"Y",
+				0,
+				0.5,
+				0,
+				{ 1.1, 0, 0 },
+				true
+			)
+		),
+	},
+}
+
+-- Blood Moon, Phantom: the ghost of a werewolf, hunched on two legs with long clawed arms.
+local GhostFur = { 150, 170, 200 }
+local GhostFurDark = { 100, 115, 150 }
+Looks.Moonhowler = {
+	gait = "walk",
+	top = 1.5,
+	pieces = {
+		block("Torso", { 1.3, 1.3, 0.9 }, { 0, -0.4, 0 }, GhostFur),
+		block("Chest", { 0.9, 0.8, 0.1 }, { 0, -0.3, -0.48 }, { 200, 215, 235 }),
+		block("Head", { 0.9, 0.8, 0.9 }, { 0, 0.65, -0.2 }, GhostFur),
+		block("Snout", { 0.5, 0.4, 0.6 }, { 0, 0.5, -0.9 }, GhostFurDark),
+		block("Nose", { 0.2, 0.15, 0.1 }, { 0, 0.68, -1.22 }, Black),
+		block("LeftFang", { 0.08, 0.18, 0.08 }, { -0.15, 0.24, -1.1 }, White),
+		block("RightFang", { 0.08, 0.18, 0.08 }, { 0.15, 0.24, -1.1 }, White),
+		block("LeftEye", { 0.15, 0.12, 0.05 }, { -0.25, 0.8, -0.67 }, RedEye, true),
+		block("RightEye", { 0.15, 0.12, 0.05 }, { 0.25, 0.8, -0.67 }, RedEye, true),
+		block("LeftEar", { 0.2, 0.45, 0.2 }, { -0.3, 1.25, -0.1 }, GhostFurDark),
+		block("RightEar", { 0.2, 0.45, 0.2 }, { 0.3, 1.25, -0.1 }, GhostFurDark),
+		block("Mane", { 1.1, 0.4, 0.6 }, { 0, 0.3, 0.25 }, GhostFurDark),
+		tilt(
+			limb("Tail", { 0.4, 0.4, 1 }, { 0, -0.85, 0.85 }, GhostFurDark, "Y", 30, 2, 0, { 0, 0, -0.5 }),
+			30,
+			0,
+			0
+		),
+		limb("LeftArm", { 0.35, 1.3, 0.35 }, { -0.85, -0.55, 0 }, GhostFur, "X", 35, 1.5, 0.5, { 0, 0.6, 0 }),
+		limb(
+			"LeftClaws",
+			{ 0.4, 0.2, 0.4 },
+			{ -0.85, -1.3, -0.05 },
+			White,
+			"X",
+			35,
+			1.5,
+			0.5,
+			{ 0, 1.35, 0.05 }
+		),
+		limb("RightArm", { 0.35, 1.3, 0.35 }, { 0.85, -0.55, 0 }, GhostFur, "X", 35, 1.5, 0, { 0, 0.6, 0 }),
+		limb(
+			"RightClaws",
+			{ 0.4, 0.2, 0.4 },
+			{ 0.85, -1.3, -0.05 },
+			White,
+			"X",
+			35,
+			1.5,
+			0,
+			{ 0, 1.35, 0.05 }
+		),
+		limb(
+			"LeftLeg",
+			{ 0.4, 0.6, 0.4 },
+			{ -0.35, -1.4, 0.05 },
+			GhostFurDark,
+			"X",
+			30,
+			1.5,
+			0,
+			{ 0, 0.3, 0 }
+		),
+		limb(
+			"LeftFoot",
+			{ 0.4, 0.25, 0.7 },
+			{ -0.35, -1.875, -0.15 },
+			GhostFurDark,
+			"X",
+			30,
+			1.5,
+			0,
+			{ 0, 0.775, 0.2 }
+		),
+		limb(
+			"RightLeg",
+			{ 0.4, 0.6, 0.4 },
+			{ 0.35, -1.4, 0.05 },
+			GhostFurDark,
+			"X",
+			30,
+			1.5,
+			0.5,
+			{ 0, 0.3, 0 }
+		),
+		limb(
+			"RightFoot",
+			{ 0.4, 0.25, 0.7 },
+			{ 0.35, -1.875, -0.15 },
+			GhostFurDark,
+			"X",
+			30,
+			1.5,
+			0.5,
+			{ 0, 0.775, 0.2 }
+		),
+	},
+}
+
+-- Mimic Night, Nightmare: a mailbox on two post legs. Its lid flaps open on a mouth of teeth
+-- and a long tongue.
+local Mailbox = { 70, 90, 130 }
+Looks.MailboxMimic = {
+	gait = "walk",
+	top = 1.05,
+	pieces = {
+		block("Box", { 1.2, 1, 1.8 }, { 0, 0.2, 0 }, Mailbox),
+		block("Roof", { 1, 0.25, 1.8 }, { 0, 0.82, 0 }, Mailbox),
+		block("Rust", { 0.05, 0.4, 0.5 }, { 0.62, 0, 0.4 }, { 140, 80, 40 }),
+		block("Inside", { 1, 0.8, 0.05 }, { 0, 0.2, -0.88 }, Black),
+		block("Tooth1", { 0.15, 0.22, 0.05 }, { -0.35, 0.5, -0.9 }, White),
+		block("Tooth2", { 0.15, 0.22, 0.05 }, { -0.12, 0.5, -0.9 }, White),
+		block("Tooth3", { 0.15, 0.22, 0.05 }, { 0.12, 0.5, -0.9 }, White),
+		block("Tooth4", { 0.15, 0.22, 0.05 }, { 0.35, 0.5, -0.9 }, White),
+		block("LeftEye", { 0.2, 0.2, 0.05 }, { -0.3, 0.75, -0.91 }, Nightmare, true),
+		block("RightEye", { 0.2, 0.2, 0.05 }, { 0.3, 0.75, -0.91 }, Nightmare, true),
+		limb("Lid", { 1.2, 0.9, 0.08 }, { 0, -0.05, -0.95 }, Mailbox, "X", -25, 2, 0, { 0, -0.45, 0 }),
+		limb(
+			"Tongue",
+			{ 0.4, 0.1, 0.9 },
+			{ 0, -0.2, -1.35 },
+			{ 200, 40, 70 },
+			"Y",
+			25,
+			2,
+			0.3,
+			{ 0, 0, 0.45 }
+		),
+		block("FlagPost", { 0.1, 0.6, 0.12 }, { 0.65, 0.5, 0.35 }, CircusRed),
+		limb("Flag", { 0.1, 0.25, 0.45 }, { 0.65, 0.7, 0.1 }, CircusRed, "X", 25, 2, 0, { 0, 0, 0.22 }),
+		limb("LeftPost", { 0.3, 1.7, 0.3 }, { -0.25, -1.15, 0 }, Wood, "X", 25, 1.8, 0, { 0, 0.85, 0 }),
+		limb("RightPost", { 0.3, 1.7, 0.3 }, { 0.25, -1.15, 0 }, Wood, "X", 25, 1.8, 0.5, { 0, 0.85, 0 }),
+	},
+}
+
+-- Mimic Night, Nightmare: a street lamp that grew spindly arms and a face in its lamp.
+local SickLight = { 210, 255, 140 }
+Looks.LamppostLurker = {
+	gait = "walk",
+	top = 2.9,
+	pieces = {
+		block("Base", { 0.8, 0.25, 0.8 }, { 0, -0.9, 0 }, Iron),
+		block("Pole", { 0.3, 2.4, 0.3 }, { 0, 0.35, 0 }, Iron),
+		block("CrossBar", { 1, 0.12, 0.12 }, { 0, 1.3, 0 }, Iron),
+		block("Lamp", { 0.7, 0.8, 0.7 }, { 0, 2, 0 }, SickLight, true),
+		block("LampFrame", { 0.75, 0.1, 0.75 }, { 0, 1.62, 0 }, Iron),
+		block("Cap", { 0.9, 0.2, 0.9 }, { 0, 2.5, 0 }, Iron),
+		block("Spike", { 0.15, 0.3, 0.15 }, { 0, 2.75, 0 }, Iron),
+		block("LeftEye", { 0.15, 0.15, 0.05 }, { -0.15, 2.1, -0.37 }, Black),
+		block("RightEye", { 0.15, 0.15, 0.05 }, { 0.15, 2.1, -0.37 }, Black),
+		block("Mouth", { 0.35, 0.08, 0.05 }, { 0, 1.85, -0.37 }, Black),
+		limb("LeftArm", { 0.15, 1.8, 0.15 }, { -0.5, 0.4, -0.05 }, Iron, "X", 30, 1.2, 0.5, { 0, 0.9, 0 }),
+		limb("LeftClaw", { 0.3, 0.25, 0.3 }, { -0.5, -0.6, -0.05 }, Iron, "X", 30, 1.2, 0.5, { 0, 1.9, 0 }),
+		limb("RightArm", { 0.15, 1.8, 0.15 }, { 0.5, 0.4, -0.05 }, Iron, "X", 30, 1.2, 0, { 0, 0.9, 0 }),
+		limb("RightClaw", { 0.3, 0.25, 0.3 }, { 0.5, -0.6, -0.05 }, Iron, "X", 30, 1.2, 0, { 0, 1.9, 0 }),
+		limb("LeftLeg", { 0.25, 1, 0.25 }, { -0.2, -1.5, 0 }, Iron, "X", 30, 1.2, 0, { 0, 0.5, 0 }),
+		limb("RightLeg", { 0.25, 1, 0.25 }, { 0.2, -1.5, 0 }, Iron, "X", 30, 1.2, 0.5, { 0, 0.5, 0 }),
+	},
+}
+
+-- Breach Storm, Nightmare: a crackling storm gremlin with a tiny thundercloud over its head.
+local StormSkin = { 60, 70, 100 }
+local Spark = { 120, 230, 255 }
+local Lightning = { 255, 240, 120 }
+Looks.StormGremlin = {
+	gait = "walk",
+	top = 1.3,
+	pieces = {
+		block("Body", { 1, 1, 0.8 }, { 0, -1, 0 }, StormSkin),
+		block("Head", { 1, 0.8, 0.8 }, { 0, -0.1, -0.05 }, StormSkin),
+		block("LeftEye", { 0.22, 0.22, 0.05 }, { -0.22, 0, -0.47 }, Spark, true),
+		block("RightEye", { 0.22, 0.22, 0.05 }, { 0.22, 0, -0.47 }, Spark, true),
+		block("Mouth", { 0.55, 0.12, 0.05 }, { 0, -0.3, -0.47 }, Black),
+		block("Fang", { 0.1, 0.12, 0.05 }, { 0.15, -0.26, -0.5 }, White),
+		tilt(block("LeftEar", { 0.55, 0.3, 0.1 }, { -0.7, 0.05, 0 }, StormSkin), 0, 0, -25),
+		tilt(block("RightEar", { 0.55, 0.3, 0.1 }, { 0.7, 0.05, 0 }, StormSkin), 0, 0, 25),
+		tilt(block("Spike1", { 0.15, 0.5, 0.15 }, { -0.25, 0.45, 0 }, Lightning, true), 0, 0, 20),
+		block("Spike2", { 0.15, 0.55, 0.15 }, { 0, 0.5, 0 }, Lightning, true),
+		tilt(block("Spike3", { 0.15, 0.5, 0.15 }, { 0.25, 0.45, 0 }, Lightning, true), 0, 0, -20),
+		limb("Cloud", { 0.9, 0.35, 0.6 }, { 0, 1, 0 }, { 80, 85, 100 }, "X", 10, 1, 0, { 0, -0.2, 0 }),
+		limb(
+			"CloudPuff",
+			{ 0.5, 0.3, 0.5 },
+			{ 0.25, 1.15, 0 },
+			{ 95, 100, 115 },
+			"X",
+			10,
+			1,
+			0,
+			{ -0.25, -0.35, 0 }
+		),
+		limb(
+			"Bolt",
+			{ 0.08, 0.35, 0.08 },
+			{ -0.15, 0.68, 0 },
+			Lightning,
+			"X",
+			10,
+			1,
+			0,
+			{ 0.15, 0.12, 0 },
+			true
+		),
+		limb("Tail", { 0.15, 0.15, 0.8 }, { 0, -1.1, 0.75 }, StormSkin, "Y", 30, 2.5, 0, { 0, 0, -0.4 }),
+		limb(
+			"TailBolt",
+			{ 0.1, 0.4, 0.25 },
+			{ 0, -1, 1.2 },
+			Lightning,
+			"Y",
+			30,
+			2.5,
+			0,
+			{ 0, -0.1, -0.85 },
+			true
+		),
+		limb("LeftArm", { 0.25, 0.7, 0.25 }, { -0.62, -1, 0 }, StormSkin, "X", 30, 2.2, 0.5, { 0, 0.35, 0 }),
+		limb(
+			"LeftSpark",
+			{ 0.2, 0.2, 0.2 },
+			{ -0.62, -1.45, 0 },
+			Spark,
+			"X",
+			30,
+			2.2,
+			0.5,
+			{ 0, 0.8, 0 },
+			true
+		),
+		limb("RightArm", { 0.25, 0.7, 0.25 }, { 0.62, -1, 0 }, StormSkin, "X", 30, 2.2, 0, { 0, 0.35, 0 }),
+		limb(
+			"RightSpark",
+			{ 0.2, 0.2, 0.2 },
+			{ 0.62, -1.45, 0 },
+			Spark,
+			"X",
+			30,
+			2.2,
+			0,
+			{ 0, 0.8, 0 },
+			true
+		),
+		limb("LeftLeg", { 0.3, 0.5, 0.3 }, { -0.3, -1.75, 0 }, StormSkin, "X", 30, 2.2, 0, { 0, 0.25, 0 }),
+		limb("RightLeg", { 0.3, 0.5, 0.3 }, { 0.3, -1.75, 0 }, StormSkin, "X", 30, 2.2, 0.5, { 0, 0.25, 0 }),
+	},
+}
+
+-- Breach Storm, Nightmare: a front door that walks. Peepholes for eyes, a brass knocker for a
+-- mouth that swings as it goes.
+local DoorWood = { 110, 35, 30 }
+local DoorPanel = { 85, 25, 22 }
+Looks.Doorknocker = {
+	gait = "walk",
+	top = 1.5,
+	pieces = {
+		block("Door", { 1.6, 2.8, 0.3 }, { 0, -0.2, 0 }, DoorWood),
+		block("Arch", { 1.2, 0.25, 0.3 }, { 0, 1.32, 0 }, DoorWood),
+		block("PanelTopLeft", { 0.5, 0.8, 0.05 }, { -0.38, 0.6, -0.17 }, DoorPanel),
+		block("PanelTopRight", { 0.5, 0.8, 0.05 }, { 0.38, 0.6, -0.17 }, DoorPanel),
+		block("PanelLowLeft", { 0.5, 0.8, 0.05 }, { -0.38, -1, -0.17 }, DoorPanel),
+		block("PanelLowRight", { 0.5, 0.8, 0.05 }, { 0.38, -1, -0.17 }, DoorPanel),
+		block("LeftEye", { 0.15, 0.15, 0.05 }, { -0.38, 0.75, -0.2 }, RedEye, true),
+		block("RightEye", { 0.15, 0.15, 0.05 }, { 0.38, 0.75, -0.2 }, RedEye, true),
+		block("LionFace", { 0.4, 0.35, 0.06 }, { 0, 0.1, -0.19 }, Bronze),
+		limb("Knocker", { 0.5, 0.5, 0.08 }, { 0, -0.3, -0.22 }, Bronze, "X", 25, 2, 0, { 0, 0.25, 0 }),
+		block("MailSlot", { 0.5, 0.08, 0.05 }, { 0, -0.75, -0.18 }, Black),
+		block("Handle", { 0.12, 0.3, 0.15 }, { 0.6, -0.25, -0.22 }, Bronze),
+		limb("LeftArm", { 0.25, 1, 0.25 }, { -0.93, -0.4, 0 }, DoorPanel, "X", 30, 1.5, 0.5, { 0, 0.45, 0 }),
+		limb("LeftHand", { 0.3, 0.25, 0.3 }, { -0.93, -1, 0 }, Bronze, "X", 30, 1.5, 0.5, { 0, 1.05, 0 }),
+		limb("RightArm", { 0.25, 1, 0.25 }, { 0.93, -0.4, 0 }, DoorPanel, "X", 30, 1.5, 0, { 0, 0.45, 0 }),
+		limb("RightHand", { 0.3, 0.25, 0.3 }, { 0.93, -1, 0 }, Bronze, "X", 30, 1.5, 0, { 0, 1.05, 0 }),
+		limb("LeftLeg", { 0.35, 0.4, 0.3 }, { -0.45, -1.8, 0 }, DoorPanel, "X", 30, 1.5, 0, { 0, 0.2, 0 }),
+		limb("RightLeg", { 0.35, 0.4, 0.3 }, { 0.45, -1.8, 0 }, DoorPanel, "X", 30, 1.5, 0.5, { 0, 0.2, 0 }),
+	},
+}
+
+-- Watcher Awakens, Eldritch: a small floating eyeball with a slit pupil, dangling tentacles.
+local Eyeball = { 230, 225, 215 }
+local Vein = { 180, 30, 40 }
+Looks.Watcherling = {
+	gait = "float",
+	top = 1.3,
+	pieces = {
+		block("Eyeball", { 1.4, 1.4, 1.4 }, { 0, 0.3, 0 }, Eyeball),
+		block("Iris", { 0.7, 0.7, 0.1 }, { 0, 0.3, -0.72 }, Eldritch, true),
+		block("Pupil", { 0.15, 0.5, 0.05 }, { 0, 0.3, -0.78 }, Black),
+		tilt(block("Vein1", { 0.06, 0.5, 0.05 }, { 0.5, 0.65, -0.71 }, Vein), 0, 0, 30),
+		tilt(block("Vein2", { 0.06, 0.45, 0.05 }, { -0.45, 0, -0.71 }, Vein), 0, 0, -40),
+		block("Lid", { 1.5, 0.35, 1.5 }, { 0, 1.05, 0.05 }, Flesh),
+		limb(
+			"FrontLeftTentacle",
+			{ 0.25, 1.2, 0.25 },
+			{ -0.45, -0.85, -0.4 },
+			Flesh,
+			"X",
+			20,
+			1.2,
+			0,
+			{ 0, 0.6, 0 }
+		),
+		limb(
+			"FrontLeftTip",
+			{ 0.2, 0.2, 0.2 },
+			{ -0.45, -1.55, -0.4 },
+			Eldritch,
+			"X",
+			20,
+			1.2,
+			0,
+			{ 0, 1.3, 0 },
+			true
+		),
+		limb(
+			"FrontRightTentacle",
+			{ 0.25, 1.2, 0.25 },
+			{ 0.45, -0.85, -0.4 },
+			Flesh,
+			"Z",
+			20,
+			1.2,
+			0.25,
+			{ 0, 0.6, 0 }
+		),
+		limb(
+			"FrontRightTip",
+			{ 0.2, 0.2, 0.2 },
+			{ 0.45, -1.55, -0.4 },
+			Eldritch,
+			"Z",
+			20,
+			1.2,
+			0.25,
+			{ 0, 1.3, 0 },
+			true
+		),
+		limb(
+			"BackLeftTentacle",
+			{ 0.25, 1.2, 0.25 },
+			{ -0.45, -0.85, 0.4 },
+			Flesh,
+			"Z",
+			20,
+			1.2,
+			0.5,
+			{ 0, 0.6, 0 }
+		),
+		limb(
+			"BackLeftTip",
+			{ 0.2, 0.2, 0.2 },
+			{ -0.45, -1.55, 0.4 },
+			Eldritch,
+			"Z",
+			20,
+			1.2,
+			0.5,
+			{ 0, 1.3, 0 },
+			true
+		),
+		limb(
+			"BackRightTentacle",
+			{ 0.25, 1.2, 0.25 },
+			{ 0.45, -0.85, 0.4 },
+			Flesh,
+			"X",
+			20,
+			1.2,
+			0.75,
+			{ 0, 0.6, 0 }
+		),
+		limb(
+			"BackRightTip",
+			{ 0.2, 0.2, 0.2 },
+			{ 0.45, -1.55, 0.4 },
+			Eldritch,
+			"X",
+			20,
+			1.2,
+			0.75,
+			{ 0, 1.3, 0 },
+			true
+		),
+	},
+}
+
+-- Watcher Awakens, Eldritch: a piece of the Watcher itself. A great eye in a socket of dark
+-- flesh, crowned with spikes, with smaller eyes circling it.
+Looks.EyeOfTheWatcher = {
+	gait = "float",
+	top = 2,
+	pieces = {
+		block("Socket", { 2, 2, 2 }, { 0, 0.4, 0 }, Flesh),
+		block("Eyeball", { 1.6, 1.6, 0.3 }, { 0, 0.4, -1 }, Eyeball),
+		block("Iris", { 0.9, 0.9, 0.1 }, { 0, 0.4, -1.17 }, Eldritch, true),
+		block("Pupil", { 0.35, 0.35, 0.05 }, { 0, 0.4, -1.23 }, Black),
+		tilt(block("Vein1", { 0.06, 0.6, 0.05 }, { 0.6, 0.85, -1.16 }, Vein), 0, 0, 35),
+		tilt(block("Vein2", { 0.06, 0.5, 0.05 }, { -0.6, -0.05, -1.16 }, Vein), 0, 0, -35),
+		tilt(block("SpikeLeft", { 0.25, 0.8, 0.25 }, { -0.7, 1.6, 0 }, Black), 0, 0, 25),
+		block("SpikeMiddle", { 0.25, 1, 0.25 }, { 0, 1.8, 0 }, Black),
+		tilt(block("SpikeRight", { 0.25, 0.8, 0.25 }, { 0.7, 1.6, 0 }, Black), 0, 0, -25),
+		spin(limb("SmallEye1", { 0.4, 0.4, 0.4 }, { 1.6, 0.4, 0 }, Eyeball, "Y", 0, 0.2, 0, { -1.6, 0, 0 })),
+		spin(
+			limb(
+				"SmallIris1",
+				{ 0.18, 0.18, 0.05 },
+				{ 1.6, 0.4, -0.22 },
+				Eldritch,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ -1.6, 0, 0.22 },
+				true
+			)
+		),
+		spin(limb("SmallEye2", { 0.4, 0.4, 0.4 }, { -1.6, 0.4, 0 }, Eyeball, "Y", 0, 0.2, 0, { 1.6, 0, 0 })),
+		spin(
+			limb(
+				"SmallIris2",
+				{ 0.18, 0.18, 0.05 },
+				{ -1.6, 0.4, -0.22 },
+				Eldritch,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ 1.6, 0, 0.22 },
+				true
+			)
+		),
+		spin(limb("SmallEye3", { 0.4, 0.4, 0.4 }, { 0, 0.4, 1.6 }, Eyeball, "Y", 0, 0.2, 0, { 0, 0, -1.6 })),
+		spin(
+			limb(
+				"SmallIris3",
+				{ 0.18, 0.18, 0.05 },
+				{ -0.22, 0.4, 1.6 },
+				Eldritch,
+				"Y",
+				0,
+				0.2,
+				0,
+				{ 0.22, 0, -1.6 },
+				true
+			)
+		),
+		limb("LeftTentacle", { 0.3, 1.2, 0.3 }, { -0.6, -1.15, 0 }, Flesh, "Z", 20, 1, 0, { 0, 0.6, 0 }),
+		limb("MiddleTentacle", { 0.3, 1.4, 0.3 }, { 0, -1.25, 0 }, Flesh, "X", 20, 1, 0.33, { 0, 0.7, 0 }),
+		limb("RightTentacle", { 0.3, 1.2, 0.3 }, { 0.6, -1.15, 0 }, Flesh, "Z", 20, 1, 0.66, { 0, 0.6, 0 }),
 	},
 }
 
