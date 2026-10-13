@@ -1032,7 +1032,9 @@ do
 		check(`{id} cliffs ring the zone outside its walls`, outside)
 		local clear = true
 		for _, p in parts do
-			if p.solid and not string.find(p.name, "^Fence") then
+			-- Ground (anything that doesn't rise above the floor) may lie under the roaming.
+			local ground = p.at[2] + p.size[2] / 2 <= 0
+			if p.solid and not ground and not string.find(p.name, "^Fence") then
 				local reach = math.max(p.size[1], p.size[3]) / 2
 				for _, r in zone.roam do
 					if inside(p.at[1], p.at[3], r, reach) then
@@ -1052,6 +1054,19 @@ do
 				and not inside(Layout.ZoneExit.x, Layout.ZoneExit.z, r, 5)
 		end
 		check(`{id} roaming ground is inside the zone and clear of the arrival and exit`, roomy)
+		if zone.water then
+			local dry = zone.bed ~= nil and (zone.waterDepth or 2) < zone.bed
+			for _, pool in zone.water do
+				for _, r in zone.roam do
+					dry = dry
+						and not (
+							math.abs(pool.x - r.x) < (pool.width + r.width) / 2
+							and math.abs(pool.z - r.z) < (pool.depth + r.depth) / 2
+						)
+				end
+			end
+			check(`{id} water stays below the ground and off the monsters' ground`, dry)
+		end
 	end
 end
 

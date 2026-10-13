@@ -271,9 +271,15 @@ end
 
 -- A zone's look: its parts, and the open ground monsters roam over (zone-local rectangles,
 -- clear of the props; SpawnService and the roam code use them as Workspace.Zones.<Id>.RoamArea).
+type Rect = { x: number, z: number, width: number, depth: number }
 export type Zone = {
 	parts: () -> { Part },
-	roam: { { x: number, z: number, width: number, depth: number } },
+	roam: { Rect },
+	-- With water: the island floor sits `bed` studs below the ground (the recipe builds the
+	-- ground round the pools) and the `water` pools hold `waterDepth` studs of terrain water.
+	bed: number?,
+	water: { Rect }?,
+	waterDepth: number?,
 }
 
 local Edge = 108 -- the fence line, just inside the zone's invisible walls
@@ -628,10 +634,367 @@ local function pumpkinGraveyard(): { Part }
 	return parts
 end
 
+-- Where monsters roam in the bayou: the mud banks round the edge and the boardwalks up the
+-- middle and across, between four stretches of swamp water.
+local BayouPaths = {
+	{ x = 0, z = -51, width = 208, depth = 14 }, -- south bank, just past the dock gate
+	{ x = 0, z = 96, width = 208, depth = 16 }, -- north bank
+	{ x = -97, z = 22, width = 14, depth = 132 }, -- west bank
+	{ x = 97, z = 22, width = 14, depth = 132 }, -- east bank
+	{ x = 0, z = 22, width = 10, depth = 132 }, -- the boardwalk up the middle
+	{ x = -47.5, z = 21, width = 85, depth = 10 }, -- boardwalk across, west half
+	{ x = 47.5, z = 21, width = 85, depth = 10 }, -- boardwalk across, east half
+}
+
+local Mud = { 54, 46, 32 }
+local Cypress = { 44, 64, 40 }
+local CypressDark = { 34, 50, 32 }
+local Moss = { 84, 96, 70 }
+local Rotten = { 74, 60, 44 }
+local Firefly = { 200, 255, 120 }
+
+-- The bayou's water: shallow, real (terrain) water in pits between the banks and boardwalks.
+-- The pit floor is `BayouBed` studs below the ground and the water `BayouWater` deep.
+local BayouBed, BayouWater = 4, 2
+local Bed, Surface = -BayouBed, BayouWater - BayouBed
+local BayouPools = {
+	{ x = -47.5, z = -14, width = 85, depth = 60 },
+	{ x = 47.5, z = -14, width = 85, depth = 60 },
+	{ x = -47.5, z = 57, width = 85, depth = 62 },
+	{ x = 47.5, z = 57, width = 85, depth = 62 },
+}
+
+-- A bald cypress standing in the water: a flared foot, a tall trunk, a flat crown with grey
+-- moss hanging from it, and knees poking up round its foot. The crown and moss are overhead,
+-- so walk-through.
+local function cypress(parts: { Part }, name: string, x: number, z: number, height: number)
+	part(parts, name .. "Foot", { 3.2, 2, 3.2 }, { x, Bed + 1, z }, Bark, "Wood", true)
+	part(parts, name .. "Flare", { 2.4, 2, 2.4 }, { x, Bed + 3, z }, Bark, "Wood", true)
+	part(parts, name .. "Trunk", { 1.5, height, 1.5 }, { x, height / 2, z }, Bark, "Wood", true)
+	part(parts, name .. "Crown", { 9, 1.4, 8 }, { x, height + 0.7, z }, Cypress, "Grass")
+	part(parts, name .. "CrownTop", { 6, 1.2, 5 }, { x + 0.8, height + 2, z - 0.6 }, CypressDark, "Grass")
+	for i, spot in { { -3.6, -2, 4 }, { 3.2, 2.4, 5 }, { 1, -3.3, 3 }, { -2.2, 3.1, 4.5 } } do
+		local length = spot[3]
+		part(
+			parts,
+			`{name}Moss{i}`,
+			{ 0.4, length, 0.2 },
+			{ x + spot[1], height - length / 2, z + spot[2] },
+			Moss,
+			"Fabric"
+		)
+	end
+	for i, spot in { { 2.4, 0.8 }, { -1.2, 2.3 } } do
+		part(parts, `{name}Knee{i}`, { 0.6, 3, 0.6 }, { x + spot[1], Bed + 1.5, z + spot[2] }, Bark, "Wood")
+	end
+end
+
+-- The Murky Bayou: a swamp under tall mossy cliffs. From the arrival pad you cross a muddy
+-- landing to a dock gate; past it, mud banks run round the edge and boardwalks run up the
+-- middle and across, over four pools of shallow murky water full of cypress trees, reeds and
+-- lily pads. Out in the water: a shack on stilts, a broken clock tower sinking into the
+-- swamp with its fallen stones around it, a rowboat and fireflies. Monsters roam the banks
+-- and boardwalks.
+local function murkyBayou(): { Part }
+	local parts: { Part } = {}
+	local roll = dice(2069)
+	cliffs(parts, 91, { 48, 58, 46 })
+
+	-- Mud round the edge down to the pit floor, boardwalks over the pools.
+	part(parts, "MudSouth", { 220, BayouBed, 66 }, { 0, Bed / 2, -77 }, Mud, "Ground", true)
+	part(parts, "MudNorth", { 220, BayouBed, 22 }, { 0, Bed / 2, 99 }, Mud, "Ground", true)
+	part(parts, "MudWest", { 20, BayouBed, 132 }, { -100, Bed / 2, 22 }, Mud, "Ground", true)
+	part(parts, "MudEast", { 20, BayouBed, 132 }, { 100, Bed / 2, 22 }, Mud, "Ground", true)
+	part(parts, "BoardwalkMiddle", { 10, 0.3, 132 }, { 0, -0.15, 22 }, Plank, "WoodPlanks", true)
+	part(parts, "BoardwalkWest", { 85, 0.3, 10 }, { -47.5, -0.15, 21 }, Plank, "WoodPlanks", true)
+	part(parts, "BoardwalkEast", { 85, 0.3, 10 }, { 47.5, -0.15, 21 }, Plank, "WoodPlanks", true)
+	local post = 0
+	local function boardwalkPost(x: number, z: number)
+		post += 1
+		part(parts, `BoardwalkPost{post}`, { 0.6, 4.8, 0.6 }, { x, Bed + 2.4, z }, Rotten, "Wood", true)
+	end
+	for z = -38, 82, 12 do
+		if z < 14 or z > 28 then
+			boardwalkPost(-5.4, z)
+			boardwalkPost(5.4, z)
+		end
+	end
+	for x = 12, 84, 12 do
+		for _, side in { -1, 1 } do
+			boardwalkPost(side * x, 15.6)
+			boardwalkPost(side * x, 26.4)
+		end
+	end
+
+	-- The way in: a dock gate with glowing firefly jars, and a rotten fence either side.
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		local x = side * 7
+		part(parts, `GatePost{tag}`, { 1.2, 9, 1.2 }, { x, 4.5, -62 }, Rotten, "Wood", true)
+		local jar = part(parts, `GateJar{tag}`, { 0.8, 0.8, 0.8 }, { x, 9.4, -62 }, Firefly, "Neon")
+		jar.light = { color = Firefly, range = 14, brightness = 1 }
+		Kit.lampPost(parts, `PathLamp{tag}`, side * 6.5, -80)
+		local count = 0
+		for fx = side * 10, side * 106, side * 8 do
+			count += 1
+			part(parts, `Fence{tag}Post{count}`, { 0.6, 4, 0.6 }, { fx, 2, -62 }, Rotten, "Wood", true)
+		end
+		local last = side * (10 + (count - 1) * 8)
+		for r, y in { 1.5, 3.2 } do
+			part(
+				parts,
+				`Fence{tag}Rail{r}`,
+				{ math.abs(last - side * 10) + 0.6, 0.3, 0.3 },
+				{ (side * 10 + last) / 2, y, -61.55 },
+				Rotten,
+				"Wood"
+			)
+		end
+	end
+	part(parts, "GateBar", { 12.8, 0.8, 0.6 }, { 0, 8.4, -62 }, Rotten, "Wood")
+	local sign = part(parts, "GateSign", { 9, 1.8, 0.3 }, { 0, 6.9, -62.75 }, { 150, 130, 90 }, "WoodPlanks")
+	sign.text = "Murky Bayou"
+	part(parts, "CrateA", { 2.4, 2.4, 2.4 }, { -52, 1.2, -84 }, Plank, "WoodPlanks", true)
+	part(parts, "CrateB", { 2, 2, 2 }, { -52.3, 3.4, -84.2 }, Rotten, "WoodPlanks", true)
+	part(parts, "Barrel", { 1.8, 2.6, 1.8 }, { -48.6, 1.3, -85 }, Rotten, "Wood", true)
+
+	-- What's out in the water takes its patch from the trees and reeds; `solid` patches also
+	-- keep the fireflies away.
+	local taken: { { number } } = {} -- minX, maxX, minZ, maxZ
+	local solids: { { number } } = {}
+	local function take(minX: number, maxX: number, minZ: number, maxZ: number, solid: boolean)
+		table.insert(taken, { minX, maxX, minZ, maxZ })
+		if solid then
+			table.insert(solids, { minX, maxX, minZ, maxZ })
+		end
+	end
+	local function clear(list: { { number } }, x: number, z: number, margin: number): boolean
+		for _, t in list do
+			if x > t[1] - margin and x < t[2] + margin and z > t[3] - margin and z < t[4] + margin then
+				return false
+			end
+		end
+		return true
+	end
+
+	-- A fisherman's shack on stilts in the north-east water, a light still on.
+	local hx, hz = 62, 58
+	take(hx - 9, hx + 9, hz - 9, hz + 8, true)
+	take(hx - 16, hx + 16, hz - 16, hz + 14, false)
+	part(parts, "ShackDeck", { 14, 0.6, 12 }, { hx, 5.3, hz }, Plank, "WoodPlanks", true)
+	for i, spot in { { -6.6, -5.6 }, { 6.6, -5.6 }, { -6.6, 5.6 }, { 6.6, 5.6 } } do
+		part(
+			parts,
+			`ShackStilt{i}`,
+			{ 0.8, 9, 0.8 },
+			{ hx + spot[1], 0.5, hz + spot[2] },
+			Rotten,
+			"Wood",
+			true
+		)
+	end
+	part(parts, "ShackBack", { 10, 7, 0.5 }, { hx, 9.1, hz + 4.75 }, Rotten, "WoodPlanks", true)
+	part(parts, "ShackLeft", { 0.5, 7, 7 }, { hx - 4.75, 9.1, hz + 1 }, Rotten, "WoodPlanks", true)
+	part(parts, "ShackRight", { 0.5, 7, 7 }, { hx + 4.75, 9.1, hz + 1 }, Rotten, "WoodPlanks", true)
+	part(parts, "ShackFrontLeft", { 3.5, 7, 0.5 }, { hx - 3.25, 9.1, hz - 2.75 }, Rotten, "WoodPlanks", true)
+	part(parts, "ShackFrontRight", { 3.5, 7, 0.5 }, { hx + 3.25, 9.1, hz - 2.75 }, Rotten, "WoodPlanks", true)
+	part(parts, "ShackOverDoor", { 3, 2, 0.5 }, { hx, 11.6, hz - 2.75 }, Rotten, "WoodPlanks", true)
+	part(parts, "ShackDoorDark", { 3, 5, 0.1 }, { hx, 8.1, hz - 2.75 }, Black, "SmoothPlastic")
+	part(parts, "ShackRoof", { 12, 0.5, 10 }, { hx, 12.85, hz + 1 }, { 110, 70, 50 }, "Metal", true)
+	part(parts, "ShackRoofTop", { 9, 0.6, 7 }, { hx, 13.4, hz + 1 }, { 96, 60, 44 }, "Metal", true)
+	local window = part(parts, "ShackWindow", { 1.6, 1.4, 0.1 }, { hx + 3.25, 9.6, hz - 3.05 }, Glow, "Neon")
+	window.light = { color = Glow, range = 16, brightness = 0.9 }
+	for _, side in { -1, 1 } do
+		part(
+			parts,
+			`ShackLadder{side}`,
+			{ 0.3, 7.4, 0.3 },
+			{ hx + side, 1.3, hz - 6.4 },
+			Rotten,
+			"Wood",
+			true
+		)
+	end
+	for r = 0, 5 do
+		part(parts, `ShackRung{r}`, { 1.7, 0.2, 0.2 }, { hx, r - 1.1, hz - 6.4 }, Rotten, "Wood")
+	end
+
+	-- A clock tower sinking into the north-west water: leaning, a hole broken in its front, the
+	-- clock stopped, half its belfry roof gone, and the fallen stones lying in the water.
+	local tx, tz = -58, 58
+	take(tx - 10, tx + 10, tz - 18, tz + 10, true)
+	take(tx - 16, tx + 16, tz - 22, tz + 16, false)
+	local tower = group(parts, { tx, Bed, tz }, 20, 10)
+	local Clock = { 196, 186, 150 }
+	-- The shaft: four walls 18 studs tall, the front one broken open in the middle.
+	tower("TowerBack", { 7, 18, 1 }, { 0, 9, 3 }, MossStone, "Slate", true)
+	tower("TowerLeft", { 1, 18, 5 }, { -3, 9, 0 }, MossStone, "Slate", true)
+	tower("TowerRight", { 1, 18, 5 }, { 3, 9, 0 }, MossStone, "Slate", true)
+	tower("TowerFrontLow", { 7, 8, 1 }, { 0, 4, -3 }, MossStone, "Slate", true)
+	tower("TowerJambLeft", { 2, 5, 1 }, { -2.5, 10.5, -3 }, MossStone, "Slate", true)
+	tower("TowerJambRight", { 2, 5, 1 }, { 2.5, 10.5, -3 }, MossStone, "Slate", true)
+	tower("TowerFrontHigh", { 7, 5, 1 }, { 0, 15.5, -3 }, MossStone, "Slate", true)
+	tower("TowerChipA", { 1, 1.2, 1 }, { -1, 12.4, -3 }, Stone, "Slate", true)
+	tower("TowerChipB", { 1.2, 1, 1 }, { 0.9, 8.5, -3 }, Stone, "Slate", true)
+	tower("TowerDark", { 5, 6, 0.1 }, { 0, 10.5, 2.45 }, Black, "SmoothPlastic")
+	tower("TowerLoft", { 5, 0.3, 5 }, { 0, 17.85, 0 }, StoneDark, "Slate", true)
+	-- Stone bands round the shaft, moss and arrow slits.
+	for b, y in { 7.7, 17.7 } do
+		tower(`TowerBandFront{b}`, { 7, 0.6, 0.3 }, { 0, y, -3.65 }, Stone, "Slate")
+		tower(`TowerBandBack{b}`, { 7, 0.6, 0.3 }, { 0, y, 3.65 }, Stone, "Slate")
+		tower(`TowerBandLeft{b}`, { 0.3, 0.6, 7.6 }, { -3.65, y, 0 }, Stone, "Slate")
+		tower(`TowerBandRight{b}`, { 0.3, 0.6, 7.6 }, { 3.65, y, 0 }, Stone, "Slate")
+	end
+	tower("TowerMossFront", { 2.2, 2.6, 0.1 }, { -2, 5, -3.55 }, Moss, "Grass")
+	tower("TowerMossLeft", { 0.1, 3, 2 }, { -3.55, 12, 1 }, Moss, "Grass")
+	tower("TowerSlitRight", { 0.1, 2.4, 1 }, { 3.55, 12, 0 }, Black, "SmoothPlastic")
+	tower("TowerSlitLeft", { 0.1, 2.4, 1 }, { -3.55, 12, -1.6 }, Black, "SmoothPlastic")
+	-- The clock, stopped at three, with a crack across it.
+	tower("ClockFace", { 3.2, 3.2, 0.1 }, { 0, 15.5, -3.55 }, Clock, "SmoothPlastic")
+	tower("ClockMinute", { 0.2, 1.4, 0.05 }, { 0, 16.2, -3.625 }, Black, "SmoothPlastic")
+	tower("ClockHour", { 0.9, 0.2, 0.05 }, { 0.55, 15.5, -3.625 }, Black, "SmoothPlastic")
+	tower("ClockCrack", { 0.1, 1.2, 0.05 }, { -0.8, 15, -3.625 }, Black, "SmoothPlastic")
+	-- The belfry: one post snapped off, the front half of the roof fallen in the water, the
+	-- bell still hanging from the back half.
+	for i, spot in { { -2.8, -2.8 }, { -2.8, 2.8 }, { 2.8, 2.8 } } do
+		tower(`TowerPost{i}`, { 1.4, 6, 1.4 }, { spot[1], 21, spot[2] }, Stone, "Slate", true)
+	end
+	tower("TowerPostBroken", { 1.4, 3, 1.4 }, { 2.8, 19.5, -2.8 }, Stone, "Slate", true)
+	tower("TowerCap", { 8, 1, 4.4 }, { 0, 24.5, 1.8 }, StoneDark, "Slate", true)
+	tower("TowerRoof", { 6, 1, 3 }, { 0, 25.5, 1.9 }, StoneDark, "Slate", true)
+	tower("TowerRoofTop", { 3, 1.2, 2 }, { 0, 26.6, 2.2 }, StoneDark, "Slate", true)
+	tower("BellHanger", { 0.4, 2.2, 0.4 }, { 0, 22.9, 0.5 }, Iron, "Metal")
+	tower("Bell", { 2.6, 2.4, 2.6 }, { 0, 20.6, 0.5 }, { 150, 110, 50 }, "Metal")
+	tower("BellLip", { 3.2, 0.5, 3.2 }, { 0, 19.15, 0.5 }, { 130, 94, 42 }, "Metal")
+	-- What fell out: stones from the hole, sticking out of the water, and the roof half.
+	for i, stone in
+		{
+			{ -60.5, 51, 2.6, 2.4, 2.2, 15 },
+			{ -57, 49.5, 1.8, 2.2, 1.6, 40 },
+			{ -63, 48.5, 2.2, 2.6, 2, 70 },
+			{ -59.5, 46.2, 1.6, 2.3, 1.4, 25 },
+			{ -55.5, 45.8, 1.2, 2.1, 1.2, 55 },
+		}
+	do
+		local rock = part(
+			parts,
+			`FallenStone{i}`,
+			{ stone[3], stone[4], stone[5] },
+			{ stone[1], Bed + stone[4] / 2, stone[2] },
+			if i % 2 == 0 then Stone else MossStone,
+			"Slate",
+			true
+		)
+		rock.rot = { 0, stone[6], 0 }
+	end
+	local fallen = part(parts, "FallenRoof", { 8, 1, 4.4 }, { -67, Bed + 1.2, 42 }, StoneDark, "Slate", true)
+	fallen.rot = { 0, 35, 18 }
+
+	-- A rowboat half sunk in the south-west water.
+	take(-58, -42, -28, -12, true)
+	take(-64, -36, -34, -6, false)
+	local boat = group(parts, { -50, Surface - 0.6, -20 }, 25, 0)
+	boat("BoatBottom", { 3, 0.3, 8 }, { 0, 0.25, 0 }, Rotten, "WoodPlanks", true)
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		boat(`BoatSide{tag}`, { 0.3, 1, 8 }, { side * 1.65, 0.75, 0 }, Plank, "WoodPlanks", true)
+		boat(`BoatEnd{tag}`, { 3.6, 1, 0.3 }, { 0, 0.75, side * 4.15 }, Plank, "WoodPlanks", true)
+	end
+	boat("BoatSeat", { 3, 0.2, 0.8 }, { 0, 0.9, 0 }, Plank, "Wood")
+	boat("BoatOar", { 0.25, 0.25, 6 }, { 0.5, 1.125, 0.5 }, Bark, "Wood")
+
+	-- Cypress trees through the water, with reeds and lily pads between them.
+	local blocks = { { -86, -9, -40, 12 }, { 9, 86, -40, 12 }, { -86, -9, 30, 84 }, { 9, 86, 30, 84 } }
+	local trees = 0
+	for _, b in blocks do
+		for x = b[1] + 2, b[2] - 2, 13 do
+			for z = b[3] + 2, b[4] - 2, 13 do
+				local tx2, tz2 = x + (roll() - 0.5) * 4, z + (roll() - 0.5) * 4
+				if roll() < 0.45 and clear(taken, tx2, tz2, 1) then
+					trees += 1
+					cypress(parts, `Cypress{trees}`, tx2, tz2, 14 + roll() * 6)
+					take(tx2 - 4.5, tx2 + 4.5, tz2 - 4, tz2 + 4, false)
+					table.insert(solids, { tx2 - 2.2, tx2 + 2.2, tz2 - 2.2, tz2 + 2.2 })
+				end
+			end
+		end
+	end
+	local pads, reeds = 0, 0
+	for _, b in blocks do
+		for x = b[1], b[2], 6 do
+			for z = b[3], b[4], 6 do
+				local px, pz = x + (roll() - 0.5) * 2, z + (roll() - 0.5) * 2
+				local pick = roll()
+				if clear(taken, px, pz, 1.5) then
+					if pick < 0.3 then
+						pads += 1
+						local d = 1.5 + roll() * 1
+						local pad = part(
+							parts,
+							`LilyPad{pads}`,
+							{ d, 0.1, d },
+							{ px, Surface + 0.05, pz },
+							{ 60, 96, 50 },
+							"Grass"
+						)
+						pad.rot = { 0, roll() * 90, 0 }
+					elseif pick < 0.5 then
+						-- Reeds grow from the pit floor; `h` is how far they stand out of the water.
+						reeds += 1
+						local h = 3 + roll() * 2
+						for i, o in { { -0.4, 0 }, { 0.3, 0.3 }, { 0.1, -0.45 } } do
+							local stalk = h - (i - 1) * 0.6 + BayouWater
+							part(
+								parts,
+								`Reeds{reeds}Stalk{i}`,
+								{ 0.2, stalk, 0.2 },
+								{ px + o[1], Bed + stalk / 2, pz + o[2] },
+								{ 96, 110, 60 },
+								"Grass"
+							)
+						end
+						part(
+							parts,
+							`Reeds{reeds}Head`,
+							{ 0.35, 0.8, 0.35 },
+							{ px - 0.4, Surface + h + 0.4, pz },
+							{ 80, 54, 34 },
+							"Fabric"
+						)
+					end
+				end
+			end
+		end
+	end
+
+	-- Fireflies drifting over the water, a few bright enough to light it.
+	local flies = 0
+	while flies < 40 do
+		local b = blocks[1 + math.floor(roll() * 4)]
+		local x, z = b[1] + roll() * (b[2] - b[1]), b[3] + roll() * (b[4] - b[3])
+		local y = 4 + roll() * 3
+		if clear(solids, x, z, 0.5) then
+			flies += 1
+			local fly = part(parts, `Firefly{flies}`, { 0.3, 0.3, 0.3 }, { x, y, z }, Firefly, "Neon")
+			if flies % 6 == 0 then
+				fly.light = { color = Firefly, range = 10, brightness = 0.8 }
+			end
+		end
+	end
+	return parts
+end
+
 Scenery.Zones = {
 	PumpkinGraveyard = {
 		parts = pumpkinGraveyard,
 		roam = GraveyardPaths,
+	},
+	MurkyBayou = {
+		parts = murkyBayou,
+		roam = BayouPaths,
+		bed = BayouBed,
+		water = BayouPools,
+		waterDepth = BayouWater,
 	},
 } :: { [string]: Zone }
 
