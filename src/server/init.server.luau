@@ -14,6 +14,7 @@ local SpawnService = require(script.Services.SpawnService)
 local MansionService = require(script.Services.MansionService)
 local WatcherService = require(script.Services.WatcherService)
 local HuntService = require(script.Services.HuntService)
+local TravelService = require(script.Services.TravelService)
 local CatchService = require(script.Services.CatchService)
 local CollectorService = require(script.Services.CollectorService)
 local WorkshopService = require(script.Services.WorkshopService)
@@ -32,6 +33,7 @@ local services: { { name: string, start: () -> ...any } } = {
 	{ name = "MansionService", start = MansionService.start },
 	{ name = "WatcherService", start = WatcherService.start },
 	{ name = "HuntService", start = HuntService.start },
+	{ name = "TravelService", start = TravelService.start },
 	{ name = "CatchService", start = CatchService.start },
 	{ name = "CollectorService", start = CollectorService.start },
 	{ name = "WorkshopService", start = WorkshopService.start },
