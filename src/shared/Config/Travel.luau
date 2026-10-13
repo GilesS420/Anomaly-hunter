@@ -12,8 +12,9 @@ return {
 	-- WalkSpeed in the open hub. Mansion plots and zones keep the normal speed
 	-- (StarterPlayer.CharacterWalkSpeed, 16 by default).
 	HubWalkSpeed = 32,
-	-- Seconds between two fast-travel trips, so spamming the buttons can't glitch anyone.
-	Cooldown = 3,
+	-- Seconds between two fast-travel trips: short enough to click through the buttons
+	-- quickly, just enough to ignore an accidental double click.
+	Cooldown = 0.25,
 	-- Studs between where you land and the shop or the row of gates.
 	StandOff = 10,
 	Destinations = {
