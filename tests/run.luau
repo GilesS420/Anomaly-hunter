@@ -22,6 +22,7 @@ local Effects = require("../src/shared/Config/Effects")
 local Haunting = require("../src/shared/Util/Haunting")
 local AttackConfig = require("../src/shared/Config/Attacks")
 local Attacks = require("../src/shared/Util/Attacks")
+local Landmarks = require("../src/shared/Config/Landmarks")
 local Looks = require("../src/shared/Config/Looks")
 local Rooms = require("../src/shared/Config/Rooms")
 local Travel = require("../src/shared/Util/Travel")
@@ -890,6 +891,69 @@ do
 			shut == expectBoarded[wingId] and open == 0
 		)
 	end
+end
+
+-- Hub landmarks: every part is sized, uses a real material and stays on the landmark's spot,
+-- the shops have a counter spot in front, and the middle of Watcher Square stays clear for
+-- the Watcher's meter.
+do
+	local materials = {
+		WoodPlanks = true,
+		Wood = true,
+		Slate = true,
+		Metal = true,
+		Neon = true,
+		Fabric = true,
+		SmoothPlastic = true,
+		Glass = true,
+		Cobblestone = true,
+		Brick = true,
+	}
+	local spots = {}
+	for _, spot in Layout.Landmarks do
+		spots[spot.name] = spot
+	end
+	for name, recipe in Landmarks.ByName do
+		local spot = spots[name]
+		local ok, names, byName = spot ~= nil, {}, {}
+		for _, p in recipe() do
+			ok = ok and #p.size == 3 and #p.at == 3 and #p.color == 3 and materials[p.material] == true
+			ok = ok
+				and math.abs(p.at[1]) <= spot.width / 2 + 1
+				and math.abs(p.at[3]) <= spot.depth / 2 + 1
+				and (p.rot ~= nil or p.at[2] - p.size[2] / 2 >= -0.01) -- nothing sunk into the ground
+			if names[p.name] then
+				ok = false
+				print(`  {name} has two parts named {p.name}`)
+			end
+			names[p.name] = true
+			byName[p.name] = p
+		end
+		check(`{name} parts are sized, named once and on its spot`, ok)
+		check(`{name} has its anchor part`, byName[Landmarks.Anchor[name]] ~= nil)
+		if name ~= "WatcherSquare" then
+			local spotPart, counter = byName[Landmarks.CounterSpot], byName.Counter
+			check(
+				`{name} counter spot is invisible and in front of the counter`,
+				spotPart ~= nil
+					and counter ~= nil
+					and spotPart.transparency == 1
+					and not spotPart.solid
+					and spotPart.at[3] < counter.at[3] - counter.size[3] / 2
+			)
+		end
+	end
+	local clear = true
+	for _, p in Landmarks.WatcherSquare() do
+		if
+			p.name ~= "Plaza"
+			and math.abs(p.at[1]) - p.size[1] / 2 < 2
+			and math.abs(p.at[3]) - p.size[3] / 2 < 2
+		then
+			clear = false
+		end
+	end
+	check("the middle of Watcher Square is clear for the Watcher's meter", clear)
 end
 
 -- Fast travel and the faster hub walk.

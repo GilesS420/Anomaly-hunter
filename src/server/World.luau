@@ -26,13 +26,16 @@ function World.find(parent: Instance?, name: string): Instance?
 	return nil
 end
 
--- The instance itself if it's a part, otherwise the first part inside it.
+-- The instance itself if it's a part, a model's PrimaryPart, otherwise the first part inside it.
 function World.part(instance: Instance?): BasePart?
 	if not instance then
 		return nil
 	end
 	if instance:IsA("BasePart") then
 		return instance
+	end
+	if instance:IsA("Model") and instance.PrimaryPart then
+		return instance.PrimaryPart
 	end
 	return instance:FindFirstChildWhichIsA("BasePart", true)
 end

@@ -31,6 +31,7 @@ local DataService = require(script.Parent.DataService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
 local PlotService = require(script.Parent.PlotService)
+local Recipe = require(script.Parent.Parent.Recipe)
 local RoamService = require(script.Parent.RoamService)
 local World = require(script.Parent.Parent.World)
 
@@ -170,56 +171,6 @@ local function roamRects(state: State, wingsOwned: number): { Roam.Rect }
 	return rects
 end
 
-local function rgb(c: { number }): Color3
-	return Color3.fromRGB(c[1], c[2], c[3])
-end
-
--- Builds a room recipe (see Config/Rooms) into the folder, centred on `base`.
-local function buildRoom(parts: { Rooms.Part }, base: CFrame, folder: Folder)
-	for _, spec in parts do
-		local part = Instance.new("Part")
-		part.Name = spec.name
-		part.Size = Vector3.new(spec.size[1], spec.size[2], spec.size[3])
-		local rot = spec.rot or { 0, 0, 0 }
-		part.CFrame = base
-			* CFrame.new(spec.at[1], spec.at[2], spec.at[3])
-			* CFrame.fromOrientation(math.rad(rot[1]), math.rad(rot[2]), math.rad(rot[3]))
-		part.Color = rgb(spec.color)
-		part.Material = (Enum.Material :: any)[spec.material]
-		part.Shape = (Enum.PartType :: any)[spec.shape or "Block"]
-		part.Transparency = spec.transparency or 0
-		part.Anchored = true
-		part.TopSurface = Enum.SurfaceType.Smooth
-		part.BottomSurface = Enum.SurfaceType.Smooth
-		if not spec.solid then
-			ghost(part)
-		end
-		if spec.light then
-			local light = Instance.new("PointLight")
-			light.Color = rgb(spec.light.color)
-			light.Range = spec.light.range
-			light.Brightness = spec.light.brightness
-			light.Shadows = true
-			light.Parent = part
-		end
-		if spec.text then
-			local gui = Instance.new("SurfaceGui")
-			gui.Face = Enum.NormalId.Front
-			gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-			gui.PixelsPerStud = 40
-			gui.LightInfluence = 0.6
-			local label = textLine(gui, spec.text, Color3.fromRGB(45, 30, 15), 0.1, 0.8)
-			label.Font = Enum.Font.Fantasy
-			local stroke = label:FindFirstChildOfClass("UIStroke")
-			if stroke then
-				stroke:Destroy()
-			end
-			gui.Parent = part
-		end
-		part.Parent = folder
-	end
-end
-
 -- A wing the player owns: a full room when it has a recipe in Config/Rooms, otherwise still a
 -- placeholder (a floor, corner pillars and the wing's name).
 local function buildOwnedWing(state: State, wing: Wings.Wing, owned: { [string]: boolean })
@@ -234,7 +185,7 @@ local function buildOwnedWing(state: State, wing: Wings.Wing, owned: { [string]:
 		local folder = Instance.new("Folder")
 		folder.Name = wing.id
 		local base = CFrame.new(wingCentre(state.plot, wing.id, top)) * state.plot.frame.Rotation
-		buildRoom(recipe(spot.width, spot.depth, owned), base, folder)
+		Recipe.build(recipe(spot.width, spot.depth, owned), base, folder)
 		folder.Parent = state.wings
 		return
 	end

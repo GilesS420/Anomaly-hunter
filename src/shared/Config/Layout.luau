@@ -26,6 +26,17 @@ export type WingSpot = {
 	depth: number, -- along z
 }
 
+-- A hub landmark (world x, z; footprint and placeholder height in studs).
+export type Landmark = {
+	name: string,
+	label: string,
+	x: number,
+	z: number,
+	width: number,
+	depth: number,
+	height: number,
+}
+
 local Layout = {}
 
 Layout.Hub = {
@@ -60,7 +71,8 @@ Layout.Wings = {
 -- Where the owner appears on their plot, plot-local (in front of the Foyer).
 Layout.PlotSpawn = { x = 0, z = -45 }
 
--- Hub landmarks (placeholders until the art pass, #31).
+-- Hub landmarks. Watcher Square, the Bakery and the Workshop are built from Config/Landmarks;
+-- the rest are still placeholders.
 Layout.Landmarks = {
 	{ name = "WatcherSquare", label = "Watcher Square", x = 0, z = 0, width = 60, depth = 60, height = 1 },
 	{
@@ -99,7 +111,7 @@ Layout.Landmarks = {
 		depth = 40,
 		height = 20,
 	},
-}
+} :: { Landmark }
 
 -- Where hunters land in the hub when they have no plot (fallback).
 Layout.ReturnPoint = { x = 0, z = 40 }

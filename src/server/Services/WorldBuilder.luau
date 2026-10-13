@@ -7,13 +7,16 @@
 --   Workspace.Hub.ZoneGates.<ZoneId> a glowing gate per zone
 --   Workspace.Hub.ReturnPoint        where hunters land when they have no plot
 --   Workspace.Hub.Landmarks.<Name>   Watcher Square, Collector, Trading Booth, Bakery, Workshop
+--                                    (the ones with a recipe in Config/Landmarks are built in full)
 --   Workspace.Zones.<ZoneId>         a floating island per zone (only if that zone folder is missing)
 -- Positions and sizes come from Shared.Config.Layout.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Landmarks = require(ReplicatedStorage.Shared.Config.Landmarks)
 local Layout = require(ReplicatedStorage.Shared.Config.Layout)
 local Zones = require(ReplicatedStorage.Shared.Config.Zones)
+local Recipe = require(script.Parent.Parent.Recipe)
 local World = require(script.Parent.Parent.World)
 
 local WorldBuilder = {}
@@ -54,11 +57,8 @@ local defaultTheme: Theme = {
 }
 
 local landmarkColors: { [string]: Color3 } = {
-	WatcherSquare = Color3.fromRGB(90, 84, 100),
 	Collector = Color3.fromRGB(110, 90, 70),
 	TradingBooth = Color3.fromRGB(70, 100, 120),
-	Bakery = Color3.fromRGB(150, 110, 90),
-	Workshop = Color3.fromRGB(100, 100, 110),
 }
 
 local built: { string } = {} -- what was made this run, for the Output line
@@ -260,10 +260,48 @@ local function buildReturnPoint(hub: Instance)
 	table.insert(built, "Hub.ReturnPoint")
 end
 
+-- Where a landmark stands, turned so its front (-Z) faces the middle of the hub along
+-- whichever axis points there most directly (the shops at the west end face due east).
+local function landmarkFrame(spot: Layout.Landmark): CFrame
+	local at = Vector3.new(spot.x, GroundTop, spot.z)
+	local facing = if math.abs(spot.x) >= math.abs(spot.z)
+		then Vector3.new(-math.sign(spot.x), 0, 0)
+		else Vector3.new(0, 0, -math.sign(spot.z))
+	if facing.Magnitude < 0.5 then
+		return CFrame.new(at)
+	end
+	return CFrame.lookAt(at, at + facing)
+end
+
+-- The grey placeholder block an earlier version built: one plain part with a floating label.
+-- If one was saved into the place, it makes way for the real landmark.
+local function isPlaceholder(existing: Instance): boolean
+	return existing:IsA("BasePart")
+		and existing:FindFirstChild("Label") ~= nil
+		and #existing:GetChildren() == 1
+end
+
+local function buildLandmarkModel(landmarks: Instance, spot: Layout.Landmark, recipe: () -> { any })
+	local model = Instance.new("Model")
+	model.Name = spot.name
+	Recipe.build(recipe(), landmarkFrame(spot), model)
+	local anchor = model:FindFirstChild(Landmarks.Anchor[spot.name] or "")
+	if anchor and anchor:IsA("BasePart") then
+		model.PrimaryPart = anchor
+	end
+	model.Parent = landmarks
+	table.insert(built, `Hub.Landmarks.{spot.name}`)
+end
+
 local function buildLandmarks(hub: Instance)
 	local landmarks = folderAt(hub, "Landmarks", "Hub.Landmarks")
 	for _, spot in Layout.Landmarks do
 		local existing = World.find(landmarks, spot.name)
+		local recipe = Landmarks.ByName[spot.name]
+		if existing and recipe and isPlaceholder(existing) then
+			existing:Destroy()
+			existing = nil
+		end
 		if existing then
 			-- A placeholder saved into the place earlier keeps its old sign: drop the
 			-- "(coming soon)" once that landmark has opened.
@@ -276,31 +314,18 @@ local function buildLandmarks(hub: Instance)
 					end
 				end
 			end
+		elseif recipe then
+			buildLandmarkModel(landmarks, spot, recipe)
 		else
 			local color = landmarkColors[spot.name] or Color3.fromRGB(100, 100, 100)
-			local position = Vector3.new(spot.x, GroundTop + spot.height / 2, spot.z)
-			local part: Part
-			if spot.name == "WatcherSquare" then
-				-- A flat round plaza (cylinder lying down, height along X).
-				part = block(
-					spot.name,
-					Vector3.new(spot.height, spot.depth, spot.width),
-					CFrame.new(position) * CFrame.Angles(0, 0, math.pi / 2),
-					color,
-					Enum.Material.Cobblestone
-				)
-				part.Shape = Enum.PartType.Cylinder
-				label(part, spot.label, nil, 8, 200)
-			else
-				part = block(
-					spot.name,
-					Vector3.new(spot.width, spot.height, spot.depth),
-					CFrame.new(position),
-					color,
-					Enum.Material.WoodPlanks
-				)
-				label(part, spot.label, nil, spot.height / 2 + 4, 250)
-			end
+			local part = block(
+				spot.name,
+				Vector3.new(spot.width, spot.height, spot.depth),
+				CFrame.new(spot.x, GroundTop + spot.height / 2, spot.z),
+				color,
+				Enum.Material.WoodPlanks
+			)
+			label(part, spot.label, nil, spot.height / 2 + 4, 250)
 			part.Parent = landmarks
 			table.insert(built, `Hub.Landmarks.{spot.name}`)
 		end
