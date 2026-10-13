@@ -23,6 +23,7 @@ local Haunting = require("../src/shared/Util/Haunting")
 local AttackConfig = require("../src/shared/Config/Attacks")
 local Attacks = require("../src/shared/Util/Attacks")
 local Looks = require("../src/shared/Config/Looks")
+local Rooms = require("../src/shared/Config/Rooms")
 
 local failures = 0
 local function check(name: string, ok: boolean)
@@ -831,6 +832,39 @@ do
 	end
 	check("every look is for a known monster and has sized parts", ok)
 	check("walkers stand on the floor", feetOk)
+end
+
+-- Mansion rooms: every part is sized, uses a real material, stays inside its floor, and
+-- the doors open for owned wings only.
+do
+	local materials = {
+		Plaster = true,
+		WoodPlanks = true,
+		Wood = true,
+		Slate = true,
+		Metal = true,
+		Neon = true,
+		Fabric = true,
+		SmoothPlastic = true,
+	}
+	local spot = Layout.Wings.Foyer
+	local function foyer(owned: { [string]: boolean })
+		local ok, names, boarded = true, {}, 0
+		for _, p in Rooms.Foyer(spot.width, spot.depth, owned) do
+			ok = ok and #p.size == 3 and #p.at == 3 and #p.color == 3 and materials[p.material] == true
+			ok = ok and math.abs(p.at[1]) <= spot.width / 2 and math.abs(p.at[3]) <= spot.depth / 2
+			ok = ok and names[p.name] == nil
+			names[p.name] = true
+			if string.find(p.name, "Boarded") then
+				boarded += 1
+			end
+		end
+		return ok, boarded
+	end
+	local ok, shut = foyer({ Foyer = true })
+	local _, open = foyer({ Foyer = true, Library = true, Ballroom = true, Garden = true })
+	check("Foyer parts are sized, named once and inside the floor", ok)
+	check("unowned wing doors are boarded up, owned ones open", shut == 6 and open == 0)
 end
 
 if failures > 0 then

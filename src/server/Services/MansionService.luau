@@ -2,7 +2,8 @@
 -- Every player's mansion, built on their plot from placeholder blocks once their save has
 -- loaded and they have a plot:
 --   Workspace.Mansions.<PlotName>     a Model made here (removed when the owner leaves)
---     Wings       a floor, four corner pillars and a name label for every owned wing
+--     Wings       the Foyer room (walls, doors, lanterns, see Config/Rooms), and a floor,
+--                 four corner pillars and a name label for every other owned wing
 --     NextWing    a see-through floor plus a sign: hold its prompt to buy that wing
 --     OwnerSign   "<name>'s Mansion" and "3/8 monsters", floating above the Foyer
 --     Monsters    the owner's caught monsters, roaming around the owned wings (each label
@@ -22,6 +23,7 @@ local Layout = require(ReplicatedStorage.Shared.Config.Layout)
 local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Roam = require(ReplicatedStorage.Shared.Util.Roam)
+local Rooms = require(ReplicatedStorage.Shared.Config.Rooms)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Wings = require(ReplicatedStorage.Shared.Config.Wings)
 local DataService = require(script.Parent.DataService)
@@ -167,14 +169,73 @@ local function roamRects(state: State, wingsOwned: number): { Roam.Rect }
 	return rects
 end
 
--- A wing the player owns: floor, corner pillars and its name.
-local function buildOwnedWing(state: State, wing: Wings.Wing)
+local function rgb(c: { number }): Color3
+	return Color3.fromRGB(c[1], c[2], c[3])
+end
+
+-- Builds a room recipe (see Config/Rooms) into the folder, centred on `base`.
+local function buildRoom(parts: { Rooms.Part }, base: CFrame, folder: Folder)
+	for _, spec in parts do
+		local part = Instance.new("Part")
+		part.Name = spec.name
+		part.Size = Vector3.new(spec.size[1], spec.size[2], spec.size[3])
+		local rot = spec.rot or { 0, 0, 0 }
+		part.CFrame = base
+			* CFrame.new(spec.at[1], spec.at[2], spec.at[3])
+			* CFrame.fromOrientation(math.rad(rot[1]), math.rad(rot[2]), math.rad(rot[3]))
+		part.Color = rgb(spec.color)
+		part.Material = (Enum.Material :: any)[spec.material]
+		part.Shape = (Enum.PartType :: any)[spec.shape or "Block"]
+		part.Transparency = spec.transparency or 0
+		part.Anchored = true
+		part.TopSurface = Enum.SurfaceType.Smooth
+		part.BottomSurface = Enum.SurfaceType.Smooth
+		if not spec.solid then
+			ghost(part)
+		end
+		if spec.light then
+			local light = Instance.new("PointLight")
+			light.Color = rgb(spec.light.color)
+			light.Range = spec.light.range
+			light.Brightness = spec.light.brightness
+			light.Shadows = true
+			light.Parent = part
+		end
+		if spec.text then
+			local gui = Instance.new("SurfaceGui")
+			gui.Face = Enum.NormalId.Front
+			gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+			gui.PixelsPerStud = 40
+			gui.LightInfluence = 0.6
+			local label = textLine(gui, spec.text, Color3.fromRGB(45, 30, 15), 0.1, 0.8)
+			label.Font = Enum.Font.Fantasy
+			local stroke = label:FindFirstChildOfClass("UIStroke")
+			if stroke then
+				stroke:Destroy()
+			end
+			gui.Parent = part
+		end
+		part.Parent = folder
+	end
+end
+
+-- A wing the player owns. The Foyer is a full room; the other wings are still placeholders
+-- (a floor, corner pillars and the wing's name) until they get their own room recipe.
+local function buildOwnedWing(state: State, wing: Wings.Wing, owned: { [string]: boolean })
 	local spot = Layout.Wings[wing.id]
 	if not spot then
 		warn(`MansionService: no layout spot for the {wing.id} wing (add it to Layout.Wings)`)
 		return
 	end
 	local top = floorTop(state.plot)
+	if wing.id == "Foyer" then
+		local folder = Instance.new("Folder")
+		folder.Name = wing.id
+		local base = CFrame.new(wingCentre(state.plot, wing.id, top)) * state.plot.frame.Rotation
+		buildRoom(Rooms.Foyer(spot.width, spot.depth, owned), base, folder)
+		folder.Parent = state.wings
+		return
+	end
 	local color = wingColors[wing.id] or Color3.fromRGB(140, 140, 140)
 	local folder = Instance.new("Folder")
 	folder.Name = wing.id
@@ -272,8 +333,12 @@ end
 -- (Re)builds every wing part and the next-wing sign, and updates where monsters may roam.
 local function buildWings(state: State, wingsOwned: number)
 	state.wings:ClearAllChildren()
+	local owned: { [string]: boolean } = {}
 	for _, wing in Mansion.ownedWings(wingsOwned) do
-		buildOwnedWing(state, wing)
+		owned[wing.id] = true
+	end
+	for _, wing in Mansion.ownedWings(wingsOwned) do
+		buildOwnedWing(state, wing, owned)
 	end
 	local nextWing = Mansion.nextWing(wingsOwned)
 	if nextWing then
@@ -429,7 +494,7 @@ local function buildOwnerSign(player: Player, plot: PlotService.Plot, model: Mod
 	local anchor = Instance.new("Part")
 	anchor.Name = "OwnerSign"
 	anchor.Size = Vector3.one
-	anchor.CFrame = CFrame.new(wingCentre(plot, "Foyer", top + PillarHeight + 6))
+	anchor.CFrame = CFrame.new(wingCentre(plot, "Foyer", top + Rooms.WallHeight + 8))
 	anchor.Anchored = true
 	anchor.Transparency = 1
 	ghost(anchor)
