@@ -44,6 +44,7 @@ type State = {
 	clock: number, -- limb clock: runs fast while walking, slow while standing
 	pace: number, -- eases between IDLE_PACE and 1 so limbs never jump
 	swings: { Swing }?, -- nil until the model has streamed in
+	lookVersion: any, -- the server rebuilds the blocks when effects change (LookVersion)
 }
 
 local random = Random.new()
@@ -174,7 +175,9 @@ function RoamController.start()
 
 			if gait then
 				local swings = state.swings
-				if not swings then
+				local lookVersion = model:GetAttribute("LookVersion")
+				if not swings or state.lookVersion ~= lookVersion then
+					state.lookVersion = lookVersion
 					swings = findSwings(model)
 					state.swings = swings
 				end

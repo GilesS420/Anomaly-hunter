@@ -8,9 +8,12 @@
 -- to Body with Motor6Ds (the client swings them, see RoamController); the rest are still a
 -- glowing orb coloured by rarity. Body is always the PrimaryPart and the part players press
 -- on to catch: for a block model it's an invisible ball around it.
+-- Effects and the catch variant change the look (Config/EffectLooks): a Gold monster is gold,
+-- a Vampire wears a cape. When they change, refresh rebuilds the blocks.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local EffectLooks = require(ReplicatedStorage.Shared.Config.EffectLooks)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Looks = require(ReplicatedStorage.Shared.Config.Looks)
 local Spawning = require(ReplicatedStorage.Shared.Util.Spawning)
@@ -22,7 +25,8 @@ export type Info = {
 	monsterId: string,
 	rarity: string,
 	size: string,
-	effects: { string }?,
+	effects: { string }?, -- merged into combos already (Value.resolveEffects)
+	variant: string?, -- catch variant: "Silver", "Gold", "Shiny" or "Rainbow"
 	owner: string?,
 	status: string?, -- mansion monsters: "Fed · 45% familiar" (see Util/Care.status)
 	hungry: boolean?, -- mansion monsters: dims the glow and puts the effects to sleep
@@ -116,11 +120,22 @@ local function detailsText(info: Info): string
 	return details
 end
 
+-- Builds (or rebuilds) the blocks for the monster's look with its effects; set further down.
+local dressModel: (model: Model, info: Info) -> ()
+
+-- Which effects and variant the blocks were built with.
+local function lookKey(info: Info): string
+	return `{table.concat(info.effects or {}, ",")}|{info.variant or ""}`
+end
+
 -- Updates the label and glow after a mansion monster was fed, got hungry or got an effect.
 function MonsterModel.refresh(model: Model, info: Info)
 	local body = model.PrimaryPart
 	if not body then
 		return
+	end
+	if model:GetAttribute("LookKey") ~= lookKey(info) then
+		dressModel(model, info)
 	end
 	local billboard = body:FindFirstChild("Label")
 	local details = billboard and billboard:FindFirstChild("Details")
@@ -195,7 +210,13 @@ end
 
 -- Builds the blocks of a look around Body. Each part is welded (or, if it swings, joined with
 -- a Motor6D) to Body, so moving Body moves the whole monster.
-local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: number, radius: number)
+local function buildLook(
+	model: Model,
+	body: BasePart,
+	look: EffectLooks.DressedLook,
+	scale: number,
+	radius: number
+)
 	-- Walkers are drawn with their feet at y = -2 (Normal size) but stand radius + 0.5 below
 	-- Body's centre (Roam places them that way), so shift them to keep their feet on the floor.
 	-- Grown floaters (event monsters) would dangle into the floor the same way, so they're lifted
@@ -204,7 +225,7 @@ local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: 
 		then 2 * scale - (radius + 0.5)
 		elseif look.grow then 2.4 * scale - (radius + 0.5)
 		else 0
-	for _, piece in look.pieces do
+	for _, piece: EffectLooks.Piece in look.pieces :: any do
 		local part = Instance.new("Part")
 		part.Name = piece.name
 		part.Shape = if piece.shape == "Ball"
@@ -215,13 +236,20 @@ local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: 
 		part.Color = Color3.fromRGB(piece.color[1], piece.color[2], piece.color[3])
 		part.Material = if piece.glow
 			then Enum.Material.Neon
+			elseif piece.material then (Enum.Material :: any)[piece.material]
 			elseif look.wet then Enum.Material.SmoothPlastic
 			else Enum.Material.Plastic
 		if look.wet and not piece.glow then
 			part.Reflectance = 0.2 -- a wet sheen
 		end
+		if piece.reflectance then
+			part.Reflectance = piece.reflectance
+		end
 		if look.seeThrough and not piece.glow then
 			part.Transparency = look.seeThrough
+		end
+		if piece.transparency then
+			part.Transparency = piece.transparency
 		end
 		part.TopSurface = Enum.SurfaceType.Studs -- the classic brick look
 		part.BottomSurface = Enum.SurfaceType.Inlet
@@ -230,7 +258,8 @@ local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: 
 		part.CanTouch = false
 		part.CanQuery = false -- presses go to Body
 		part.Massless = true
-		part.CastShadow = not piece.glow and not look.seeThrough
+		part.CastShadow = not piece.glow and not look.seeThrough and not piece.transparency
+		part:SetAttribute("Look", true) -- rebuilt when the effects change
 
 		local centre = vector(piece.at, scale) + Vector3.new(0, lift, 0)
 		local rot = piece.rot
@@ -248,6 +277,12 @@ local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: 
 			motor.Part1 = part
 			motor.C0 = place * CFrame.new(pivot)
 			motor.C1 = CFrame.new(pivot)
+			if joint.around then
+				-- Circles a point of the monster, upright whatever the part's own tilt.
+				local hub = vector(joint.around, scale) + Vector3.new(0, lift, 0)
+				motor.C0 = CFrame.new(hub)
+				motor.C1 = (CFrame.new(-hub) * place):Inverse()
+			end
 			-- Read by the client every frame to swing the part (RoamController).
 			motor:SetAttribute("SwingAxis", axes[joint.axis])
 			motor:SetAttribute("SwingAmp", if joint.slide then joint.amp * scale else math.rad(joint.amp))
@@ -266,6 +301,66 @@ local function buildLook(model: Model, body: BasePart, look: Looks.Look, scale: 
 		part.Parent = model
 	end
 	model:SetAttribute("Gait", look.gait)
+end
+
+-- Particles an effect or variant gives off (sparkles, mist, drips).
+local auraTextures = {
+	Sparkle = "rbxasset://textures/particles/sparkles_main.dds",
+	Mist = "rbxasset://textures/particles/smoke_main.dds",
+	Drip = "rbxasset://textures/particles/sparkles_main.dds",
+}
+local function addAura(body: BasePart, aura: EffectLooks.Aura, radius: number)
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Name = "Aura"
+	emitter.Texture = auraTextures[aura.kind]
+	emitter.Color = ColorSequence.new(Color3.fromRGB(aura.color[1], aura.color[2], aura.color[3]))
+	emitter.LightEmission = if aura.kind == "Mist" then 0.3 else 1
+	emitter.Lifetime = NumberRange.new(1, 2)
+	emitter.Rate = if aura.kind == "Mist" then 4 else 6
+	emitter.SpreadAngle = Vector2.new(180, 180)
+	emitter.Speed = NumberRange.new(0.3, 1)
+	if aura.kind == "Drip" then
+		emitter.Acceleration = Vector3.new(0, -8, 0)
+		emitter.Size = NumberSequence.new(0.25 * radius / 1.5)
+	elseif aura.kind == "Mist" then
+		emitter.Size = NumberSequence.new(radius * 0.8, radius * 1.4)
+		emitter.Transparency = NumberSequence.new(0.75, 1)
+	else
+		emitter.Size = NumberSequence.new(0.35 * radius / 1.5, 0)
+	end
+	emitter.Parent = body
+end
+
+function dressModel(model: Model, info: Info)
+	local body = model.PrimaryPart :: BasePart
+	local base = Looks[info.monsterId]
+	model:SetAttribute("LookKey", lookKey(info))
+	if not base then
+		return -- still a glowing orb
+	end
+	for _, child in model:GetChildren() do
+		if child:GetAttribute("Look") then
+			child:Destroy()
+		end
+	end
+	for _, child in body:GetChildren() do
+		if child:IsA("ParticleEmitter") and child.Name == "Aura" then
+			child:Destroy()
+		end
+	end
+	local radius = MonsterModel.radius(info.size, info.monsterId)
+	local scale = radius / Spawning.BaseRadius
+	local look = EffectLooks.dress(base, info.effects, info.variant)
+	buildLook(model, body, look, scale, radius)
+	for _, aura in look.auras or {} do
+		addAura(body, aura, radius)
+	end
+	local billboard = body:FindFirstChild("Label")
+	if billboard and billboard:IsA("BillboardGui") then
+		billboard.StudsOffset = Vector3.new(0, look.top * scale + 1.6, 0)
+	end
+	-- Tells the client to pick up the new swinging joints (RoamController).
+	model:SetAttribute("LookVersion", ((model:GetAttribute("LookVersion") :: number?) or 0) + 1)
 end
 
 function MonsterModel.build(info: Info): Model
@@ -291,12 +386,9 @@ function MonsterModel.build(info: Info): Model
 	model.PrimaryPart = body
 
 	local look = Looks[info.monsterId]
-	local scale = radius / Spawning.BaseRadius
 	local labelHeight = radius + 1.6
 	if look then
 		body.Transparency = 1 -- just the press target; the blocks are what players see
-		buildLook(model, body, look, scale, radius)
-		labelHeight = look.top * scale + 1.2
 	end
 
 	local light = Instance.new("PointLight")
@@ -341,7 +433,7 @@ function MonsterModel.build(info: Info): Model
 	if info.owner then
 		model:SetAttribute("Owner", info.owner)
 	end
-	MonsterModel.refresh(model, info)
+	MonsterModel.refresh(model, info) -- builds the look (with its effects) on the way
 	return model
 end
 

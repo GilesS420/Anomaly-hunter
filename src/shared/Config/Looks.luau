@@ -24,6 +24,9 @@ export type Joint = {
 	pivot: { number }?,
 	spin: boolean?, -- turns round and round (speed = turns per second) instead of swinging
 	slide: boolean?, -- moves up and down its axis (amp in studs) instead of swinging
+	-- spin round this point of the monster (around its straight-up axis) instead of the part's
+	-- own pivot: things circling a monster, see Config/EffectLooks
+	around: { number }?,
 }
 
 export type Piece = {
