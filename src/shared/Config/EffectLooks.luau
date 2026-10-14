@@ -4,27 +4,31 @@
 -- MonsterModel builds it like any other look. Pure data, so the tests and the preview page see
 -- exactly what the game builds.
 --
--- A style can:
+-- Effects change the monster itself (its colours, skin and glow), they don't hand it hats or
+-- props. A style can:
 --   tint       mix the monster's colours toward a colour (mix 0..1); glowing bits keep theirs
+--   fade       like tint, but strongest at the feet and gone at the top (a vampire's dark hem)
 --   glow       recolour the glowing bits (eyes, flames)
 --   seeThrough make the non-glowing parts see-through (0..1)
---   shell      cover each part in a slightly bigger skin (slime, cobwebs)
---   wrap       wind bandages round each part (they swing with the limb they sit on)
+--   shell      cover each part in a slightly bigger skin (slime, cobwebs, an eclipse's glow)
+--   wrap       wind bands round each part (bandages, gold straps, stitches)
+--   fur        tufts of fur sticking out of the biggest parts
+--   pumpkin    turn the head into a carved pumpkin
 --   patchwork  make every other part a sickly green or a dark brown patch (stitched together)
 --   hueShift   turn the colours round the colour wheel (0..1), like a shiny monster
---   rainbow    colour the parts by height in rainbow bands
+--   rainbow    colours that keep cycling through the rainbow (the client turns them)
 --   material   a Roblox material name for the non-glowing parts, with reflectance
---   extras     added blocks, placed on an anchor:
---                head   on top of the monster; extras on the head stack, they never overlap
---                back   behind it (front is -Z); back extras stack outward too
+--   extras     a few things that float with the monster, placed on an anchor:
+--                head   above the monster; extras on the head stack, they never overlap
 --                feet   at the bottom middle
---                orbit  circling round its middle (each orbit group a bit further out)
---              `at` and `size` are for a medium head and get scaled to the monster
+--                orbit  circling round its middle (each orbit group a bit further out); a
+--                       part's `angle` is where on the ring it sits, `at` is its offset there
 --   auras      particles coming off the monster (kind Sparkle, Mist or Drip)
 --   includes   the styles of other effects first (a combo builds on its two effects)
 --
--- Variants (Silver, Gold, Shiny, Rainbow) are applied last, so a gold monster stays gold
--- whatever effects it has; their extras and auras still add up.
+-- Everything added to a part (shells, bands, fur, stitches) copies that part's joint, so it
+-- swings along with the limb it sits on. Variants (Silver, Gold, Shiny, Rainbow) are applied
+-- last, so a gold monster stays gold whatever effects it has; their auras still add up.
 
 local Looks = require("./Looks")
 
@@ -33,6 +37,7 @@ export type Extra = {
 	size: { number },
 	at: { number },
 	color: { number },
+	angle: number?, -- orbit: degrees round the ring
 	shape: ("Block" | "Ball" | "Cylinder")?,
 	glow: boolean?,
 	rot: { number }?,
@@ -41,7 +46,7 @@ export type Extra = {
 }
 
 export type Group = {
-	anchor: "head" | "back" | "feet" | "orbit",
+	anchor: "head" | "feet" | "orbit",
 	speed: number?, -- orbit: turns per second
 	parts: { Extra },
 }
@@ -54,10 +59,13 @@ export type Aura = {
 export type Style = {
 	includes: { string }?,
 	tint: { color: { number }, mix: number }?,
+	fade: { color: { number }, mix: number }?,
 	glow: { number }?,
 	seeThrough: number?,
-	shell: { color: { number }, transparency: number, material: string? }?,
-	wrap: { color: { number } }?,
+	shell: { color: { number }, transparency: number, material: string?, glow: boolean? }?,
+	wrap: { colors: { { number } }, thickness: number?, material: string?, stitches: boolean? }?,
+	fur: { { number } }?,
+	pumpkin: boolean?,
 	patchwork: number?,
 	hueShift: number?,
 	rainbow: boolean?,
@@ -66,11 +74,12 @@ export type Style = {
 	auras: { Aura }?,
 }
 
--- Pieces get three optional fields on top of Looks.Piece; MonsterModel reads them.
+-- Pieces get a few optional fields on top of Looks.Piece; MonsterModel reads them.
 export type Piece = Looks.Piece & {
 	material: string?,
 	reflectance: number?,
 	transparency: number?,
+	rainbow: number?, -- 0..1: where in the rainbow cycle this part starts
 }
 
 export type DressedLook = Looks.Look & {
@@ -82,55 +91,69 @@ local EffectLooks = {}
 -- Colours.
 local Black = { 24, 22, 28 }
 local Bone = { 232, 224, 200 }
-local Gold = { 255, 205, 70 }
-local Blood = { 200, 20, 30 }
+local Gold = { 255, 205, 30 }
 local Orange = { 245, 130, 30 }
-local Leaf = { 70, 140, 50 }
 local Flame = { 255, 220, 90 }
 local Bandage = { 226, 212, 172 }
 local Fur = { 110, 78, 52 }
-local Wood = { 120, 78, 40 }
-local Purple = { 150, 60, 220 }
 
-local function bat(name: string, x: number, z: number, color: { number }): { Extra }
+-- A little bat: body, ears, eyes and wings all touching, so it flies as one.
+local function bat(name: string, angle: number): { Extra }
+	local color = { 40, 30, 45 }
+	local eye = { 255, 40, 50 }
 	return {
-		{ name = name, size = { 0.5, 0.4, 0.5 }, at = { x, 0, z }, color = color },
+		{ name = name, size = { 0.6, 0.55, 0.6 }, at = { 0, 0, 0 }, color = color, angle = angle },
 		{
 			name = name .. "WingL",
-			size = { 0.6, 0.1, 0.4 },
-			at = { x - 0.55, 0.1, z },
+			size = { 0.7, 0.1, 0.5 },
+			at = { -0.65, 0.12, 0 },
 			color = color,
-			rot = { 0, 0, 20 },
+			angle = angle,
 		},
 		{
 			name = name .. "WingR",
-			size = { 0.6, 0.1, 0.4 },
-			at = { x + 0.55, 0.1, z },
+			size = { 0.7, 0.1, 0.5 },
+			at = { 0.65, 0.12, 0 },
 			color = color,
-			rot = { 0, 0, -20 },
+			angle = angle,
+		},
+		{
+			name = name .. "EarL",
+			size = { 0.14, 0.2, 0.14 },
+			at = { -0.16, 0.37, 0 },
+			color = color,
+			angle = angle,
+		},
+		{
+			name = name .. "EarR",
+			size = { 0.14, 0.2, 0.14 },
+			at = { 0.16, 0.37, 0 },
+			color = color,
+			angle = angle,
 		},
 		{
 			name = name .. "EyeL",
-			size = { 0.1, 0.1, 0.05 },
-			at = { x - 0.12, 0.05, z - 0.27 },
-			color = Blood,
+			size = { 0.12, 0.12, 0.05 },
+			at = { -0.14, 0.06, -0.32 },
+			color = eye,
 			glow = true,
+			angle = angle,
 		},
 		{
 			name = name .. "EyeR",
-			size = { 0.1, 0.1, 0.05 },
-			at = { x + 0.12, 0.05, z - 0.27 },
-			color = Blood,
+			size = { 0.12, 0.12, 0.05 },
+			at = { 0.14, 0.06, -0.32 },
+			color = eye,
 			glow = true,
+			angle = angle,
 		},
 	}
 end
 
-local function bats(prefix: string, count: number, color: { number }): { Extra }
+local function bats(prefix: string, count: number): { Extra }
 	local parts = {}
 	for i = 1, count do
-		local angle = (i - 1) / count * math.pi * 2
-		for _, part in bat(`{prefix}{i}`, math.cos(angle), math.sin(angle), color) do
+		for _, part in bat(`{prefix}{i}`, (i - 1) * 360 / count) do
 			table.insert(parts, part)
 		end
 	end
@@ -141,35 +164,8 @@ end
 EffectLooks.Styles = {
 	-- Roam effects.
 	Cobwebbed = {
-		tint = { color = { 150, 150, 155 }, mix = 0.3 },
-		extras = {
-			{
-				anchor = "head",
-				parts = {
-					{
-						name = "Web",
-						size = { 2.2, 0.06, 2.2 },
-						at = { 0, 0.05, 0 },
-						color = { 240, 240, 245 },
-						transparency = 0.4,
-						rot = { 0, 45, 0 },
-					},
-					{
-						name = "Thread",
-						size = { 0.04, 0.9, 0.04 },
-						at = { 0.6, 0.5, 0 },
-						color = { 240, 240, 245 },
-					},
-					{
-						name = "Spider",
-						size = { 0.35, 0.3, 0.35 },
-						at = { 0.6, 1.1, 0 },
-						color = Black,
-						shape = "Ball",
-					},
-				},
-			},
-		},
+		tint = { color = { 150, 150, 155 }, mix = 0.35 },
+		shell = { color = { 240, 240, 245 }, transparency = 0.7 },
 		auras = { { kind = "Mist", color = { 170, 170, 170 } } },
 	},
 	Possessed = {
@@ -183,7 +179,8 @@ EffectLooks.Styles = {
 					{
 						name = "Wisp1",
 						size = { 0.4, 0.4, 0.4 },
-						at = { 1, 0.4, 0 },
+						at = { 0, 0.4, 0 },
+						angle = 0,
 						color = { 210, 120, 255 },
 						glow = true,
 						shape = "Ball",
@@ -191,7 +188,8 @@ EffectLooks.Styles = {
 					{
 						name = "Wisp2",
 						size = { 0.3, 0.3, 0.3 },
-						at = { -1, -0.2, 0 },
+						at = { 0, -0.2, 0 },
+						angle = 180,
 						color = { 210, 120, 255 },
 						glow = true,
 						shape = "Ball",
@@ -202,82 +200,26 @@ EffectLooks.Styles = {
 		auras = { { kind = "Mist", color = { 170, 90, 255 } } },
 	},
 	Vampire = {
-		tint = { color = { 205, 200, 220 }, mix = 0.35 },
+		tint = { color = { 210, 205, 225 }, mix = 0.45 },
+		fade = { color = { 90, 10, 20 }, mix = 0.8 },
 		glow = { 255, 40, 50 },
-		extras = {
-			{
-				anchor = "back",
-				parts = {
-					{ name = "CapeLining", size = { 1.8, 2, 0.1 }, at = { 0, -1, 0.05 }, color = Blood },
-					{ name = "Cape", size = { 2, 2.2, 0.12 }, at = { 0, -1, 0.16 }, color = Black },
-					{
-						name = "CollarL",
-						size = { 0.12, 0.8, 0.6 },
-						at = { -1, 0.3, 0.1 },
-						color = Black,
-						rot = { 0, -20, 0 },
-					},
-					{
-						name = "CollarR",
-						size = { 0.12, 0.8, 0.6 },
-						at = { 1, 0.3, 0.1 },
-						color = Black,
-						rot = { 0, 20, 0 },
-					},
-				},
-			},
-		},
+		auras = { { kind = "Mist", color = { 120, 10, 20 } } },
 	},
 	Batty = {
 		tint = { color = { 60, 40, 70 }, mix = 0.2 },
-		extras = { { anchor = "orbit", speed = 0.4, parts = bats("Bat", 3, { 40, 30, 45 }) } },
+		extras = { { anchor = "orbit", speed = 0.4, parts = bats("Bat", 3) } },
 	},
 	Mummy = {
 		tint = { color = Bandage, mix = 0.55 },
-		wrap = { color = Bandage },
+		wrap = { colors = { Bandage } },
 		glow = { 140, 255, 110 },
 		auras = { { kind = "Mist", color = { 200, 190, 150 } } },
 	},
 
 	-- Food effects.
 	PumpkinHead = {
-		glow = Flame,
-		extras = {
-			{
-				anchor = "head",
-				parts = {
-					{ name = "Pumpkin", size = { 1.6, 1.2, 1.5 }, at = { 0, 0.6, 0 }, color = Orange },
-					{
-						name = "PumpkinRib",
-						size = { 0.5, 1.25, 1.55 },
-						at = { 0, 0.6, 0 },
-						color = { 225, 105, 20 },
-					},
-					{ name = "Stem", size = { 0.25, 0.4, 0.25 }, at = { 0, 1.4, 0 }, color = Leaf },
-					{
-						name = "EyeL",
-						size = { 0.3, 0.25, 0.05 },
-						at = { -0.35, 0.8, -0.78 },
-						color = Flame,
-						glow = true,
-					},
-					{
-						name = "EyeR",
-						size = { 0.3, 0.25, 0.05 },
-						at = { 0.35, 0.8, -0.78 },
-						color = Flame,
-						glow = true,
-					},
-					{
-						name = "Grin",
-						size = { 0.9, 0.15, 0.05 },
-						at = { 0, 0.35, -0.78 },
-						color = Flame,
-						glow = true,
-					},
-				},
-			},
-		},
+		pumpkin = true,
+		auras = { { kind = "Sparkle", color = Flame } },
 	},
 	Slimed = {
 		tint = { color = { 110, 200, 70 }, mix = 0.3 },
@@ -288,7 +230,7 @@ EffectLooks.Styles = {
 				parts = {
 					{
 						name = "Puddle",
-						size = { 2.2, 0.08, 2.2 },
+						size = { 0.08, 2.2, 2.2 },
 						at = { 0, 0.04, 0 },
 						color = { 120, 235, 80 },
 						glow = true,
@@ -304,32 +246,10 @@ EffectLooks.Styles = {
 	Cursed = {
 		tint = { color = { 70, 30, 90 }, mix = 0.45 },
 		glow = { 255, 60, 200 },
-		extras = {
-			{
-				anchor = "head",
-				parts = {
-					{
-						name = "CurseRing",
-						size = { 0.1, 1.8, 1.8 },
-						at = { 0, 0.6, 0 },
-						color = { 255, 60, 200 },
-						glow = true,
-						shape = "Cylinder",
-						rot = { 0, 0, 90 },
-						transparency = 0.3,
-					},
-					{
-						name = "CurseHole",
-						size = { 0.12, 1.4, 1.4 },
-						at = { 0, 0.6, 0 },
-						color = Black,
-						shape = "Cylinder",
-						rot = { 0, 0, 90 },
-					},
-				},
-			},
+		auras = {
+			{ kind = "Mist", color = { 110, 30, 140 } },
+			{ kind = "Sparkle", color = { 255, 60, 200 } },
 		},
-		auras = { { kind = "Mist", color = { 110, 30, 140 } } },
 	},
 
 	-- Catch effects.
@@ -340,46 +260,12 @@ EffectLooks.Styles = {
 		auras = { { kind = "Mist", color = { 210, 230, 255 } } },
 	},
 	Werewolf = {
-		tint = { color = Fur, mix = 0.45 },
+		tint = { color = Fur, mix = 0.6 },
+		fur = { { 95, 66, 44 }, { 135, 100, 70 } },
 		glow = { 255, 210, 60 },
-		extras = {
-			{
-				anchor = "head",
-				parts = {
-					{
-						name = "EarL",
-						size = { 0.45, 0.7, 0.3 },
-						at = { -0.5, 0.35, 0 },
-						color = Fur,
-						rot = { 0, 0, 12 },
-					},
-					{
-						name = "EarR",
-						size = { 0.45, 0.7, 0.3 },
-						at = { 0.5, 0.35, 0 },
-						color = Fur,
-						rot = { 0, 0, -12 },
-					},
-					{
-						name = "EarInL",
-						size = { 0.25, 0.45, 0.05 },
-						at = { -0.5, 0.3, -0.17 },
-						color = { 230, 150, 150 },
-						rot = { 0, 0, 12 },
-					},
-					{
-						name = "EarInR",
-						size = { 0.25, 0.45, 0.05 },
-						at = { 0.5, 0.3, -0.17 },
-						color = { 230, 150, 150 },
-						rot = { 0, 0, -12 },
-					},
-				},
-			},
-		},
 	},
 
-	-- Event effects: these are what an event leaves on a monster, so each wears its event.
+	-- Event effects: what an event leaves on a monster.
 	Poltergeist = {
 		seeThrough = 0.25,
 		tint = { color = { 190, 210, 255 }, mix = 0.2 },
@@ -392,30 +278,40 @@ EffectLooks.Styles = {
 					{
 						name = "Book",
 						size = { 0.5, 0.15, 0.7 },
-						at = { 1, 0.5, 0 },
+						at = { 0, 0.5, 0 },
+						angle = 0,
 						color = { 120, 40, 40 },
 						rot = { 20, 0, 15 },
 					},
 					{
 						name = "Pages",
 						size = { 0.45, 0.1, 0.65 },
-						at = { 1, 0.6, 0 },
+						at = { 0, 0.6, 0 },
+						angle = 0,
 						color = Bone,
 						rot = { 20, 0, 15 },
 					},
 					{
 						name = "Plate",
 						size = { 0.08, 0.7, 0.7 },
-						at = { -0.5, 0, 0.87 },
+						at = { 0, 0, 0 },
+						angle = 120,
 						color = Bone,
 						shape = "Cylinder",
 						rot = { 0, 0, 70 },
 					},
-					{ name = "Candle", size = { 0.2, 0.5, 0.2 }, at = { -0.5, -0.3, -0.87 }, color = Bone },
+					{
+						name = "Candle",
+						size = { 0.2, 0.5, 0.2 },
+						at = { 0, -0.3, 0 },
+						angle = 240,
+						color = Bone,
+					},
 					{
 						name = "CandleFlame",
 						size = { 0.12, 0.2, 0.12 },
-						at = { -0.5, 0.05, -0.87 },
+						at = { 0, 0.05, 0 },
+						angle = 240,
 						color = Flame,
 						glow = true,
 					},
@@ -427,66 +323,12 @@ EffectLooks.Styles = {
 	Bloodmoon = {
 		tint = { color = { 150, 20, 30 }, mix = 0.45 },
 		glow = { 255, 40, 40 },
-		extras = {
-			{
-				anchor = "head",
-				parts = {
-					{
-						name = "Moon",
-						size = { 0.9, 0.9, 0.9 },
-						at = { 0, 0.9, 0 },
-						color = { 230, 40, 40 },
-						glow = true,
-						shape = "Ball",
-					},
-				},
-			},
-		},
-		auras = { { kind = "Mist", color = { 200, 20, 30 } } },
+		auras = { { kind = "Mist", color = { 200, 20, 30 } }, { kind = "Sparkle", color = { 255, 40, 40 } } },
 	},
 	Mimic = {
-		tint = { color = Wood, mix = 0.4 },
+		tint = { color = { 120, 78, 40 }, mix = 0.5 },
+		wrap = { colors = { Gold }, thickness = 0.18, material = "Metal" },
 		glow = Gold,
-		extras = {
-			{
-				anchor = "head",
-				parts = {
-					{
-						name = "Lid",
-						size = { 1.8, 0.5, 1.4 },
-						at = { 0, 0.4, 0.1 },
-						color = Wood,
-						rot = { -15, 0, 0 },
-					},
-					{
-						name = "LidBandL",
-						size = { 0.2, 0.55, 1.45 },
-						at = { -0.6, 0.4, 0.1 },
-						color = Gold,
-						rot = { -15, 0, 0 },
-						material = "Metal",
-					},
-					{
-						name = "LidBandR",
-						size = { 0.2, 0.55, 1.45 },
-						at = { 0.6, 0.4, 0.1 },
-						color = Gold,
-						rot = { -15, 0, 0 },
-						material = "Metal",
-					},
-					{
-						name = "Lock",
-						size = { 0.3, 0.3, 0.1 },
-						at = { 0, 0.3, -0.68 },
-						color = Gold,
-						material = "Metal",
-					},
-					{ name = "Tooth1", size = { 0.2, 0.25, 0.1 }, at = { -0.5, 0.05, -0.55 }, color = Bone },
-					{ name = "Tooth2", size = { 0.2, 0.25, 0.1 }, at = { 0, 0.05, -0.55 }, color = Bone },
-					{ name = "Tooth3", size = { 0.2, 0.25, 0.1 }, at = { 0.5, 0.05, -0.55 }, color = Bone },
-				},
-			},
-		},
 		auras = { { kind = "Sparkle", color = Gold } },
 	},
 	Watched = {
@@ -529,121 +371,27 @@ EffectLooks.Styles = {
 	-- Round 2 effects.
 	Stitched = {
 		patchwork = 0.45,
+		wrap = { colors = { { 30, 24, 28 } }, thickness = 0.07, stitches = true },
 		glow = { 140, 255, 120 },
-		extras = {
-			{
-				anchor = "head",
-				parts = {
-					{
-						name = "BoltL",
-						size = { 0.5, 0.25, 0.25 },
-						at = { -0.55, 0.15, 0 },
-						color = { 150, 150, 160 },
-						shape = "Cylinder",
-						material = "Metal",
-					},
-					{
-						name = "BoltR",
-						size = { 0.5, 0.25, 0.25 },
-						at = { 0.55, 0.15, 0 },
-						color = { 150, 150, 160 },
-						shape = "Cylinder",
-						material = "Metal",
-					},
-					{ name = "Stitch1", size = { 0.8, 0.06, 0.1 }, at = { 0, 0.04, -0.3 }, color = Black },
-					{
-						name = "Stitch2",
-						size = { 0.06, 0.06, 0.3 },
-						at = { -0.2, 0.04, -0.3 },
-						color = Black,
-					},
-					{ name = "Stitch3", size = { 0.06, 0.06, 0.3 }, at = { 0.2, 0.04, -0.3 }, color = Black },
-				},
-			},
-		},
 	},
 	Hexed = {
-		tint = { color = { 50, 90, 50 }, mix = 0.2 },
+		tint = { color = { 60, 110, 60 }, mix = 0.35 },
 		glow = { 120, 255, 90 },
-		extras = {
-			{
-				anchor = "head",
-				parts = {
-					{ name = "HatBrim", size = { 1.8, 0.12, 1.8 }, at = { 0, 0.06, 0 }, color = Black },
-					{ name = "HatBand", size = { 1.05, 0.2, 1.05 }, at = { 0, 0.22, 0 }, color = Purple },
-					{ name = "HatLow", size = { 1, 0.6, 1 }, at = { 0, 0.42, 0 }, color = Black },
-					{
-						name = "HatMid",
-						size = { 0.65, 0.6, 0.65 },
-						at = { 0.05, 1, 0.05 },
-						color = Black,
-						rot = { 0, 0, -8 },
-					},
-					{
-						name = "HatTip",
-						size = { 0.35, 0.5, 0.35 },
-						at = { 0.2, 1.5, 0.1 },
-						color = Black,
-						rot = { 0, 0, -20 },
-					},
-				},
-			},
+		auras = {
+			{ kind = "Sparkle", color = { 120, 255, 90 } },
+			{ kind = "Mist", color = { 120, 50, 170 } },
 		},
-		auras = { { kind = "Sparkle", color = { 120, 255, 90 } } },
 	},
 	Eclipsed = {
-		tint = { color = { 25, 20, 35 }, mix = 0.6 },
-		glow = { 255, 150, 40 },
-		extras = {
-			{
-				anchor = "back",
-				parts = {
-					{
-						name = "Corona",
-						size = { 0.1, 2.6, 2.6 },
-						at = { 0, 0, 0.3 },
-						color = { 255, 150, 40 },
-						glow = true,
-						shape = "Cylinder",
-						rot = { 0, 90, 0 },
-					},
-					{
-						name = "Sun",
-						size = { 0.12, 2.1, 2.1 },
-						at = { 0, 0, 0.2 },
-						color = { 15, 12, 20 },
-						shape = "Cylinder",
-						rot = { 0, 90, 0 },
-					},
-				},
-			},
-		},
+		tint = { color = { 12, 10, 16 }, mix = 0.85 },
+		shell = { color = { 255, 40, 30 }, transparency = 0.7, glow = true },
+		glow = { 255, 120, 40 },
 	},
 
 	-- Combos: both effects' looks plus a finishing touch.
 	Count = {
 		includes = { "Vampire", "Batty" },
-		extras = {
-			{
-				anchor = "head",
-				parts = {
-					{
-						name = "Medallion",
-						size = { 0.45, 0.45, 0.1 },
-						at = { 0, -0.6, -0.8 },
-						color = Gold,
-						material = "Metal",
-					},
-					{
-						name = "MedallionGem",
-						size = { 0.2, 0.2, 0.06 },
-						at = { 0, -0.6, -0.86 },
-						color = Blood,
-						glow = true,
-					},
-				},
-			},
-		},
+		auras = { { kind = "Sparkle", color = { 255, 40, 50 } } },
 	},
 	Banshee = {
 		includes = { "Cursed", "Ghost" },
@@ -651,50 +399,10 @@ EffectLooks.Styles = {
 		auras = { { kind = "Mist", color = { 230, 240, 255 } } },
 	},
 	Pharaoh = {
-		includes = { "Mummy" },
+		tint = { color = Bandage, mix = 0.55 },
+		wrap = { colors = { Gold, { 40, 70, 170 } }, material = "Metal" },
 		glow = Gold,
-		extras = {
-			{
-				anchor = "head",
-				parts = {
-					{
-						name = "Nemes",
-						size = { 1.7, 0.5, 1.5 },
-						at = { 0, 0.25, 0.05 },
-						color = Gold,
-						material = "Metal",
-					},
-					{
-						name = "NemesStripe",
-						size = { 1.75, 0.15, 1.55 },
-						at = { 0, 0.25, 0.05 },
-						color = { 40, 70, 170 },
-					},
-					{
-						name = "FlapL",
-						size = { 0.35, 1.1, 0.5 },
-						at = { -0.8, -0.3, -0.2 },
-						color = Gold,
-						material = "Metal",
-					},
-					{
-						name = "FlapR",
-						size = { 0.35, 1.1, 0.5 },
-						at = { 0.8, -0.3, -0.2 },
-						color = Gold,
-						material = "Metal",
-					},
-					{
-						name = "Cobra",
-						size = { 0.2, 0.4, 0.2 },
-						at = { 0, 0.65, -0.65 },
-						color = Gold,
-						material = "Metal",
-					},
-				},
-			},
-		},
-		auras = { { kind = "Sparkle", color = Gold } },
+		auras = { { kind = "Sparkle", color = Gold }, { kind = "Mist", color = { 200, 190, 150 } } },
 	},
 	Alpha = {
 		includes = { "Werewolf", "Bloodmoon" },
@@ -709,12 +417,13 @@ EffectLooks.Styles = {
 		auras = { { kind = "Sparkle", color = { 230, 235, 255 } } },
 	},
 	Gold = {
-		tint = { color = Gold, mix = 0.9 },
-		material = { name = "Metal", reflectance = 0.35 },
-		auras = { { kind = "Sparkle", color = Gold } },
+		tint = { color = Gold, mix = 0.92 },
+		material = { name = "Foil", reflectance = 0.3 },
+		auras = { { kind = "Sparkle", color = { 255, 230, 120 } } },
 	},
 	Shiny = {
 		hueShift = 0.45,
+		material = { name = "Foil", reflectance = 0.35 },
 		auras = { { kind = "Sparkle", color = { 255, 255, 255 } } },
 	},
 	Rainbow = {
@@ -755,7 +464,8 @@ local function toHsv(c: { number }): (number, number, number)
 	return h, if max > 0 then d / max else 0, max
 end
 
-local function fromHsv(h: number, s: number, v: number): { number }
+-- A colour from hue, saturation and value (all 0..1), as 0..255 numbers.
+function EffectLooks.fromHsv(h: number, s: number, v: number): { number }
 	local i = math.floor(h * 6)
 	local f = h * 6 - i
 	local p, q, t = v * (1 - s), v * (1 - f * s), v * (1 - (1 - f) * s)
@@ -776,21 +486,36 @@ local function fromHsv(h: number, s: number, v: number): { number }
 	end
 	return { math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5) }
 end
+local fromHsv = EffectLooks.fromHsv
 
--- The box round a look's pieces (rotations ignored) and the piece that reaches highest.
-local function bounds(pieces: { Piece }): ({ number }, { number }, Piece)
+-- The box round a look's pieces (rotations ignored).
+local function bounds(pieces: { Piece }): ({ number }, { number })
 	local min, max = { math.huge, math.huge, math.huge }, { -math.huge, -math.huge, -math.huge }
-	local top = pieces[1]
 	for _, piece in pieces do
 		for axis = 1, 3 do
 			min[axis] = math.min(min[axis], piece.at[axis] - piece.size[axis] / 2)
 			max[axis] = math.max(max[axis], piece.at[axis] + piece.size[axis] / 2)
 		end
-		if piece.at[2] + piece.size[2] / 2 > top.at[2] + top.size[2] / 2 then
-			top = piece
+	end
+	return min, max
+end
+
+local function volume(piece: Piece): number
+	return piece.size[1] * piece.size[2] * piece.size[3]
+end
+
+-- The biggest non-glowing parts, biggest first.
+local function biggest(pieces: { Piece }, count: number): { Piece }
+	local list: { Piece } = {}
+	for _, piece in pieces do
+		if not piece.glow then
+			table.insert(list, piece)
 		end
 	end
-	return min, max, top
+	table.sort(list, function(a, b)
+		return volume(a) > volume(b)
+	end)
+	return { table.unpack(list, 1, math.min(count, #list)) }
 end
 
 -- The styles to apply, in order: included effects first, every style once.
@@ -807,8 +532,49 @@ local function collect(ids: { string }, out: { Style }, seen: { [string]: boolea
 	end
 end
 
+-- Turns a vector by a part's rotation (degrees, applied like CFrame.fromOrientation).
+local function rotate(rot: { number }?, v: { number }): { number }
+	if not rot then
+		return v
+	end
+	local rx, ry, rz = math.rad(rot[1]), math.rad(rot[2]), math.rad(rot[3])
+	local x, y, z = v[1], v[2], v[3]
+	x, y = x * math.cos(rz) - y * math.sin(rz), x * math.sin(rz) + y * math.cos(rz)
+	y, z = y * math.cos(rx) - z * math.sin(rx), y * math.sin(rx) + z * math.cos(rx)
+	x, z = x * math.cos(ry) + z * math.sin(ry), -x * math.sin(ry) + z * math.cos(ry)
+	return { x, y, z }
+end
+
+-- A part stuck onto `piece`, `offset` studs from its centre in the piece's own directions. It
+-- shares the piece's tilt and joint (with the pivot moved to match), so it swings along.
+local function attach(
+	piece: Piece,
+	name: string,
+	size: { number },
+	color: { number },
+	offset: { number }
+): Piece
+	local turned = rotate(piece.rot, offset)
+	local part: Piece = {
+		name = name,
+		size = size,
+		at = { piece.at[1] + turned[1], piece.at[2] + turned[2], piece.at[3] + turned[3] },
+		color = color,
+		shape = piece.shape,
+		rot = piece.rot,
+	}
+	if piece.joint then
+		local joint = table.clone(piece.joint)
+		local pivot = joint.pivot or { 0, 0, 0 }
+		joint.pivot = { pivot[1] - offset[1], pivot[2] - offset[2], pivot[3] - offset[3] }
+		part.joint = joint
+	end
+	return part
+end
+
 local function recolor(pieces: { Piece }, style: Style)
 	local min, max = bounds(pieces)
+	local height = math.max(max[2] - min[2], 0.01)
 	for i, piece in pieces do
 		if piece.glow then
 			if style.glow then
@@ -819,17 +585,22 @@ local function recolor(pieces: { Piece }, style: Style)
 		if style.tint then
 			piece.color = mixColor(piece.color, style.tint.color, style.tint.mix)
 		end
+		if style.fade then
+			local up = (piece.at[2] - min[2]) / height
+			piece.color =
+				mixColor(piece.color, style.fade.color, style.fade.mix * math.clamp(1 - up * 1.4, 0, 1))
+		end
 		if style.patchwork then
 			local toward = if i % 2 == 0 then { 150, 190, 130 } else { 95, 70, 60 }
 			piece.color = mixColor(piece.color, toward, style.patchwork)
 		end
 		if style.hueShift then
 			local h, s, v = toHsv(piece.color)
-			piece.color = fromHsv((h + style.hueShift) % 1, math.max(s, 0.35), math.max(v, 0.35))
+			piece.color = fromHsv((h + style.hueShift) % 1, math.max(s, 0.45), math.max(v, 0.45))
 		end
 		if style.rainbow then
-			local height = (piece.at[2] - min[2]) / math.max(max[2] - min[2], 0.01)
-			piece.color = fromHsv(height * 0.85, 0.75, 1)
+			piece.rainbow = (piece.at[2] - min[2]) / height * 0.85
+			piece.color = fromHsv(piece.rainbow :: number, 0.75, 1)
 		end
 		if style.seeThrough then
 			piece.transparency = style.seeThrough
@@ -841,20 +612,68 @@ local function recolor(pieces: { Piece }, style: Style)
 	end
 end
 
--- A copy of a piece that sits on it, so it swings along with it.
-local function onPiece(piece: Piece, name: string, size: { number }, color: { number }): Piece
-	return {
-		name = name,
-		size = size,
-		at = piece.at,
-		color = color,
-		shape = piece.shape,
-		rot = piece.rot,
-		joint = piece.joint,
-	}
+-- The head: a part called Head or Skull, or else the biggest part near the top (a ghost or a
+-- blob is all head).
+local function findHead(pieces: { Piece }): Piece?
+	for _, piece in pieces do
+		if (piece.name == "Head" or piece.name == "Skull") and not piece.glow then
+			return piece
+		end
+	end
+	local min, max = bounds(pieces)
+	local best: Piece? = nil
+	for _, piece in pieces do
+		local top = piece.at[2] + piece.size[2] / 2
+		if not piece.glow and top >= min[2] + (max[2] - min[2]) * 0.6 then
+			if not best or volume(piece) > volume(best) then
+				best = piece
+			end
+		end
+	end
+	return best
 end
 
-local function coverings(pieces: { Piece }, style: Style): { Piece }
+-- Turns the head into a carved pumpkin: orange, ribbed, a stem on top, and everything on its
+-- face (eyes, mouth, nose) glowing like candle light or carved dark.
+local function pumpkin(pieces: { Piece }, prefix: string): { Piece }
+	local head = findHead(pieces)
+	if not head then
+		return {}
+	end
+	local s = head.size
+	for _, piece in pieces do
+		if piece ~= head then
+			local inside = true
+			for axis = 1, 3 do
+				if math.abs(piece.at[axis] - head.at[axis]) > s[axis] / 2 + 0.35 then
+					inside = false
+				end
+			end
+			if inside and volume(piece) < volume(head) * 0.3 then
+				piece.color = if piece.glow then Flame else { 120, 45, 10 }
+			end
+		end
+	end
+	head.color = Orange
+	head.material = nil
+	head.reflectance = nil
+	local k = math.clamp(math.min(s[1], s[3]) / 1.6, 0.4, 2.5)
+	local rib = attach(
+		head,
+		prefix .. "Rib",
+		{ s[1] * 0.34, s[2] + 0.04, s[3] + 0.04 },
+		{ 220, 100, 20 },
+		{ 0, 0, 0 }
+	)
+	local stem = attach(head, prefix .. "Stem", { 0.28 * k, 0.45 * k, 0.28 * k }, { 70, 140, 50 }, {
+		0,
+		s[2] / 2 + 0.2 * k,
+		0,
+	})
+	return { rib, stem }
+end
+
+local function coverings(pieces: { Piece }, style: Style, prefix: string): { Piece }
 	local added = {}
 	for _, piece in pieces do
 		if piece.glow then
@@ -862,62 +681,99 @@ local function coverings(pieces: { Piece }, style: Style): { Piece }
 		end
 		local s = piece.size
 		if style.shell then
-			local shell = onPiece(
+			local shell = attach(
 				piece,
-				piece.name .. "Shell",
+				`{prefix}Shell{piece.name}`,
 				{ s[1] + 0.12, s[2] + 0.12, s[3] + 0.12 },
-				style.shell.color
+				style.shell.color,
+				{ 0, 0, 0 }
 			)
 			shell.transparency = style.shell.transparency
 			shell.material = style.shell.material
+			shell.glow = style.shell.glow
 			table.insert(added, shell)
 		end
-		if style.wrap and s[2] >= 0.4 then
-			-- One band round the middle of each part (two on long parts), along its height.
-			local bands = if s[2] >= 1.2 then 2 else 1
+	end
+	if style.wrap then
+		-- Bands round the middle of each part (two on long parts), along its height.
+		local wrap = style.wrap
+		local n = 0
+		local list = if wrap.stitches then biggest(pieces, 8) else pieces
+		for _, piece in list do
+			local s = piece.size
+			if piece.glow or s[2] < 0.4 then
+				continue
+			end
+			local bands = if s[2] >= 1.2 and not wrap.stitches then 2 else 1
 			for b = 1, bands do
+				n += 1
 				local offset = if bands == 1 then 0 else (b - 1.5) * s[2] * 0.45
-				local band = onPiece(
+				local thickness = wrap.thickness or math.min(0.3, s[2] * 0.3)
+				local band = attach(
 					piece,
-					`{piece.name}Wrap{b}`,
-					{ s[1] + 0.1, math.min(0.3, s[2] * 0.3), s[3] + 0.1 },
-					style.wrap.color
+					`{prefix}Band{piece.name}{b}`,
+					{ s[1] + 0.1, thickness, s[3] + 0.1 },
+					wrap.colors[(n - 1) % #wrap.colors + 1],
+					{ 0, offset, 0 }
 				)
-				band.material = "Fabric"
-				if offset ~= 0 then
-					-- Moved along the part's own up axis; a jointed band keeps the part's pivot.
-					local rot = piece.rot or { 0, 0, 0 }
-					local rx, ry, rz = math.rad(rot[1]), math.rad(rot[2]), math.rad(rot[3])
-					-- Up vector of CFrame.fromOrientation(rx, ry, rz) (Y, then X, then Z).
-					local ux = -math.sin(rz) * math.cos(ry) + math.cos(rz) * math.sin(rx) * math.sin(ry)
-					local uy = math.cos(rz) * math.cos(rx)
-					local uz = math.sin(rz) * math.sin(ry) + math.cos(rz) * math.sin(rx) * math.cos(ry)
-					band.at =
-						{ piece.at[1] + ux * offset, piece.at[2] + uy * offset, piece.at[3] + uz * offset }
-					if piece.joint and piece.joint.pivot then
-						local p = piece.joint.pivot
-						local joint = table.clone(piece.joint)
-						joint.pivot = { p[1], p[2] - offset, p[3] }
-						band.joint = joint
-					end
-				end
+				band.material = wrap.material or "Fabric"
 				table.insert(added, band)
+			end
+			-- Stitches: short ticks across the seam on the front.
+			if wrap.stitches and s[1] >= 0.8 then
+				for t = -1, 1 do
+					local tick = attach(
+						piece,
+						`{prefix}Tick{piece.name}{t + 2}`,
+						{ 0.07, 0.32, 0.06 },
+						wrap.colors[1],
+						{ t * s[1] * 0.28, 0, -(s[3] / 2 + 0.04) }
+					)
+					table.insert(added, tick)
+				end
+			end
+		end
+	end
+	if style.fur then
+		-- Tufts on the top and the sides of the biggest parts, light and dark.
+		local n = 0
+		for _, piece in biggest(pieces, 10) do
+			local s = piece.size
+			if math.min(s[1], s[3]) < 0.5 or s[2] < 0.4 then
+				continue
+			end
+			local spots = {
+				{ -s[1] * 0.25, s[2] / 2 + 0.05, -s[3] * 0.2 },
+				{ s[1] * 0.25, s[2] / 2 + 0.05, s[3] * 0.2 },
+				{ -(s[1] / 2 + 0.05), s[2] * 0.15, 0 },
+				{ s[1] / 2 + 0.05, -s[2] * 0.1, 0 },
+			}
+			for i, spot in spots do
+				n += 1
+				local tuft = attach(
+					piece,
+					`{prefix}Tuft{piece.name}{i}`,
+					{ 0.4, 0.32, 0.4 },
+					style.fur[n % #style.fur + 1],
+					spot
+				)
+				table.insert(added, tuft)
 			end
 		end
 	end
 	return added
 end
 
-local function extent(group: Group, axis: number, sign: number): number
+local function extent(group: Group, axis: number): number
 	local reach = 0
 	for _, part in group.parts do
-		reach = math.max(reach, sign * part.at[axis] + part.size[axis] / 2)
+		reach = math.max(reach, part.at[axis] + part.size[axis] / 2)
 	end
 	return reach
 end
 
 -- Places a style's extras on the look. `stack` remembers how far each anchor has been used
--- so later groups sit above (or behind, or outside) earlier ones instead of inside them.
+-- so later groups sit above (or outside) earlier ones instead of inside them.
 local function place(
 	pieces: { Piece },
 	base: { Piece },
@@ -940,33 +796,22 @@ local function place(
 	end
 	-- Head extras are drawn for a 1.6-stud head; scale them to the real one (within reason).
 	local head = math.clamp(math.max(hx1 - hx0, hz1 - hz0) / 1.6, 0.6, 2.5)
-	-- Back extras (capes, the eclipse) match the monster's width and height, not its length.
-	local back = math.clamp(math.min(width / 2, (max[2] - min[2]) / 2.4), 0.6, 3)
 	local body = math.clamp(math.max(width, depth) / 3, 0.6, 3)
+	local middle = { (min[1] + max[1]) / 2, (min[2] + max[2]) / 2, (min[3] + max[3]) / 2 }
 	for _, group in groups do
-		local k = if group.anchor == "head" then head elseif group.anchor == "back" then back else body
-		local origin: { number }
-		if group.anchor == "head" then
-			local y = stack.head or max[2]
-			-- Things hanging below the head line (collars, medallions) don't push the stack up.
-			stack.head = y + extent(group, 2, 1) * k
-			origin = { (hx0 + hx1) / 2, y, (hz0 + hz1) / 2 }
-		elseif group.anchor == "back" then
-			local z = stack.back or max[3]
-			stack.back = z + extent(group, 3, 1) * k
-			origin = { 0, (min[2] + max[2]) / 2 + (max[2] - min[2]) * 0.15, z }
-		elseif group.anchor == "feet" then
-			origin = { (min[1] + max[1]) / 2, min[2], (min[3] + max[3]) / 2 }
-		else
-			local reach = stack.orbit or (math.max(width, depth) / 2 + 0.6)
-			stack.orbit = reach + 1.2 * k
-			origin = { (min[1] + max[1]) / 2, (min[2] + max[2]) / 2, (min[3] + max[3]) / 2 }
-			-- Orbit parts are given on a ring of radius 1; push them out to `reach`.
+		if group.anchor == "orbit" then
+			local reach = stack.orbit or (math.max(width, depth) / 2 + 1)
+			stack.orbit = reach + 1.4
 			for _, part in group.parts do
-				local x, z = part.at[1], part.at[3]
-				local length = math.sqrt(x * x + z * z)
-				local scale = if length > 0 then (reach + 0.4) / length else 1
-				local at = { origin[1] + x * scale, origin[2] + part.at[2], origin[3] + z * scale }
+				-- On the ring at `angle`, turned so the part's X points out from the middle.
+				local angle = math.rad(part.angle or 0)
+				local offset = rotate({ 0, -(part.angle or 0), 0 }, part.at)
+				local at = {
+					middle[1] + math.cos(angle) * reach + offset[1],
+					middle[2] + offset[2],
+					middle[3] + math.sin(angle) * reach + offset[3],
+				}
+				local rot = part.rot or { 0, 0, 0 }
 				table.insert(pieces, {
 					name = `{prefix}{part.name}`,
 					size = part.size,
@@ -974,7 +819,7 @@ local function place(
 					color = part.color,
 					shape = part.shape,
 					glow = part.glow,
-					rot = part.rot,
+					rot = { rot[1], rot[2] - (part.angle or 0), rot[3] },
 					material = part.material,
 					transparency = part.transparency,
 					joint = {
@@ -982,11 +827,20 @@ local function place(
 						amp = 0,
 						speed = group.speed or 0.3,
 						spin = true,
-						around = origin,
+						around = middle,
 					},
 				})
 			end
 			continue
+		end
+		local k = if group.anchor == "head" then head else body
+		local origin: { number }
+		if group.anchor == "head" then
+			local y = stack.head or max[2]
+			stack.head = y + extent(group, 2) * k
+			origin = { (hx0 + hx1) / 2, y, (hz0 + hz1) / 2 }
+		else
+			origin = { middle[1], min[2], middle[3] }
 		end
 		for _, part in group.parts do
 			table.insert(pieces, {
@@ -1017,26 +871,52 @@ function EffectLooks.dress(look: Looks.Look, effects: { string }?, variant: stri
 		return look :: any
 	end
 
-	local base: { Piece } = {}
-	for _, piece in look.pieces do
-		table.insert(base, table.clone(piece) :: Piece)
-	end
-	-- Effects colour the monster first, the variant last.
-	for _, style in styles do
-		recolor(base, style)
-	end
-	local pieces: { Piece } = table.clone(base)
-	local stack: { [string]: number } = {}
-	local auras: { Aura } = {}
-	-- Name extras after the style they came from so names never clash.
+	-- Name what a style adds after the style, so names never clash.
 	local names: { [Style]: string } = {}
 	for id, style in EffectLooks.Styles do
 		names[style] = id
 	end
-	for _, style in styles do
-		for _, piece in coverings(base, style) do
+
+	local base: { Piece } = {}
+	for _, piece in look.pieces do
+		local copy = table.clone(piece) :: Piece
+		if look.seeThrough and not piece.glow then
+			copy.transparency = look.seeThrough -- per piece now; the look-wide one is dropped
+		end
+		table.insert(base, copy)
+	end
+	local effectStyles = table.clone(styles)
+	if variantStyle then
+		table.remove(effectStyles)
+	end
+	-- Effects change the monster first: its colours, then what sits on its parts.
+	local pieces: { Piece } = table.clone(base)
+	for _, style in effectStyles do
+		recolor(base, style)
+		if style.pumpkin then
+			for _, piece in pumpkin(base, names[style]) do
+				table.insert(pieces, piece)
+			end
+		end
+	end
+	for _, style in effectStyles do
+		for _, piece in coverings(base, style, names[style]) do
 			table.insert(pieces, piece)
 		end
+	end
+	-- The variant last, over everything on the monster (see-through skins keep their colour).
+	if variantStyle then
+		local solid = {}
+		for _, piece in pieces do
+			if piece.transparency == nil or piece.transparency < 0.5 then
+				table.insert(solid, piece)
+			end
+		end
+		recolor(solid, variantStyle)
+	end
+	local stack: { [string]: number } = {}
+	local auras: { Aura } = {}
+	for _, style in styles do
 		if style.extras then
 			place(pieces, base, style.extras, stack, names[style])
 		end
@@ -1050,15 +930,7 @@ function EffectLooks.dress(look: Looks.Look, effects: { string }?, variant: stri
 	dressed.pieces = pieces :: any
 	dressed.top = math.max(look.top, max[2])
 	dressed.auras = if #auras > 0 then auras else nil
-	-- See-through now comes per piece, so the look-wide setting would double it.
-	if look.seeThrough then
-		for _, piece in base do
-			if not piece.glow and piece.transparency == nil then
-				piece.transparency = look.seeThrough
-			end
-		end
-		dressed.seeThrough = nil
-	end
+	dressed.seeThrough = nil
 	return dressed
 end
 

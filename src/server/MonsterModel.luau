@@ -260,6 +260,9 @@ local function buildLook(
 		part.Massless = true
 		part.CastShadow = not piece.glow and not look.seeThrough and not piece.transparency
 		part:SetAttribute("Look", true) -- rebuilt when the effects change
+		if piece.rainbow then
+			part:SetAttribute("Rainbow", piece.rainbow) -- the client keeps its colour cycling
+		end
 
 		local centre = vector(piece.at, scale) + Vector3.new(0, lift, 0)
 		local rot = piece.rot

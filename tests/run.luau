@@ -931,7 +931,7 @@ end
 -- materials; head extras stack above the monster and the label clears them.
 do
 	local EffectLooks = require("../src/shared/Config/EffectLooks")
-	local materials = { Metal = true, SmoothPlastic = true, Fabric = true }
+	local materials = { Metal = true, SmoothPlastic = true, Fabric = true, Foil = true }
 	local missing = {}
 	for id in Effects.List do
 		if not EffectLooks.Styles[id] then
@@ -996,25 +996,30 @@ do
 	end
 	check(`every monster can wear every effect look {bad}`, ok)
 
-	-- Head extras never overlap: three hats stack on top of each other.
-	local look = Looks.GraveGrub or select(2, next(Looks))
-	local dressed = EffectLooks.dress(look, { "PumpkinHead", "Hexed", "Watched" })
-	local function span(name: string): (number, number)
+	-- Effects change the monster itself: a pumpkin head turns the head orange (no hat on
+	-- top), and every bat flies as one piece (its wings touch its body).
+	local look = Looks.Gravepup
+	local function find(dressed: any, name: string): any
 		for _, p in dressed.pieces do
 			if p.name == name then
-				return p.at[2] - p.size[2] / 2, p.at[2] + p.size[2] / 2
+				return p
 			end
 		end
-		return 0, 0
+		return nil
 	end
-	local _, pumpkinTop = span("PumpkinHeadStem")
-	local brimBottom, _ = span("HexedHatBrim")
-	local _, hatTop = span("HexedHatTip")
-	local eyeBottom, _ = span("WatchedEye")
+	local pumpkin = EffectLooks.dress(look, { "PumpkinHead" })
+	local head = find(pumpkin, "Head")
 	check(
-		"head extras stack without overlapping",
-		pumpkinTop <= brimBottom + 0.01 and hatTop <= eyeBottom + 0.01
+		"a pumpkin head turns the head into a pumpkin",
+		head and head.color[1] == 245 and head.color[2] == 130
 	)
+	local batty = EffectLooks.dress(look, { "Batty" })
+	local body, wing = find(batty, "BattyBat1"), find(batty, "BattyBat1WingL")
+	local dx, dz = body.at[1] - wing.at[1], body.at[3] - wing.at[3]
+	local gap = math.sqrt(dx * dx + dz * dz) - (body.size[1] + wing.size[1]) / 2
+	check("a bat's wings touch its body", math.abs(gap) < 0.11)
+	local rainbow = EffectLooks.dress(look, {}, "Rainbow")
+	check("rainbow parts carry where they start in the colour cycle", rainbow.pieces[1].rainbow ~= nil)
 	check("an undressed look is the look itself", EffectLooks.dress(look, {}, nil) == look)
 end
 
