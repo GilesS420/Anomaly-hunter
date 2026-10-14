@@ -1032,14 +1032,18 @@ do
 		check(`{id} cliffs ring the zone outside its walls`, outside)
 		local clear = true
 		for _, p in parts do
-			-- Ground (anything that doesn't rise above the floor) may lie under the roaming,
-			-- and monsters may walk under anything overhead.
+			-- Slabs level with the ground may lie under the roaming, low walk-through parts may be
+			-- glided over, and monsters may walk under anything overhead.
 			local hx, hz, bottom = Scenery.footprint(p)
-			local ground = p.at[2] + p.size[2] / 2 <= 0
-			if p.solid and not ground and bottom < Scenery.Overhead and not string.find(p.name, "^Fence") then
+			local top = p.at[2] * 2 - bottom
+			local rise = if p.solid then 0.05 else Scenery.Low
+			if math.abs(top) > 0.05 and not string.find(p.name, "^Fence") then
 				for _, r in zone.roam do
+					local y = r.y or 0
 					if
-						math.abs(p.at[1] - r.x) < hx + r.width / 2
+						top > y + rise
+						and bottom < y + Scenery.Overhead
+						and math.abs(p.at[1] - r.x) < hx + r.width / 2
 						and math.abs(p.at[3] - r.z) < hz + r.depth / 2
 					then
 						clear = false
@@ -1059,17 +1063,24 @@ do
 		end
 		check(`{id} roaming ground is inside the zone and clear of the arrival and exit`, roomy)
 		if zone.water then
-			local dry = zone.bed ~= nil and (zone.waterDepth or 2) < zone.bed
+			-- Monsters roam over the water's surface: ground over a pool lies wholly in it, at
+			-- the surface.
+			local surface = (zone.waterDepth or 2) - (zone.bed or 0)
+			local dry = surface < 0
 			for _, pool in zone.water do
+				dry = dry and pool.y == surface
 				for _, r in zone.roam do
-					dry = dry
-						and not (
-							math.abs(pool.x - r.x) < (pool.width + r.width) / 2
-							and math.abs(pool.z - r.z) < (pool.depth + r.depth) / 2
-						)
+					local over = math.abs(pool.x - r.x) < (pool.width + r.width) / 2
+						and math.abs(pool.z - r.z) < (pool.depth + r.depth) / 2
+					if over then
+						dry = dry
+							and r.y == surface
+							and math.abs(pool.x - r.x) + r.width / 2 <= pool.width / 2
+							and math.abs(pool.z - r.z) + r.depth / 2 <= pool.depth / 2
+					end
 				end
 			end
-			check(`{id} water stays below the ground and off the monsters' ground`, dry)
+			check(`{id} water stays below the ground; monsters roam on its surface`, dry)
 		end
 	end
 end
@@ -1102,7 +1113,7 @@ do
 		end
 		return false
 	end
-	check("open ground leaves out the cells round a prop", not onGround(40, 40) and not onGround(46, 40))
+	check("open ground leaves out the cells round a prop", not onGround(40, 40) and not onGround(45.5, 40))
 	check(
 		"open ground runs under a roof and across the rest",
 		onGround(-40, 40) and onGround(0, 0) and onGround(80, -60)
@@ -1111,11 +1122,48 @@ do
 		"open ground leaves out the arrival pad and the exit",
 		not onGround(-20, -90) and not onGround(20, -100)
 	)
-	local area = 0
-	for _, r in Scenery.Zones.AbandonedCarnival.roam do
-		area += r.width * r.depth
+	-- Most of each zone is open (the rectangles may overlap, so count spots on a grid).
+	for id, zone in Scenery.Zones do
+		local open, total = 0, 0
+		for x = -105, 105, 2 do
+			for z = -105, 105, 2 do
+				total += 1
+				for _, r in zone.roam do
+					if math.abs(x - r.x) <= r.width / 2 and math.abs(z - r.z) <= r.depth / 2 then
+						open += 1
+						break
+					end
+				end
+			end
+		end
+		check(`monsters roam most of {id}`, open > 0.6 * total)
 	end
-	check("monsters roam most of the carnival", area > 0.5 * 212 * 212)
+
+	-- A floor of water: ground over it sits at its height, and a stone poking out of the water
+	-- (but not up to the ground) still blocks it.
+	local pool = { x = 40, z = -40, width = 20, depth = 20, y = -2 }
+	local stone = {
+		name = "Stone",
+		size = { 2, 2, 2 },
+		at = { 40, -2, -40 },
+		color = { 0, 0, 0 },
+		material = "Slate",
+		solid = true,
+	}
+	local wet = Scenery.openGround({ stone :: any }, { floors = { pool } })
+	local onWater, onStone, dryAround = false, false, true
+	for _, r in wet do
+		local inPool = math.abs(r.x - 40) < 10 and math.abs(r.z + 40) < 10
+		if math.abs(35 - r.x) <= r.width / 2 and math.abs(-35 - r.z) <= r.depth / 2 then
+			onWater = r.y == -2
+		end
+		if math.abs(40 - r.x) <= r.width / 2 and math.abs(-40 - r.z) <= r.depth / 2 then
+			onStone = true
+		end
+		dryAround = dryAround and (inPool == (r.y == -2))
+	end
+	check("open ground runs over a pool at its surface", onWater and dryAround)
+	check("a stone in the water blocks the ground over it", not onStone)
 end
 
 -- Roaming legs stay on the floor: a straight line between two patches of open ground may not
@@ -1127,6 +1175,13 @@ do
 	check("a leg straight across the props is refused", not Roam.lineInside(L, -30, -40, 30, -40, 1.5))
 	local wings = { Roam.rect(-21, 0, 40, 40, 0), Roam.rect(21, 0, 40, 40, 0) }
 	check("a leg may step over the gap between two wings", Roam.lineInside(wings, -30, 0, 30, 0, 1.5))
+	-- A big orb never squeezes through a gap narrower than itself.
+	local gap = { Roam.rect(-20, 0, 30, 30, 0), Roam.rect(0, 0, 10, 2, 0), Roam.rect(20, 0, 30, 30, 0) }
+	check("a small orb may cross a narrow gap", Roam.lineInside(Roam.fitting(gap, 0.8), -20, 0, 20, 0, 0.25))
+	check(
+		"a big orb can't cross a narrow gap",
+		not Roam.lineInside(Roam.fitting(gap, 3), -20, 0, 20, 0, 0.25)
+	)
 end
 
 -- Fast travel and the faster hub walk.

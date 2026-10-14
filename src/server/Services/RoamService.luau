@@ -20,11 +20,23 @@ local Roam = require(ReplicatedStorage.Shared.Util.Roam)
 
 local RoamService = {}
 
-export type Options = { rects: { Roam.Rect }, radius: number, speed: number, group: string, at: Vector3 }
+-- `exact`: the rectangles cover the open ground between a zone's props exactly (no gaps to
+-- step over), so legs keep to them strictly, across only those the orb fits in.
+export type Options = {
+	rects: { Roam.Rect },
+	exact: boolean?,
+	radius: number,
+	speed: number,
+	group: string,
+	at: Vector3,
+}
 
 type Roamer = {
 	model: Model,
 	rects: { Roam.Rect },
+	exact: boolean,
+	slack: number, -- how far a leg may stray off the rectangles
+	paths: { Roam.Rect }, -- the rectangles a leg may cross
 	radius: number,
 	speed: number,
 	group: string,
@@ -47,6 +59,7 @@ local RetrySeconds = 1 -- wait when no clear path was found (crowded)
 local Candidates = 8 -- targets tried per new leg
 local PathStep = 1 -- studs between the sample bodies placed along a path (small, so no gaps)
 local FloorSlack = 1.5 -- studs a leg may stray off the floor rectangles (bridges the 2-stud gap between wings)
+local ExactSlack = 0.25 -- the same on exact open ground (only rounding)
 
 local random = Random.new()
 local roamers: { [Model]: Roamer } = {}
@@ -148,7 +161,7 @@ local function startLeg(roamer: Roamer, at: number): boolean
 
 	-- Stay on the open ground: no walking straight across the props between two patches of
 	-- it. One that's somehow off it already may walk back on.
-	local offFloor = not Roam.inside(roamer.rects, here.X, here.Z, -FloorSlack)
+	local offFloor = not Roam.inside(roamer.paths, here.X, here.Z, -roamer.slack)
 	local close = nearby(roamer.rects, here.X, here.Z, roamer.radius)
 	for attempt = 1, Candidates do
 		-- Mostly short hops; the last tries look anywhere, so a crowded corner can't trap it.
@@ -157,7 +170,7 @@ local function startLeg(roamer: Roamer, at: number): boolean
 		if
 			point
 			and Roam.pathClear(here.X, here.Z, point.x, point.z, roamer.radius, blocking)
-			and (offFloor or Roam.lineInside(roamer.rects, here.X, here.Z, point.x, point.z, FloorSlack))
+			and (offFloor or Roam.lineInside(roamer.paths, here.X, here.Z, point.x, point.z, roamer.slack))
 		then
 			local target = Vector3.new(point.x, point.y + roamer.radius + 0.5, point.z)
 			local distance = (target - here).Magnitude
@@ -207,6 +220,9 @@ function RoamService.add(model: Model, opts: Options)
 	local roamer: Roamer = {
 		model = model,
 		rects = opts.rects,
+		exact = opts.exact == true,
+		slack = if opts.exact then ExactSlack else FloorSlack,
+		paths = if opts.exact then Roam.fitting(opts.rects, opts.radius) else opts.rects,
 		radius = opts.radius,
 		speed = math.max(opts.speed, 0.1),
 		group = opts.group,
@@ -238,11 +254,18 @@ function RoamService.remove(model: Model)
 	CollectionService:RemoveTag(model, Tag)
 end
 
+-- New floor area for a roamer. On exact open ground, legs only cross rectangles it fits in
+-- (so a big one never squeezes through a narrow gap between props).
+local function setRects(roamer: Roamer, rects: { Roam.Rect })
+	roamer.rects = rects
+	roamer.paths = if roamer.exact then Roam.fitting(rects, roamer.radius) else rects
+end
+
 -- New floor area for one roamer (it walks there on its next leg if it's outside).
 function RoamService.setRects(model: Model, rects: { Roam.Rect })
 	local roamer = roamers[model]
 	if roamer then
-		roamer.rects = rects
+		setRects(roamer, rects)
 	end
 end
 
@@ -250,7 +273,7 @@ end
 function RoamService.setRectsForGroup(group: string, rects: { Roam.Rect })
 	for _, roamer in roamers do
 		if roamer.group == group then
-			roamer.rects = rects
+			setRects(roamer, rects)
 		end
 	end
 end
