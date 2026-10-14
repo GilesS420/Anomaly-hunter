@@ -1,7 +1,9 @@
 --!strict
--- Building blocks for the shop windows (Workshop, Collector): a window in the middle of the
--- screen with a title, a status line, a scrolling list, a footer and a close button. Sizes
--- scale down on phones; every button works with a mouse click or a tap.
+-- Building blocks for the shop windows (Workshop, Bakery, Collector) and the other buttons:
+-- a window in the middle of the screen with a title, a status line, a scrolling list, a
+-- footer and a close button. The look matches the haunted hub: near-black purple panels,
+-- lantern-orange spooky titles and dark buttons rimmed in their colour. Sizes scale down on
+-- phones; every button works with a mouse click or a tap.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -9,15 +11,17 @@ local RunService = game:GetService("RunService")
 local Ui = {}
 
 Ui.Colors = {
-	panel = Color3.fromRGB(28, 22, 38),
-	row = Color3.fromRGB(44, 36, 58),
+	panel = Color3.fromRGB(18, 14, 26),
+	row = Color3.fromRGB(32, 26, 44),
+	rim = Color3.fromRGB(96, 74, 140), -- panel and row outlines
+	lamp = Color3.fromRGB(255, 176, 84), -- titles, like the lanterns
 	text = Color3.new(1, 1, 1),
 	muted = Color3.fromRGB(190, 180, 210),
 	money = Color3.fromRGB(140, 255, 140),
 	buy = Color3.fromRGB(60, 150, 80),
 	sell = Color3.fromRGB(205, 135, 30),
 	equip = Color3.fromRGB(110, 80, 200),
-	off = Color3.fromRGB(72, 66, 84),
+	off = Color3.fromRGB(86, 78, 100),
 	confirm = Color3.fromRGB(200, 60, 70),
 }
 
@@ -65,16 +69,50 @@ function Ui.text(
 	return label
 end
 
+-- The spooky title font.
+Ui.TitleFont = Enum.Font.Creepster
+
+-- A thin outline round a frame or button.
+function Ui.rim(parent: Instance, color: Color3, thickness: number): UIStroke
+	local stroke = Instance.new("UIStroke")
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Color = color
+	stroke.Thickness = thickness
+	stroke.Parent = parent
+	return stroke
+end
+
+-- Gives a button the hub look: a dark body tinted with its colour, a rim in the colour and
+-- a soft shine from the top. Call again after changing the colour (Ui.paint).
+function Ui.paint(button: GuiButton, color: Color3)
+	local h, sat, v = color:ToHSV()
+	button.BackgroundColor3 = Color3.fromHSV(h, math.min(sat * 1.1, 1), v * 0.45)
+	local stroke = button:FindFirstChild("Rim") :: UIStroke?
+	if not stroke then
+		stroke = Ui.rim(button, color, 2);
+		(stroke :: UIStroke).Name = "Rim"
+	end
+	(stroke :: UIStroke).Color = Color3.fromHSV(h, sat * 0.8, math.min(v * 1.25, 1))
+	if not button:FindFirstChild("Shine") then
+		local shine = Instance.new("UIGradient")
+		shine.Name = "Shine"
+		shine.Rotation = 90
+		shine.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(150, 140, 165))
+		shine.Parent = button
+	end
+end
+
 function Ui.button(parent: Instance, text: string, color: Color3, size: UDim2): TextButton
 	local button = Instance.new("TextButton")
 	button.Size = size
-	button.BackgroundColor3 = color
-	button.Font = Enum.Font.GothamBold
+	button.Font = Enum.Font.GothamBlack
 	button.Text = text
 	button.TextColor3 = Ui.Colors.text
+	button.TextStrokeTransparency = 0.6
 	button.TextScaled = true
 	button.AutoButtonColor = true
 	Ui.corner(button, 8)
+	Ui.paint(button, color)
 	local padding = Instance.new("UIPadding")
 	padding.PaddingLeft = UDim.new(0, 8)
 	padding.PaddingRight = UDim.new(0, 8)
@@ -93,6 +131,8 @@ end
 function Ui.confirmButton(button: TextButton, question: string, action: () -> ())
 	local armed = false
 	local text, color = button.Text, button.BackgroundColor3
+	local rim = button:FindFirstChild("Rim")
+	local rimColor = if rim and rim:IsA("UIStroke") then rim.Color else color
 	button.Activated:Connect(function()
 		if armed then
 			armed = false
@@ -101,12 +141,16 @@ function Ui.confirmButton(button: TextButton, question: string, action: () -> ()
 		end
 		armed = true
 		button.Text = question
-		button.BackgroundColor3 = Ui.Colors.confirm
+		Ui.paint(button, Ui.Colors.confirm)
 		task.delay(3, function()
 			if armed and button.Parent then
 				armed = false
 				button.Text = text
 				button.BackgroundColor3 = color
+				local rim = button:FindFirstChild("Rim")
+				if rim and rim:IsA("UIStroke") then
+					rim.Color = rimColor
+				end
 			end
 		end)
 	end)
@@ -134,13 +178,15 @@ function Ui.window(name: string, titleText: string): Window
 	panel.Position = UDim2.fromScale(0.5, 0.5)
 	panel.Size = UDim2.fromScale(0.92, 0.9) -- tall, so a landscape phone still shows a few rows
 	panel.BackgroundColor3 = Ui.Colors.panel
-	panel.BackgroundTransparency = 0.05
+	panel.BackgroundTransparency = 0.04
 	panel.Parent = gui
 	Ui.corner(panel, 14)
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = Color3.fromRGB(120, 100, 160)
-	stroke.Thickness = 2
-	stroke.Parent = panel
+	Ui.rim(panel, Ui.Colors.rim, 2)
+	-- A faint purple mist rising from the bottom, like the hub at night.
+	local mist = Instance.new("UIGradient")
+	mist.Rotation = 90
+	mist.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(200, 170, 255))
+	mist.Parent = panel
 	local limit = Instance.new("UISizeConstraint")
 	limit.MaxSize = Vector2.new(560, 600)
 	limit.Parent = panel
@@ -151,8 +197,10 @@ function Ui.window(name: string, titleText: string): Window
 	padding.PaddingBottom = UDim.new(0, 12)
 	padding.Parent = panel
 
-	local title = Ui.text(panel, titleText, UDim2.new(1, -54, 0, 34), Ui.Colors.text, true, 30)
-	title.Font = Enum.Font.GothamBlack
+	local title = Ui.text(panel, titleText, UDim2.new(1, -54, 0, 34), Ui.Colors.lamp, true, 34)
+	title.Font = Ui.TitleFont
+	title.TextStrokeTransparency = 0.4
+	title.TextStrokeColor3 = Color3.fromRGB(60, 20, 0)
 
 	local status = Ui.text(panel, "", UDim2.new(1, 0, 0, 22), Ui.Colors.muted, false, 18)
 	status.Position = UDim2.fromOffset(0, 38)
@@ -160,6 +208,10 @@ function Ui.window(name: string, titleText: string): Window
 	local close = Ui.button(panel, "X", Ui.Colors.off, UDim2.fromOffset(44, 44))
 	close.AnchorPoint = Vector2.new(1, 0)
 	close.Position = UDim2.new(1, 0, 0, -4)
+	local round = close:FindFirstChildOfClass("UICorner")
+	if round then
+		round.CornerRadius = UDim.new(0.5, 0)
+	end
 
 	local list = Instance.new("ScrollingFrame")
 	list.Name = "List"
@@ -168,6 +220,7 @@ function Ui.window(name: string, titleText: string): Window
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
 	list.ScrollBarThickness = 6
+	list.ScrollBarImageColor3 = Ui.Colors.rim
 	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	list.CanvasSize = UDim2.new()
 	list.Parent = panel
@@ -256,6 +309,7 @@ function Ui.row(
 	row.BackgroundColor3 = Ui.Colors.row
 	row.Parent = list
 	Ui.corner(row, 10)
+	Ui.rim(row, Color3.fromRGB(58, 48, 78), 1)
 	local padding = Instance.new("UIPadding")
 	padding.PaddingLeft = UDim.new(0, 10)
 	padding.PaddingRight = UDim.new(0, 8)
