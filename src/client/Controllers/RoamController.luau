@@ -44,8 +44,11 @@ type State = {
 	clock: number, -- limb clock: runs fast while walking, slow while standing
 	pace: number, -- eases between IDLE_PACE and 1 so limbs never jump
 	swings: { Swing }?, -- nil until the model has streamed in
+	lookVersion: any, -- the server rebuilds the blocks when effects change (LookVersion)
+	rainbow: { BasePart }?, -- parts of a Rainbow monster, recoloured every frame
 }
 
+local RAINBOW_SPEED = 0.25 -- trips round the colour wheel per second
 local random = Random.new()
 local phases: { [Model]: State } = {}
 
@@ -174,9 +177,26 @@ function RoamController.start()
 
 			if gait then
 				local swings = state.swings
-				if not swings then
+				local lookVersion = model:GetAttribute("LookVersion")
+				if not swings or state.lookVersion ~= lookVersion then
+					state.lookVersion = lookVersion
+					local rainbow: { BasePart } = {}
+					for _, part in model:GetDescendants() do
+						if part:IsA("BasePart") and typeof(part:GetAttribute("Rainbow")) == "number" then
+							table.insert(rainbow, part)
+						end
+					end
+					state.rainbow = if #rainbow > 0 then rainbow else nil
 					swings = findSwings(model)
 					state.swings = swings
+				end
+				if state.rainbow then
+					-- Rainbow catches keep cycling through the colours, each part a bit ahead
+					-- of the one below it.
+					for _, part in state.rainbow do
+						local start = part:GetAttribute("Rainbow") :: number
+						part.Color = Color3.fromHSV((start + clock * RAINBOW_SPEED) % 1, 0.75, 1)
+					end
 				end
 				for _, swing in swings :: { Swing } do
 					local angle = if swing.spin

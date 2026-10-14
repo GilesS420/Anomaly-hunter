@@ -1090,6 +1090,103 @@ do
 	end
 end
 
+-- Effect looks: every effect, combo and variant has a look, and dressing any monster in any
+-- of them (or three effects plus a variant) gives sized, uniquely named parts with real
+-- materials; head extras stack above the monster and the label clears them.
+do
+	local EffectLooks = require("../src/shared/Config/EffectLooks")
+	local materials = { Metal = true, SmoothPlastic = true, Fabric = true, Foil = true }
+	local missing = {}
+	for id in Effects.List do
+		if not EffectLooks.Styles[id] then
+			table.insert(missing, id)
+		end
+	end
+	for id in Effects.Combos do
+		if not EffectLooks.Styles[id] then
+			table.insert(missing, id)
+		end
+	end
+	for _, id in EffectLooks.Variants do
+		if not EffectLooks.Styles[id] then
+			table.insert(missing, id)
+		end
+	end
+	check(`every effect, combo and variant has a look {table.concat(missing, ",")}`, #missing == 0)
+
+	local function valid(look: any): boolean
+		local names = {}
+		for _, p in look.pieces do
+			if names[p.name] or #p.size ~= 3 or #p.at ~= 3 or #p.color ~= 3 then
+				return false
+			end
+			for i = 1, 3 do
+				if p.size[i] <= 0 or p.color[i] < 0 or p.color[i] > 255 then
+					return false
+				end
+			end
+			if p.material and not materials[p.material] then
+				return false
+			end
+			names[p.name] = true
+			if p.at[2] + p.size[2] / 2 > look.top + 0.01 then
+				return false
+			end
+		end
+		return true
+	end
+	local stacks = {
+		{ { "PumpkinHead", "Watched", "Hexed" }, "Gold" },
+		{ { "Count", "Pharaoh", "Alpha" }, "Rainbow" },
+		{ { "Slimed", "Poltergeist", "Eclipsed" }, "Shiny" },
+		{ { "Mimic", "Stitched", "Cobwebbed" }, "Silver" },
+		{ { "Banshee", "Possessed", "Mummy" }, nil },
+	}
+	local ok, bad = true, ""
+	for monsterId, look in Looks do
+		for id in EffectLooks.Styles do
+			local isVariant = table.find(EffectLooks.Variants, id) ~= nil
+			local dressed =
+				EffectLooks.dress(look, if isVariant then nil else { id }, if isVariant then id else nil)
+			if not valid(dressed) then
+				ok, bad = false, `{monsterId} {id}`
+			end
+		end
+		for _, stack in stacks do
+			if not valid(EffectLooks.dress(look, stack[1], stack[2])) then
+				ok, bad = false, `{monsterId} {table.concat(stack[1], "+")}`
+			end
+		end
+	end
+	check(`every monster can wear every effect look {bad}`, ok)
+
+	-- Effects change the monster itself: a pumpkin head turns the head orange (no hat on
+	-- top), and every bat flies as one piece (its wings touch its body).
+	local look = Looks.Gravepup
+	local function find(dressed: any, name: string): any
+		for _, p in dressed.pieces do
+			if p.name == name then
+				return p
+			end
+		end
+		return nil
+	end
+	local pumpkin = EffectLooks.dress(look, { "PumpkinHead" })
+	local head = find(pumpkin, "Head")
+	check(
+		"a pumpkin head turns the head into a pumpkin",
+		head and head.color[1] == 245 and head.color[2] == 130
+	)
+	local batty = EffectLooks.dress(look, { "Batty" })
+	local body, wing = find(batty, "BattyBat1"), find(batty, "BattyBat1WingL")
+	local dx, dz = body.at[1] - wing.at[1], body.at[3] - wing.at[3]
+	local gap = math.sqrt(dx * dx + dz * dz) - (body.size[1] + wing.size[1]) / 2
+	check("a bat's wings touch its body", math.abs(gap) < 0.11)
+	local rainbow = EffectLooks.dress(look, {}, "Rainbow")
+	check("rainbow parts carry where they start in the colour cycle", rainbow.pieces[1].rainbow ~= nil)
+	check("an undressed look is the look itself", EffectLooks.dress(look, {}, nil) == look)
+end
+
 -- Hub landmarks: every part is sized, uses a real material and stays on the landmark's spot,
 -- the shops have a counter spot in front, and the middle of Watcher Square stays clear for
 -- the Watcher's meter.
