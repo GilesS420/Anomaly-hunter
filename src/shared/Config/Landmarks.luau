@@ -626,18 +626,201 @@ function Landmarks.Workshop(): { Part }
 	return parts
 end
 
+local Oxblood = { 72, 34, 40 }
+local Crimson = { 120, 30, 40 }
+local Soot = { 30, 26, 30 }
+local Coat = { 28, 24, 32 }
+local Skull = { 226, 220, 200 }
+local Gold = { 212, 170, 60 }
+local GlassTint = { 180, 220, 230 }
+local Wisps = { { 120, 255, 220 }, { 255, 120, 200 }, WatcherPurple, { 255, 200, 80 } }
+
+-- An iron cage: a floor, a lid, a post at each corner and bars between them. `size` is its
+-- width and depth, `height` its inside height; (x, y, z) is the middle of its floor.
+local function cage(
+	parts: { Part },
+	name: string,
+	x: number,
+	y: number,
+	z: number,
+	size: number,
+	height: number
+)
+	local half = size / 2
+	part(parts, name .. "Floor", { size, 0.3, size }, { x, y + 0.15, z }, Iron, "Metal", true)
+	part(parts, name .. "Lid", { size, 0.3, size }, { x, y + 0.45 + height, z }, Iron, "Metal", true)
+	part(parts, name .. "Ring", { 0.8, 0.8, 0.2 }, { x, y + 1 + height, z }, Iron, "Metal")
+	local n = 0
+	for _, cx in { -1, 1 } do
+		for _, cz in { -1, 1 } do
+			n += 1
+			part(
+				parts,
+				`{name}Post{n}`,
+				{ 0.25, height, 0.25 },
+				{ x + cx * (half - 0.125), y + 0.3 + height / 2, z + cz * (half - 0.125) },
+				Iron,
+				"Metal",
+				true
+			)
+		end
+	end
+	-- Thin bars on each face, between the posts (decor only; the posts hold the cage).
+	for _, along in { -1 / 3, 1 / 3 } do
+		for _, offset in { { along, -1 }, { along, 1 }, { -1, along }, { 1, along } } do
+			n += 1
+			part(
+				parts,
+				`{name}Bar{n}`,
+				{ 0.12, height, 0.12 },
+				{ x + offset[1] * (half - 0.125), y + 0.3 + height / 2, z + offset[2] * (half - 0.125) },
+				Iron,
+				"Metal"
+			)
+		end
+	end
+end
+
+-- The Collector: an oxblood shop under a crimson and black awning, where a tall skeletal
+-- dealer in a top hat buys your monsters. Brass scales and stacks of gold on the counter,
+-- shelves of jars with trapped glowing wisps behind him, a caged monster out on the deck, and
+-- a giant specimen jar with a wisp swirling inside on the roof.
+function Landmarks.Collector(): { Part }
+	local parts: { Part } = {}
+	local y = shop(parts, {
+		title = "The Collector",
+		wall = Oxblood,
+		trim = Bone,
+		roof = { 40, 30, 34 },
+		deck = { 54, 44, 40 },
+		sign = Bone,
+		awning = { Crimson, Soot },
+	})
+
+	-- Shelves of jars, each with a glowing wisp inside.
+	for s, x in { -9.5, 9.5 } do
+		for i, top in shelves(parts, `JarShelf{s}`, x, { 52, 36, 34 }) do
+			for j, dx in { -2, 0, 2 } do
+				local name = `Jar{s}{i}{j}`
+				local glass = part(parts, name, { 1, 1.4, 1 }, { x + dx, top + 0.7, 16 }, GlassTint, "Glass")
+				glass.transparency = 0.55
+				local color = Wisps[(s + i + j) % #Wisps + 1]
+				local wisp = part(
+					parts,
+					name .. "Wisp",
+					{ 0.5, 0.5, 0.5 },
+					{ x + dx, top + 0.6, 16 },
+					color,
+					"Neon"
+				)
+				wisp.shape = "Ball"
+				if i == 2 and j == 2 then
+					wisp.light = { color = color, range = 12, brightness = 0.8 }
+				end
+				part(parts, name .. "Lid", { 1.1, 0.2, 1.1 }, { x + dx, top + 1.5, 16 }, Iron, "Metal")
+			end
+		end
+	end
+
+	-- The Collector himself, low enough that his hat stays under the awning: a long coat, a grinning skull, a top hat and glowing eyes.
+	local hz = 1.6
+	part(parts, "CollectorCoat", { 2.6, 4.8, 1.6 }, { 0, y + 2.4, hz }, Coat, "Fabric", true)
+	part(parts, "CollectorCollar", { 3, 0.6, 1.8 }, { 0, y + 4.6, hz }, Crimson, "Fabric")
+	part(parts, "CollectorSkull", { 1.6, 1.8, 1.6 }, { 0, y + 5.8, hz }, Skull, "SmoothPlastic", true)
+	part(parts, "CollectorJaw", { 1.2, 0.4, 0.1 }, { 0, y + 5.15, hz - 0.85 }, Ink, "SmoothPlastic")
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		part(
+			parts,
+			`CollectorEye{tag}`,
+			{ 0.4, 0.4, 0.1 },
+			{ side * 0.38, y + 6.0, hz - 0.85 },
+			Wisps[1],
+			"Neon"
+		)
+		part(parts, `CollectorArm{tag}`, { 0.6, 0.6, 1.4 }, { side * 1.6, y + 3.85, 0.1 }, Coat, "Fabric")
+		part(
+			parts,
+			`CollectorHand{tag}`,
+			{ 0.5, 0.3, 0.5 },
+			{ side * 1.6, y + 3.65, -0.85 },
+			Skull,
+			"SmoothPlastic"
+		)
+	end
+	part(parts, "HatBrim", { 2.4, 0.2, 2.4 }, { 0, y + 6.8, hz }, Soot, "Fabric")
+	part(parts, "Hat", { 1.6, 1.3, 1.6 }, { 0, y + 7.55, hz }, Soot, "Fabric")
+	part(parts, "HatBand", { 1.7, 0.3, 1.7 }, { 0, y + 7.1, hz }, Crimson, "Fabric")
+	local eyeGlow = part(parts, "CollectorGlow", { 0.2, 0.2, 0.2 }, { 0, y + 6.0, hz }, Wisps[1], "Neon")
+	eyeGlow.transparency = 1
+	eyeGlow.light = { color = Wisps[1], range = 8, brightness = 0.7 }
+
+	-- On the counter: brass scales and stacks of gold coins.
+	local top = y + 3.5
+	part(parts, "ScaleBase", { 1.6, 0.2, 1 }, { -5, top + 0.1, -1 }, Brass, "Metal")
+	part(parts, "ScalePost", { 0.2, 2.4, 0.2 }, { -5, top + 1.4, -1 }, Brass, "Metal")
+	part(parts, "ScaleBeam", { 3.4, 0.15, 0.15 }, { -5, top + 2.675, -1 }, Brass, "Metal")
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		local px = -5 + side * 1.6
+		part(parts, `ScaleChain{tag}`, { 0.06, 1.2, 0.06 }, { px, top + 2.0, -1 }, Brass, "Metal")
+		part(parts, `ScalePan{tag}`, { 1.2, 0.1, 1.2 }, { px, top + 1.35, -1 }, Brass, "Metal")
+	end
+	part(parts, "ScaleWisp", { 0.5, 0.5, 0.5 }, { -6.6, top + 1.65, -1.4 }, Wisps[2], "Neon").shape = "Ball"
+	for i, stack in { { 4.5, 3 }, { 5.6, 5 }, { 6.7, 2 } } do
+		for k = 1, stack[2] do
+			local coin = part(
+				parts,
+				`Coins{i}_{k}`,
+				{ 0.2, 0.9, 0.9 },
+				{ stack[1], top + k * 0.2 - 0.1, -1.2 },
+				Gold,
+				"Metal"
+			)
+			coin.shape = "Cylinder"
+			coin.rot = { 0, 0, 90 }
+		end
+	end
+
+	-- A caged monster out on the deck, and empty cages waiting to be filled.
+	cage(parts, "BigCage", 12.5, y, -8, 3.6, 3.6)
+	local caught = part(parts, "CagedWisp", { 1.6, 1.6, 1.6 }, { 12.5, y + 2.1, -8 }, Wisps[3], "Neon")
+	caught.shape = "Ball"
+	caught.light = { color = Wisps[3], range = 12, brightness = 0.9 }
+	cage(parts, "SmallCage", -13, y, -8, 2.4, 2)
+	cage(parts, "TopCage", -13, y + 3.45, -8, 2.2, 1.6)
+
+	-- The specimen jar on the roof: a glass drum on an iron stand with a wisp inside.
+	local roof = y + 15.6
+	local jz = 9.5
+	part(parts, "JarStand", { 5, 0.8, 5 }, { 0, roof + 0.4, jz }, Iron, "Metal", true)
+	local drum = part(parts, "SpecimenJar", { 6, 4.4, 4.4 }, { 0, roof + 3.8, jz }, GlassTint, "Glass")
+	drum.shape = "Cylinder"
+	drum.rot = { 0, 0, 90 }
+	drum.transparency = 0.5
+	local lid = part(parts, "SpecimenLid", { 0.6, 4.8, 4.8 }, { 0, roof + 7.1, jz }, Iron, "Metal", true)
+	lid.shape = "Cylinder"
+	lid.rot = { 0, 0, 90 }
+	local spirit = part(parts, "SpecimenWisp", { 2.4, 2.4, 2.4 }, { 0, roof + 3.6, jz }, Wisps[1], "Neon")
+	spirit.shape = "Ball"
+	spirit.light = { color = Wisps[1], range = 22, brightness = 1 }
+	return parts
+end
+
 -- Recipes by landmark name (Layout.Landmarks), and which of their parts is the model's
 -- PrimaryPart: what Counter puts the prompt on.
 Landmarks.ByName = {
 	WatcherSquare = Landmarks.WatcherSquare,
 	Bakery = Landmarks.Bakery,
 	Workshop = Landmarks.Workshop,
+	Collector = Landmarks.Collector,
 } :: { [string]: () -> { Part } }
 
 Landmarks.Anchor = {
 	WatcherSquare = "Plaza",
 	Bakery = Landmarks.CounterSpot,
 	Workshop = Landmarks.CounterSpot,
+	Collector = Landmarks.CounterSpot,
 } :: { [string]: string }
 
 return Landmarks
