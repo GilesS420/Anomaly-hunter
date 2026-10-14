@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local TravelConfig = require(Shared:WaitForChild("Config"):WaitForChild("Travel"))
+local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
 local TravelController = {}
 
@@ -21,12 +22,14 @@ local function buildUi(): (Frame, { TextButton })
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "TravelUi"
 	gui.ResetOnSpawn = false
+	-- Up in the top bar, level with Roblox's own menu buttons.
+	gui.IgnoreGuiInset = true
 
 	-- Centred at the top; the toasts sit just below it (ToastController).
 	local bar = Instance.new("Frame")
 	bar.Name = "FastTravel"
 	bar.AnchorPoint = Vector2.new(0.5, 0)
-	bar.Position = UDim2.new(0.5, 0, 0, 8)
+	bar.Position = UDim2.new(0.5, 0, 0, 10)
 	bar.Size = UDim2.fromOffset(0, BUTTON_HEIGHT)
 	bar.AutomaticSize = Enum.AutomaticSize.X
 	bar.BackgroundTransparency = 1
@@ -44,16 +47,18 @@ local function buildUi(): (Frame, { TextButton })
 		button.LayoutOrder = order
 		button.Size = UDim2.fromOffset(BUTTON_WIDTH, BUTTON_HEIGHT)
 		local rgb = destination.color
-		button.BackgroundColor3 = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
-		button.TextColor3 = Color3.new(1, 1, 1)
-		button.Font = Enum.Font.GothamBold
+		local color = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
+		-- The hub look (Ui.paint), with the label in the spooky font and its own colour.
+		local h, sat = color:ToHSV()
+		button.TextColor3 = Color3.fromHSV(h, sat * 0.45, 1)
+		button.TextStrokeTransparency = 0.3
+		button.Font = Ui.TitleFont
 		button.TextScaled = true
 		button.AutoButtonColor = true
 		button.Text = destination.label
 		button:SetAttribute("Destination", destination.id)
-		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(0, 10)
-		corner.Parent = button
+		Ui.corner(button, 12)
+		Ui.paint(button, color)
 		local padding = Instance.new("UIPadding")
 		padding.PaddingLeft = UDim.new(0, 10)
 		padding.PaddingRight = UDim.new(0, 10)
@@ -61,7 +66,7 @@ local function buildUi(): (Frame, { TextButton })
 		padding.PaddingBottom = UDim.new(0, 8)
 		padding.Parent = button
 		local limit = Instance.new("UITextSizeConstraint")
-		limit.MaxTextSize = 22
+		limit.MaxTextSize = 26
 		limit.Parent = button
 		button.Parent = bar
 		table.insert(buttons, button)

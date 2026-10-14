@@ -12,7 +12,7 @@
 --   Workspace.Hub.ReturnPoint        where hunters land when they have no plot
 --   Workspace.Hub.Map                paths, lamps, the fence, cliffs and graves round the edge
 --                                    (Config/HubMap)
---   Lighting                         a foggy, moonlit night (once; see setNight)
+--   Lighting                         a foggy, moonlit night (once per version; see setNight)
 --   Workspace.Hub.Landmarks.<Name>   Watcher Square, Collector, Trading Booth, Bakery, Workshop
 --                                    (the ones with a recipe in Config/Landmarks are built in full)
 --   Workspace.Zones.<ZoneId>         a floating island per zone (only if that zone folder is missing),
@@ -513,52 +513,63 @@ local function buildZone(zonesFolder: Instance, zone: Zones.Zone)
 	table.insert(built, `Zones.{zone.id}`)
 end
 
--- A foggy, moonlit night. Only once per place (Lighting gets a "NightSet" attribute), and an
--- Atmosphere, Sky, Bloom or ColorCorrection already in Lighting is left as it is.
+-- A foggy, moonlit night, bright enough to see the hub by. Applied once per version
+-- (Lighting's "NightVersion" attribute); raise NightVersion to roll out new values. Its own
+-- Atmosphere, Sky, Bloom and ColorCorrection are tagged "Night" and updated; ones made by
+-- hand are left as they are.
+local NightVersion = 2
 local function setNight()
-	if Lighting:GetAttribute("NightSet") then
+	if Lighting:GetAttribute("NightVersion") == NightVersion then
 		return
 	end
+	-- The first version only marked Lighting with "NightSet"; what it added counts as ours.
+	local firstVersion = Lighting:GetAttribute("NightSet") == true
 	Lighting.ClockTime = 0
-	Lighting.Brightness = 1.2
-	Lighting.Ambient = Color3.fromRGB(34, 30, 48)
-	Lighting.OutdoorAmbient = Color3.fromRGB(80, 74, 110)
-	Lighting.EnvironmentDiffuseScale = 0.3
+	Lighting.Brightness = 2.4
+	Lighting.Ambient = Color3.fromRGB(78, 72, 100)
+	Lighting.OutdoorAmbient = Color3.fromRGB(128, 120, 160)
+	Lighting.ExposureCompensation = 0.35
+	Lighting.EnvironmentDiffuseScale = 0.4
 	Lighting.EnvironmentSpecularScale = 0.3
-	local function add(className: string, setup: (Instance) -> ())
-		if not Lighting:FindFirstChildOfClass(className) then
-			local effect = Instance.new(className)
-			setup(effect)
-			effect.Parent = Lighting
+	local function effect(className: string, setup: (Instance) -> ())
+		local existing = Lighting:FindFirstChildOfClass(className)
+		if existing and not (existing:GetAttribute("Night") or firstVersion) then
+			return
 		end
+		local instance = existing or Instance.new(className)
+		setup(instance)
+		instance:SetAttribute("Night", true)
+		instance.Parent = Lighting
 	end
-	add("Atmosphere", function(effect)
-		local atmosphere = effect :: Atmosphere
-		atmosphere.Density = 0.38
-		atmosphere.Offset = 0.15
-		atmosphere.Color = Color3.fromRGB(96, 88, 124)
-		atmosphere.Decay = Color3.fromRGB(46, 38, 64)
+	effect("Atmosphere", function(instance)
+		local atmosphere = instance :: Atmosphere
+		atmosphere.Density = 0.3
+		atmosphere.Offset = 0.1
+		atmosphere.Color = Color3.fromRGB(122, 112, 156)
+		atmosphere.Decay = Color3.fromRGB(70, 60, 96)
 		atmosphere.Glare = 0
-		atmosphere.Haze = 2.2
+		atmosphere.Haze = 1.2
 	end)
-	add("Sky", function(effect)
-		local sky = effect :: Sky
+	effect("Sky", function(instance)
+		local sky = instance :: Sky
 		sky.MoonAngularSize = 24
 		sky.StarCount = 4000
 	end)
-	add("BloomEffect", function(effect)
-		local bloom = effect :: BloomEffect
+	effect("BloomEffect", function(instance)
+		local bloom = instance :: BloomEffect
 		bloom.Intensity = 0.6
 		bloom.Size = 30
 		bloom.Threshold = 1.6
 	end)
-	add("ColorCorrectionEffect", function(effect)
-		local color = effect :: ColorCorrectionEffect
-		color.Saturation = -0.15
-		color.Contrast = 0.08
-		color.TintColor = Color3.fromRGB(226, 222, 255)
+	effect("ColorCorrectionEffect", function(instance)
+		local color = instance :: ColorCorrectionEffect
+		color.Brightness = 0.05
+		color.Saturation = -0.1
+		color.Contrast = 0.05
+		color.TintColor = Color3.fromRGB(232, 228, 255)
 	end)
-	Lighting:SetAttribute("NightSet", true)
+	Lighting:SetAttribute("NightSet", nil)
+	Lighting:SetAttribute("NightVersion", NightVersion)
 	table.insert(built, "Lighting (night)")
 end
 
