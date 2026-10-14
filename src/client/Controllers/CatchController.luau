@@ -1,6 +1,6 @@
 --!strict
 -- Catch controls, the same with a mouse or a finger:
---   press and HOLD on a monster    your flashlight freezes it and the vacuum starts;
+--   press and HOLD on a monster    your vacuum's beam freezes it, and
 --                                  the catch meter fills by itself (about 1-3 seconds)
 --   keep holding until it's full   caught! Bring it to the zone's Exit
 --   let go early                   it gets away (but stays dazed for a moment, so try again)

@@ -90,7 +90,9 @@ local function monsterRows(data: DataService.Data): { MonsterRow }
 		local effects = if #parts > 0 then `{table.concat(parts, ", ")} · ` else ""
 		table.insert(rows, {
 			uid = uid,
-			name = `{caught.size} {Format.name(caught.monsterId)} · {Format.money(values[uid])}`,
+			name = `{caught.variant or ""}{if caught.variant then " " else ""}{caught.size} {Format.name(
+				caught.monsterId
+			)} · {Format.money(values[uid])}`,
 			details = `{effects}{Care.status(caught)}`,
 			color = MonsterModel.color(monster.rarity),
 			hungry = not caught.fed,

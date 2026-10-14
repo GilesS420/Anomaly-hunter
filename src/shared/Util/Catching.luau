@@ -51,10 +51,22 @@ function Catching.catchSeconds(vacuumId: string, rarityId: string): number
 	return vacuum.catchSeconds * (1 + steps * Tools.ResistPerRarity)
 end
 
--- How far away (studs) this flashlight lets you start and keep a catch, slack included.
-function Catching.reach(flashlightId: string): number
-	local flashlight = Tools.Flashlights[flashlightId]
-	return if flashlight then flashlight.reach + Tools.ReachSlack else 0
+-- How far away (studs) this vacuum lets you start and keep a catch, slack included.
+function Catching.reach(vacuumId: string): number
+	local vacuum = Tools.Vacuums[vacuumId]
+	return if vacuum then vacuum.reach + Tools.ReachSlack else 0
+end
+
+-- Seconds a monster stays dazed after this vacuum lets go of it.
+function Catching.stunSeconds(vacuumId: string): number
+	local vacuum = Tools.Vacuums[vacuumId]
+	return if vacuum then vacuum.stunSeconds else 1
+end
+
+-- How many monsters this vacuum carries per trip (at least 1).
+function Catching.bagSize(vacuumId: string): number
+	local vacuum = Tools.Vacuums[vacuumId]
+	return if vacuum then math.max(1, vacuum.bag) else 1
 end
 
 return Catching

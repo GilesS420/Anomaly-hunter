@@ -154,7 +154,7 @@ local function onWarn(info: Warning)
 		end
 	end
 	task.delay(seconds, clear)
-	-- Caught in a flashlight (or gone) mid wind-up: the attack is off.
+	-- Caught in a vacuum beam (or gone) mid wind-up: the attack is off.
 	local connections: { RBXScriptConnection } = {}
 	local function stop()
 		for _, connection in connections do

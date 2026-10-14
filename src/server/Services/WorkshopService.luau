@@ -1,5 +1,5 @@
 --!strict
--- The Hunter's Workshop: buy vacuums, flashlights, the Spirit Lens, Bait Bells and Return
+-- The Hunter's Workshop: buy vacuums, Bait Bells and Return
 -- Charms, and choose which tools to use. Hold the prompt at Workspace.Hub.Landmarks.Workshop
 -- to open the shop window. The stock changes every 5 minutes (Util/Workshop decides what's in
 -- stock, the same in every server). Tools are kept forever and equipped straight away;
@@ -9,7 +9,7 @@
 --   Open     server -> client (counter: Vector3)   the player used the Workshop prompt
 --   GetShop  client -> server () -> View?          what's for sale and what they own
 --   Buy      client -> server (itemId) -> Result
---   Equip    client -> server (itemId) -> Result   (equipping the lens you wear takes it off)
+--   Equip    client -> server (itemId) -> Result   puts an owned vacuum into use
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -58,7 +58,7 @@ Equip.Parent = remotes
 
 local counter: Attachment? = nil -- where the Workshop's prompt is (nil if there's no Workshop)
 
-local kindOrder = { Vacuum = 1, Flashlight = 2, Lens = 3, Lure = 4, Charm = 5 }
+local kindOrder = { Vacuum = 1, Lure = 2, Charm = 3 }
 
 local function currentSlot(): number
 	return Workshop.slotAt(os.time())
@@ -161,7 +161,7 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 end
 
 -- Puts an owned tool into use (the Workshop window and the Backpack both use this).
--- Equipping the lens you wear takes it off. Returns whether it worked and what to say.
+-- Returns whether it worked and what to say.
 function WorkshopService.equip(data: DataService.Data, itemId: unknown): (boolean, string)
 	local item = if typeof(itemId) == "string" then Workshop.item(itemId) else nil
 	local equipSlot = if item then Workshop.equipSlot(item) else nil
@@ -169,10 +169,6 @@ function WorkshopService.equip(data: DataService.Data, itemId: unknown): (boolea
 		return false, "You don't own that tool."
 	end
 	local equipped = data.equipped :: { [string]: string }
-	if equipSlot == "lens" and equipped.lens == item.id then
-		equipped.lens = "" -- a lens is optional: equipping the one you wear takes it off
-		return true, `Took off the {item.name}.`
-	end
 	equipped[equipSlot] = item.id
 	return true, `Using the {item.name}.`
 end
@@ -186,11 +182,30 @@ Equip.OnServerInvoke = function(player: Player, itemId: unknown): Result
 		return { ok = false, message = "Walk up to the Workshop to change tools.", view = viewFor(data) }
 	end
 	local ok, message = WorkshopService.equip(data, itemId)
+	HuntService.refreshItems(player) -- the bag size follows the vacuum
 	return { ok = ok, message = message, view = viewFor(data) }
+end
+
+-- Flashlights and the Spirit Lens were replaced by vacuums: owners get their money back.
+local function refundRetired(player: Player, data: DataService.Data)
+	local equipped: { [string]: string? } = data.equipped :: any -- older saves have more slots
+	equipped.flashlight = nil
+	equipped.lens = nil
+	if not Workshop.item(data.equipped.vacuum) then
+		data.equipped.vacuum = "DustBuster"
+	end
+	local refund = Workshop.refundRetired(data.inventory)
+	if refund > 0 and DataService.addMoney(player, refund) then
+		Notify.toast(
+			player,
+			`Flashlights are gone: vacuums do it all now. You got {Format.money(refund)} back for yours!`
+		)
+	end
 end
 
 function WorkshopService.start()
 	remotes.Parent = ReplicatedStorage
+	DataService.onLoaded(refundRetired)
 	counter = Counter.prompt("Workshop", "Shop", "Hunter's Workshop", function(player)
 		local at = counter
 		if at and DataService.isLoaded(player) then

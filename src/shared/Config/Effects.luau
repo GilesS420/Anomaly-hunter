@@ -21,7 +21,7 @@ export type Combo = {
 local Effects = {}
 
 Effects.MaxSlots = 3
--- Percent a Catch-effect tool (Spirit Lens, Moonbeam) applies its effect (balance sheet input).
+-- Percent each of a vacuum's catch effects (Config/Tools) lands on a catch (balance sheet input).
 Effects.CatchChance = 25
 
 -- Roaming effects (Util/Haunting). Every RoamRollSeconds each fed monster in an online
@@ -43,9 +43,9 @@ Effects.List = {
 	Poltergeist = { id = "Poltergeist", multiplier = 2, source = "Event", from = "Flicker" },
 	Vampire = { id = "Vampire", multiplier = 2.5, source = "Roam", weight = 15 },
 	Batty = { id = "Batty", multiplier = 3, source = "Roam", weight = 10 },
-	Ghost = { id = "Ghost", multiplier = 3, source = "Catch", from = "SpiritLens" },
-	-- x4 (not x3 like Ghost) so the Moonbeam has a perk of its own; set by the balance sheet.
-	Werewolf = { id = "Werewolf", multiplier = 4, source = "Catch", from = "Moonbeam" },
+	Ghost = { id = "Ghost", multiplier = 3, source = "Catch", from = "SpiritSiphon" },
+	-- x4 (not x3 like Ghost) so the Moon Vac has a perk of its own; set by the balance sheet.
+	Werewolf = { id = "Werewolf", multiplier = 4, source = "Catch", from = "MoonVac" },
 	Mummy = { id = "Mummy", multiplier = 4, source = "Roam", weight = 5 },
 	Cursed = { id = "Cursed", multiplier = 5, source = "Food", from = "CursedCake" },
 	Bloodmoon = { id = "Bloodmoon", multiplier = 6, source = "Event", from = "BloodMoon" },

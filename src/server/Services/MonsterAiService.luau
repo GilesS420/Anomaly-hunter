@@ -5,7 +5,7 @@
 -- hits whoever is still inside. After that it rests for its cooldown (shorter for rarer
 -- monsters). At most MaxAttackersPerHunter monsters go after one hunter at a time.
 --
--- A monster you're catching is stunned by your flashlight and can't attack, but the others
+-- A monster you're catching is stunned by your vacuum's beam and can't attack, but the others
 -- can, and a hit that costs a heart makes the catch get away. They keep attacking while you
 -- carry a catch; at 0 hearts you drop it and go home (HuntService.damage).
 -- Players with the attribute Calm (Studio: /calm) are left alone, and Bait Bell monsters
@@ -313,7 +313,7 @@ local function step()
 		end
 		local hunters = byZone[zone.id]
 
-		-- Caught in a flashlight: no attacking, and a moment to recover once let go.
+		-- Caught in a vacuum beam: no attacking, and a moment to recover once let go.
 		if RoamService.isHeld(model) then
 			brain.windup = nil
 			brain.target = nil

@@ -2,14 +2,14 @@
 -- Two shops in the main area. Each restocks every RestockSeconds; restockChance is the
 -- percent chance an item is in stock after a restock.
 -- Prices and restock chances are set by the balance sheet, docs in /mnt/project-files/balance.
--- The upgrade order is Strobe Light, Phantom Vac, Spirit Lens, Library, Ballroom, Moonbeam,
--- Void Vac, each taking about 2-3x as long to afford as the one before. The Strobe Light is
--- always in stock and the Phantom Vac in 80% of restocks, so first purchases don't stall on luck.
+-- The upgrade order is Phantom Vac, Spirit Siphon, Library, Ballroom, Banshee Blower, Moon Vac,
+-- Void Vac, each taking about 2-3x as long to afford as the one before. The Phantom Vac is in
+-- stock in 80% of restocks, so the first purchase doesn't stall on luck.
 
 export type Item = {
 	id: string,
 	name: string,
-	kind: "Food" | "Vacuum" | "Flashlight" | "Lure" | "Lens" | "Charm",
+	kind: "Food" | "Vacuum" | "Lure" | "Charm",
 	price: number,
 	restockChance: number,
 	tier: number?, -- vacuum tier for size limits
@@ -24,7 +24,7 @@ local Shop = {}
 Shop.RestockSeconds = 5 * 60
 
 -- How many of one single-use item (Bait Bell, Return Charm, a treat) a player can buy per restock.
--- Tools (vacuums, flashlights, lenses) are bought once and kept forever.
+-- Vacuums are bought once and kept forever.
 Shop.ConsumablesPerRestock = 3
 
 -- Selling a monster of this rarity or rarer at the Collector asks "are you sure?" first.
@@ -67,7 +67,6 @@ Shop.Bakery = {
 
 Shop.Workshop = {
 	{ id = "DustBuster", name = "Dust Buster", kind = "Vacuum", price = 0, restockChance = 100, tier = 1 },
-	{ id = "CandleLamp", name = "Candle Lamp", kind = "Flashlight", price = 0, restockChance = 100 },
 	{
 		id = "BaitBell",
 		name = "Bait Bell",
@@ -77,7 +76,6 @@ Shop.Workshop = {
 		singleUse = true,
 		maxRarity = "Legendary",
 	},
-	{ id = "StrobeLight", name = "Strobe Light", kind = "Flashlight", price = 20_000, restockChance = 100 },
 	{
 		id = "PhantomVac",
 		name = "Phantom Vac",
@@ -87,21 +85,22 @@ Shop.Workshop = {
 		tier = 2,
 	},
 	{
-		id = "SpiritLens",
-		name = "Spirit Lens",
-		kind = "Lens",
+		id = "SpiritSiphon",
+		name = "Spirit Siphon",
+		kind = "Vacuum",
 		price = 250_000,
 		restockChance = 60,
-		grantsEffect = "Ghost",
+		tier = 2,
 	},
 	{
-		id = "Moonbeam",
-		name = "Moonbeam",
-		kind = "Flashlight",
-		price = 100_000_000,
-		restockChance = 15,
-		grantsEffect = "Werewolf",
+		id = "BansheeBlower",
+		name = "Banshee Blower",
+		kind = "Vacuum",
+		price = 70_000_000,
+		restockChance = 25,
+		tier = 2,
 	},
+	{ id = "MoonVac", name = "Moon Vac", kind = "Vacuum", price = 150_000_000, restockChance = 15, tier = 2 },
 	{ id = "VoidVac", name = "Void Vac", kind = "Vacuum", price = 400_000_000, restockChance = 6, tier = 3 },
 	-- A convenience: it pays for itself in time saved once you hunt in zone 3.
 	{
@@ -113,5 +112,14 @@ Shop.Workshop = {
 		singleUse = true,
 	},
 } :: { Item }
+
+-- Tools that are no longer sold (flashlights and the Spirit Lens, replaced by vacuums in
+-- 2026-10). Saves that own one get its price back in cash when they load.
+Shop.Retired = {
+	CandleLamp = 0,
+	StrobeLight = 20_000,
+	SpiritLens = 250_000,
+	Moonbeam = 100_000_000,
+} :: { [string]: number }
 
 return Shop

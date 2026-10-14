@@ -1,6 +1,7 @@
 --!strict
--- Hunt runs: walk into a zone's gate in the hub, catch one monster, and bring it back out
--- through the zone's exit (or use a Return Charm). The world pieces (WorldBuilder makes grey
+-- Hunt runs: walk into a zone's gate in the hub, catch as many monsters as your vacuum's bag
+-- holds (Config/Tools), and bring them back out through the zone's exit (or use a Return
+-- Charm). The world pieces (WorldBuilder makes grey
 -- placeholders for any that are missing):
 --   Workspace.Hub.ZoneGates.<ZoneId>  a part; touching it takes you into that zone
 --   Workspace.Hub.ReturnPoint         where hunters land in the hub if they have no plot
@@ -12,11 +13,13 @@
 --   UseReturnCharm  client -> server ()  (the Return Charm button)
 --   UseBaitBell     client -> server ()  (the Bait Bell button: a rarer monster comes to you)
 -- Player attributes ReturnCharms and BaitBells (numbers) mirror how many the player owns, so
--- the buttons only show when there is one to use.
+-- the buttons only show when there is one to use. Carrying / CarryingSize name the latest
+-- catch in the bag, CarryingCount and BagSize say how full it is.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Catching = require(ReplicatedStorage.Shared.Util.Catching)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
 local Layout = require(ReplicatedStorage.Shared.Config.Layout)
@@ -34,7 +37,7 @@ local HuntService = {}
 local PortalCooldown = 1 -- seconds between two trips through a gate or exit
 local LockedCooldown = 4 -- seconds between two "this zone is locked" messages
 
-local carrying: { [Player]: Value.CaughtMonster } = {}
+local carrying: { [Player]: { Value.CaughtMonster } } = {} -- the bag, oldest catch first
 local lastPortal: { [Player]: number } = {}
 local lastLocked: { [Player]: number } = {}
 
@@ -79,14 +82,24 @@ local function returnPoint(): BasePart?
 		or workspace:FindFirstChildWhichIsA("SpawnLocation", true)
 end
 
-local function setCarrying(player: Player, caught: Value.CaughtMonster?)
-	if caught then
-		carrying[player] = caught
+-- How many monsters the player's equipped vacuum carries.
+local function bagSize(player: Player): number
+	local data = DataService.get(player)
+	return if data then Catching.bagSize(data.equipped.vacuum) else 1
+end
+
+local function setCarrying(player: Player, bag: { Value.CaughtMonster }?)
+	local list: { Value.CaughtMonster } = bag or {}
+	local latest = list[#list]
+	if latest then
+		carrying[player] = list
 	else
-		carrying[player] = nil
+		carrying[player] = nil -- an empty bag counts as none
 	end
-	player:SetAttribute("Carrying", if caught then caught.monsterId else nil)
-	player:SetAttribute("CarryingSize", if caught then caught.size else nil)
+	player:SetAttribute("Carrying", if latest then latest.monsterId else nil)
+	player:SetAttribute("CarryingSize", if latest then latest.size else nil)
+	player:SetAttribute("CarryingCount", if latest then #list else nil)
+	player:SetAttribute("BagSize", bagSize(player))
 end
 
 -- How many of a single-use item (ReturnCharm, BaitBell) the save holds.
@@ -102,29 +115,43 @@ local function useItem(data: DataService.Data, itemId: string)
 	inventory[itemId] = if count <= 1 then nil else count - 1
 end
 
--- Drops the carried monster (it's lost) without ending anything else.
+-- "Big Gravepup", or "3 monsters".
+local function bagName(bag: { Value.CaughtMonster }): string
+	return if #bag == 1 then `{bag[1].size} {Format.name(bag[1].monsterId)}` else `{#bag} monsters`
+end
+
+-- Drops everything in the bag (it's lost) without ending anything else.
 local function drop(player: Player)
-	local caught = carrying[player]
-	if caught then
+	local bag = carrying[player]
+	if bag then
 		setCarrying(player, nil)
-		Notify.toast(player, `You dropped {Format.name(caught.monsterId)}!`)
+		Notify.toast(player, `You dropped {bagName(bag)}!`)
 	end
 end
 
--- Leaves the zone. With deliver, the carried monster goes home with the hunter.
+-- Leaves the zone. With deliver, the bag goes home with the hunter.
 local function goHome(player: Player, deliver: boolean)
-	local caught = carrying[player]
-	if caught and deliver then
-		local where = MansionService.addMonster(player, caught)
-		local name = `{caught.size} {Format.name(caught.monsterId)}`
-		if where == "Mansion" then
-			Notify.toast(player, `{name} is home in your mansion!`)
-		elseif where == "Storage" then
-			Notify.toast(player, `Your mansion is full, so {name} went into Storage (your Backpack).`)
+	local bag = carrying[player]
+	if bag and deliver then
+		local home, stored, lost = 0, 0, 0
+		for _, caught in bag do
+			local where = MansionService.addMonster(player, caught)
+			if where == "Mansion" then
+				home += 1
+			elseif where == "Storage" then
+				stored += 1
+			else
+				lost += 1
+			end
+		end
+		if home == #bag then
+			Notify.toast(player, `{bagName(bag)} {if #bag == 1 then "is" else "are"} home in your mansion!`)
+		elseif lost == 0 then
+			Notify.toast(player, `Your mansion is full, so {stored} went into Storage (your Backpack).`)
 		else
 			Notify.toast(
 				player,
-				"Your mansion and Storage are full! Sell some at the Collector or buy a new wing."
+				`Your mansion and Storage are full! {lost} got away. Sell some at the Collector or buy a new wing.`
 			)
 		end
 	end
@@ -143,28 +170,37 @@ local function goHome(player: Player, deliver: boolean)
 	end
 end
 
--- Updates the ReturnCharms and BaitBells attributes (the client shows each button only if
--- it's above 0). Call it after anything changes the inventory (e.g. a Workshop purchase).
+-- Updates the ReturnCharms, BaitBells and BagSize attributes (the client shows each button
+-- only if it's above 0). Call it after anything changes the inventory or the equipped vacuum.
 function HuntService.refreshItems(player: Player)
 	local data = DataService.get(player)
 	player:SetAttribute("ReturnCharms", if data then itemCount(data, "ReturnCharm") else 0)
 	player:SetAttribute("BaitBells", if data then itemCount(data, "BaitBell") else 0)
+	setCarrying(player, carrying[player])
 end
 
 function HuntService.isCarrying(player: Player): boolean
 	return carrying[player] ~= nil
 end
 
--- Puts a fresh catch in the hunter's vacuum. False if they already carry one.
+-- True when the bag holds as many as the equipped vacuum carries.
+function HuntService.isBagFull(player: Player): boolean
+	local bag = carrying[player]
+	return bag ~= nil and #bag >= bagSize(player)
+end
+
+-- Puts a fresh catch in the hunter's bag. False if the bag is full.
 function HuntService.carry(player: Player, caught: Value.CaughtMonster): boolean
-	if carrying[player] then
+	if HuntService.isBagFull(player) then
 		return false
 	end
-	setCarrying(player, caught)
+	local bag = table.clone(carrying[player] or {})
+	table.insert(bag, caught)
+	setCarrying(player, bag)
 	return true
 end
 
--- Monsters fighting back. At 0 hearts the carried monster is dropped and the hunter is
+-- Monsters fighting back. At 0 hearts everything in the bag is dropped and the hunter is
 -- sent home (no death; the game is for all ages).
 function HuntService.damage(player: Player, amount: number)
 	local hearts = player:GetAttribute("Hearts")
@@ -258,8 +294,8 @@ UseBaitBell.OnServerEvent:Connect(function(player)
 		return
 	end
 	-- A monster you couldn't catch would waste the bell.
-	if carrying[player] then
-		Notify.toast(player, "Bring your catch home before ringing the bell!")
+	if HuntService.isBagFull(player) then
+		Notify.toast(player, "Your bag is full. Bring your catch home before ringing the bell!")
 		return
 	end
 	if not MansionService.hasRoom(player) then
@@ -356,7 +392,7 @@ function HuntService.start()
 		HuntService.refreshItems(player)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
-		-- Leaving mid-run loses the catch, so quitting can't be used as a free teleport home.
+		-- Leaving mid-run loses the bag, so quitting can't be used as a free teleport home.
 		carrying[player] = nil
 		lastPortal[player] = nil
 		lastLocked[player] = nil

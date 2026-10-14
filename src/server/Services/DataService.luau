@@ -20,7 +20,7 @@ export type Data = {
 	storage: { Value.CaughtMonster }, -- monsters that didn't fit, paused (Util/Storage)
 	vault: { Value.CaughtMonster }, -- up to 3 monsters that can never be stolen
 	inventory: { [string]: number }, -- shop items by id -> how many
-	equipped: { flashlight: string, vacuum: string, lens: string },
+	equipped: { vacuum: string }, -- older saves also have flashlight/lens (cleared on load)
 	codex: { [string]: any }, -- discovered monsters, effects and combo recipes
 	shop: { slot: number, bought: { [string]: number } }, -- Workshop buys since the last restock
 	stealingEnabled: boolean,
@@ -36,10 +36,8 @@ DataService.Template = {
 	storage = {},
 	vault = {},
 	inventory = {},
-	equipped = { -- item ids in use; the starter tools are free
-		flashlight = "CandleLamp",
+	equipped = { -- item ids in use; the starter vacuum is free
 		vacuum = "DustBuster",
-		lens = "", -- "" for none
 	},
 	codex = {},
 	shop = { slot = 0, bought = {} },

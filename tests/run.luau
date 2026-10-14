@@ -29,6 +29,8 @@ local Scenery = require("../src/shared/Config/Scenery")
 local Travel = require("../src/shared/Util/Travel")
 local TravelConfig = require("../src/shared/Config/Travel")
 local Storage = require("../src/shared/Util/Storage")
+local Tools = require("../src/shared/Config/Tools")
+local Variants = require("../src/shared/Config/Variants")
 local InventoryConfig = require("../src/shared/Config/Inventory")
 
 local failures = 0
@@ -109,17 +111,51 @@ for _ = 1, rolls do
 end
 check("about 1% of sizes are Colossal", math.abs(colossal / rolls - 0.01) < 0.002)
 
-check("no catch effects without a lens", #Spawning.rollCatchEffects({ "DustBuster" }, rng) == 0)
+check("the Dust Buster gives no catch effects", #Spawning.rollCatchEffects("DustBuster", rng) == 0)
 local alwaysHit = {
 	NextNumber = function(_self)
 		return 0
 	end,
 }
-local effects = Spawning.rollCatchEffects({ "SpiritLens", "Moonbeam", "SpiritLens" }, alwaysHit :: any)
+local effects = Spawning.rollCatchEffects("VoidVac", alwaysHit :: any)
 check(
-	"lens + moonbeam give Ghost and Werewolf once each",
+	"the Void Vac can give Ghost and Werewolf",
 	#effects == 2 and table.find(effects, "Ghost") ~= nil and table.find(effects, "Werewolf") ~= nil
 )
+local neverHit = {
+	NextNumber = function(_self)
+		return 0.999999
+	end,
+}
+check("the Dust Buster never rolls a variant", Spawning.rollVariant("DustBuster", alwaysHit :: any) == nil)
+check("a lucky Void Vac catch is Rainbow", Spawning.rollVariant("VoidVac", alwaysHit :: any) == "Rainbow")
+check("an unlucky catch has no variant", Spawning.rollVariant("VoidVac", neverHit :: any) == nil)
+-- The little stand-in above is too streaky for several rolls in a row; math.random isn't.
+math.randomseed(5)
+local variantRng = {
+	NextNumber = function(_self)
+		return math.random()
+	end,
+}
+local golds = 0
+for _ = 1, 20_000 do
+	if Spawning.rollVariant("BansheeBlower", variantRng :: any) == "Gold" then
+		golds += 1
+	end
+end
+-- Gold is checked after Shiny (0.5%), so it lands a little under its 3%.
+check("about 3% of Banshee Blower catches are Gold", math.abs(golds / 20_000 - 0.03) < 0.005)
+do
+	local plain: any = { monsterId = "Gravepup", size = "Normal", effects = {}, familiarity = 0, fed = true }
+	local gold: any = table.clone(plain)
+	gold.variant = "Gold"
+	check("a Gold monster sells for x5", Value.sellValue(gold, 1) == 5 * Value.sellValue(plain, 1))
+	plain.fed, gold.fed = false, false
+	check(
+		"a hungry Gold monster still keeps its x5",
+		Value.sellValue(gold, 1) == 5 * Value.sellValue(plain, 1)
+	)
+end
 
 -- Catching: vacuum tiers gate size and rarity.
 check("Dust Buster catches a Normal Common", Catching.canVacuum("DustBuster", "Normal", "Common"))
@@ -141,7 +177,25 @@ check(
 	Catching.catchSeconds("VoidVac", "Rare") < Catching.catchSeconds("DustBuster", "Rare")
 )
 check("unknown vacuums can't catch", Catching.catchSeconds("Broom", "Common") == math.huge)
-check("better flashlights reach further", Catching.reach("Moonbeam") > Catching.reach("CandleLamp"))
+check("better vacuums reach further", Catching.reach("VoidVac") > Catching.reach("DustBuster"))
+check(
+	"the Dust Buster carries one, the Void Vac four",
+	Catching.bagSize("DustBuster") == 1 and Catching.bagSize("VoidVac") == 4
+)
+check("an unknown vacuum can't reach anything", Catching.reach("Broom") == 0)
+do
+	local inventory = { StrobeLight = 1, Moonbeam = 1, CandleLamp = 1, BaitBell = 2 }
+	local refund = Workshop.refundRetired(inventory)
+	check("retired tools are refunded", refund == Shop.Retired.StrobeLight + Shop.Retired.Moonbeam)
+	check(
+		"retired tools leave the inventory, the rest stays",
+		inventory.StrobeLight == nil
+			and inventory.Moonbeam == nil
+			and inventory.CandleLamp == nil
+			and inventory.BaitBell == 2
+	)
+	check("nothing to refund twice", Workshop.refundRetired(inventory) == 0)
+end
 
 -- Hunt runs: zones open with their wing and only once they've shipped.
 check("Pumpkin Graveyard is open from the start", Hunt.isZoneUnlocked(1, 1))
@@ -322,21 +376,18 @@ end
 do
 	check("a slot lasts 5 minutes", Workshop.slotAt(299) == 0 and Workshop.slotAt(300) == 1)
 	check("the next restock is the start of the next slot", Workshop.restockAt(4) == 1500)
-	local strobe = Workshop.item("StrobeLight") :: Shop.Item
+	local siphon = Workshop.item("SpiritSiphon") :: Shop.Item
 	local phantomVac = Workshop.item("PhantomVac") :: Shop.Item
 	local voidVac = Workshop.item("VoidVac") :: Shop.Item
 	local charm = Workshop.item("ReturnCharm") :: Shop.Item
 	local starter = Workshop.item("DustBuster") :: Shop.Item
 	check(
 		"the same slot always has the same stock",
-		Workshop.inStock(strobe, 1234) == Workshop.inStock(strobe, 1234)
+		Workshop.inStock(siphon, 1234) == Workshop.inStock(siphon, 1234)
 	)
 	local slots = 20_000
-	local strobeIn, phantomIn, voidIn = 0, 0, 0
+	local phantomIn, voidIn = 0, 0
 	for slot = 1, slots do
-		if Workshop.inStock(strobe, slot) then
-			strobeIn += 1
-		end
 		if Workshop.inStock(phantomVac, slot) then
 			phantomIn += 1
 		end
@@ -344,7 +395,6 @@ do
 			voidIn += 1
 		end
 	end
-	check("Strobe Light is always in stock", strobeIn == slots)
 	check("Phantom Vac is in stock about 80% of restocks", math.abs(phantomIn / slots - 0.80) < 0.02)
 	check("Void Vac is in stock about 6% of restocks", math.abs(voidIn / slots - 0.06) < 0.01)
 	check(
@@ -369,7 +419,7 @@ do
 	check("can't buy without the money", Workshop.canBuy(charm, inSlot, charm.price - 1, {}, 0) == "TooPoor")
 	check(
 		"a tool you own can't be bought again",
-		Workshop.canBuy(strobe, 1, 1e9, { StrobeLight = 1 }, 0) == "Owned"
+		Workshop.canBuy(siphon, 1, 1e9, { SpiritSiphon = 1 }, 0) == "Owned"
 	)
 	check("an unknown item can't be bought", Workshop.canBuy(nil, 1, 1e9, {}, 0) == "Unknown")
 	check("vacuums go in the vacuum slot", Workshop.equipSlot(voidVac) == "vacuum")
@@ -419,9 +469,10 @@ do
 	local Wings = require("../src/shared/Config/Wings")
 	local Zones = require("../src/shared/Config/Zones")
 
-	-- Expected value of the best monster this vacuum can hold out of `seen` wild ones in a
-	-- zone. Each one is rolled by spawnWeight and size weight; ones it can't hold count as 0.
-	local function expectedBest(zone: number, vacuumId: string, seen: number): number
+	-- Expected total value of the `take` best monsters this vacuum can hold out of `seen` wild
+	-- ones in a zone (take = the bag size). Each one is rolled by spawnWeight and size weight;
+	-- ones it can't hold count as 0.
+	local function expectedTop(zone: number, vacuumId: string, seen: number, take: number): number
 		local outcomes: { { value: number, p: number } } = {}
 		local totalWeight = 0
 		for _, m in Spawning.monstersInZone(zone) do
@@ -439,27 +490,53 @@ do
 		table.sort(outcomes, function(a, b)
 			return a.value < b.value
 		end)
-		-- E[max] = sum of value x P(max is this value) = value x (F(v)^seen - F(below v)^seen)
-		local best, below = 0, 0
-		for _, o in outcomes do
-			local upTo = below + o.p
-			best += o.value * (upTo ^ seen - below ^ seen)
-			below = upTo
+		local function choose(n: number, k: number): number
+			local c = 1
+			for i = 1, k do
+				c = c * (n - k + i) / i
+			end
+			return c
 		end
-		return best
+		-- P(the j-th best of `seen` is at most v) = P(fewer than j of them are above v).
+		local function atMost(j: number, below: number): number
+			local above = 1 - below
+			local total = 0
+			for i = 0, j - 1 do
+				total += choose(seen, i) * above ^ i * below ^ (seen - i)
+			end
+			return total
+		end
+		local sum = 0
+		for j = 1, math.min(take, seen) do
+			local below, last = 0, 0
+			for _, o in outcomes do
+				below += o.p
+				local now = atMost(j, math.min(below, 1))
+				sum += o.value * (now - last)
+				last = now
+			end
+		end
+		return sum
+	end
+	local function expectedBest(zone: number, vacuumId: string, seen: number): number
+		return expectedTop(zone, vacuumId, seen, 1)
 	end
 
-	-- Average catch-effect bonus from the Spirit Lens (Ghost) and Moonbeam (Werewolf).
-	local function catchBonus(lens: boolean, moonbeam: boolean): number
+	-- Average value bonus a vacuum's catch effects and variants add to each catch.
+	local function vacuumBonus(vacuumId: string): number
+		local vacuum = Tools.Vacuums[vacuumId]
 		local chance = Effects.CatchChance / 100
-		local bonus = 1
-		if lens then
-			bonus += chance * (Effects.List.Ghost.multiplier - 1)
+		local effects = 1
+		for _, effectId in vacuum.catchEffects or {} do
+			effects += chance * (Effects.List[effectId].multiplier - 1)
 		end
-		if moonbeam then
-			bonus += chance * (Effects.List.Werewolf.multiplier - 1)
+		local variant, left = 0, 1
+		for _, v in Variants do
+			local p = left * (((vacuum.variants or {})[v.id] or 0) / 100)
+			variant += p * v.multiplier
+			left -= p
 		end
-		return bonus
+		return effects * (variant + left)
 	end
 
 	local function priceOf(id: string): number
@@ -516,7 +593,7 @@ do
 	local pricesOk = true
 	for _, list in { Shop.Workshop, Shop.Bakery } do
 		for _, item in list do
-			local starter = item.id == "DustBuster" or item.id == "CandleLamp"
+			local starter = item.id == "DustBuster"
 			if starter then
 				pricesOk = pricesOk and item.price == 0
 			else
@@ -532,35 +609,49 @@ do
 		end
 	end
 	check("every tool and wing price is a positive round number", pricesOk)
-	check(
-		"the Moonbeam's Werewolf beats the Spirit Lens's Ghost",
-		catchBonus(false, true) > catchBonus(true, false)
-	)
+	local ladderOk = true
+	local previous = "DustBuster"
+	for _, id in { "PhantomVac", "SpiritSiphon", "BansheeBlower", "MoonVac", "VoidVac" } do
+		local a, b = Tools.Vacuums[previous], Tools.Vacuums[id]
+		ladderOk = ladderOk
+			and vacuumBonus(id) > vacuumBonus(previous)
+			and b.catchSeconds < a.catchSeconds
+			and b.reach >= a.reach
+			and b.bag >= a.bag
+		previous = id
+	end
+	check("every vacuum up the ladder is better at everything", ladderOk)
 
-	-- The upgrade order, and what a player earns per trip while saving for each step:
-	-- zone, vacuum, Spirit Lens, Moonbeam (wings owned = zone).
+	-- The upgrade order, and what a player uses while saving for each step (wings owned = zone).
 	local order = {
-		{ id = "StrobeLight", zone = 1, vacuum = "DustBuster", lens = false, moonbeam = false },
-		{ id = "PhantomVac", zone = 1, vacuum = "DustBuster", lens = false, moonbeam = false },
-		{ id = "SpiritLens", zone = 1, vacuum = "PhantomVac", lens = false, moonbeam = false },
-		{ id = "Library", zone = 1, vacuum = "PhantomVac", lens = true, moonbeam = false },
-		{ id = "Ballroom", zone = 2, vacuum = "PhantomVac", lens = true, moonbeam = false },
-		{ id = "Moonbeam", zone = 3, vacuum = "PhantomVac", lens = true, moonbeam = false },
-		{ id = "VoidVac", zone = 3, vacuum = "PhantomVac", lens = true, moonbeam = true },
+		{ id = "PhantomVac", zone = 1, vacuum = "DustBuster" },
+		{ id = "SpiritSiphon", zone = 1, vacuum = "PhantomVac" },
+		{ id = "Library", zone = 1, vacuum = "SpiritSiphon" },
+		{ id = "Ballroom", zone = 2, vacuum = "SpiritSiphon" },
+		{ id = "BansheeBlower", zone = 3, vacuum = "SpiritSiphon" },
+		{ id = "MoonVac", zone = 3, vacuum = "BansheeBlower" },
+		{ id = "VoidVac", zone = 3, vacuum = "MoonVac" },
 	}
+	-- Each extra monster in the bag makes a trip about 20% longer (more catching).
+	local function tripFor(vacuumId: string): number
+		return tripSeconds * (1 + 0.2 * (Catching.bagSize(vacuumId) - 1))
+	end
 	local rising, paced = true, true
 	local trips: { number } = {}
-	local totalTrips, libraryTrips = 0, 0
+	local totalTrips = 0
+	local totalSeconds, librarySeconds = 0, 0
 	for i, step in order do
 		local wingBoost = 1 + (step.zone - 1) * Wings.ValueBoostPerWing
-		local perTrip = expectedBest(step.zone, step.vacuum, seen)
-			* catchBonus(step.lens, step.moonbeam)
+		local perTrip = expectedTop(step.zone, step.vacuum, seen, Catching.bagSize(step.vacuum))
+			* vacuumBonus(step.vacuum)
 			* wingBoost
 		trips[i] = priceOf(step.id) / perTrip
 		totalTrips += trips[i]
+		totalSeconds += trips[i] * tripFor(step.vacuum)
 		if step.id == "Library" then
-			libraryTrips = totalTrips
+			librarySeconds = totalSeconds
 		end
+		print(`  pacing: {step.id} takes {math.floor(trips[i] * 10) / 10} trips`)
 		if i > 1 then
 			rising = rising and priceOf(step.id) > priceOf(order[i - 1].id)
 			-- the sheet's curve: each step takes about 2-3x as long as the one before
@@ -569,10 +660,15 @@ do
 		end
 	end
 	check("prices rise along the upgrade order", rising)
-	check("the Strobe Light takes about one trip", trips[1] <= 1.5)
+	check("the Phantom Vac takes a few trips", trips[1] <= 3)
 	check("each upgrade takes 1.5-4x as many trips as the one before", paced)
-	check("the Library comes inside the first hour", libraryTrips * tripSeconds / 60 <= 60)
-	local hours = totalTrips * tripSeconds / 3600
+	check("the Library comes inside the first hour", librarySeconds / 60 <= 60)
+	local hours = totalSeconds / 3600
+	print(
+		`  pacing: Library after {math.floor(librarySeconds / 60)} min, all tools after {math.floor(
+			hours * 10
+		) / 10} h`
+	)
 	check("the launch tools last 4-20 hours", hours >= 4 and hours <= 20)
 	check(
 		"Nightmare monsters need the Phantom Vac",

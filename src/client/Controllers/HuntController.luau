@@ -7,7 +7,8 @@
 -- there and opens your items and monsters (InventoryController). Outside the zones a "Feed all"
 -- button shows when your monsters are (nearly) hungry; one tap feeds them all for free.
 -- Everything shown comes from the server: player attributes Zone / Hearts / Carrying /
--- CarryingSize / ReturnCharms / BaitBells / Hungry / HungrySoon and leaderstats.Money.
+-- CarryingSize / CarryingCount / BagSize / ReturnCharms / BaitBells / Hungry / HungrySoon and
+-- leaderstats.Money.
 -- Messages ("Entering Murky Bayou") are toasts now, see ToastController.
 
 local Players = game:GetService("Players")
@@ -160,9 +161,17 @@ function HuntController.start()
 
 		local monsterId = player:GetAttribute("Carrying")
 		local size = player:GetAttribute("CarryingSize")
+		local inBag = player:GetAttribute("CarryingCount")
+		local bagSize = player:GetAttribute("BagSize")
+		local bagFull = typeof(inBag) == "number" and typeof(bagSize) == "number" and inBag >= bagSize
 		if typeof(monsterId) == "string" then
 			local sizeText = if typeof(size) == "string" then `{size} ` else ""
-			carrying.Text = `Carrying: {sizeText}{Format.name(monsterId)}`
+			local bagText = if typeof(inBag) == "number"
+					and typeof(bagSize) == "number"
+					and bagSize > 1
+				then ` ({inBag}/{bagSize})`
+				else ""
+			carrying.Text = `Carrying: {sizeText}{Format.name(monsterId)}{bagText}`
 		else
 			carrying.Text = ""
 		end
@@ -173,9 +182,9 @@ function HuntController.start()
 		local hasCharm = typeof(charms) == "number" and charms > 0
 		button.Visible = hasCharm and (inZone or typeof(monsterId) == "string")
 
-		-- The bell only works in a zone with an empty vacuum, and only if you own one.
+		-- The bell only works in a zone with room in the bag, and only if you own one.
 		local bells = player:GetAttribute("BaitBells")
-		bell.Visible = inZone and typeof(monsterId) ~= "string" and typeof(bells) == "number" and bells > 0
+		bell.Visible = inZone and not bagFull and typeof(bells) == "number" and bells > 0
 		if bell.Visible then
 			local keyText = if UserInputService.KeyboardEnabled then " (B)" else ""
 			bell.Text = `Bait Bell x{bells}{keyText}`
@@ -201,6 +210,8 @@ function HuntController.start()
 			"Hearts",
 			"Carrying",
 			"CarryingSize",
+			"CarryingCount",
+			"BagSize",
 			"ReturnCharms",
 			"BaitBells",
 			"Hungry",

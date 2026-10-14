@@ -91,7 +91,8 @@ local function offerFor(data: DataService.Data): Offer
 			continue
 		end
 		local rarity = Rarities[monster.rarity]
-		local details = `{caught.size} {monster.rarity}`
+		local variant = if caught.variant then `{caught.variant} ` else ""
+		local details = `{variant}{caught.size} {monster.rarity}`
 		if #caught.effects > 0 then
 			local names = {}
 			for _, effectId in Value.resolveEffects(caught.effects) do
