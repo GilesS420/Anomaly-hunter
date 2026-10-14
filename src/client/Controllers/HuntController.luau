@@ -3,7 +3,8 @@
 -- window, the top-right to the player list): your money, your hearts while you're in a zone, the
 -- monster you're carrying, a big "Return Charm" button (tap or click it; R works too on
 -- a keyboard) that takes you home, and in a zone a "Bait Bell" button (B) that brings a rarer
--- monster to you. Each button shows only if you own one. Outside the zones a "Feed all"
+-- monster to you. Each button shows only if you own one. A "Backpack" button (G) is always
+-- there and opens your items and monsters (InventoryController). Outside the zones a "Feed all"
 -- button shows when your monsters are (nearly) hungry; one tap feeds them all for free.
 -- Everything shown comes from the server: player attributes Zone / Hearts / Carrying /
 -- CarryingSize / ReturnCharms / BaitBells / Hungry / HungrySoon and leaderstats.Money.
@@ -104,6 +105,10 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, TextButt
 	local bell =
 		itemButton("BaitBell", 5, Color3.fromRGB(190, 110, 50), if keys then "Bait Bell (B)" else "Bait Bell")
 	local feed = itemButton("FeedAll", 6, HungryColor, "Feed all")
+	-- Always there; InventoryController opens the Backpack with it.
+	local backpack =
+		itemButton("Backpack", 7, Color3.fromRGB(70, 60, 110), if keys then "Backpack (G)" else "Backpack")
+	backpack.Visible = true
 
 	gui.Parent = player:WaitForChild("PlayerGui")
 	return money, hearts, carrying, charm, bell, feed

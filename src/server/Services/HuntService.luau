@@ -115,10 +115,17 @@ end
 local function goHome(player: Player, deliver: boolean)
 	local caught = carrying[player]
 	if caught and deliver then
-		if MansionService.addMonster(player, caught) then
-			Notify.toast(player, `{caught.size} {Format.name(caught.monsterId)} is home in your mansion!`)
+		local where = MansionService.addMonster(player, caught)
+		local name = `{caught.size} {Format.name(caught.monsterId)}`
+		if where == "Mansion" then
+			Notify.toast(player, `{name} is home in your mansion!`)
+		elseif where == "Storage" then
+			Notify.toast(player, `Your mansion is full, so {name} went into Storage (your Backpack).`)
 		else
-			Notify.toast(player, "Your mansion is full! Sell some at the Collector or buy a new wing.")
+			Notify.toast(
+				player,
+				"Your mansion and Storage are full! Sell some at the Collector or buy a new wing."
+			)
 		end
 	end
 	setCarrying(player, nil)
@@ -256,7 +263,10 @@ UseBaitBell.OnServerEvent:Connect(function(player)
 		return
 	end
 	if not MansionService.hasRoom(player) then
-		Notify.toast(player, "Your mansion is full! Sell some at the Collector first.")
+		Notify.toast(
+			player,
+			"Your mansion and Storage are full! Sell some at the Collector or buy a new wing."
+		)
 		return
 	end
 	local ok, message = SpawnService.lure(player, zone.index, data.equipped.vacuum)

@@ -28,6 +28,8 @@ local Rooms = require("../src/shared/Config/Rooms")
 local Scenery = require("../src/shared/Config/Scenery")
 local Travel = require("../src/shared/Util/Travel")
 local TravelConfig = require("../src/shared/Config/Travel")
+local Storage = require("../src/shared/Util/Storage")
+local InventoryConfig = require("../src/shared/Config/Inventory")
 
 local failures = 0
 local function check(name: string, ok: boolean)
@@ -1313,6 +1315,24 @@ do
 		landmarks[spot.name] = true
 	end
 	check("fast-travel shops are hub landmarks", landmarks.Bakery and landmarks.Workshop or false)
+end
+
+-- Storage (Util/Storage): a stored monster is paused and comes back as it went in.
+do
+	local day = CareConfig.FedHours * 3600
+	local caught: any = { monsterId = "Gravepup", size = "Normal", effects = {}, familiarity = 0 }
+	Care.settle(caught, 0) -- fed until `day`
+	Care.settle(caught, 3600) -- an hour of growing
+	local before = caught.familiarity
+	Storage.store(caught, 3600)
+	check("storing a monster notes when", caught.storedAt == 3600)
+	Storage.unstore(caught, 3600 + 10 * day) -- ten days in Storage
+	check("taking it out clears storedAt", caught.storedAt == nil)
+	check("stored monster didn't grow", near(caught.familiarity, before))
+	check("stored monster didn't get hungry", caught.fed == true)
+	check("its hunger clock moved on", near(caught.fedUntil, day + 10 * day))
+	check("storage has room below the limit", Storage.hasRoom(InventoryConfig.StorageSlots - 1))
+	check("storage is full at the limit", not Storage.hasRoom(InventoryConfig.StorageSlots))
 end
 
 if failures > 0 then

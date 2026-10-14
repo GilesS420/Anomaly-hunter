@@ -161,7 +161,10 @@ local function finish(player: Player)
 	local inHub = hold.zoneId == ""
 	if inHub and not MansionService.hasRoom(player) then
 		RoamService.release(model, hold.stunSeconds)
-		Notify.toast(player, "Your mansion is full! Buy a new wing to catch more.")
+		Notify.toast(
+			player,
+			"Your mansion and Storage are full! Sell some at the Collector or buy a new wing."
+		)
 		State:FireClient(player, "Ended", { result = "Escaped", model = model })
 		return
 	end
@@ -175,8 +178,9 @@ local function finish(player: Player)
 	-- Main-area catches fly straight home; zone catches are carried to the Exit.
 	local afterward = "Now bring it to the Exit."
 	if inHub then
-		MansionService.addMonster(player, caught)
-		afterward = "It flew straight home to your mansion!"
+		afterward = if MansionService.addMonster(player, caught) == "Storage"
+			then "Your mansion is full, so it went into Storage (your Backpack)."
+			else "It flew straight home to your mansion!"
 	else
 		HuntService.carry(player, caught)
 	end
@@ -256,7 +260,10 @@ local function onStartCatch(player: Player, model: unknown)
 
 	-- 4. Room at home.
 	if not MansionService.hasRoom(player) then
-		Notify.toast(player, "Your mansion is full! Sell some at the Collector or buy a new wing.")
+		Notify.toast(
+			player,
+			"Your mansion and Storage are full! Sell some at the Collector or buy a new wing."
+		)
 		return
 	end
 

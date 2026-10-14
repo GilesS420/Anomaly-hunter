@@ -3,7 +3,7 @@
 -- in the chat box:
 --   /money 1000000    adds money (a negative number takes some away; 5k, 2.5m and 1b work too)
 --   /wings 3          sets how many wings your mansion has (1 to 6) and rebuilds it
---   /clearmonsters    empties your mansion
+--   /clearmonsters    empties your mansion and Storage
 --   /summon           starts the next Watcher event right away (Flicker, then Blood Moon)
 --   /give VoidVac     gives a Workshop item or Bakery treat for free (tools are equipped;
 --                     /give BaitBell 5 or /give PumpkinCandy 3 gives several)
@@ -102,8 +102,9 @@ commands["/clearmonsters"] = function(player)
 		return
 	end
 	table.clear(data.monsters)
+	table.clear(data.storage)
 	MansionService.rebuild(player)
-	Notify.toast(player, "Your mansion is empty now.")
+	Notify.toast(player, "Your mansion and Storage are empty now.")
 end
 
 commands["/summon"] = function(player)

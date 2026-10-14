@@ -17,6 +17,7 @@ export type Data = {
 	money: number,
 	wingsOwned: number, -- the free Foyer counts as one
 	monsters: { Value.CaughtMonster }, -- caught monsters roaming the mansion
+	storage: { Value.CaughtMonster }, -- monsters that didn't fit, paused (Util/Storage)
 	vault: { Value.CaughtMonster }, -- up to 3 monsters that can never be stolen
 	inventory: { [string]: number }, -- shop items by id -> how many
 	equipped: { flashlight: string, vacuum: string, lens: string },
@@ -32,6 +33,7 @@ DataService.Template = {
 	money = 0,
 	wingsOwned = 1, -- Foyer is free
 	monsters = {},
+	storage = {},
 	vault = {},
 	inventory = {},
 	equipped = { -- item ids in use; the starter tools are free

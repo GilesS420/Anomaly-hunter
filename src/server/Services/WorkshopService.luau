@@ -160,6 +160,23 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 	return { ok = false, message = message, view = viewFor(data) }
 end
 
+-- Puts an owned tool into use (the Workshop window and the Backpack both use this).
+-- Equipping the lens you wear takes it off. Returns whether it worked and what to say.
+function WorkshopService.equip(data: DataService.Data, itemId: unknown): (boolean, string)
+	local item = if typeof(itemId) == "string" then Workshop.item(itemId) else nil
+	local equipSlot = if item then Workshop.equipSlot(item) else nil
+	if not item or not equipSlot or not Workshop.owns(data.inventory, item) then
+		return false, "You don't own that tool."
+	end
+	local equipped = data.equipped :: { [string]: string }
+	if equipSlot == "lens" and equipped.lens == item.id then
+		equipped.lens = "" -- a lens is optional: equipping the one you wear takes it off
+		return true, `Took off the {item.name}.`
+	end
+	equipped[equipSlot] = item.id
+	return true, `Using the {item.name}.`
+end
+
 Equip.OnServerInvoke = function(player: Player, itemId: unknown): Result
 	local data = DataService.get(player)
 	if not data then
@@ -168,21 +185,8 @@ Equip.OnServerInvoke = function(player: Player, itemId: unknown): Result
 	if not Counter.isNear(player, counter) then
 		return { ok = false, message = "Walk up to the Workshop to change tools.", view = viewFor(data) }
 	end
-	local item = if typeof(itemId) == "string" then Workshop.item(itemId) else nil
-	local equipSlot = if item then Workshop.equipSlot(item) else nil
-	if not item or not equipSlot or not Workshop.owns(data.inventory, item) then
-		return { ok = false, message = "You don't own that tool.", view = viewFor(data) }
-	end
-	local equipped = data.equipped :: { [string]: string }
-	local message
-	if equipSlot == "lens" and equipped.lens == item.id then
-		equipped.lens = "" -- a lens is optional: equipping the one you wear takes it off
-		message = `Took off the {item.name}.`
-	else
-		equipped[equipSlot] = item.id
-		message = `Using the {item.name}.`
-	end
-	return { ok = true, message = message, view = viewFor(data) }
+	local ok, message = WorkshopService.equip(data, itemId)
+	return { ok = ok, message = message, view = viewFor(data) }
 end
 
 function WorkshopService.start()
