@@ -4,6 +4,7 @@
 --   Monsters  mansion and Storage, most valuable first. Store / Place moves one between them,
 --             Lock keeps it away from the Collector.
 --   Items     tools (tap Equip to use one) and how many treats, bells and charms you have.
+--             Give on a treat lists your mansion monsters so you pick who eats it.
 -- The server does every change and sends the new list back (server/Services/InventoryService).
 
 local Players = game:GetService("Players")
@@ -21,8 +22,17 @@ type MonsterRow = {
 	color: Color3,
 	stored: boolean,
 	locked: boolean,
+	blocked: { [string]: string },
 }
-type ItemRow = { id: string, name: string, details: string, tool: boolean, equipped: boolean }
+type ItemRow = {
+	id: string,
+	name: string,
+	details: string,
+	tool: boolean,
+	equipped: boolean,
+	treat: boolean,
+	confirm: boolean,
+}
 type View = {
 	monsters: { MonsterRow },
 	items: { ItemRow },
@@ -41,11 +51,13 @@ function InventoryController.start()
 	local Move = remotes:WaitForChild("Move") :: RemoteFunction
 	local Lock = remotes:WaitForChild("Lock") :: RemoteFunction
 	local Equip = remotes:WaitForChild("Equip") :: RemoteFunction
+	local Give = remotes:WaitForChild("Give") :: RemoteFunction
 
 	local window = Ui.window("BackpackUi", "Backpack")
 	local tab: Tab = "Monsters"
 	local view: View? = nil
 	local busy = false
+	local picking: string? = nil -- the treat being given: the list shows your monsters instead
 	local render: () -> ()
 
 	-- Two tab buttons side by side in the footer.
@@ -55,17 +67,18 @@ function InventoryController.start()
 		button.Position = UDim2.new((i - 1) * 0.5, if i == 1 then 0 else 4, 0, 0)
 		button.Activated:Connect(function()
 			tab = name
+			picking = nil
 			render()
 		end)
 		tabs[name] = button
 	end
 
-	local function call(fn: RemoteFunction, arg: string)
+	local function call(fn: RemoteFunction, ...: string)
 		if busy then
 			return
 		end
 		busy = true
-		local ok, result = pcall(fn.InvokeServer, fn, arg)
+		local ok, result = pcall(fn.InvokeServer, fn, ...)
 		busy = false
 		if ok and typeof(result) == "table" then
 			if result.view then
@@ -108,7 +121,14 @@ function InventoryController.start()
 	local function itemRows(rows: { ItemRow })
 		for i, item in rows do
 			local _, actions = Ui.row(window.list, i, item.name, Ui.Colors.text, item.details)
-			if item.tool then
+			if item.treat then
+				local button = Ui.button(actions, "Give", Ui.Colors.buy, UDim2.fromScale(1, 1))
+				local id = item.id
+				button.Activated:Connect(function()
+					picking = id
+					render()
+				end)
+			elseif item.tool then
 				local button = Ui.button(
 					actions,
 					if item.equipped then "Using" else "Equip",
@@ -121,6 +141,36 @@ function InventoryController.start()
 				end)
 			end
 		end
+	end
+
+	-- Picking who eats a treat: your mansion monsters, each with Give (or why it can't).
+	local function giveRows(rows: { MonsterRow }, treat: ItemRow)
+		local order = 0
+		for _, monster in rows do
+			if monster.stored then
+				continue -- paused in Storage: place it back first
+			end
+			order += 1
+			local _, actions = Ui.row(window.list, order, monster.name, monster.color, monster.details)
+			local reason = monster.blocked[treat.id]
+			if reason then
+				Ui.button(actions, reason, Ui.Colors.off, UDim2.fromScale(1, 1)).AutoButtonColor = false
+				continue
+			end
+			local button = Ui.button(actions, "Give", Ui.Colors.buy, UDim2.fromScale(1, 1))
+			local treatId, uid = treat.id, monster.uid
+			local function give()
+				call(Give, treatId, uid)
+			end
+			if treat.confirm then
+				Ui.confirmButton(button, "Sure?", give)
+			else
+				button.Activated:Connect(give)
+			end
+		end
+		window.status.Text = if order == 0
+			then "No monsters in your mansion to give it to. Tap Items to go back."
+			else `Who gets the {treat.name}? Tap Items to go back.`
 	end
 
 	function render()
@@ -141,6 +191,14 @@ function InventoryController.start()
 			end
 			monsterRows(current.monsters)
 		else
+			-- Stay on the monster list while you still have that treat (to give the next one).
+			for _, item in current.items do
+				if item.id == picking then
+					giveRows(current.monsters, item)
+					return
+				end
+			end
+			picking = nil
 			window.status.Text = if #current.items == 0
 				then "Nothing yet. Visit the Workshop and the Bakery!"
 				else "Your tools and supplies"
@@ -153,6 +211,7 @@ function InventoryController.start()
 			window.close()
 			return
 		end
+		picking = nil
 		window.status.Text = "Loading..."
 		window.open(nil)
 		local ok, result = pcall(GetView.InvokeServer, GetView)
