@@ -43,6 +43,7 @@ type ZoneState = {
 	folder: Instance, -- Workspace.Zones.<ZoneId>
 	monsters: Folder?, -- where spawned models go (made on first spawn)
 	rects: { Roam.Rect },
+	exact: boolean, -- the rects cover the open ground between props exactly (RoamService.Options)
 	group: string, -- RoamService group, so orbs only avoid others in the same zone
 	alive: number,
 	retrying: boolean, -- a "too crowded, try later" refill is already waiting
@@ -66,11 +67,14 @@ local function turnedSideways(part: BasePart): boolean
 	return math.abs(right.Z) > math.abs(right.X)
 end
 
--- Floor rectangles monsters may wander over in this zone (empty if nothing was built).
-local function zoneRects(zone: Zones.Zone, zoneFolder: Instance): { Roam.Rect }
+-- Floor rectangles monsters may wander over in this zone (empty if nothing was built), and
+-- whether they cover the open ground between the props exactly (a RoamArea with an "Exact"
+-- attribute, as the scenery builds it).
+local function zoneRects(zone: Zones.Zone, zoneFolder: Instance): ({ Roam.Rect }, boolean)
 	local rects = {}
 	local roamArea = World.find(zoneFolder, "RoamArea")
 	if roamArea then
+		local exact = roamArea:GetAttribute("Exact") == true
 		for _, part in World.parts(roamArea) do
 			local width, depth = part.Size.X, part.Size.Z
 			if turnedSideways(part) then
@@ -82,7 +86,7 @@ local function zoneRects(zone: Zones.Zone, zoneFolder: Instance): { Roam.Rect }
 		if #rects == 0 then
 			warn(`SpawnService: {zone.id} has a RoamArea with no Part in it, so nothing spawns there`)
 		end
-		return rects
+		return rects, exact
 	end
 
 	local spawnPoints = World.find(zoneFolder, "SpawnPoints")
@@ -101,7 +105,7 @@ local function zoneRects(zone: Zones.Zone, zoneFolder: Instance): { Roam.Rect }
 				.. `Workspace > Zones > {zone.id} > RoamArea (it can be invisible)`
 		)
 	end
-	return rects
+	return rects, false
 end
 
 -- The zone's Monsters folder, made if needed. Nil if the zone itself was removed.
@@ -176,6 +180,7 @@ local function spawnOne(state: ZoneState): boolean
 	local rarity = Rarities[monster.rarity]
 	RoamService.add(model, {
 		rects = state.rects,
+		exact = state.exact,
 		radius = radius,
 		speed = 6 + 0.5 * (if rarity then rarity.order else 1),
 		group = state.group,
@@ -315,6 +320,7 @@ local function bring(
 	end)
 	RoamService.add(model, {
 		rects = state.rects,
+		exact = state.exact,
 		radius = radius,
 		speed = 5, -- slower than the zone's own monsters
 		group = state.group,
@@ -425,7 +431,7 @@ function SpawnService.start()
 			warn(`SpawnService: no Workspace > Zones > {zone.id} folder, so nothing spawns there`)
 			continue
 		end
-		local rects = zoneRects(zone, zoneFolder)
+		local rects, exact = zoneRects(zone, zoneFolder)
 		if #rects == 0 then
 			continue
 		end
@@ -434,6 +440,7 @@ function SpawnService.start()
 			folder = zoneFolder,
 			monsters = nil,
 			rects = rects,
+			exact = exact,
 			group = "Zone:" .. zone.id,
 			alive = 0,
 			retrying = false,

@@ -440,13 +440,15 @@ local function buildZone(zonesFolder: Instance, zone: Zones.Zone)
 	if scenery then
 		roamFolder = Instance.new("Folder")
 		roamFolder.Name = "RoamArea"
+		-- The rectangles cover the open ground between the props exactly (RoamService.Options).
+		roamFolder:SetAttribute("Exact", true)
 		roamFolder.Parent = folder
 	end
 	for i, roam in rects do
 		local roamArea = block(
 			if scenery then `Ground{i}` else "RoamArea",
 			Vector3.new(roam.width, 1, roam.depth),
-			at(roam.x, top - 0.5, roam.z),
+			at(roam.x, top + ((roam :: any).y or 0) - 0.5, roam.z),
 			theme.glow,
 			Enum.Material.SmoothPlastic
 		)

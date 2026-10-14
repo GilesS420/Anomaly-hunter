@@ -128,6 +128,17 @@ function Roam.alpha(startTime: number, endTime: number, now: number): number
 	return math.clamp((now - startTime) / (endTime - startTime), 0, 1)
 end
 
+-- The rectangles an orb of this radius fits in (all of them if it fits in none).
+function Roam.fitting(rects: { Rect }, radius: number): { Rect }
+	local result = {}
+	for _, r in rects do
+		if r.maxX - r.minX >= 2 * radius and r.maxZ - r.minZ >= 2 * radius then
+			table.insert(result, r)
+		end
+	end
+	return if #result > 0 then result else rects
+end
+
 -- True if the point lies inside any rectangle (with the given margin).
 function Roam.inside(rects: { Rect }, x: number, z: number, margin: number): boolean
 	for _, r in rects do

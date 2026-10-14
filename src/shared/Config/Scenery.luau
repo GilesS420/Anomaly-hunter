@@ -271,7 +271,8 @@ end
 
 -- A zone's look: its parts, and the open ground monsters roam over (zone-local rectangles,
 -- clear of the props; SpawnService and the roam code use them as Workspace.Zones.<Id>.RoamArea).
-export type Rect = { x: number, z: number, width: number, depth: number }
+-- `y` is the floor's height when it isn't the ground (the water's surface, say).
+export type Rect = { x: number, z: number, width: number, depth: number, y: number? }
 export type Zone = {
 	parts: () -> { Part },
 	roam: { Rect },
@@ -398,7 +399,7 @@ local function fenceRun(parts: { Part }, name: string, from: number, to: number,
 	end
 end
 
--- Where monsters roam in the graveyard: the dirt paths between the blocks of graves.
+-- The dirt paths between the blocks of graves.
 local GraveyardPaths = {
 	{ x = 0, z = -51, width = 208, depth = 14 }, -- south path, just inside the gate
 	{ x = 0, z = 96, width = 208, depth = 16 }, -- north path
@@ -413,7 +414,8 @@ local GraveyardPaths = {
 -- cobbled path leads through an archway in an inner fence; inside, dirt paths run round the
 -- edge, up the middle and across, between four blocks of crooked graves. Tucked among the
 -- graves: a small ruined chapel, a mausoleum, a little pumpkin patch with a scarecrow, and the
--- groundskeeper's shed with an open grave. Monsters roam the paths.
+-- groundskeeper's shed with an open grave. Monsters roam all the open ground,
+-- between the graves too.
 local function pumpkinGraveyard(): { Part }
 	local parts: { Part } = {}
 	local roll = dice(1031)
@@ -634,18 +636,6 @@ local function pumpkinGraveyard(): { Part }
 	return parts
 end
 
--- Where monsters roam in the bayou: the mud banks round the edge and the boardwalks up the
--- middle and across, between four stretches of swamp water.
-local BayouPaths = {
-	{ x = 0, z = -51, width = 208, depth = 14 }, -- south bank, just past the dock gate
-	{ x = 0, z = 96, width = 208, depth = 16 }, -- north bank
-	{ x = -97, z = 22, width = 14, depth = 132 }, -- west bank
-	{ x = 97, z = 22, width = 14, depth = 132 }, -- east bank
-	{ x = 0, z = 22, width = 10, depth = 132 }, -- the boardwalk up the middle
-	{ x = -47.5, z = 21, width = 85, depth = 10 }, -- boardwalk across, west half
-	{ x = 47.5, z = 21, width = 85, depth = 10 }, -- boardwalk across, east half
-}
-
 local Mud = { 54, 46, 32 }
 local Cypress = { 44, 64, 40 }
 local CypressDark = { 34, 50, 32 }
@@ -657,11 +647,12 @@ local Firefly = { 200, 255, 120 }
 -- The pit floor is `BayouBed` studs below the ground and the water `BayouWater` deep.
 local BayouBed, BayouWater = 4, 2
 local Bed, Surface = -BayouBed, BayouWater - BayouBed
-local BayouPools = {
-	{ x = -47.5, z = -14, width = 85, depth = 60 },
-	{ x = 47.5, z = -14, width = 85, depth = 60 },
-	{ x = -47.5, z = 57, width = 85, depth = 62 },
-	{ x = 47.5, z = 57, width = 85, depth = 62 },
+-- Monsters roam over the water too, gliding just above its surface.
+local BayouPools: { Rect } = {
+	{ x = -47.5, z = -14, width = 85, depth = 60, y = Surface },
+	{ x = 47.5, z = -14, width = 85, depth = 60, y = Surface },
+	{ x = -47.5, z = 57, width = 85, depth = 62, y = Surface },
+	{ x = 47.5, z = 57, width = 85, depth = 62, y = Surface },
 }
 
 -- A bald cypress standing in the water: a flared foot, a tall trunk, a flat crown with grey
@@ -693,8 +684,8 @@ end
 -- landing to a dock gate; past it, mud banks run round the edge and boardwalks run up the
 -- middle and across, over four pools of shallow murky water full of cypress trees, reeds and
 -- lily pads. Out in the water: a shack on stilts, a broken clock tower sinking into the
--- swamp with its fallen stones around it, a rowboat and fireflies. Monsters roam the banks
--- and boardwalks.
+-- swamp with its fallen stones around it, a rowboat and fireflies. Monsters roam all the open
+-- ground, banks, boardwalks and water alike.
 local function murkyBayou(): { Part }
 	local parts: { Part } = {}
 	local roll = dice(2069)
@@ -1721,76 +1712,192 @@ function Scenery.footprint(p: Part): (number, number, number)
 	return reach(m[1]), reach(m[3]), p.at[2] - reach(m[2])
 end
 
--- Monsters may walk under anything whose bottom is this high (roofs, wires, the wheel's top).
-Scenery.Overhead = 7
+-- Monsters may walk under anything whose bottom is this high over their floor (roofs, wires,
+-- the wheel's top).
+Scenery.Overhead = 6
+-- Walk-through parts lower than this (grass, mounds, puddles) are glided over.
+Scenery.Low = 1.5
 
--- All the open ground of a zone as rectangles for monsters to roam: the floor in 4-stud
--- cells, minus every cell within `Pad` studs of a solid prop standing on the floor, and minus
--- the arrival pad and the exit arch. Rows of free cells are joined into strips, and equal
--- strips on top of each other into rectangles.
-local Cell, Pad, Reach = 4, 3, 106
+-- All the open ground of a zone as rectangles for monsters to roam: the floor in `cell`-stud
+-- squares, minus every square within `pad` studs of a prop standing on it (solid, or a
+-- walk-through one taller than `Low`), and minus the
+-- arrival pad and the exit arch. Squares inside one of the `floors` (water, say) have their
+-- floor at that height instead of the ground. The free squares are covered with big rectangles
+-- (they may overlap).
+export type GroundOptions = { cell: number?, pad: number?, floors: { Rect }? }
+local Reach = 106
 local KeepOut = {
 	{ x = -20, z = -90, hx = 7, hz = 7 }, -- the arrival pad
 	{ x = 20, z = -100, hx = 9, hz = 6 }, -- the exit and its arch
 }
-function Scenery.openGround(parts: { Part }): { Rect }
-	local n = math.floor(2 * Reach / Cell)
+function Scenery.openGround(parts: { Part }, options: GroundOptions?): { Rect }
+	local cell = options and options.cell or 1
+	local pad = options and options.pad or 1
+	local floors = options and options.floors or {}
+	local n = math.floor(2 * Reach / cell)
+	local function centre(i: number): number
+		return -Reach + (i - 0.5) * cell
+	end
+	-- Which floor each square is on (0 = the ground), and whether something stands there.
+	local floorOf: { { number } } = {}
 	local blocked: { { boolean } } = {}
 	for i = 1, n do
-		blocked[i] = {}
+		floorOf[i], blocked[i] = {}, {}
+		for j = 1, n do
+			local x, z = centre(i), centre(j)
+			floorOf[i][j] = 0
+			for f, r in floors do
+				if math.abs(x - r.x) < r.width / 2 and math.abs(z - r.z) < r.depth / 2 then
+					floorOf[i][j] = f
+				end
+			end
+		end
 	end
-	local function mark(minX: number, maxX: number, minZ: number, maxZ: number)
-		local i0 = math.max(1, math.floor((minX + Reach) / Cell) + 1)
-		local i1 = math.min(n, math.ceil((maxX + Reach) / Cell))
-		local j0 = math.max(1, math.floor((minZ + Reach) / Cell) + 1)
-		local j1 = math.min(n, math.ceil((maxZ + Reach) / Cell))
+	local function heightOf(f: number): number
+		return if f == 0 then 0 else floors[f].y or 0
+	end
+	local function mark(
+		minX: number,
+		maxX: number,
+		minZ: number,
+		maxZ: number,
+		top: number?,
+		bottom: number?,
+		rise: number?
+	)
+		local i0 = math.max(1, math.floor((minX + Reach) / cell) + 1)
+		local i1 = math.min(n, math.ceil((maxX + Reach) / cell))
+		local j0 = math.max(1, math.floor((minZ + Reach) / cell) + 1)
+		local j1 = math.min(n, math.ceil((maxZ + Reach) / cell))
 		for i = i0, i1 do
 			for j = j0, j1 do
-				blocked[i][j] = true
+				local y = heightOf(floorOf[i][j])
+				if
+					top == nil
+					or bottom == nil
+					or (top > y + (rise or 0.05) and bottom < y + Scenery.Overhead)
+				then
+					blocked[i][j] = true
+				end
 			end
 		end
 	end
 	for _, p in parts do
-		if p.solid then
-			local hx, hz, bottom = Scenery.footprint(p)
-			local top = p.at[2] * 2 - bottom
-			if top > 0.05 and bottom < Scenery.Overhead then
-				mark(p.at[1] - hx - Pad, p.at[1] + hx + Pad, p.at[3] - hz - Pad, p.at[3] + hz + Pad)
-			end
+		local hx, hz, bottom = Scenery.footprint(p)
+		local top = p.at[2] * 2 - bottom
+		-- Walk-through parts only count when they stand taller than a monster can glide over.
+		-- Slabs level with the ground (paths, banks, decks) are floor, even next to the water.
+		local rise = if p.solid then 0.05 else Scenery.Low
+		if math.abs(top) > 0.05 then
+			mark(
+				p.at[1] - hx - pad,
+				p.at[1] + hx + pad,
+				p.at[3] - hz - pad,
+				p.at[3] + hz + pad,
+				top,
+				bottom,
+				rise
+			)
 		end
 	end
 	for _, k in KeepOut do
 		mark(k.x - k.hx, k.x + k.hx, k.z - k.hz, k.z + k.hz)
 	end
-	-- Strips of free cells per column of z, then stack equal strips.
-	local rects: { Rect } = {}
-	local open: { [string]: Rect } = {}
-	for j = 1, n do
-		local z0 = -Reach + (j - 1) * Cell
-		local nextOpen: { [string]: Rect } = {}
-		local i = 1
-		while i <= n do
-			if blocked[i][j] then
-				i += 1
-			else
-				local start = i
-				while i <= n and not blocked[i][j] do
-					i += 1
-				end
-				local key = `{start}:{i}`
-				local x0, x1 = -Reach + (start - 1) * Cell, -Reach + (i - 1) * Cell
-				local r = open[key]
-				if r then
-					r.depth += Cell
-					r.z = z0 + Cell - r.depth / 2
-				else
-					r = { x = (x0 + x1) / 2, z = z0 + Cell / 2, width = x1 - x0, depth = Cell }
-					table.insert(rects, r)
-				end
-				nextOpen[key] = r
+	-- Cover the free squares with big rectangles: from each square not yet covered, grow the
+	-- rectangle (on that square's floor) whose shorter side is longest, then the biggest. So a
+	-- lane between graves becomes one long rectangle, and an open field one big block.
+	-- Rectangles may overlap.
+	local run: { { number } } = {} -- free squares on one floor from (i, j) along +x
+	for i = n, 1, -1 do
+		run[i] = {}
+		for j = 1, n do
+			local f = floorOf[i][j]
+			run[i][j] = if blocked[i][j]
+				then 0
+				elseif i < n and floorOf[i + 1][j] == f then run[i + 1][j] + 1
+				else 1
+		end
+	end
+	-- The best rectangle with its corner at square (i, j).
+	local function grow(i: number, j: number): (number, number, number, number)
+		local f = floorOf[i][j]
+		local i1, j1, bestSide, bestArea = i, j, 0, 0
+		local width = math.huge
+		local cj = j
+		while cj <= n and run[i][cj] > 0 and floorOf[i][cj] == f do
+			width = math.min(width, run[i][cj])
+			local height = cj - j + 1
+			local side, area = math.min(width, height), width * height
+			if side > bestSide or (side == bestSide and area > bestArea) then
+				i1, j1, bestSide, bestArea = i + width - 1, cj, side, area
+			end
+			cj += 1
+		end
+		return i1, j1, bestSide, bestArea
+	end
+	-- Every corner of the open ground (a free square with a blocked or other-floor square to its
+	-- -x or -z side) offers its best rectangle; take the best first, while they add new ground.
+	local function edge(i: number, j: number, di: number, dj: number): boolean
+		local a, b = i + di, j + dj
+		return a < 1 or b < 1 or blocked[a][b] or floorOf[a][b] ~= floorOf[i][j]
+	end
+	type Offer = { i: number, j: number, i1: number, j1: number, side: number, area: number }
+	local offers: { Offer } = {}
+	for i = 1, n do
+		for j = 1, n do
+			if not blocked[i][j] and (edge(i, j, -1, 0) or edge(i, j, 0, -1)) then
+				local i1, j1, side, area = grow(i, j)
+				table.insert(offers, { i = i, j = j, i1 = i1, j1 = j1, side = side, area = area })
 			end
 		end
-		open = nextOpen
+	end
+	table.sort(offers, function(a: Offer, b: Offer): boolean
+		if a.side ~= b.side then
+			return a.side > b.side
+		end
+		return a.area > b.area
+	end)
+	local covered: { { boolean } } = {}
+	for i = 1, n do
+		covered[i] = {}
+	end
+	local rects: { Rect } = {}
+	local function take(i: number, j: number, i1: number, j1: number)
+		local fresh = false
+		for ci = i, i1 do
+			for cj = j, j1 do
+				if not covered[ci][cj] then
+					covered[ci][cj], fresh = true, true
+				end
+			end
+		end
+		if not fresh then
+			return
+		end
+		local x0, z0 = -Reach + (i - 1) * cell, -Reach + (j - 1) * cell
+		local r: Rect = {
+			x = x0 + (i1 - i + 1) * cell / 2,
+			z = z0 + (j1 - j + 1) * cell / 2,
+			width = (i1 - i + 1) * cell,
+			depth = (j1 - j + 1) * cell,
+		}
+		local f = floorOf[i][j]
+		if f ~= 0 then
+			r.y = heightOf(f)
+		end
+		table.insert(rects, r)
+	end
+	for _, o in offers do
+		take(o.i, o.j, o.i1, o.j1)
+	end
+	-- Anything still left over (inner corners the offers missed) gets its own.
+	for j = 1, n do
+		for i = 1, n do
+			if not blocked[i][j] and not covered[i][j] then
+				local i1, j1 = grow(i, j)
+				take(i, j, i1, j1)
+			end
+		end
 	end
 	return rects
 end
@@ -1798,11 +1905,11 @@ end
 Scenery.Zones = {
 	PumpkinGraveyard = {
 		parts = pumpkinGraveyard,
-		roam = GraveyardPaths,
+		roam = Scenery.openGround(pumpkinGraveyard()),
 	},
 	MurkyBayou = {
 		parts = murkyBayou,
-		roam = BayouPaths,
+		roam = Scenery.openGround(murkyBayou(), { floors = BayouPools }),
 		bed = BayouBed,
 		water = BayouPools,
 		waterDepth = BayouWater,
