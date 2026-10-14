@@ -10,6 +10,9 @@
 --   Workspace.Hub.GateArches.<ZoneId> the stone archway round each gate (Config/Scenery); locked
 --                                    zones get a boarded-up arch with no gate
 --   Workspace.Hub.ReturnPoint        where hunters land when they have no plot
+--   Workspace.Hub.Map                paths, lamps, the fence, cliffs and graves round the edge
+--                                    (Config/HubMap)
+--   Lighting                         a foggy, moonlit night (once; see setNight)
 --   Workspace.Hub.Landmarks.<Name>   Watcher Square, Collector, Trading Booth, Bakery, Workshop
 --                                    (the ones with a recipe in Config/Landmarks are built in full)
 --   Workspace.Zones.<ZoneId>         a floating island per zone (only if that zone folder is missing),
@@ -18,10 +21,12 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
+local Lighting = game:GetService("Lighting")
 
 local Landmarks = require(ReplicatedStorage.Shared.Config.Landmarks)
 local Layout = require(ReplicatedStorage.Shared.Config.Layout)
 local Scenery = require(ReplicatedStorage.Shared.Config.Scenery)
+local HubMap = require(ReplicatedStorage.Shared.Config.HubMap)
 local Zones = require(ReplicatedStorage.Shared.Config.Zones)
 local Recipe = require(script.Parent.Parent.Recipe)
 local World = require(script.Parent.Parent.World)
@@ -508,6 +513,55 @@ local function buildZone(zonesFolder: Instance, zone: Zones.Zone)
 	table.insert(built, `Zones.{zone.id}`)
 end
 
+-- A foggy, moonlit night. Only once per place (Lighting gets a "NightSet" attribute), and an
+-- Atmosphere, Sky, Bloom or ColorCorrection already in Lighting is left as it is.
+local function setNight()
+	if Lighting:GetAttribute("NightSet") then
+		return
+	end
+	Lighting.ClockTime = 0
+	Lighting.Brightness = 1.2
+	Lighting.Ambient = Color3.fromRGB(34, 30, 48)
+	Lighting.OutdoorAmbient = Color3.fromRGB(80, 74, 110)
+	Lighting.EnvironmentDiffuseScale = 0.3
+	Lighting.EnvironmentSpecularScale = 0.3
+	local function add(className: string, setup: (Instance) -> ())
+		if not Lighting:FindFirstChildOfClass(className) then
+			local effect = Instance.new(className)
+			setup(effect)
+			effect.Parent = Lighting
+		end
+	end
+	add("Atmosphere", function(effect)
+		local atmosphere = effect :: Atmosphere
+		atmosphere.Density = 0.38
+		atmosphere.Offset = 0.15
+		atmosphere.Color = Color3.fromRGB(96, 88, 124)
+		atmosphere.Decay = Color3.fromRGB(46, 38, 64)
+		atmosphere.Glare = 0
+		atmosphere.Haze = 2.2
+	end)
+	add("Sky", function(effect)
+		local sky = effect :: Sky
+		sky.MoonAngularSize = 24
+		sky.StarCount = 4000
+	end)
+	add("BloomEffect", function(effect)
+		local bloom = effect :: BloomEffect
+		bloom.Intensity = 0.6
+		bloom.Size = 30
+		bloom.Threshold = 1.6
+	end)
+	add("ColorCorrectionEffect", function(effect)
+		local color = effect :: ColorCorrectionEffect
+		color.Saturation = -0.15
+		color.Contrast = 0.08
+		color.TintColor = Color3.fromRGB(226, 222, 255)
+	end)
+	Lighting:SetAttribute("NightSet", true)
+	table.insert(built, "Lighting (night)")
+end
+
 function WorldBuilder.start()
 	table.clear(built)
 	local hub = folderAt(workspace, "Hub", "Hub")
@@ -520,6 +574,16 @@ function WorldBuilder.start()
 		buildReturnPoint(hub)
 	end
 	buildLandmarks(hub)
+	if not World.find(hub, "Map") then
+		recipeModel(
+			"Map",
+			HubMap.parts(),
+			CFrame.new(Layout.Hub.Center.x, GroundTop, Layout.Hub.Center.z),
+			hub
+		)
+		table.insert(built, "Hub.Map")
+	end
+	setNight()
 
 	local zonesFolder = folderAt(workspace, "Zones", "Zones")
 	for _, zone in Zones.List do
