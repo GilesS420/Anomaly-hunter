@@ -1791,6 +1791,29 @@ Rooms.ByWing = {
 	Garden = Rooms.Garden,
 } :: { [string]: (width: number, depth: number, owned: { [string]: boolean }) -> { Part } }
 
+-- Everything about a part in one string: two parts with the same key look exactly the same.
+-- MansionService compares keys to rebuild only the parts of a room that changed (a door that
+-- opens when its wing is bought), so the rest of the mansion never blinks.
+function Rooms.key(p: Part): string
+	local function list(values: { number }?): string
+		return if values then table.concat(values, ",") else "-"
+	end
+	local light = if p.light then `{list(p.light.color)}/{p.light.range}/{p.light.brightness}` else "-"
+	return table.concat({
+		p.name,
+		list(p.size),
+		list(p.at),
+		list(p.rot),
+		list(p.color),
+		p.material,
+		p.shape or "Block",
+		tostring(p.solid == true),
+		tostring(p.transparency or 0),
+		light,
+		p.text or "-",
+	}, "|")
+end
+
 -- The building blocks, for other recipes in the same style (Config/Landmarks).
 Rooms.Kit = {
 	part = part,

@@ -39,38 +39,44 @@ local function paint(part: BasePart, text: string)
 	gui.Parent = part
 end
 
+-- Builds one part of a recipe into `parent`, placed relative to `base`.
+function Recipe.buildPart(spec: Rooms.Part, base: CFrame, parent: Instance): Part
+	local part = Instance.new("Part")
+	part.Name = spec.name
+	part.Size = Vector3.new(spec.size[1], spec.size[2], spec.size[3])
+	local rot = spec.rot or { 0, 0, 0 }
+	part.CFrame = base
+		* CFrame.new(spec.at[1], spec.at[2], spec.at[3])
+		* CFrame.fromOrientation(math.rad(rot[1]), math.rad(rot[2]), math.rad(rot[3]))
+	part.Color = rgb(spec.color)
+	part.Material = (Enum.Material :: any)[spec.material]
+	part.Shape = (Enum.PartType :: any)[spec.shape or "Block"]
+	part.Transparency = spec.transparency or 0
+	part.Anchored = true
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	if not spec.solid then
+		ghost(part)
+	end
+	if spec.light then
+		local light = Instance.new("PointLight")
+		light.Color = rgb(spec.light.color)
+		light.Range = spec.light.range
+		light.Brightness = spec.light.brightness
+		light.Shadows = true
+		light.Parent = part
+	end
+	if spec.text then
+		paint(part, spec.text)
+	end
+	part.Parent = parent
+	return part
+end
+
 -- Builds every part of the recipe into `parent`, placed relative to `base`.
 function Recipe.build(parts: { Rooms.Part }, base: CFrame, parent: Instance)
 	for _, spec in parts do
-		local part = Instance.new("Part")
-		part.Name = spec.name
-		part.Size = Vector3.new(spec.size[1], spec.size[2], spec.size[3])
-		local rot = spec.rot or { 0, 0, 0 }
-		part.CFrame = base
-			* CFrame.new(spec.at[1], spec.at[2], spec.at[3])
-			* CFrame.fromOrientation(math.rad(rot[1]), math.rad(rot[2]), math.rad(rot[3]))
-		part.Color = rgb(spec.color)
-		part.Material = (Enum.Material :: any)[spec.material]
-		part.Shape = (Enum.PartType :: any)[spec.shape or "Block"]
-		part.Transparency = spec.transparency or 0
-		part.Anchored = true
-		part.TopSurface = Enum.SurfaceType.Smooth
-		part.BottomSurface = Enum.SurfaceType.Smooth
-		if not spec.solid then
-			ghost(part)
-		end
-		if spec.light then
-			local light = Instance.new("PointLight")
-			light.Color = rgb(spec.light.color)
-			light.Range = spec.light.range
-			light.Brightness = spec.light.brightness
-			light.Shadows = true
-			light.Parent = part
-		end
-		if spec.text then
-			paint(part, spec.text)
-		end
-		part.Parent = parent
+		Recipe.buildPart(spec, base, parent)
 	end
 end
 

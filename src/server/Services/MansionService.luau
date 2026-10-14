@@ -41,13 +41,17 @@ type State = {
 	player: Player,
 	plot: PlotService.Plot,
 	model: Model,
-	wings: Folder, -- owned wing parts plus the NextWing sign; rebuilt when a wing is bought
+	wings: Folder, -- owned wing parts plus the NextWing sign; only what changed is rebuilt
+	built: { [string]: { [string]: Built } }, -- recipe parts per wing, by part name
 	monsters: Folder,
 	countLabel: TextLabel, -- "3/8 monsters" on the owner sign
 	group: string, -- RoamService group shared by this mansion's monsters
 	rects: { Roam.Rect }, -- floor areas the monsters may roam (one per owned wing)
 	generation: number, -- goes up whenever the monsters are cleared, cancelling waiting spawns
 }
+
+-- A room part as it stands in the world, with the recipe key (Rooms.key) it was built from.
+type Built = { key: string, part: BasePart }
 
 local MonsterSpeed = 4 -- studs per second; mansion monsters stroll, zone monsters hurry
 local PillarHeight = 12
@@ -180,14 +184,36 @@ local function buildOwnedWing(state: State, wing: Wings.Wing, owned: { [string]:
 		return
 	end
 	local top = floorTop(state.plot)
+	local existing = state.wings:FindFirstChild(wing.id)
 	local recipe = Rooms.ByWing[wing.id]
 	if recipe then
-		local folder = Instance.new("Folder")
+		-- Only parts that are new or look different get built, and only parts that are gone
+		-- get removed (e.g. the boards on a door when the wing behind it is bought). Everything
+		-- else stays put, so buying a wing never makes the rest of the mansion blink.
+		local folder = existing or Instance.new("Folder")
 		folder.Name = wing.id
 		local base = CFrame.new(wingCentre(state.plot, wing.id, top)) * state.plot.frame.Rotation
-		Recipe.build(recipe(spot.width, spot.depth, owned), base, folder)
+		local old = state.built[wing.id] or {}
+		local now: { [string]: Built } = {}
+		for _, spec in recipe(spot.width, spot.depth, owned) do
+			local key = Rooms.key(spec)
+			local was = old[spec.name]
+			if was and was.key == key and was.part.Parent == folder then
+				now[spec.name] = was
+				old[spec.name] = nil
+			else
+				now[spec.name] = { key = key, part = Recipe.buildPart(spec, base, folder) }
+			end
+		end
+		for _, gone in old do
+			gone.part:Destroy()
+		end
+		state.built[wing.id] = now
 		folder.Parent = state.wings
 		return
+	end
+	if existing then
+		return -- a placeholder looks the same whichever wings are owned
 	end
 	local color = wingColors[wing.id] or Color3.fromRGB(140, 140, 140)
 	local folder = Instance.new("Folder")
@@ -238,6 +264,7 @@ local function buildNextWing(state: State, wing: Wings.Wing)
 	local color = wingColors[wing.id] or Color3.fromRGB(140, 140, 140)
 	local folder = Instance.new("Folder")
 	folder.Name = "NextWing"
+	folder:SetAttribute("WingId", wing.id)
 
 	local floor = block(
 		"Floor",
@@ -298,18 +325,32 @@ local function buildNextWing(state: State, wing: Wings.Wing)
 	folder.Parent = state.wings
 end
 
--- (Re)builds every wing part and the next-wing sign, and updates where monsters may roam.
+-- Brings the wing parts and the next-wing sign in line with the wings owned, and updates
+-- where monsters may roam. Rooms already standing are kept; only what changed is rebuilt.
 local function buildWings(state: State, wingsOwned: number)
-	state.wings:ClearAllChildren()
 	local owned: { [string]: boolean } = {}
 	for _, wing in Mansion.ownedWings(wingsOwned) do
 		owned[wing.id] = true
 	end
+	local nextWing = Mansion.nextWing(wingsOwned)
+	-- The old next-wing sign goes first: the room bought in its place is built right after,
+	-- in the same frame, so nothing blinks.
+	local sign = state.wings:FindFirstChild("NextWing")
+	if sign and not (nextWing and sign:GetAttribute("WingId") == nextWing.id) then
+		sign:Destroy()
+		sign = nil
+	end
+	-- Wings no longer owned (only the Studio /wings command takes wings away).
+	for _, child in state.wings:GetChildren() do
+		if child ~= sign and not owned[child.Name] then
+			child:Destroy()
+			state.built[child.Name] = nil
+		end
+	end
 	for _, wing in Mansion.ownedWings(wingsOwned) do
 		buildOwnedWing(state, wing, owned)
 	end
-	local nextWing = Mansion.nextWing(wingsOwned)
-	if nextWing then
+	if nextWing and not sign then
 		buildNextWing(state, nextWing)
 	end
 	state.rects = roamRects(state, wingsOwned)
@@ -498,6 +539,7 @@ local function tryBuild(player: Player)
 		plot = plot,
 		model = model,
 		wings = folderIn(model, "Wings"),
+		built = {},
 		monsters = folderIn(model, "Monsters"),
 		countLabel = buildOwnerSign(player, plot, model),
 		group = `Mansion:{player.UserId}`,
@@ -620,7 +662,7 @@ function MansionService.removeMonsters(player: Player, uids: { [string]: boolean
 	return removed
 end
 
--- Rebuilds the whole mansion from the save (wings, sign and monsters). Used after the save
+-- Brings the whole mansion in line with the save (wings, sign and monsters). Used after the save
 -- was changed directly, e.g. by the Studio test commands.
 function MansionService.rebuild(player: Player)
 	local state = mansions[player]
