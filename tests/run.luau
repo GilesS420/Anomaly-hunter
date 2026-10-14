@@ -1085,6 +1085,76 @@ do
 	end
 end
 
+-- The hub map: every part sized and named once, everything but the cliffs inside the oval,
+-- and nothing standing on a plot, a landmark, a gate or the landing spot.
+do
+	local HubMap = require("../src/shared/Config/HubMap")
+	local parts = HubMap.parts()
+	local ok, names = #parts > 0, {}
+	local blocked: { { number } } = {} -- minX, maxX, minZ, maxZ
+	local hx, hz = Layout.PlotSize.x / 2, Layout.PlotSize.z / 2
+	for _, plot in Layout.Plots do
+		table.insert(blocked, { plot.x - hx, plot.x + hx, plot.z - hz, plot.z + hz })
+	end
+	for _, spot in Layout.Landmarks do
+		-- Turned to face the middle along x (WorldBuilder.landmarkFrame), or not turned.
+		local w, d = spot.width / 2, spot.depth / 2
+		if math.abs(spot.x) >= math.abs(spot.z) and spot.x ~= 0 then
+			w, d = d, w
+		end
+		table.insert(blocked, { spot.x - w, spot.x + w, spot.z - d, spot.z + d })
+	end
+	for _, gate in Layout.Gates do
+		table.insert(blocked, { gate.x - 4, gate.x + 4, gate.z - 11, gate.z + 11 })
+	end
+	local back = Layout.ReturnPoint
+	for _, p in parts do
+		ok = ok
+			and #p.size == 3
+			and #p.at == 3
+			and #p.color == 3
+			and p.size[1] > 0
+			and p.size[2] > 0
+			and p.size[3] > 0
+		if names[p.name] then
+			ok = false
+			print(`  two hub map parts named {p.name}`)
+		end
+		names[p.name] = true
+		local fx, fz = Scenery.footprint(p)
+		if not string.find(p.name, "^Cliff") then
+			for _, c in { { -1, -1 }, { -1, 1 }, { 1, -1 }, { 1, 1 } } do
+				if not HubMap.inside(p.at[1] + c[1] * fx, p.at[3] + c[2] * fz, 0) then
+					ok = false
+					print(`  {p.name} hangs over the edge of the hub`)
+					break
+				end
+			end
+			for _, b in blocked do
+				if
+					p.at[1] + fx > b[1]
+					and p.at[1] - fx < b[2]
+					and p.at[3] + fz > b[3]
+					and p.at[3] - fz < b[4]
+				then
+					ok = false
+					print(`  {p.name} stands on a plot, landmark or gate`)
+				end
+			end
+			-- Paths may run over the landing spot; nothing else may stand on it.
+			local flat = p.at[2] + p.size[2] / 2 <= 0.2
+			if not flat and math.abs(p.at[1] - back.x) < fx + 3 and math.abs(p.at[3] - back.z) < fz + 3 then
+				ok = false
+				print(`  {p.name} stands on the landing spot`)
+			end
+		elseif HubMap.inside(p.at[1], p.at[3], 0) then
+			ok = false
+			print(`  {p.name} is inside the hub`)
+		end
+	end
+	check("the hub map stays inside the oval and off the plots, landmarks, gates and landing spot", ok)
+end
+
 -- Open ground: monsters may roam everywhere except near solid props on the floor (props high
 -- overhead don't count), the arrival pad and the exit.
 do
