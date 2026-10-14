@@ -895,6 +895,37 @@ do
 	end
 end
 
+-- Buying a wing only changes the door to that wing in the rooms already standing (its boards
+-- come off and the leaves swing open); every other part keeps the same key, so MansionService
+-- leaves it alone and the mansion doesn't blink.
+do
+	for count = 1, #Mansion.ownedWings(99) - 1 do
+		local before, after = {}, {}
+		for _, wing in Mansion.ownedWings(count) do
+			before[wing.id] = true
+			after[wing.id] = true
+		end
+		local bought = (Mansion.nextWing(count) :: any).id
+		after[bought] = true
+		local ok = true
+		for wingId in before do
+			local spot = Layout.Wings[wingId]
+			local recipe = Rooms.ByWing[wingId]
+			local keys = {}
+			for _, p in recipe(spot.width, spot.depth, before) do
+				keys[p.name] = Rooms.key(p)
+			end
+			for _, p in recipe(spot.width, spot.depth, after) do
+				if keys[p.name] ~= Rooms.key(p) and string.sub(p.name, 1, #bought) ~= bought then
+					ok = false
+					print(`  buying the {bought} changes {wingId}'s {p.name}`)
+				end
+			end
+		end
+		check(`buying the {bought} only changes the doors to it`, ok)
+	end
+end
+
 -- Hub landmarks: every part is sized, uses a real material and stays on the landmark's spot,
 -- the shops have a counter spot in front, and the middle of Watcher Square stays clear for
 -- the Watcher's meter.
