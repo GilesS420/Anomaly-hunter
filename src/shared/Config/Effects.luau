@@ -47,9 +47,12 @@ Effects.List = {
 	-- x4 (not x3 like Ghost) so the Moon Vac has a perk of its own; set by the balance sheet.
 	Werewolf = { id = "Werewolf", multiplier = 4, source = "Catch", from = "MoonVac" },
 	Mummy = { id = "Mummy", multiplier = 4, source = "Roam", weight = 5 },
+	Stitched = { id = "Stitched", multiplier = 3, source = "Food", from = "StitchCupcake" },
 	Cursed = { id = "Cursed", multiplier = 5, source = "Food", from = "CursedCake" },
 	Bloodmoon = { id = "Bloodmoon", multiplier = 6, source = "Event", from = "BloodMoon" },
 	Mimic = { id = "Mimic", multiplier = 8, source = "Event", from = "MimicNight" },
+	Hexed = { id = "Hexed", multiplier = 8, source = "Food", from = "WitchsBrewTart" },
+	Eclipsed = { id = "Eclipsed", multiplier = 15, source = "Food", from = "EclipseEclair" },
 	Watched = { id = "Watched", multiplier = 20, source = "Survive", from = "WatcherAwakens" },
 } :: { [string]: Effect }
 

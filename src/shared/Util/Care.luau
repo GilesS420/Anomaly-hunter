@@ -8,6 +8,7 @@ local CareConfig = require("../Config/Care")
 local Effects = require("../Config/Effects")
 local Shop = require("../Config/Shop")
 local Format = require("./Format")
+local Rng = require("./Rng")
 local Value = require("./Value")
 
 local Care = {}
@@ -64,27 +65,73 @@ function Care.percent(caught: Value.CaughtMonster): number
 	return math.floor(math.clamp(caught.familiarity or 0, 0, 1) * 100 + 1e-6)
 end
 
+-- The effects a treat may give, in the order they're tried, each with its chance in percent.
+-- A plain treat gives its one effect for sure.
+function Care.effectChances(item: Shop.Item): { Shop.EffectChance }
+	if item.effectChances then
+		return item.effectChances
+	end
+	return if item.grantsEffect then { { effect = item.grantsEffect, chance = 100 } } else {}
+end
+
 -- Whether this treat can be given to this monster. A treat is refused rather than wasted when
--- the monster already has its effect, or when the effect wouldn't fit (combos count as one).
+-- none of its effects could land: the monster already has them, or they wouldn't fit
+-- (combos count as one). A chance treat is fine as long as one of its effects fits.
 function Care.canTreat(caught: Value.CaughtMonster, item: Shop.Item?): TreatCheck
 	if not item or item.kind ~= "Food" then
 		return "Unknown"
 	end
-	local effectId = item.grantsEffect
-	if effectId then
-		return Value.fits(caught.effects, effectId)
+	local first: TreatCheck = "Ok"
+	for i, option in Care.effectChances(item) do
+		local fits: TreatCheck = Value.fits(caught.effects, option.effect)
+		if fits == "Ok" then
+			return "Ok"
+		elseif i == 1 then
+			first = fits
+		end
 	end
-	return "Ok"
+	return first
+end
+
+-- Rolls which effect a treat gives this monster, or nil: each effect in turn rolls its chance
+-- (skipping ones that don't fit) and the first hit wins. A bite from a set-out cake first
+-- has to pass Config/Care.SetOutEffectChance.
+function Care.pickEffect(
+	caught: Value.CaughtMonster,
+	item: Shop.Item,
+	random: Random?,
+	bite: boolean?
+): string?
+	if bite and not Rng.chance(CareConfig.SetOutEffectChance, random) then
+		return nil
+	end
+	for _, option in Care.effectChances(item) do
+		if Value.fits(caught.effects, option.effect) == "Ok" and Rng.chance(option.chance, random) then
+			return option.effect
+		end
+	end
+	return nil
 end
 
 -- Gives a treat (check Care.canTreat first): feeds the monster, fills part of its Familiarity
--- bar and adds the treat's effect.
-function Care.giveTreat(caught: Value.CaughtMonster, item: Shop.Item, now: number)
+-- bar and rolls the treat's effect. A bite from a set-out cake fills only
+-- Config/Care.BiteFamiliarityShare of it and has lower effect odds (see Care.pickEffect).
+-- Returns the effect it got, if any.
+function Care.giveTreat(
+	caught: Value.CaughtMonster,
+	item: Shop.Item,
+	now: number,
+	random: Random?,
+	bite: boolean?
+): string?
 	Care.feed(caught, now)
-	caught.familiarity = math.clamp(caught.familiarity + (item.familiarity or 0), 0, 1)
-	if item.grantsEffect then
-		table.insert(caught.effects, item.grantsEffect)
+	local share = if bite then CareConfig.BiteFamiliarityShare else 1
+	caught.familiarity = math.clamp(caught.familiarity + (item.familiarity or 0) * share, 0, 1)
+	local effectId = Care.pickEffect(caught, item, random, bite)
+	if effectId then
+		table.insert(caught.effects, effectId)
 	end
+	return effectId
 end
 
 -- The line under a mansion monster's name: "Fed · 45% familiar" or "Hungry! · 45% familiar".
@@ -100,9 +147,17 @@ function Care.describe(item: Shop.Item): string
 	if item.familiarity then
 		table.insert(parts, `+{math.floor(item.familiarity * 100 + 0.5)}% Familiarity`)
 	end
-	local effect = if item.grantsEffect then Effects.List[item.grantsEffect] else nil
-	if effect then
-		table.insert(parts, `gives {Format.name(effect.id)} (x{effect.multiplier})`)
+	local odds = {}
+	for _, option in Care.effectChances(item) do
+		local effect = Effects.List[option.effect]
+		if effect then
+			local chance = if option.chance >= 100 then "" else `{option.chance}% `
+			table.insert(odds, `{chance}{Format.name(effect.id)} (x{effect.multiplier})`)
+		end
+	end
+	if #odds > 0 then
+		-- "gives Slimed (x2)", or "25% Mummy (x4), else Batty (x3)" for a chance treat
+		table.insert(parts, if item.effectChances then table.concat(odds, ", else ") else `gives {odds[1]}`)
 	end
 	return table.concat(parts, " · ")
 end

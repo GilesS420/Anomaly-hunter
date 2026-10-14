@@ -4,7 +4,8 @@
 --   Monsters  mansion and Storage, most valuable first. Store / Place moves one between them,
 --             Lock keeps it away from the Collector.
 --   Items     tools (tap Equip to use one) and how many treats, bells and charms you have.
---             Give on a treat lists your mansion monsters so you pick who eats it.
+--             Give on a treat lists your mansion monsters so you pick who eats it; Set out
+--             puts it down where you stand in your mansion for several monsters to nibble.
 -- The server does every change and sends the new list back (server/Services/InventoryService).
 
 local Players = game:GetService("Players")
@@ -52,6 +53,7 @@ function InventoryController.start()
 	local Lock = remotes:WaitForChild("Lock") :: RemoteFunction
 	local Equip = remotes:WaitForChild("Equip") :: RemoteFunction
 	local Give = remotes:WaitForChild("Give") :: RemoteFunction
+	local SetOut = remotes:WaitForChild("SetOut") :: RemoteFunction
 
 	local window = Ui.window("BackpackUi", "Backpack")
 	local tab: Tab = "Monsters"
@@ -122,12 +124,22 @@ function InventoryController.start()
 		for i, item in rows do
 			local _, actions = Ui.row(window.list, i, item.name, Ui.Colors.text, item.details)
 			if item.treat then
-				local button = Ui.button(actions, "Give", Ui.Colors.buy, UDim2.fromScale(1, 1))
+				local give = Ui.button(actions, "Give", Ui.Colors.buy, UDim2.new(0.5, -4, 1, 0))
+				local setOut = Ui.button(actions, "Set out", Ui.Colors.equip, UDim2.new(0.5, -4, 1, 0))
+				setOut.Position = UDim2.new(0.5, 4, 0, 0)
 				local id = item.id
-				button.Activated:Connect(function()
+				give.Activated:Connect(function()
 					picking = id
 					render()
 				end)
+				local function place()
+					call(SetOut, id)
+				end
+				if item.confirm then
+					Ui.confirmButton(setOut, "Sure?", place)
+				else
+					setOut.Activated:Connect(place)
+				end
 			elseif item.tool then
 				local button = Ui.button(
 					actions,

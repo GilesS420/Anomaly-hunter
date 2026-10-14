@@ -3,8 +3,8 @@
 -- Workspace.Hub.Landmarks.Bakery to open the window. The stock changes every 5 minutes, at
 -- the same moment as the Workshop's and by the same rules (Util/Workshop), and you can buy up
 -- to Shop.ConsumablesPerRestock of each treat per restock. Bought treats go into your
--- Backpack, where you give them to a monster (InventoryService; Util/Care says what a
--- treat does).
+-- Backpack, where you give them to a monster or set them out in your mansion as a cake
+-- (InventoryService, CakeService; Util/Care says what a treat does).
 -- Everyday feeding is free with Feed all (CareService), here or anywhere.
 --
 -- Remotes in ReplicatedStorage.BakeryRemotes:

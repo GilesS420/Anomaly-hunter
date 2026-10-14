@@ -18,6 +18,7 @@ local Care = require(ReplicatedStorage.Shared.Util.Care)
 local CareConfig = require(ReplicatedStorage.Shared.Config.Care)
 local Effects = require(ReplicatedStorage.Shared.Config.Effects)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
+local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local DataService = require(script.Parent.DataService)
 local MansionService = require(script.Parent.MansionService)
@@ -35,6 +36,7 @@ FeedAll.Name = "FeedAll"
 FeedAll.Parent = remotes
 
 local lastFed: { [Player]: number } = {}
+local random = Random.new()
 
 -- Brings the player's monsters up to date, then updates their labels and the Feed all button.
 function CareService.refresh(player: Player)
@@ -104,31 +106,49 @@ function CareService.giveTreat(player: Player, uid: unknown, itemId: unknown): (
 	local name = Format.name(caught.monsterId)
 	local check = Care.canTreat(caught, item)
 	if check == "HasEffect" then
-		return false, `{name} already has {Format.name(item.grantsEffect or "")}.`
+		local effects = {}
+		for _, option in Care.effectChances(item) do
+			table.insert(effects, Format.name(option.effect))
+		end
+		return false, `{name} already has {table.concat(effects, " and ")}.`
 	elseif check == "NoRoom" then
 		return false, `{name} has no room for another effect ({Effects.MaxSlots} at most).`
 	elseif check ~= "Ok" then
 		return false, "That isn't a treat."
 	end
 
-	local before = Value.resolveEffects(caught.effects)
 	local inventory: { [string]: number? } = data.inventory
 	local left = (inventory[item.id] or 0) - 1
 	inventory[item.id] = if left > 0 then left else nil
-	Care.giveTreat(caught, item, os.time())
-	CareService.refresh(player)
+	local result = CareService.eat(player, data, caught, item, false)
+	if result == "" and #Care.effectChances(item) > 0 then
+		result = " but no effect this time" -- a chance treat that missed
+	end
+	return true, `{name} ate the {item.name}{result}! Now {Care.percent(caught)}% familiar.`
+end
 
-	-- "...and turned into a Banshee!" when the new effect completes a combo.
-	local result = ""
+-- One monster eats a treat (a whole one, or a bite of a set-out cake): feeds it, rolls the
+-- effect and refreshes the labels. Returns the end of the message: " and got Slimed",
+-- " and turned into a Banshee" when the new effect completes a combo, or "".
+function CareService.eat(
+	player: Player,
+	data: DataService.Data,
+	caught: Value.CaughtMonster,
+	item: Shop.Item,
+	bite: boolean
+): string
+	local before = Value.resolveEffects(caught.effects)
+	local effectId = Care.giveTreat(caught, item, os.time(), random, bite)
+	CareService.refresh(player)
 	local combo = Value.newCombo(before, Value.resolveEffects(caught.effects))
 	if combo then
 		CareService.discoverCombo(data, combo)
 		local article = if string.match(combo, "^[AEIOU]") then "an" else "a"
-		result = ` and turned into {article} {combo}`
-	elseif item.grantsEffect then
-		result = ` and got {Format.name(item.grantsEffect)}`
+		return ` and turned into {article} {combo}`
+	elseif effectId then
+		return ` and got {Format.name(effectId)}`
 	end
-	return true, `{name} ate the {item.name}{result}! Now {Care.percent(caught)}% familiar.`
+	return ""
 end
 
 -- Remembers a combo the player has made, for the Codex (data.codex.combos[id] = true).

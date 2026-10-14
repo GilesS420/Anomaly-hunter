@@ -1,7 +1,9 @@
 --!strict
 -- The Backpack: everything you own, anywhere in the game. Two tabs:
 --   Items     your tools (equip them right here) and how many of each treat, bell and charm.
---             Give on a treat lists your mansion monsters so you pick who eats it.
+--             Give on a treat lists your mansion monsters so you pick who eats it; Set out
+--             puts it down where you stand in your mansion for the monsters to nibble
+--             (CakeService).
 --   Monsters  every monster in your mansion and in Storage, most valuable first. Store one to
 --             make room (it's paused there, see Util/Storage), place it back when a wing has
 --             room, and Lock the ones you never want to sell by accident.
@@ -13,6 +15,7 @@
 --   Lock     client -> server (uid) -> Result      locks or unlocks a monster
 --   Equip    client -> server (itemId) -> Result   puts an owned tool into use
 --   Give     client -> server (itemId, uid) -> Result   gives a treat to a mansion monster
+--   SetOut   client -> server (itemId) -> Result   sets a treat out as a cake where you stand
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -24,6 +27,7 @@ local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
+local CakeService = require(script.Parent.CakeService)
 local CareService = require(script.Parent.CareService)
 local DataService = require(script.Parent.DataService)
 local HuntService = require(script.Parent.HuntService)
@@ -75,6 +79,7 @@ local Move = remote("Move")
 local Lock = remote("Lock")
 local Equip = remote("Equip")
 local Give = remote("Give")
+local SetOut = remote("SetOut")
 
 local ConfirmGiveFrom = 1_000_000 -- giving a treat this expensive needs a second tap
 local blockedText: { [string]: string } = { HasEffect = "Has it", NoRoom = "Full" }
@@ -278,6 +283,16 @@ Give.OnServerInvoke = function(player: Player, itemId: unknown, uid: unknown): R
 		return Loading
 	end
 	local ok, message = CareService.giveTreat(player, uid, itemId)
+	Notify.toast(player, message)
+	return { ok = ok, message = message, view = viewFor(data) }
+end
+
+SetOut.OnServerInvoke = function(player: Player, itemId: unknown): Result
+	local data = DataService.get(player)
+	if not data then
+		return Loading
+	end
+	local ok, message = CakeService.setOut(player, itemId)
 	Notify.toast(player, message)
 	return { ok = ok, message = message, view = viewFor(data) }
 end
