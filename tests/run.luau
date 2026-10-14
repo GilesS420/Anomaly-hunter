@@ -1032,12 +1032,16 @@ do
 		check(`{id} cliffs ring the zone outside its walls`, outside)
 		local clear = true
 		for _, p in parts do
-			-- Ground (anything that doesn't rise above the floor) may lie under the roaming.
+			-- Ground (anything that doesn't rise above the floor) may lie under the roaming,
+			-- and monsters may walk under anything overhead.
+			local hx, hz, bottom = Scenery.footprint(p)
 			local ground = p.at[2] + p.size[2] / 2 <= 0
-			if p.solid and not ground and not string.find(p.name, "^Fence") then
-				local reach = math.max(p.size[1], p.size[3]) / 2
+			if p.solid and not ground and bottom < Scenery.Overhead and not string.find(p.name, "^Fence") then
 				for _, r in zone.roam do
-					if inside(p.at[1], p.at[3], r, reach) then
+					if
+						math.abs(p.at[1] - r.x) < hx + r.width / 2
+						and math.abs(p.at[3] - r.z) < hz + r.depth / 2
+					then
 						clear = false
 						print(`  {id}: {p.name} stands on the monsters' ground`)
 					end
@@ -1068,6 +1072,50 @@ do
 			check(`{id} water stays below the ground and off the monsters' ground`, dry)
 		end
 	end
+end
+
+-- Open ground: monsters may roam everywhere except near solid props on the floor (props high
+-- overhead don't count), the arrival pad and the exit.
+do
+	local box = {
+		name = "Box",
+		size = { 10, 4, 10 },
+		at = { 40, 2, 40 },
+		color = { 0, 0, 0 },
+		material = "Slate",
+		solid = true,
+	}
+	local roof = {
+		name = "Roof",
+		size = { 30, 1, 30 },
+		at = { -40, 12, 40 },
+		color = { 0, 0, 0 },
+		material = "Slate",
+		solid = true,
+	}
+	local rects = Scenery.openGround({ box :: any, roof :: any })
+	local function onGround(x: number, z: number): boolean
+		for _, r in rects do
+			if math.abs(x - r.x) <= r.width / 2 and math.abs(z - r.z) <= r.depth / 2 then
+				return true
+			end
+		end
+		return false
+	end
+	check("open ground leaves out the cells round a prop", not onGround(40, 40) and not onGround(46, 40))
+	check(
+		"open ground runs under a roof and across the rest",
+		onGround(-40, 40) and onGround(0, 0) and onGround(80, -60)
+	)
+	check(
+		"open ground leaves out the arrival pad and the exit",
+		not onGround(-20, -90) and not onGround(20, -100)
+	)
+	local area = 0
+	for _, r in Scenery.Zones.AbandonedCarnival.roam do
+		area += r.width * r.depth
+	end
+	check("monsters roam most of the carnival", area > 0.5 * 212 * 212)
 end
 
 -- Roaming legs stay on the floor: a straight line between two patches of open ground may not
