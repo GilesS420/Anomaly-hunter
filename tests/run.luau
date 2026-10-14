@@ -743,7 +743,7 @@ do
 		Care.canTreat(withEffects({ "Ghost", "Vampire", "Possessed" }), cake) == "Ok"
 	)
 	local treated = withEffects({ "Ghost" })
-	Care.giveTreat(treated, candy, t0)
+	Care.giveTreat(treated, candy, t0, fakeRandom(1))
 	check(
 		"a treat feeds, adds its effect and Familiarity (capped)",
 		treated.fed
@@ -754,17 +754,83 @@ do
 
 	local treatsOk = true
 	for _, item in Shop.Bakery do
-		local effect = item.grantsEffect
+		local chances = Care.effectChances(item)
 		treatsOk = treatsOk
 			and item.kind == "Food"
 			and (item.familiarity or 0) > 0
 			and (item.familiarity or 0) <= 1
-			and effect ~= nil
-			and Effects.List[effect] ~= nil
+			and #chances > 0
 			and Care.describe(item) ~= ""
 			and Care.treat(item.id) == item
+		for _, option in chances do
+			treatsOk = treatsOk
+				and Effects.List[option.effect] ~= nil
+				and option.chance > 0
+				and option.chance <= 100
+		end
 	end
 	check("every treat is food with Familiarity and a real effect", treatsOk)
+
+	local foodEffectsOk = true
+	for id, effect in Effects.List do
+		if effect.source == "Food" then
+			local from = Care.treat(effect.from or "")
+			foodEffectsOk = foodEffectsOk and from ~= nil and from.grantsEffect == id
+		end
+	end
+	check("every Food effect comes from the Bakery treat it names", foodEffectsOk)
+
+	-- Chance treats and cakes that are set out.
+	local fudge = Care.treat("FangFudge") :: Shop.Item
+	local mousse = Care.treat("BoneMarrowMousse") :: Shop.Item
+	check(
+		"a chance treat is fine while one of its effects fits",
+		Care.canTreat(withEffects({ "Mummy" }), mousse) == "Ok"
+	)
+	check(
+		"a chance treat is refused when none of its effects can land",
+		Care.canTreat(withEffects({ "Vampire" }), fudge) == "HasEffect"
+	)
+	check(
+		"the mousse gives Batty when Mummy can't land",
+		Care.pickEffect(withEffects({ "Mummy" }), mousse, fakeRandom(1)) == "Batty"
+	)
+	math.randomseed(7)
+	local fake = {
+		NextNumber = function()
+			return math.random()
+		end,
+	} :: any
+	local tries, vampires, bites, biteEffects = 4000, 0, 0, 0
+	for _ = 1, tries do
+		if Care.pickEffect(withEffects({}), fudge, fake) == "Vampire" then
+			vampires += 1
+		end
+		if Care.pickEffect(withEffects({}), candy, fake, true) then
+			bites += 1
+		end
+		if Care.pickEffect(withEffects({}), fudge, fake, true) then
+			biteEffects += 1
+		end
+	end
+	check("Fang Fudge gives Vampire about 35% of the time", math.abs(vampires / tries - 0.35) < 0.03)
+	check(
+		"a bite of a sure treat gives its effect about half the time",
+		math.abs(bites / tries - CareConfig.SetOutEffectChance / 100) < 0.03
+	)
+	check(
+		"a bite of Fang Fudge lands Vampire about 17.5% of the time",
+		math.abs(biteEffects / tries - 0.175) < 0.03
+	)
+
+	local nibbler = withEffects({ "PumpkinHead" })
+	nibbler.familiarity = 0
+	local got = Care.giveTreat(nibbler, candy, t0, fake, true)
+	check(
+		"a bite feeds and gives half the Familiarity, but never an effect it has",
+		nibbler.fed and math.abs(nibbler.familiarity - (candy.familiarity or 0) / 2) < 1e-9 and got == nil
+	)
+	check("a chance treat lists its odds", string.find(Care.describe(mousse), "25% Mummy", 1, true) ~= nil)
 
 	local record = { slot = 5, bought = { PumpkinCandy = 2 } }
 	check("buys count within a restock", Workshop.boughtThisSlot(record, 5).PumpkinCandy == 2)

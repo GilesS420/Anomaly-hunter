@@ -17,7 +17,10 @@ export type Item = {
 	singleUse: boolean?,
 	maxRarity: string?, -- Bait Bell: the rarest rarity it can bring
 	familiarity: number?, -- Bakery treats: how much of the Familiarity bar it fills (0 to 1)
+	-- Bakery chance treats: tried in order, the first that hits (and fits) is the effect.
+	effectChances: { EffectChance }?,
 }
+export type EffectChance = { effect: string, chance: number } -- chance in percent
 
 local Shop = {}
 
@@ -32,7 +35,9 @@ Shop.ConfirmSellFrom = "Legendary"
 
 -- Haunted Bakery treats. Each one feeds one monster, fills part of its Familiarity bar and
 -- gives it the treat's effect (a monster can't get an effect twice, and holds at most
--- Effects.MaxSlots), so treats are for your best monsters. Prices are x100 like the monsters
+-- Effects.MaxSlots), so treats are for your best monsters. Chance treats (effectChances)
+-- may give one of several effects, or none. Any treat can also be set out in the mansion
+-- as a cake that several monsters nibble (Config/Care.Cake*, server/Services/CakeService). Prices are x100 like the monsters
 -- so they keep the same size relative to what a monster sells for. Everyday feeding is free
 -- (Feed all), see Config/Care.
 Shop.Bakery = {
@@ -46,6 +51,15 @@ Shop.Bakery = {
 		familiarity = 0.1,
 	},
 	{
+		id = "FangFudge",
+		name = "Fang Fudge",
+		kind = "Food",
+		price = 800_000,
+		restockChance = 45,
+		effectChances = { { effect = "Vampire", chance = 35 } },
+		familiarity = 0.15,
+	},
+	{
 		id = "EctoplasmPie",
 		name = "Ectoplasm Pie",
 		kind = "Food",
@@ -55,6 +69,15 @@ Shop.Bakery = {
 		familiarity = 0.25,
 	},
 	{
+		id = "StitchCupcake",
+		name = "Stitch Cupcake",
+		kind = "Food",
+		price = 30_000_000,
+		restockChance = 10,
+		grantsEffect = "Stitched",
+		familiarity = 0.3,
+	},
+	{
 		id = "CursedCake",
 		name = "Cursed Cake",
 		kind = "Food",
@@ -62,6 +85,33 @@ Shop.Bakery = {
 		restockChance = 2,
 		grantsEffect = "Cursed",
 		familiarity = 0.5,
+	},
+	{
+		id = "BoneMarrowMousse",
+		name = "Bone Marrow Mousse",
+		kind = "Food",
+		price = 400_000_000,
+		restockChance = 3,
+		effectChances = { { effect = "Mummy", chance = 25 }, { effect = "Batty", chance = 100 } },
+		familiarity = 0.4,
+	},
+	{
+		id = "WitchsBrewTart",
+		name = "Witch's Brew Tart",
+		kind = "Food",
+		price = 2_000_000_000,
+		restockChance = 0.8,
+		grantsEffect = "Hexed",
+		familiarity = 0.6,
+	},
+	{
+		id = "EclipseEclair",
+		name = "Eclipse Éclair",
+		kind = "Food",
+		price = 15_000_000_000,
+		restockChance = 0.2,
+		grantsEffect = "Eclipsed",
+		familiarity = 0.75,
 	},
 } :: { Item }
 

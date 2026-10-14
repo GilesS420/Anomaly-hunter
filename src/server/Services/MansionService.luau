@@ -744,6 +744,35 @@ function MansionService.rebuild(player: Player)
 	updateSign(state)
 end
 
+-- The spot on the player's mansion floor under `position`, or nil when it isn't inside one of
+-- their wings (for setting a cake down where they stand). `margin` keeps it off the edges.
+function MansionService.floorSpot(player: Player, position: Vector3, margin: number): Vector3?
+	local state = mansions[player]
+	if not state or not Roam.inside(state.rects, position.X, position.Z, 0) then
+		return nil
+	end
+	local point = Roam.clamp(state.rects, position.X, position.Z, margin)
+	if not point or math.abs(position.Y - point.y) > PillarHeight then
+		return nil -- standing on the roof, not in the room
+	end
+	return Vector3.new(point.x, point.y, point.z)
+end
+
+-- The player's mansion monster orbs by uid (empty while their mansion isn't built).
+function MansionService.monsterModels(player: Player): { [string]: Model }
+	local out: { [string]: Model } = {}
+	local state = mansions[player]
+	if state then
+		for _, child in state.monsters:GetChildren() do
+			local uid = child:GetAttribute("Uid")
+			if child:IsA("Model") and typeof(uid) == "string" then
+				out[uid] = child
+			end
+		end
+	end
+	return out
+end
+
 -- Updates every monster's label and glow from the save (after feeding, or as they get
 -- hungry). Settle them first (Util/Care.settle) so the labels show how they are right now.
 function MansionService.refreshMonsters(player: Player)
