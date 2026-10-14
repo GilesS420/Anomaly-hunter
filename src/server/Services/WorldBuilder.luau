@@ -1,7 +1,9 @@
 --!strict
 -- Builds grey placeholder blocks for any part of the world that isn't in the place yet, so
 -- the game is playable before the real models exist. Anything already built in Studio with
--- the same name wins: this never moves, changes or deletes what's there.
+-- the same name wins: this never moves, changes or deletes what's there. The one exception: a
+-- zone folder without the zone's scenery (made by hand, or by an older version) is moved to
+-- ServerStorage > OldZones so the real zone can be built.
 --   Workspace.Hub.Ground             the oval floor of the hub
 --   Workspace.Hub.Plots.Plot1..8     mansion plots (each built one by one if missing)
 --   Workspace.Hub.ZoneGates.<ZoneId> a glowing gate per zone
@@ -15,6 +17,7 @@
 -- Positions and sizes come from Shared.Config.Layout.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 
 local Landmarks = require(ReplicatedStorage.Shared.Config.Landmarks)
 local Layout = require(ReplicatedStorage.Shared.Config.Layout)
@@ -523,6 +526,18 @@ function WorldBuilder.start()
 		local existing = World.find(zonesFolder, zone.id)
 		if existing and zone.launch and isPlaceholderZone(existing) then
 			existing:Destroy()
+			existing = nil
+		elseif
+			existing
+			and zone.launch
+			and Scenery.Zones[zone.id]
+			and not existing:FindFirstChild("Scenery")
+		then
+			-- A zone made by hand (or by an older version) before it had scenery: put it away
+			-- safely, not deleted, and build the real one.
+			local old = folderAt(ServerStorage, "OldZones", "OldZones")
+			existing.Parent = old
+			warn(`WorldBuilder: moved the old {zone.id} to ServerStorage > OldZones and built the new one`)
 			existing = nil
 		end
 		if zone.launch and not existing then
