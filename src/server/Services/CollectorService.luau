@@ -2,8 +2,8 @@
 -- The Collector: sells the monsters roaming your mansion for money. Hold the prompt at
 -- Workspace.Hub.Landmarks.Collector to open the sell window. Prices come from
 -- Util/Value.sellValue (size, effects, familiarity and wings all count; a hungry monster
--- sells for base value x size, so the window says so). Monsters in the Vault are never
--- offered here.
+-- sells for base value x size, so the window says so). Monsters in Storage are offered too
+-- (at the value they had when stored). Locked monsters and the Vault are never offered here.
 --
 -- Remotes in ReplicatedStorage.CollectorRemotes:
 --   Open     server -> client (counter: Vector3)   the player used the Collector prompt
@@ -62,12 +62,29 @@ local function price(caught: Value.CaughtMonster, wingsOwned: number): number
 	return if ok then value else 0 -- an unknown monster or effect sells for nothing (and isn't listed)
 end
 
-local function offerFor(data: DataService.Data): Offer
-	local rows: { Row } = {}
-	local total = 0
+-- Every monster that can be sold: unlocked, in the mansion or in Storage. Mansion monsters
+-- are brought up to date first; stored ones are paused, so they keep their stored state.
+local function sellable(data: DataService.Data): { Value.CaughtMonster }
+	local list = {}
 	local now = os.time()
 	for _, caught in data.monsters do
 		Care.settle(caught, now) -- up-to-date Familiarity, and hungry or not
+		if not caught.locked then
+			table.insert(list, caught)
+		end
+	end
+	for _, caught in data.storage do
+		if not caught.locked then
+			table.insert(list, caught)
+		end
+	end
+	return list
+end
+
+local function offerFor(data: DataService.Data): Offer
+	local rows: { Row } = {}
+	local total = 0
+	for _, caught in sellable(data) do
 		local monster = Monsters[caught.monsterId]
 		local value = price(caught, data.wingsOwned)
 		if not monster or not caught.uid or value <= 0 then
@@ -139,14 +156,14 @@ Sell.OnServerInvoke = function(player: Player, uids: unknown): Result
 	-- Price each one before it leaves the mansion (the wing boost needs the save as it is now).
 	local earned = 0
 	local priced: { [string]: number } = {}
-	local now = os.time()
-	for _, caught in data.monsters do
+	local selling: { [string]: boolean } = {} -- only unlocked ones, whatever was asked
+	for _, caught in sellable(data) do
 		if caught.uid and wanted[caught.uid] then
-			Care.settle(caught, now)
 			priced[caught.uid] = price(caught, data.wingsOwned)
+			selling[caught.uid] = true
 		end
 	end
-	local sold = MansionService.removeMonsters(player, wanted)
+	local sold = MansionService.removeMonsters(player, selling)
 	for _, caught in sold do
 		earned += priced[caught.uid :: string] or 0
 	end

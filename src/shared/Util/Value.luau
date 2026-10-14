@@ -23,6 +23,8 @@ export type CaughtMonster = {
 	fed: boolean, -- kept up to date by Util/Care.settle; hungry monsters sell for base x size
 	fedUntil: number?, -- os.time() when it gets hungry (set when it enters the mansion)
 	grownAt: number?, -- os.time() its familiarity was last brought up to date
+	storedAt: number?, -- os.time() it went into Storage (nil while in the mansion), see Util/Storage
+	locked: boolean?, -- locked monsters can't be sold
 }
 
 local function sizeMultiplier(sizeId: string): number

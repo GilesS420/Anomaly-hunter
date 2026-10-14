@@ -31,7 +31,7 @@ export type Window = {
 	status: TextLabel,
 	list: ScrollingFrame,
 	footer: Frame,
-	open: (counter: Vector3) -> (),
+	open: (counter: Vector3?) -> (), -- with a counter, walking away from it closes the window
 	close: () -> (),
 	isOpen: () -> boolean,
 	onClose: (() -> ())?,
@@ -257,20 +257,21 @@ function Ui.window(name: string, titleText: string): Window
 		end
 	end
 
-	local function openWindow(counter: Vector3)
+	local function openWindow(counter: Vector3?)
 		gui.Enabled = true
 		if watching then
 			watching:Disconnect()
+			watching = nil
 		end
+		if not counter then
+			return -- not a shop window (the Backpack): stays open until closed
+		end
+		local at: Vector3 = counter
 		-- Walking away from the counter closes the window.
 		watching = RunService.Heartbeat:Connect(function()
 			local character = Players.LocalPlayer.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart")
-			if
-				not root
-				or not root:IsA("BasePart")
-				or (root.Position - counter).Magnitude > WalkAwayDistance
-			then
+			if not root or not root:IsA("BasePart") or (root.Position - at).Magnitude > WalkAwayDistance then
 				closeWindow()
 			end
 		end)

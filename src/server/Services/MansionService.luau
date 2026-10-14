@@ -25,6 +25,7 @@ local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Roam = require(ReplicatedStorage.Shared.Util.Roam)
 local Rooms = require(ReplicatedStorage.Shared.Config.Rooms)
+local Storage = require(ReplicatedStorage.Shared.Util.Storage)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Wings = require(ReplicatedStorage.Shared.Config.Wings)
 local DataService = require(script.Parent.DataService)
@@ -462,7 +463,7 @@ local function repair(data: DataService.Data, joining: boolean)
 		data.wingsOwned = 1
 	end
 	data.wingsOwned = math.clamp(math.floor(data.wingsOwned), 1, MaxWings)
-	for _, list in { data.monsters, data.vault } do
+	for _, list in { data.monsters, data.storage, data.vault } do
 		for _, caught in list do
 			if typeof(caught.uid) ~= "string" or caught.uid == "" then
 				caught.uid = HttpService:GenerateGUID(false)
@@ -606,17 +607,17 @@ function MansionService.capacity(player: Player): number
 	return if data then Mansion.capacity(data.wingsOwned) else 0
 end
 
--- True if there's room for one more monster (false while their save is loading).
+-- True if one more monster fits, in the mansion or else in Storage (false while their
+-- save is loading).
 function MansionService.hasRoom(player: Player): boolean
 	local data = DataService.get(player)
-	return data ~= nil and Mansion.hasRoom(data.wingsOwned, #data.monsters)
+	return data ~= nil
+		and (Mansion.hasRoom(data.wingsOwned, #data.monsters) or Storage.hasRoom(#data.storage))
 end
 
--- Saves a caught monster into the mansion and lets it roam there. False (and nothing saved)
--- if the mansion is full or the save isn't loaded.
-function MansionService.addMonster(player: Player, caught: Value.CaughtMonster): boolean
-	local data = DataService.get(player)
-	if not data or not Mansion.hasRoom(data.wingsOwned, #data.monsters) then
+-- Puts a monster in the mansion and lets it roam there. False if the mansion is full.
+local function place(player: Player, data: DataService.Data, caught: Value.CaughtMonster): boolean
+	if not Mansion.hasRoom(data.wingsOwned, #data.monsters) then
 		return false
 	end
 	if typeof(caught.uid) ~= "string" or caught.uid == "" then
@@ -632,18 +633,84 @@ function MansionService.addMonster(player: Player, caught: Value.CaughtMonster):
 	return true
 end
 
--- Takes sold monsters out of the save and off the mansion floor. uids is a set of the
--- monsters' uids. Returns the ones it removed (anything not found is skipped).
+-- Saves a caught monster: into the mansion if there's room, else into Storage. Returns where
+-- it went, or nil (and nothing saved) if both are full or the save isn't loaded.
+function MansionService.addMonster(player: Player, caught: Value.CaughtMonster): ("Mansion" | "Storage")?
+	local data = DataService.get(player)
+	if not data then
+		return nil
+	end
+	if place(player, data, caught) then
+		return "Mansion"
+	end
+	if not Storage.hasRoom(#data.storage) then
+		return nil
+	end
+	if typeof(caught.uid) ~= "string" or caught.uid == "" then
+		caught.uid = HttpService:GenerateGUID(false)
+	end
+	Storage.store(caught, os.time())
+	table.insert(data.storage, caught)
+	return "Storage"
+end
+
+local function indexOf(list: { Value.CaughtMonster }, uid: string): number?
+	for i, caught in list do
+		if caught.uid == uid then
+			return i
+		end
+	end
+	return nil
+end
+
+export type MoveResult = "Ok" | "NotFound" | "MansionFull" | "StorageFull"
+
+-- Moves a monster from the mansion into Storage, or from Storage back into the mansion.
+function MansionService.move(player: Player, uid: string): (MoveResult, Value.CaughtMonster?)
+	local data = DataService.get(player)
+	if not data then
+		return "NotFound", nil
+	end
+	local stored = indexOf(data.storage, uid)
+	if stored then
+		if not Mansion.hasRoom(data.wingsOwned, #data.monsters) then
+			return "MansionFull", data.storage[stored]
+		end
+		local caught = table.remove(data.storage, stored) :: Value.CaughtMonster
+		Storage.unstore(caught, os.time())
+		place(player, data, caught)
+		return "Ok", caught
+	end
+	if not indexOf(data.monsters, uid) then
+		return "NotFound", nil
+	end
+	if not Storage.hasRoom(#data.storage) then
+		return "StorageFull", nil
+	end
+	local removed = MansionService.removeMonsters(player, { [uid] = true })
+	local caught = removed[1]
+	if not caught then
+		return "NotFound", nil
+	end
+	Storage.store(caught, os.time())
+	table.insert(data.storage, caught)
+	return "Ok", caught
+end
+
+-- Takes sold monsters out of the save: off the mansion floor or out of Storage. uids is a
+-- set of the monsters' uids. Returns the ones it removed (anything not found is skipped).
 function MansionService.removeMonsters(player: Player, uids: { [string]: boolean }): { Value.CaughtMonster }
 	local data = DataService.get(player)
 	if not data then
 		return {}
 	end
 	local removed = {}
-	for i = #data.monsters, 1, -1 do
-		local caught = data.monsters[i]
-		if caught.uid and uids[caught.uid] then
-			table.insert(removed, table.remove(data.monsters, i) :: Value.CaughtMonster)
+	for _, list in { data.monsters, data.storage } do
+		for i = #list, 1, -1 do
+			local caught = list[i]
+			if caught.uid and uids[caught.uid] then
+				table.insert(removed, table.remove(list, i) :: Value.CaughtMonster)
+			end
 		end
 	end
 	local state = mansions[player]

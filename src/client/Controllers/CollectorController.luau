@@ -55,7 +55,7 @@ function CollectorController.start()
 		end
 		local count = #offer.monsters
 		if count == 0 then
-			window.status.Text = "Your mansion is empty. Catch some monsters first!"
+			window.status.Text = "Nothing to sell. Catch some monsters first (locked ones stay out of here)."
 			return
 		end
 		window.status.Text =
