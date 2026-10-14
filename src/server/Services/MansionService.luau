@@ -323,8 +323,10 @@ local function updateSign(state: State)
 	end
 end
 
--- What the orb shows: name, size, rarity, effects and whether it's fed.
+-- What the orb shows: name, size, rarity, effects, whether it's fed and what it sells for.
 local function infoFor(player: Player, caught: Value.CaughtMonster, rarity: string): MonsterModel.Info
+	local data = DataService.get(player)
+	local ok, value = pcall(Value.sellValue, caught, if data then data.wingsOwned else 1)
 	return {
 		monsterId = caught.monsterId,
 		rarity = rarity,
@@ -333,6 +335,7 @@ local function infoFor(player: Player, caught: Value.CaughtMonster, rarity: stri
 		owner = player.DisplayName,
 		status = Care.status(caught),
 		hungry = not caught.fed,
+		value = if ok then value else 0,
 	}
 end
 
@@ -529,6 +532,7 @@ local function purchase(state: State, player: Player)
 		data.wingsOwned += 1
 		buildWings(state, data.wingsOwned)
 		updateSign(state)
+		MansionService.refreshMonsters(player) -- the new wing's value boost shows on the price tags
 		local zone = if wing.unlocksZone then Hunt.zoneByIndex(wing.unlocksZone) else nil
 		if zone and zone.launch then
 			Notify.toast(player, `You bought the {wing.id}! {zone.name} is now open.`)

@@ -1,7 +1,9 @@
 --!strict
 -- Builds how a monster looks, with its name floating above it. Used for wild monsters in
--- zones and for the ones roaming a mansion (those get a third line saying if they're fed,
--- and glow dimmer while they're hungry).
+-- zones and for the ones roaming a mansion (those get a third line saying if they're fed and
+-- glow dimmer while they're hungry). Every monster wears a price tag: what the Collector pays
+-- for a mansion monster, and base value x size (what it's worth before effects, Familiarity
+-- and wings) for a wild one.
 -- Monsters with a look in Config/Looks are stud-style block models whose limbs are joined
 -- to Body with Motor6Ds (the client swings them, see RoamController); the rest are still a
 -- glowing orb coloured by rarity. Body is always the PrimaryPart and the part players press
@@ -12,6 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Looks = require(ReplicatedStorage.Shared.Config.Looks)
 local Spawning = require(ReplicatedStorage.Shared.Util.Spawning)
+local Value = require(ReplicatedStorage.Shared.Util.Value)
 
 local MonsterModel = {}
 
@@ -23,7 +26,20 @@ export type Info = {
 	owner: string?,
 	status: string?, -- mansion monsters: "Fed · 45% familiar" (see Util/Care.status)
 	hungry: boolean?, -- mansion monsters: dims the glow and puts the effects to sleep
+	value: number?, -- mansion monsters: what the Collector pays right now (Util/Value.sellValue);
+	-- left out, the tag shows base value x size
 }
+
+-- What the tag shows: the given value, or base value x size (an unfed monster with no effects).
+local function tagValue(info: Info): number
+	if info.value then
+		return info.value
+	end
+	local plain: Value.CaughtMonster =
+		{ monsterId = info.monsterId, size = info.size, effects = {}, familiarity = 0, fed = false }
+	local ok, value = pcall(Value.sellValue, plain, 1)
+	return if ok then value else 0
+end
 
 -- Orb and label colour per rarity.
 local rarityColors: { [string]: Color3 } = {
@@ -52,6 +68,12 @@ end
 
 local FedColor = Color3.fromRGB(255, 190, 230)
 local HungryColor = Color3.fromRGB(255, 120, 70)
+
+-- Price tag colours, the same spooky style as the shop windows (client Ui.Colors).
+local TagPanel = Color3.fromRGB(18, 14, 26)
+local TagLamp = Color3.fromRGB(255, 176, 84) -- lantern orange
+local TagHungry = Color3.fromRGB(150, 140, 165) -- a hungry monster sells for less: the tag dims
+local TagHeight = 26 -- pixels, on top of the name label
 
 -- One line of text in the name label.
 local function line(
@@ -110,11 +132,59 @@ function MonsterModel.refresh(model: Model, info: Info)
 		status.Text = info.status or ""
 		status.TextColor3 = if info.hungry then HungryColor else FedColor
 	end
+	local tag = billboard and billboard:FindFirstChild("Value")
+	local price = tag and tag:FindFirstChild("Price")
+	if tag and price and price:IsA("TextLabel") then
+		price.Text = Format.money(tagValue(info))
+		local color = if info.hungry then TagHungry else TagLamp
+		price.TextColor3 = color
+		local rim = tag:FindFirstChildOfClass("UIStroke")
+		if rim then
+			rim.Color = color
+		end
+	end
 	body.Material = if info.hungry then Enum.Material.SmoothPlastic else Enum.Material.Neon
 	local light = body:FindFirstChildOfClass("PointLight")
 	if light then
 		light.Brightness = if info.hungry then 0.3 else 1.2
 	end
+end
+
+-- The "$1.2M" pill at the top of a monster's label, so players can see what it's worth
+-- without going to the Collector. The text is filled in by refresh.
+local function priceTag(parent: Instance)
+	local tag = Instance.new("Frame")
+	tag.Name = "Value"
+	tag.AnchorPoint = Vector2.new(0.5, 0)
+	tag.Position = UDim2.fromScale(0.5, 0)
+	tag.Size = UDim2.new(0, 0, 0, TagHeight - 4)
+	tag.AutomaticSize = Enum.AutomaticSize.X -- as wide as the price
+	tag.BackgroundColor3 = TagPanel
+	tag.BackgroundTransparency = 0.15
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0.5, 0)
+	corner.Parent = tag
+	local rim = Instance.new("UIStroke")
+	rim.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	rim.Thickness = 1.5
+	rim.Color = TagLamp
+	rim.Parent = tag
+	local padding = Instance.new("UIPadding")
+	padding.PaddingLeft = UDim.new(0, 10)
+	padding.PaddingRight = UDim.new(0, 10)
+	padding.Parent = tag
+
+	local price = Instance.new("TextLabel")
+	price.Name = "Price"
+	price.BackgroundTransparency = 1
+	price.Size = UDim2.fromScale(0, 1)
+	price.AutomaticSize = Enum.AutomaticSize.X
+	price.Font = Enum.Font.GothamBlack
+	price.TextSize = 16
+	price.Text = ""
+	price.TextColor3 = TagLamp
+	price.Parent = tag
+	tag.Parent = parent
 end
 
 local axes = { X = Vector3.xAxis, Y = Vector3.yAxis, Z = Vector3.zAxis }
@@ -236,7 +306,8 @@ function MonsterModel.build(info: Info): Model
 	light.Shadows = false
 	light.Parent = body
 
-	-- "Wisp Jack" / "Big Rare · Ghost, Werewolf" / mansion monsters: "Fed · 45% familiar"
+	-- "$1.2M" price tag / "Wisp Jack" / "Big Rare · Ghost, Werewolf" / mansion monsters:
+	-- "Fed · 45% familiar"
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "Label"
 	billboard.Adornee = body
@@ -244,16 +315,23 @@ function MonsterModel.build(info: Info): Model
 	billboard.MaxDistance = 80
 	billboard.LightInfluence = 0
 	billboard.StudsOffset = Vector3.new(0, labelHeight, 0)
+	-- The price tag sits above the text lines, which keep their 66 (or 46) pixels.
+	billboard.StudsOffset += Vector3.new(0, 0.4, 0)
 	local name = Format.name(info.monsterId)
+	local top = TagHeight
+	local height = top + if info.status then 66 else 46
+	billboard.Size = UDim2.fromOffset(220, height)
+	priceTag(billboard)
+	local function row(px: number): number
+		return px / height
+	end
 	if info.status then
-		billboard.Size = UDim2.fromOffset(220, 66)
-		line(billboard, "Name", name, Color3.new(1, 1, 1), 0, 0.4, true)
-		line(billboard, "Details", "", color, 0.4, 0.3, false)
-		line(billboard, "Status", "", FedColor, 0.7, 0.3, false)
+		line(billboard, "Name", name, Color3.new(1, 1, 1), row(top), row(26.4), true)
+		line(billboard, "Details", "", color, row(top + 26.4), row(19.8), false)
+		line(billboard, "Status", "", FedColor, row(top + 46.2), row(19.8), false)
 	else
-		billboard.Size = UDim2.fromOffset(220, 46)
-		line(billboard, "Name", name, Color3.new(1, 1, 1), 0, 0.55, true)
-		line(billboard, "Details", "", color, 0.55, 0.45, false)
+		line(billboard, "Name", name, Color3.new(1, 1, 1), row(top), row(25.3), true)
+		line(billboard, "Details", "", color, row(top + 25.3), row(20.7), false)
 	end
 	billboard.Parent = body
 
