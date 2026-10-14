@@ -142,31 +142,24 @@ local function label(part: BasePart, title: string, subtitle: string?, height: n
 	billboard.Parent = part
 end
 
--- Text painted on the front face of a flat upright part (gates and exits).
-local function sign(part: BasePart, title: string, subtitle: string?)
-	local gui = Instance.new("SurfaceGui")
-	gui.Name = "Sign"
-	gui.Face = Enum.NormalId.Front
-	gui.LightInfluence = 0
-	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = 20
-	local lines: { string } = if subtitle then { title, subtitle } else { title }
-	for i, text in lines do
-		local textLabel = Instance.new("TextLabel")
-		textLabel.BackgroundTransparency = 1
-		textLabel.AnchorPoint = Vector2.new(0.5, 0)
-		textLabel.Position = UDim2.fromScale(0.5, 0.15 + (i - 1) * 0.2)
-		textLabel.Size = UDim2.fromScale(0.9, if i == 1 then 0.18 else 0.12)
-		textLabel.Font = if i == 1 then Enum.Font.GothamBlack else Enum.Font.GothamBold
-		textLabel.Text = text
-		textLabel.TextColor3 = Color3.new(1, 1, 1)
-		textLabel.TextScaled = true
-		local stroke = Instance.new("UIStroke")
-		stroke.Thickness = 2
-		stroke.Parent = textLabel
-		textLabel.Parent = gui
+-- The name over a portal (gates and exits): floating well above its archway and drawn on top
+-- of everything, so the arch or the portal glow never covers it, even up close. Replaces the
+-- older text painted on the portal ("Sign") and any earlier label, so it also fixes portals
+-- already in the place.
+-- Studs from a portal's middle to its label: clear of the top of its arch (Scenery.Arch adds
+-- about 3.6 studs over the portal) with a little air.
+local GateLabelHeight = Layout.GateSize.height / 2 + 6
+local ExitLabelHeight = Scenery.ExitPortal.height / 2 + 6
+local function portalLabel(part: BasePart, title: string, subtitle: string?, height: number)
+	for _, name in { "Sign", "Label" } do
+		local old = part:FindFirstChild(name)
+		if old then
+			old:Destroy()
+		end
 	end
-	gui.Parent = part
+	label(part, title, subtitle, height, 200)
+	local billboard = part:FindFirstChild("Label") :: BillboardGui
+	billboard.AlwaysOnTop = true
 end
 
 -- The hub floor: an oval made of a long middle slab and a round end on each side
@@ -271,13 +264,17 @@ local function buildGates(hub: Instance)
 			gate.CanCollide = false
 			gate.CanQuery = false
 			gate.Transparency = 0.2
-			sign(
-				gate,
-				zone.name,
-				if zone.wing == "Foyer" then "Walk in to hunt!" else `Needs the {zone.wing}`
-			)
 			gate.Parent = gates
 			table.insert(built, `Hub.ZoneGates.{zone.id}`)
+		end
+		local gate = if zone.launch then World.find(gates, zone.id) else nil
+		if gate and gate:IsA("BasePart") then
+			portalLabel(
+				gate,
+				zone.name,
+				if zone.wing == "Foyer" then "Walk in to hunt!" else `Needs the {zone.wing}`,
+				GateLabelHeight
+			)
 		end
 	end
 	buildArches(hub)
@@ -492,7 +489,6 @@ local function buildZone(zonesFolder: Instance, zone: Zones.Zone)
 	exit.CanCollide = false
 	exit.CanQuery = false -- never blocks a press on a monster behind it
 	exit.Transparency = 0.2
-	label(exit, "Exit — bring your catch home", nil, 8, 120)
 	exit.Parent = folder
 
 	-- The archway round the exit, matching this zone's gate in the hub.
@@ -617,6 +613,10 @@ function WorldBuilder.start()
 		end
 		if zone.launch and not existing then
 			buildZone(zonesFolder, zone)
+		end
+		local exit = if zone.launch then World.find(World.find(zonesFolder, zone.id), "Exit") else nil
+		if exit and exit:IsA("BasePart") then
+			portalLabel(exit, "Exit", "Bring your catch home", ExitLabelHeight)
 		end
 	end
 
