@@ -30,8 +30,6 @@ type View = { items: { Row }, secondsLeft: number, money: number }
 
 local kindColors: { [string]: Color3 } = {
 	Vacuum = Color3.fromRGB(120, 200, 255),
-	Flashlight = Color3.fromRGB(255, 225, 120),
-	Lens = Color3.fromRGB(200, 170, 255),
 	Lure = Color3.fromRGB(255, 160, 120),
 	Charm = Color3.fromRGB(160, 255, 200),
 }
@@ -93,11 +91,7 @@ function WorkshopController.start()
 			local itemId = item.id
 
 			if item.tool and item.owned then
-				if item.equipped and item.kind == "Lens" then
-					Ui.button(actions, "Take off", Ui.Colors.equip, size).Activated:Connect(function()
-						ask(Equip, itemId)
-					end)
-				elseif item.equipped then
+				if item.equipped then
 					local using = Ui.button(actions, "Using", Ui.Colors.off, size)
 					using.AutoButtonColor = false
 				else

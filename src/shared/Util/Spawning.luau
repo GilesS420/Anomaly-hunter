@@ -7,6 +7,8 @@ local Rarities = require("../Config/Rarities")
 local Rng = require("./Rng")
 local Shop = require("../Config/Shop")
 local Sizes = require("../Config/Sizes")
+local Tools = require("../Config/Tools")
+local Variants = require("../Config/Variants")
 local Zones = require("../Config/Zones")
 
 local Spawning = {}
@@ -106,22 +108,15 @@ function Spawning.rollSize(random: Random?): Sizes.Size
 	end, random)
 end
 
--- Tool id -> effect it can give on catch (Spirit Lens -> Ghost, Moonbeam -> Werewolf).
-local catchEffectByItem: { [string]: string } = {}
-for _, effect in Effects.List do
-	if effect.source == "Catch" and effect.from then
-		catchEffectByItem[effect.from] = effect.id
-	end
-end
-
--- Effects a monster gets at the moment it's caught. Each equipped Catch-effect tool rolls
--- CatchChance once.
-function Spawning.rollCatchEffects(equippedItemIds: { string }, random: Random?): { string }
+-- Effects a monster gets at the moment it's caught: each of the vacuum's catch effects
+-- (Config/Tools) rolls Effects.CatchChance once.
+function Spawning.rollCatchEffects(vacuumId: string, random: Random?): { string }
 	local effects = {}
-	for _, itemId in equippedItemIds do
-		local effectId = catchEffectByItem[itemId]
+	local vacuum = Tools.Vacuums[vacuumId]
+	local candidates: { string } = if vacuum and vacuum.catchEffects then vacuum.catchEffects else {}
+	for _, effectId in candidates do
 		if
-			effectId
+			Effects.List[effectId]
 			and #effects < Effects.MaxSlots
 			and not table.find(effects, effectId)
 			and Rng.chance(Effects.CatchChance, random)
@@ -130,6 +125,23 @@ function Spawning.rollCatchEffects(equippedItemIds: { string }, random: Random?)
 		end
 	end
 	return effects
+end
+
+-- The catch variant a monster gets (nil for none): rarest first, each with the vacuum's
+-- chance for it, so a catch never gets two.
+function Spawning.rollVariant(vacuumId: string, random: Random?): string?
+	local vacuum = Tools.Vacuums[vacuumId]
+	local chances = if vacuum then vacuum.variants else nil
+	if not chances then
+		return nil
+	end
+	for _, variant in Variants do
+		local chance = chances[variant.id]
+		if chance and Rng.chance(chance, random) then
+			return variant.id
+		end
+	end
+	return nil
 end
 
 return Spawning

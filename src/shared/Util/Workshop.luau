@@ -9,11 +9,12 @@ local Effects = require("../Config/Effects")
 local Shop = require("../Config/Shop")
 local Sizes = require("../Config/Sizes")
 local Tools = require("../Config/Tools")
+local Variants = require("../Config/Variants")
 
 local Workshop = {}
 
 export type BuyResult = "Ok" | "Unknown" | "OutOfStock" | "Owned" | "SoldOut" | "TooPoor"
-export type EquipSlot = "vacuum" | "flashlight" | "lens"
+export type EquipSlot = "vacuum"
 
 local byId: { [string]: Shop.Item } = {}
 for _, item in Shop.Workshop do
@@ -66,20 +67,27 @@ function Workshop.inStock(item: Shop.Item, slot: number): boolean
 	return roll < item.restockChance
 end
 
--- Tools are kept forever and equipped; everything else is used up.
+-- Tools (vacuums) are kept forever and equipped; everything else is used up.
 function Workshop.isTool(item: Shop.Item): boolean
-	return item.kind == "Vacuum" or item.kind == "Flashlight" or item.kind == "Lens"
+	return item.kind == "Vacuum"
 end
 
 function Workshop.equipSlot(item: Shop.Item): EquipSlot?
-	if item.kind == "Vacuum" then
-		return "vacuum"
-	elseif item.kind == "Flashlight" then
-		return "flashlight"
-	elseif item.kind == "Lens" then
-		return "lens"
+	return if item.kind == "Vacuum" then "vacuum" else nil
+end
+
+-- Takes retired tools (Shop.Retired: flashlights, the Spirit Lens) out of an inventory and
+-- returns the cash they're worth back. 0 if there were none.
+function Workshop.refundRetired(inventory: { [string]: number }): number
+	local refund = 0
+	local items: { [string]: number? } = inventory
+	for id, price in Shop.Retired do
+		if (items[id] or 0) > 0 then
+			refund += price
+			items[id] = nil
+		end
 	end
-	return nil
+	return refund
 end
 
 -- True if the player has this tool (the free starter tools always count).
@@ -129,25 +137,40 @@ local function biggestSize(tier: number): string
 	return biggest
 end
 
-local function effectLine(effectId: string?): string
-	return if effectId then `{Effects.CatchChance}% chance of {effectId} on catch` else ""
+-- "Gold 3% · Silver 5%", rarest first.
+local function variantLine(chances: { [string]: number }?): string
+	local parts = {}
+	for _, variant in Variants do
+		local chance = if chances then chances[variant.id] else nil
+		if chance then
+			table.insert(parts, `{variant.id} {chance}%`)
+		end
+	end
+	return table.concat(parts, " · ")
 end
 
 -- One short line saying what the item does, for the shop window.
 function Workshop.describe(item: Shop.Item): string
 	if item.kind == "Vacuum" then
 		local vacuum = Tools.Vacuums[item.id]
+		if not vacuum then
+			return ""
+		end
 		local tier = item.tier or 1
-		local speed = if vacuum then ` · catches in {vacuum.catchSeconds}s` else ""
 		local extra = if tier >= 3 then ", Mythic and Divine too" else ""
-		return `Holds up to {biggestSize(tier)}{extra}{speed}`
-	elseif item.kind == "Flashlight" then
-		local light = Tools.Flashlights[item.id]
-		local stats = if light then `Reach {light.reach} studs · stuns {light.stunSeconds}s` else ""
-		local effect = effectLine(item.grantsEffect)
-		return if effect ~= "" then `{stats} · {effect}` else stats
-	elseif item.kind == "Lens" then
-		return effectLine(item.grantsEffect)
+		local parts = {
+			`Carries {vacuum.bag} · up to {biggestSize(tier)}{extra}`,
+			`catches in {vacuum.catchSeconds}s · reach {vacuum.reach}`,
+		}
+		local catchEffects: { string } = vacuum.catchEffects or {}
+		for _, effectId in catchEffects do
+			table.insert(parts, `{Effects.CatchChance}% {effectId}`)
+		end
+		local variants = variantLine(vacuum.variants)
+		if variants ~= "" then
+			table.insert(parts, variants)
+		end
+		return table.concat(parts, " · ")
 	elseif item.kind == "Lure" then
 		return "Ring it in a zone and a rarer monster comes to you"
 	elseif item.kind == "Charm" then

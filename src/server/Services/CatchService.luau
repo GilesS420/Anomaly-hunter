@@ -1,5 +1,5 @@
 --!strict
--- Catching: press and hold on a wild monster. It freezes in your flashlight beam and a catch
+-- Catching: press and hold on a wild monster. It freezes in your vacuum's beam and a catch
 -- meter fills by itself (1-3 seconds, longer for rarer monsters). Let go early, walk out of
 -- reach or get knocked out and it escapes (dazed for a moment, so you can grab it again).
 -- The client only says "start catching this" and "stop"; every rule is checked here.
@@ -61,7 +61,7 @@ local StartCatch = remote("StartCatch") -- client -> server: (model)
 local StopCatch = remote("StopCatch") -- client -> server: ()
 local State = remote("State") -- server -> client: ("Holding" | "Ended", info)
 
--- Shop names by item id ("CandleLamp" -> "Candle Lamp"), and vacuum names by tier.
+-- Shop names by item id ("PhantomVac" -> "Phantom Vac"), and vacuum names by tier.
 local itemNames: { [string]: string } = {}
 local vacuumByTier: { [number]: string } = {}
 for _, item in Shop.Workshop do
@@ -128,7 +128,7 @@ local function clear(player: Player): Hold?
 	return hold
 end
 
--- Lets the monster go (it stays dazed for the flashlight's stun time). message is toasted
+-- Lets the monster go (it stays dazed for the vacuum's stun time). message is toasted
 -- if given; nil when the player is leaving.
 local function release(player: Player, message: string?)
 	local hold = clear(player)
@@ -151,13 +151,13 @@ local function finish(player: Player)
 	end
 	local model = hold.model
 	local data = DataService.get(player)
-	if not data or HuntService.isCarrying(player) or not isHunting(player, hold.zoneId) then
+	if not data or HuntService.isBagFull(player) or not isHunting(player, hold.zoneId) then
 		RoamService.release(model, hold.stunSeconds)
 		State:FireClient(player, "Ended", { result = "Escaped", model = model })
 		return
 	end
 
-	local equipped = { data.equipped.flashlight, data.equipped.vacuum, data.equipped.lens }
+	local vacuumId = data.equipped.vacuum
 	local inHub = hold.zoneId == ""
 	if inHub and not MansionService.hasRoom(player) then
 		RoamService.release(model, hold.stunSeconds)
@@ -169,8 +169,8 @@ local function finish(player: Player)
 		return
 	end
 	local caught = if inHub
-		then WatcherService.capture(model, equipped)
-		else SpawnService.capture(model, equipped)
+		then WatcherService.capture(model, vacuumId)
+		else SpawnService.capture(model, vacuumId)
 	if not caught then
 		State:FireClient(player, "Ended", { result = "Gone", model = model })
 		return
@@ -183,6 +183,13 @@ local function finish(player: Player)
 			else "It flew straight home to your mansion!"
 	else
 		HuntService.carry(player, caught)
+		local count = player:GetAttribute("CarryingCount")
+		local size = player:GetAttribute("BagSize")
+		if typeof(count) == "number" and typeof(size) == "number" and count < size then
+			afterward = `Bag {count}/{size}: catch another or bring them to the Exit.`
+		elseif typeof(size) == "number" and size > 1 then
+			afterward = "Your bag is full! Bring them to the Exit."
+		end
 	end
 
 	local bonus = ""
@@ -193,7 +200,8 @@ local function finish(player: Player)
 		end
 		bonus = ` Bonus: {table.concat(names, " and ")}!`
 	end
-	Notify.toast(player, `Caught a {caught.size} {hold.name}!{bonus} {afterward}`)
+	local variant = if caught.variant then `{caught.variant} ` else ""
+	Notify.toast(player, `Caught a {variant}{caught.size} {hold.name}!{bonus} {afterward}`)
 	State:FireClient(player, "Ended", { result = "Caught", monsterId = caught.monsterId, model = model })
 end
 
@@ -252,9 +260,9 @@ local function onStartCatch(player: Player, model: unknown)
 		return
 	end
 
-	-- 3. One monster per trip.
-	if HuntService.isCarrying(player) then
-		Notify.toast(player, "Your vacuum is full. Bring your catch home first!")
+	-- 3. Room in the bag.
+	if HuntService.isBagFull(player) then
+		Notify.toast(player, "Your bag is full. Bring your catch home first!")
 		return
 	end
 
@@ -267,17 +275,16 @@ local function onStartCatch(player: Player, model: unknown)
 		return
 	end
 
-	-- 5. Close enough for the flashlight.
-	local flashlightId = data.equipped.flashlight
-	local reach = Catching.reach(flashlightId)
+	-- 5. Close enough for the vacuum's beam.
+	local vacuumId = data.equipped.vacuum
+	local reach = Catching.reach(vacuumId)
 	if distanceTo(player, model) > reach then
 		local shown = math.floor(reach - Tools.ReachSlack)
-		Notify.toast(player, `Get closer! Your {itemName(flashlightId)} reaches {shown} studs.`)
+		Notify.toast(player, `Get closer! Your {itemName(vacuumId)} reaches {shown} studs.`)
 		return
 	end
 
 	-- 6. Strong enough vacuum.
-	local vacuumId = data.equipped.vacuum
 	if not Catching.canVacuum(vacuumId, spawned.size, spawned.rarity) then
 		local tier = Catching.requiredTier(spawned.size, spawned.rarity)
 		local vacuumName = vacuumByTier[tier]
@@ -327,13 +334,12 @@ local function onStartCatch(player: Player, model: unknown)
 	beam.Segments = 1
 	beam.Parent = body
 
-	local flashlight = Tools.Flashlights[flashlightId]
 	local hold: Hold = {
 		model = model,
 		name = name,
 		zoneId = zoneId,
 		reach = reach,
-		stunSeconds = if flashlight then flashlight.stunSeconds else 1,
+		stunSeconds = Catching.stunSeconds(vacuumId),
 		endTime = serverNow + seconds,
 		glow = glow,
 		beam = beam,

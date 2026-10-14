@@ -231,8 +231,8 @@ function SpawnService.all(): { [Model]: Spawned }
 end
 
 -- Removes a caught monster from the zone and returns it as a save-ready entry, rolling any
--- catch effects from the hunter's equipped tools. Returns nil if someone caught it first.
-function SpawnService.capture(model: Model, equippedItemIds: { string }): Value.CaughtMonster?
+-- catch effects and a variant from the hunter's vacuum. Returns nil if someone caught it first.
+function SpawnService.capture(model: Model, vacuumId: string): Value.CaughtMonster?
 	local spawned = live[model]
 	if not spawned then
 		return nil
@@ -243,7 +243,8 @@ function SpawnService.capture(model: Model, equippedItemIds: { string }): Value.
 		uid = HttpService:GenerateGUID(false),
 		monsterId = spawned.monsterId,
 		size = spawned.size,
-		effects = Spawning.rollCatchEffects(equippedItemIds, random),
+		effects = Spawning.rollCatchEffects(vacuumId, random),
+		variant = Spawning.rollVariant(vacuumId, random),
 		familiarity = 0,
 		fed = true,
 	}

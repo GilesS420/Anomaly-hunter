@@ -1,13 +1,15 @@
 --!strict
 -- Sell value of a caught monster:
---   baseValue x size x effects x familiarity x wing boost
+--   baseValue x size x effects x familiarity x wing boost x catch variant
 -- Effect bonuses add up (1 + sum(multiplier - 1)). Combos replace their two
--- ingredients. Unfed (hungry) monsters only sell for base value x size. Call Util/Care.settle
+-- ingredients. Unfed (hungry) monsters only sell for base value x size x variant (a Gold
+-- coat doesn't go to sleep). Call Util/Care.settle
 -- first so familiarity and fed are up to date.
 
 local Effects = require("../Config/Effects")
 local Monsters = require("../Config/Monsters")
 local Sizes = require("../Config/Sizes")
+local Variants = require("../Config/Variants")
 local Wings = require("../Config/Wings")
 
 local Value = {}
@@ -25,7 +27,18 @@ export type CaughtMonster = {
 	grownAt: number?, -- os.time() its familiarity was last brought up to date
 	storedAt: number?, -- os.time() it went into Storage (nil while in the mansion), see Util/Storage
 	locked: boolean?, -- locked monsters can't be sold
+	variant: string?, -- catch variant (Config/Variants): "Silver", "Gold", "Shiny", "Rainbow"
 }
+
+local variantMultipliers: { [string]: number } = {}
+for _, variant in Variants do
+	variantMultipliers[variant.id] = variant.multiplier
+end
+
+-- x2 for Silver, x5 for Gold...; 1 for none (or one that no longer exists).
+function Value.variantMultiplier(variantId: string?): number
+	return if variantId then variantMultipliers[variantId] or 1 else 1
+end
 
 local function sizeMultiplier(sizeId: string): number
 	for _, size in Sizes do
@@ -90,7 +103,7 @@ function Value.sellValue(caught: CaughtMonster, wingsOwned: number): number
 	local monster = Monsters[caught.monsterId]
 	assert(monster, "unknown monster " .. caught.monsterId)
 
-	local value = monster.baseValue * sizeMultiplier(caught.size)
+	local value = monster.baseValue * sizeMultiplier(caught.size) * Value.variantMultiplier(caught.variant)
 	if not caught.fed then
 		return math.floor(value)
 	end

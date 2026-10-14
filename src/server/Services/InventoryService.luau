@@ -26,6 +26,7 @@ local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local CareService = require(script.Parent.CareService)
 local DataService = require(script.Parent.DataService)
+local HuntService = require(script.Parent.HuntService)
 local MansionService = require(script.Parent.MansionService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
@@ -78,7 +79,7 @@ local Give = remote("Give")
 local ConfirmGiveFrom = 1_000_000 -- giving a treat this expensive needs a second tap
 local blockedText: { [string]: string } = { HasEffect = "Has it", NoRoom = "Full" }
 
-local kindOrder = { Vacuum = 1, Flashlight = 2, Lens = 3, Food = 4, Lure = 5, Charm = 6 }
+local kindOrder = { Vacuum = 1, Food = 2, Lure = 3, Charm = 4 }
 
 local function price(caught: Value.CaughtMonster, wingsOwned: number): number
 	local ok, value = pcall(Value.sellValue, caught, wingsOwned)
@@ -90,7 +91,8 @@ local function monsterRow(caught: Value.CaughtMonster, stored: boolean, value: n
 	if not monster or not caught.uid then
 		return nil
 	end
-	local parts = { `{caught.size} {monster.rarity}` }
+	local variant = if caught.variant then `{caught.variant} ` else ""
+	local parts = { `{variant}{caught.size} {monster.rarity}` }
 	local effects = Value.resolveEffects(caught.effects)
 	if #effects > 0 then
 		local names = {}
@@ -266,6 +268,7 @@ Equip.OnServerInvoke = function(player: Player, itemId: unknown): Result
 		return Loading
 	end
 	local ok, message = WorkshopService.equip(data, itemId)
+	HuntService.refreshItems(player) -- the bag size follows the vacuum
 	return { ok = ok, message = message, view = viewFor(data) }
 end
 

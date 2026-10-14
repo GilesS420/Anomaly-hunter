@@ -128,7 +128,7 @@ commands["/give"] = function(player, argument)
 		end
 	end
 	if not data or not item then
-		Notify.toast(player, "Try: /give VoidVac, /give Moonbeam, /give BaitBell 5 or /give PumpkinCandy 3")
+		Notify.toast(player, "Try: /give VoidVac, /give MoonVac, /give BaitBell 5 or /give PumpkinCandy 3")
 		return
 	end
 	local count = math.clamp(math.floor(tonumber(countText) or 1), 1, 99)
