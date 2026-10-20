@@ -25,7 +25,7 @@ Weight.StartKg = {
 	Big = 25,
 	Huge = 40,
 	Colossal = 75,
-	Titan = 200, -- worth x10 when it turns Titan, and it keeps going up from there
+	Titan = 500, -- worth x25 when it turns Titan, and it keeps going up from there
 }
 Weight.CatchSpread = 0.1
 
@@ -55,11 +55,12 @@ Weight.SpurtMax = 0.6
 Weight.SpurtSkew = 3
 
 -- Titans are drawn from TitanStartScale (Normal = 1) and TitanScaleStep bigger each time they
--- double in weight, but never past TitanMaxScale so phones keep up. Their weight and price
--- have no limit; only the drawing stops growing.
+-- double in weight, with no limit: weight, price and drawn size all keep growing.
+-- (EngineMaxScale only keeps every block under Roblox's 2048-stud part limit; no Titan gets
+-- near it, that would take hundreds of doublings.)
 Weight.TitanStartScale = 3.5
 Weight.TitanScaleStep = 0.5
-Weight.TitanMaxScale = 6
+Weight.EngineMaxScale = 300
 
 -- However big a monster is drawn, it walks the mansion floors as if it were this wide
 -- (radius in studs, Colossal's), so a Titan still fits through the rooms and pokes through

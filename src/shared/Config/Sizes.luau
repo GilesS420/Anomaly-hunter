@@ -18,7 +18,7 @@ local Sizes: { Size } = {
 	{ id = "Big", weight = 15, valueMultiplier = 1.5, vacuumTier = 2, scale = 1.3 },
 	{ id = "Huge", weight = 4, valueMultiplier = 2.5, vacuumTier = 2, scale = 1.7 },
 	{ id = "Colossal", weight = 1, valueMultiplier = 5, vacuumTier = 3, scale = 2.5 },
-	{ id = "Titan", weight = 0, valueMultiplier = 10, vacuumTier = 99, scale = 3.5 },
+	{ id = "Titan", weight = 0, valueMultiplier = 25, vacuumTier = 99, scale = 3.5 },
 }
 
 return Sizes

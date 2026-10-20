@@ -10,7 +10,7 @@
 --   /haunt            every monster in your mansion picks up a roaming effect right now
 --   /skip 12          your monsters live 12 hours ahead: they grow Familiarity
 --   /grow 5           every monster in your mansion has 5 growth spurts right now, ignoring
---                     luck and growth genes (/grow 20 makes Titans)
+--                     luck and growth genes (/grow 25 makes Titans)
 --   /calm             zone monsters leave you alone (type it again to let them attack)
 --   /attack           the closest monster in your zone attacks you right now
 --   /spawn Gravepup   brings that monster to you in the zone you're in (any monster, any zone;
@@ -174,7 +174,7 @@ end
 commands["/grow"] = function(player, argument)
 	local spurts = tonumber(argument)
 	if not spurts or spurts < 1 or spurts > 200 then
-		Notify.toast(player, "Try: /grow 5 (growth spurts for every monster; /grow 20 makes Titans)")
+		Notify.toast(player, "Try: /grow 5 (growth spurts for every monster; /grow 25 makes Titans)")
 		return
 	end
 	MansionService.grow(player, math.floor(spurts))

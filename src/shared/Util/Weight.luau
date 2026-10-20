@@ -152,7 +152,7 @@ function Weight.valueMultiplier(sizeId: string, kg: number?): number
 end
 
 -- How big it's drawn (Normal = 1): Config/Sizes, except a Titan, which grows a step every
--- time it doubles in weight, up to Config/Weight.TitanMaxScale.
+-- time it doubles in weight, with no limit (see Config/Weight.EngineMaxScale).
 function Weight.drawScale(sizeId: string, kg: number?): number
 	local size = byId[sizeId]
 	if not size then
@@ -163,7 +163,7 @@ function Weight.drawScale(sizeId: string, kg: number?): number
 	end
 	local doublings = math.max(0, math.floor(math.log(kg / WeightConfig.StartKg.Titan, 2) + 1e-6))
 	return math.min(
-		WeightConfig.TitanMaxScale,
+		WeightConfig.EngineMaxScale,
 		WeightConfig.TitanStartScale + doublings * WeightConfig.TitanScaleStep
 	)
 end
