@@ -16,6 +16,8 @@ export type Rgb = { number } -- { red, green, blue }, 0 to 255 (Color3.fromRGB)
 -- How an event changes the sky. Lighting values are set on the server and reach everyone;
 -- the sky pieces (moon, eye, aurora, sparkles, flashes) are drawn by each client around its
 -- own camera (client/Controllers/SkyController), so players in zones see them too.
+export type Weather = { kind: "Snow" | "Rain" | "Coins" | "Candy" | "Eyes", color: Rgb? }
+
 export type Sky = {
 	ambient: Rgb?, -- Lighting.Ambient
 	outdoorAmbient: Rgb?, -- Lighting.OutdoorAmbient
@@ -27,7 +29,15 @@ export type Sky = {
 	eye: boolean?, -- the Watcher's giant eye, looking around
 	aurora: Rgb?, -- slow waving bands of light
 	sparkles: Rgb?, -- specks drifting down everywhere
-	flashes: boolean?, -- the whole sky flashes now and then, like a dying bulb
+	flashes: boolean?, -- lightning: the screen flashes and bolts strike in the distance
+	-- What falls (or floats) all around the player while the event is on:
+	--   Snow   a thick, sideways-blowing snowstorm
+	--   Rain   fast streaks of rain (Blood Moon: blood-red)
+	--   Coins  spinning gold coins tumbling out of the sky
+	--   Candy  sweets and sprinkles in every colour
+	--   Eyes   eyeballs floating in the air, all turning to look at you
+	weather: Weather?,
+	edge: Rgb?, -- a glow round the edges of the screen in this colour
 }
 
 export type WatcherEvent = {
@@ -98,9 +108,10 @@ Events.List = {
 			outdoorAmbient = { 110, 150, 200 },
 			tint = { 205, 230, 255 },
 			saturation = -0.15,
-			atmosphere = { color = { 160, 205, 240 }, decay = { 70, 115, 170 }, density = 0.42, haze = 2 },
+			atmosphere = { color = { 220, 235, 250 }, decay = { 160, 190, 225 }, density = 0.6, haze = 3 },
 			aurora = { 120, 230, 255 },
-			sparkles = { 210, 240, 255 },
+			weather = { kind = "Snow" },
+			edge = { 225, 245, 255 },
 		},
 		warning = "The air turns icy cold...",
 		announce = "Frost Fog rolls in! Monsters can freeze over, and the Bakery sells Frost Tarts.",
@@ -121,8 +132,10 @@ Events.List = {
 			outdoorAmbient = { 105, 170, 90 },
 			tint = { 215, 255, 195 },
 			saturation = 0.15,
-			atmosphere = { color = { 150, 220, 115 }, decay = { 45, 110, 45 }, density = 0.33, haze = 1.6 },
+			atmosphere = { color = { 150, 220, 115 }, decay = { 45, 110, 45 }, density = 0.38, haze = 2 },
 			sparkles = { 230, 255, 160 },
+			weather = { kind = "Candy" },
+			edge = { 140, 255, 120 },
 		},
 		warning = "Something sweet is in the air...",
 		announce = "Sugar Rush! Cakes get eaten twice as fast, monsters grow and the Bakery is packed.",
@@ -142,8 +155,10 @@ Events.List = {
 			tint = { 255, 228, 180 },
 			saturation = 0.1,
 			atmosphere = { color = { 240, 180, 90 }, decay = { 150, 85, 25 }, density = 0.3, haze = 1.4 },
-			moon = { color = { 255, 205, 80 }, size = 34, coin = true },
+			moon = { color = { 255, 205, 80 }, size = 70, coin = true },
 			sparkles = { 255, 215, 110 },
+			weather = { kind = "Coins" },
+			edge = { 255, 200, 60 },
 		},
 		warning = "Coins jingle somewhere in the dark...",
 		announce = "Gold Rush! The Collector pays 25% more and the Bakery sells Gilded Truffles.",
@@ -163,8 +178,10 @@ Events.List = {
 			brightness = 1.2,
 			tint = { 205, 210, 235 },
 			saturation = -0.45,
-			atmosphere = { color = { 45, 45, 60 }, decay = { 12, 12, 18 }, density = 0.45, haze = 1.5 },
+			atmosphere = { color = { 45, 45, 60 }, decay = { 12, 12, 18 }, density = 0.5, haze = 2 },
 			flashes = true,
+			weather = { kind = "Rain", color = { 170, 180, 210 } },
+			edge = { 10, 10, 20 },
 		},
 		warning = "The streetlights buzz and dim...",
 		announce = "Flicker! The lights are failing, Phantoms drift between the mansions and the Bakery sells Static Cupcakes.",
@@ -185,7 +202,9 @@ Events.List = {
 			outdoorAmbient = { 150, 30, 30 },
 			tint = { 255, 170, 170 },
 			atmosphere = { color = { 190, 50, 50 }, decay = { 100, 0, 0 }, density = 0.35, haze = 1.5 },
-			moon = { color = { 255, 70, 55 }, size = 44 },
+			moon = { color = { 255, 70, 55 }, size = 90 },
+			weather = { kind = "Rain", color = { 200, 25, 30 } },
+			edge = { 170, 0, 10 },
 		},
 		warning = "The moon is turning red...",
 		announce = "A Blood Moon rises! Haunted effects are twice as likely, monsters grow, Phantoms roam and the Bakery sells Blood Moon Pies.",
@@ -207,8 +226,10 @@ Events.List = {
 			outdoorAmbient = { 80, 35, 110 },
 			tint = { 225, 195, 255 },
 			saturation = -0.1,
-			atmosphere = { color = { 95, 45, 125 }, decay = { 35, 0, 45 }, density = 0.4, haze = 2 },
+			atmosphere = { color = { 95, 45, 125 }, decay = { 35, 0, 45 }, density = 0.45, haze = 2.5 },
 			eye = true,
+			weather = { kind = "Eyes" },
+			edge = { 110, 30, 160 },
 		},
 		warning = "All five eyes are open. The Watcher is waking up...",
 		announce = "THE WATCHER AWAKENS! Its eye is on every mansion.",
