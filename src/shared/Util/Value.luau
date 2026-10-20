@@ -1,6 +1,7 @@
 --!strict
 -- Sell value of a caught monster:
---   baseValue x size (a Titan's grows with its weight, Util/Weight) x effects x familiarity x wing boost x catch variant
+--   baseValue x weight (kg / 20, Util/Weight; wild monsters use their size) x effects
+--   x familiarity x wing boost x catch variant
 -- Effect bonuses add up (1 + sum(multiplier - 1)). Combos replace their two
 -- ingredients. Call Util/Care.settle first so familiarity is up to date.
 
@@ -25,7 +26,8 @@ export type CaughtMonster = {
 	locked: boolean?, -- locked monsters can't be sold
 	variant: string?, -- catch variant (Config/Variants): "Silver", "Gold", "Shiny", "Rainbow"
 	kg: number?, -- weight, kept up to date by Util/Weight.settle (its size follows it)
-	kgAt: number?, -- os.time() its weight was last brought up to date
+	kgAt: number?, -- os.time() of its last growth check
+	gene: string?, -- hidden growth gene (Config/Weight.Genes)
 }
 
 local variantMultipliers: { [string]: number } = {}

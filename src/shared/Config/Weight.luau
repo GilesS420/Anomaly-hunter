@@ -1,39 +1,65 @@
 --!strict
--- Weight and Titans. Every monster in a mansion has a weight in kg that keeps growing, also
--- while its owner is offline (Storage pauses it). Its size follows its weight: a Normal
--- monster that gets heavy enough turns Big, then Huge, then Colossal, and past Colossal it
--- becomes a Titan that is too big for the mansion and clips through its walls and roof.
--- Effects make it grow faster, so cakes speed it up through the effects they give.
+-- Weight and Titans. Every monster in a mansion has a weight in kg, and its price follows its
+-- weight: it's worth baseValue x kg / KgPerValue (a Normal monster weighs about 20 kg, so
+-- that's about x1). Its size follows its weight too: Normal, Big, Huge, Colossal, and past
+-- Colossal a Titan that is too big for the mansion and clips through its walls and roof.
+-- There is no top weight, so the biggest monsters are the rarest.
+--
+-- Growing is luck, not a timer. A monster grows in sudden spurts, and only rolls for one once
+-- its Familiarity is at 100%. Every monster also gets a hidden growth gene when it's caught:
+-- some never grow, some stop at a certain size, and a lucky few can keep growing for ever.
+-- Watcher events with a growthMultiplier (Config/Events) give extra spurt rolls while live.
+-- Rolls keep happening while the owner is offline; Storage pauses them.
 -- Placeholders, tune in playtesting.
 
 local Weight = {}
 
--- The weight (kg) a monster needs to be drawn at that size. A caught monster gets a random
--- weight between its size's start and the next one's.
+Weight.KgPerValue = 20 -- value multiplier = kg / KgPerValue
+
+-- The weight (kg) where each size starts. A caught monster gets its size's value multiplier
+-- x KgPerValue in kg, give or take CatchSpread (a Normal one 18-22 kg, a Colossal 90-110 kg).
 Weight.StartKg = {
-	Tiny = 5,
-	Small = 10,
-	Normal = 20,
-	Big = 40,
-	Huge = 80,
-	Colossal = 160,
-	Titan = 320,
+	Tiny = 0,
+	Small = 13,
+	Normal = 18,
+	Big = 25,
+	Huge = 40,
+	Colossal = 75,
+	Titan = 200, -- worth x10 when it turns Titan, and it keeps going up from there
 }
-Weight.MaxKg = 2560 -- a Titan stops growing here (8 times its starting weight)
+Weight.CatchSpread = 0.1
 
--- How fast a monster grows: this share of its own weight per hour (0.01 = +1% an hour, so it
--- doubles, and goes up one size, in about 3 days). Each effect it has adds GrowthPerEffect
--- (3 effects: +4% an hour, a size every 17 hours or so).
-Weight.GrowthPerHour = 0.01
-Weight.GrowthPerEffect = 0.01
+-- Hidden growth genes, rolled once per monster when it's caught (weights add up to 100).
+-- maxSize is the biggest size it can grow to; nil means no limit.
+export type Gene = { id: string, weight: number, maxSize: string? }
+Weight.Genes = {
+	{ id = "Stunted", weight = 30, maxSize = "None" }, -- never grows
+	{ id = "Sturdy", weight = 45, maxSize = "Huge" },
+	{ id = "Mighty", weight = 20, maxSize = "Colossal" },
+	{ id = "Titanic", weight = 5 }, -- can become a Titan and never stops
+} :: { Gene }
 
--- Titans: worth Sizes' Titan multiplier (x10) when they turn Titan, rising to TitanMaxValue at
--- MaxKg, and drawn from TitanStartScale up to TitanMaxScale (capped so phones keep up).
--- The drawn size goes up in steps of TitanScaleStep, so the model is only rebuilt now and then.
-Weight.TitanMaxValue = 20
+-- A fully familiar monster rolls SpurtChance percent every CheckMinutes (0.25% every 5 min is
+-- about 3% an hour, so a spurt every day and a half or so). While a Watcher event with a
+-- growthMultiplier is live, every monster (familiar or not) also rolls
+-- EventSpurtChance x growthMultiplier percent every minute.
+Weight.CheckMinutes = 5
+Weight.SpurtChance = 0.25
+Weight.EventSpurtChance = 3
+Weight.MaxOfflineDays = 30 -- rolls owed for longer than this away are dropped
+
+-- How much a spurt adds: between SpurtMin and SpurtMax of its weight, mostly small
+-- (+5% to +60%; SpurtSkew 3 makes big spurts rare).
+Weight.SpurtMin = 0.05
+Weight.SpurtMax = 0.6
+Weight.SpurtSkew = 3
+
+-- Titans are drawn from TitanStartScale (Normal = 1) and TitanScaleStep bigger each time they
+-- double in weight, but never past TitanMaxScale so phones keep up. Their weight and price
+-- have no limit; only the drawing stops growing.
 Weight.TitanStartScale = 3.5
-Weight.TitanMaxScale = 6
 Weight.TitanScaleStep = 0.5
+Weight.TitanMaxScale = 6
 
 -- However big a monster is drawn, it walks the mansion floors as if it were this wide
 -- (radius in studs, Colossal's), so a Titan still fits through the rooms and pokes through

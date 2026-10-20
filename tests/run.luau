@@ -1666,52 +1666,79 @@ do
 	check("storage is full at the limit", not Storage.hasRoom(InventoryConfig.StorageSlots))
 end
 
--- Weight and Titans (Util/Weight): weight grows from timestamps, sizes follow it, Titans cap.
+-- Weight and Titans (Util/Weight): price follows weight, growth is lucky spurts.
 do
-	local caught: any = { monsterId = "Gravepup", size = "Normal", effects = {}, familiarity = 0, fed = true }
+	local caught: any = { monsterId = "Gravepup", size = "Normal", effects = {}, familiarity = 0 }
 	Weight.settle(caught, 0, fakeRandom(1))
-	check("a new monster gets a weight in its size", caught.kg >= 20 and caught.kg < 40 and caught.kgAt == 0)
+	check("a new monster gets a weight in its size", caught.kg >= 18 and caught.kg <= 22 and caught.kgAt == 0)
+	check("and a growth gene", WeightConfig.Genes[1] ~= nil and caught.gene ~= nil)
 	check("weight picks the size", Weight.sizeFor(caught.kg) == "Normal")
+	local geneTotal = 0
+	for _, gene in WeightConfig.Genes do
+		geneTotal += gene.weight
+	end
+	check("gene weights add up to 100", near(geneTotal, 100))
+
+	-- No growth until fully familiar, then only by luck.
+	caught.gene = "Titanic"
 	caught.kg = 20
 	local day = 24 * 3600
-	Weight.settle(caught, day)
-	check("it grows 1% an hour", near(caught.kg, 20 * math.exp(0.24)))
-	check("still Normal after a day", caught.size == "Normal")
-	caught.effects = { "Slimed", "Ghost" }
-	check("effects speed growth up", near(Weight.rate(caught), 0.03))
-	check("it grows into the next size", Weight.settle(caught, 2 * day) and caught.size == "Big")
-	check("settling twice at once changes nothing", not Weight.settle(caught, 2 * day))
-	Weight.settle(caught, 100 * day)
-	check("a monster becomes a Titan", caught.size == "Titan")
-	check("Titans stop at the max weight", near(caught.kg, WeightConfig.MaxKg))
+	check("not familiar: no growth", not Weight.settle(caught, 10 * day, fakeRandom(2)) and caught.kg == 20)
+	check("growth checks still move on", caught.kgAt == 10 * day)
+	caught.familiarity = 1
+	Weight.settle(caught, 40 * day, fakeRandom(3))
+	check("30 lucky days grow a fully familiar monster", caught.kg > 20)
+	check("value follows weight", near(Weight.valueMultiplier("Normal", 30), 1.5))
+	check("wild monsters use their size", near(Weight.valueMultiplier("Colossal", nil), 5))
+
+	local stunted: any = { size = "Normal", familiarity = 1, kg = 20, kgAt = 0, gene = "Stunted" }
+	Weight.settle(stunted, 100 * day, fakeRandom(4))
+	check("a Stunted monster never grows", stunted.kg == 20)
+	check("but /grow can force it", Weight.spurt(stunted, fakeRandom(4), true) or stunted.kg > 20)
+
+	local sturdy: any = { size = "Normal", familiarity = 1, kg = 20, kgAt = 0, gene = "Sturdy" }
+	for _ = 1, 200 do
+		Weight.spurt(sturdy, fakeRandom(5))
+	end
 	check(
-		"a Titan at max weight hits the top value",
-		near(Weight.valueMultiplier("Titan", caught.kg), WeightConfig.TitanMaxValue)
+		"a Sturdy monster stops at Huge",
+		sturdy.size == "Huge" and sturdy.kg < WeightConfig.StartKg.Colossal
 	)
-	check("a new Titan is worth x10", near(Weight.valueMultiplier("Titan", WeightConfig.StartKg.Titan), 10))
+
+	local titan: any = { size = "Normal", familiarity = 1, kg = 20, kgAt = 0, gene = "Titanic" }
+	local rng = fakeRandom(6)
+	for _ = 1, 200 do
+		Weight.spurt(titan, rng)
+	end
+	check("a Titanic monster becomes a Titan", titan.size == "Titan")
+	check("and keeps growing past any old cap", titan.kg > 10000)
+	check("a Titan's price has no limit", Weight.valueMultiplier("Titan", titan.kg) > 500)
 	check(
-		"a Titan is drawn at most TitanMaxScale",
-		near(Weight.drawScale("Titan", caught.kg), WeightConfig.TitanMaxScale)
+		"but its drawing stops at TitanMaxScale",
+		near(Weight.drawScale("Titan", titan.kg), WeightConfig.TitanMaxScale)
 	)
 	check(
 		"a new Titan starts at TitanStartScale",
-		near(Weight.drawScale("Titan", 320), WeightConfig.TitanStartScale)
+		near(Weight.drawScale("Titan", 200), WeightConfig.TitanStartScale)
 	)
-	check("other sizes draw at their Sizes scale", near(Weight.drawScale("Huge", 100), 1.7))
+	check("other sizes draw at their Sizes scale", near(Weight.drawScale("Huge", 50), 1.7))
 	check(
-		"value uses the Titan multiplier",
+		"value uses the weight",
 		Value.sellValue(
-			{ monsterId = "Gravepup", size = "Titan", kg = 320, effects = {}, familiarity = 0, fed = false },
+			{ monsterId = "Gravepup", size = "Titan", kg = 200, effects = {}, familiarity = 0 } :: any,
 			1
 		) == 100_000
 	)
-	local big: any = { size = "Big", effects = {}, kg = 15, kgAt = 0 }
-	Weight.settle(big, 0)
+	local big: any = { size = "Big", familiarity = 0, kg = 15, kgAt = 0, gene = "Mighty" }
+	Weight.spurt(big, fakeRandom(7))
 	check("sizes never shrink", big.size == "Big")
 	check(
 		"weight text",
 		Weight.text(54.7) == "54 kg" and Weight.text(1250) == "1.2 t" and Weight.text(5.25) == "5.2 kg"
 	)
+	local always: any = { size = "Normal", familiarity = 0, kg = 20, gene = "Titanic" }
+	local hit = Weight.eventRoll(always, 100, fakeRandom(8))
+	check("events roll growth even before full Familiarity", hit and always.kg > 20)
 	check(
 		"Titans are never rolled wild",
 		(function()
@@ -1724,12 +1751,19 @@ do
 		end)()
 	)
 
-	-- Storage pauses weight too.
-	local stored: any =
-		{ monsterId = "Gravepup", size = "Normal", effects = {}, familiarity = 0, kg = 20, kgAt = 0 }
+	-- Storage pauses growth too.
+	local stored: any = {
+		monsterId = "Gravepup",
+		size = "Normal",
+		effects = {},
+		familiarity = 1,
+		kg = 20,
+		kgAt = 0,
+		gene = "Titanic",
+	}
 	Storage.store(stored, 0)
-	Storage.unstore(stored, 10 * day)
-	Weight.settle(stored, 10 * day)
+	Storage.unstore(stored, 100 * day)
+	Weight.settle(stored, 100 * day, fakeRandom(9))
 	check("stored monster didn't gain weight", near(stored.kg, 20))
 end
 
