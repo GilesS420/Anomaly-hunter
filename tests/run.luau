@@ -266,6 +266,13 @@ do
 		end
 	end
 	check("every launch event has its own sky", skies)
+	local loud = true
+	for _, event in Events.List do
+		if event.launch and event.sky then
+			loud = loud and event.sky.weather ~= nil and event.sky.edge ~= nil
+		end
+	end
+	check("every launch event has weather and a screen edge you can't miss", loud)
 	check("Events.find finds by id", (Events.find("BloodMoon") :: any).name == "Blood Moon")
 	check("Events.find returns nil for unknown ids", Events.find("Nope") == nil and Events.find(nil) == nil)
 
