@@ -36,7 +36,9 @@ export type WatcherEvent = {
 	launch: boolean,
 	weight: number?, -- how often it's picked by the clock (nil: never picked by weight)
 	awakening: boolean?, -- plays when all the eyes are open
-	effect: string?, -- haunted effect that can roll while the event is live
+	effect: string?, -- haunted effect mansion monsters can pick up while the event is live
+	effectChance: number?, -- percent per monster per EffectRollSeconds (raised like roaming odds)
+	otherEffectsChance: number?, -- percent per roll for one of the other events' effects
 	durationSeconds: number?,
 	monsters: { [string]: number }?, -- event monster id -> spawn weight (optional bonus to catch)
 	effectOddsMultiplier: number?, -- mansion effect odds while live (Blood Moon doubles them)
@@ -52,6 +54,11 @@ Events.GapMinSeconds = 5 * 60
 Events.GapMaxSeconds = 10 * 60
 Events.WarningSeconds = 30
 Events.EyesToAwaken = 5
+
+-- While an event is live, every monster in the mansions of the players in the server rolls
+-- for the event's effect this often (Util/Haunting.eventRoll). A monster with all its effect
+-- slots full swaps its weakest plain effect for a stronger event effect.
+Events.EffectRollSeconds = 30
 
 -- How many event monsters (the Flicker and Blood Moon Phantoms, an optional bonus to catch)
 -- appear at the start of an event: this many per player in the server, clamped between Min
@@ -80,6 +87,8 @@ Events.List = {
 		name = "Frost Fog",
 		launch = true,
 		weight = 30,
+		effect = "Frostbitten",
+		effectChance = 6,
 		durationSeconds = 180,
 		sky = {
 			ambient = { 80, 110, 150 },
@@ -98,6 +107,8 @@ Events.List = {
 		name = "Sugar Rush",
 		launch = true,
 		weight = 25,
+		effect = "Sugarcoated",
+		effectChance = 6,
 		durationSeconds = 180,
 		growthMultiplier = 2,
 		sky = {
@@ -116,6 +127,8 @@ Events.List = {
 		name = "Gold Rush",
 		launch = true,
 		weight = 15,
+		effect = "Gilded",
+		effectChance = 4,
 		durationSeconds = 180,
 		sky = {
 			ambient = { 130, 95, 50 },
@@ -135,6 +148,7 @@ Events.List = {
 		launch = true,
 		weight = 20,
 		effect = "Poltergeist",
+		effectChance = 4,
 		durationSeconds = 180,
 		monsters = { Flickerwick = 70, StaticShade = 30 },
 		sky = {
@@ -155,6 +169,7 @@ Events.List = {
 		launch = true,
 		weight = 10,
 		effect = "Bloodmoon",
+		effectChance = 2,
 		durationSeconds = 240,
 		monsters = { CrimsonWisp = 70, Moonhowler = 30 },
 		effectOddsMultiplier = 2,
@@ -177,6 +192,8 @@ Events.List = {
 		launch = true,
 		awakening = true,
 		effect = "Watched",
+		effectChance = 0.3,
+		otherEffectsChance = 1,
 		durationSeconds = 300,
 		growthMultiplier = 3,
 		sky = {

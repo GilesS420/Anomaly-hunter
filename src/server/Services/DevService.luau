@@ -10,6 +10,7 @@
 --   /give VoidVac     gives a Workshop item or Bakery cake for free (tools are equipped;
 --                     /give BaitBell 5 or /give PumpkinCandy 3 gives several)
 --   /haunt            every monster in your mansion picks up a roaming effect right now
+--                     (during a Watcher event: the event's own effect instead)
 --   /skip 12          your monsters live 12 hours ahead: they grow Familiarity
 --   /grow 5           every monster in your mansion has 5 growth spurts right now, ignoring
 --                     luck and growth genes (/grow 25 makes Titans)
@@ -169,7 +170,10 @@ commands["/give"] = function(player, argument)
 end
 
 commands["/haunt"] = function(player)
-	local gained = HauntService.rollFor(player, true)
+	local event = WatcherService.current()
+	local gained = if event and event.effect
+		then HauntService.eventRollFor(player, event, true)
+		else HauntService.rollFor(player, true)
 	if gained == 0 then
 		Notify.toast(player, "No monster could take an effect (no room left).")
 	end

@@ -1,10 +1,12 @@
 --!strict
 -- Roaming effects: while a monster roams its owner's mansion it now and then picks up a
--- haunted effect (Cobwebbed, Possessed, Vampire, Batty, Mummy, and the live Watcher event's
--- effect). Numbers live in Config/Effects. Combos merge by themselves (Value.resolveEffects).
--- Pure functions so they can be tested outside Roblox.
+-- haunted effect (Cobwebbed, Possessed, Vampire, Batty, Mummy). Numbers live in
+-- Config/Effects. While a Watcher event is live, monsters also roll for that event's own
+-- effect (eventRoll, numbers in Config/Events). Combos merge by themselves
+-- (Value.resolveEffects). Pure functions so they can be tested outside Roblox.
 
 local Effects = require("../Config/Effects")
+local Events = require("../Config/Events")
 local Rng = require("./Rng")
 local Value = require("./Value")
 
@@ -62,6 +64,102 @@ function Haunting.roll(
 	return Rng.pickWeighted(options, function(option: Option)
 		return option.weight
 	end, random).id
+end
+
+-- Percent chance one event roll hits, from the event's base chance, raised by Familiarity and
+-- wings the same way as roaming odds.
+function Haunting.eventChance(base: number, familiarity: number, wingsOwned: number): number
+	return math.min(100, base * Haunting.chance(familiarity, wingsOwned, nil) / Effects.RoamChance)
+end
+
+-- The monster's effects with `effectId` added, or nil if it can't take it. A monster with no
+-- room swaps out its weakest plain effect (one that isn't part of a combo), but only for a
+-- stronger one.
+function Haunting.withEffect(effects: { string }, effectId: string): { string }?
+	local fit = Value.fits(effects, effectId)
+	if fit == "Ok" then
+		local after = table.clone(effects)
+		table.insert(after, effectId)
+		return after
+	elseif fit == "HasEffect" then
+		return nil
+	end
+	local incoming = Effects.List[effectId]
+	if not incoming then
+		return nil
+	end
+	local resolved = Value.resolveEffects(effects)
+	local plain: { string } = {}
+	for _, id in effects do
+		local effect = Effects.List[id]
+		if effect and table.find(resolved, id) and effect.multiplier < incoming.multiplier then
+			table.insert(plain, id)
+		end
+	end
+	table.sort(plain, function(a, b)
+		local ma, mb = Effects.List[a].multiplier, Effects.List[b].multiplier
+		return if ma == mb then a < b else ma < mb
+	end)
+	for _, weakest in plain do
+		local without = table.clone(effects)
+		table.remove(without, table.find(without, weakest) :: number)
+		if Value.fits(without, effectId) == "Ok" then
+			table.insert(without, effectId)
+			return without
+		end
+	end
+	return nil
+end
+
+-- The effects of the other launch events (for The Watcher Awakens' otherEffectsChance).
+local function otherEventEffects(event: Events.WatcherEvent): { string }
+	local list: { string } = {}
+	for _, other in Events.List do
+		local id = other.effect
+		if other.launch and other.id ~= event.id and id and Effects.List[id] and not table.find(list, id) then
+			table.insert(list, id)
+		end
+	end
+	table.sort(list)
+	return list
+end
+
+-- One event roll for a monster while `event` is live: the effect it picks up and its effect
+-- list afterwards, or nil. Doesn't change the monster.
+function Haunting.eventRoll(
+	caught: Value.CaughtMonster,
+	wingsOwned: number,
+	event: Events.WatcherEvent,
+	random: Random?
+): (string?, { string }?)
+	local effectId: string? = nil
+	if event.effect and event.effectChance then
+		if Rng.chance(Haunting.eventChance(event.effectChance, caught.familiarity, wingsOwned), random) then
+			effectId = event.effect
+		end
+	end
+	if not effectId and event.otherEffectsChance then
+		local others = otherEventEffects(event)
+		if
+			#others > 0
+			and Rng.chance(
+				Haunting.eventChance(event.otherEffectsChance, caught.familiarity, wingsOwned),
+				random
+			)
+		then
+			effectId = Rng.pickWeighted(others, function()
+				return 1
+			end, random)
+		end
+	end
+	if not effectId then
+		return nil, nil
+	end
+	local after = Haunting.withEffect(caught.effects, effectId)
+	if not after then
+		return nil, nil
+	end
+	return effectId, after
 end
 
 return Haunting
