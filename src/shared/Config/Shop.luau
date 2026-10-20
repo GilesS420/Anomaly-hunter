@@ -12,6 +12,7 @@ export type Item = {
 	kind: "Food" | "Vacuum" | "Lure" | "Charm",
 	price: number,
 	restockChance: number,
+	rarity: string, -- the tag in the shop window: a Config/Rarities id, or "Event" for event treats
 	tier: number?, -- vacuum tier for size limits
 	grantsEffect: string?,
 	singleUse: boolean?,
@@ -45,6 +46,7 @@ Shop.Bakery = {
 		kind = "Food",
 		price = 50_000,
 		restockChance = 80,
+		rarity = "Common",
 		grantsEffect = "PumpkinHead",
 	},
 	{
@@ -53,6 +55,7 @@ Shop.Bakery = {
 		kind = "Food",
 		price = 800_000,
 		restockChance = 45,
+		rarity = "Uncommon",
 		effectChances = { { effect = "Vampire", chance = 35 } },
 	},
 	{
@@ -61,6 +64,7 @@ Shop.Bakery = {
 		kind = "Food",
 		price = 2_000_000,
 		restockChance = 100,
+		rarity = "Event",
 		grantsEffect = "Poltergeist",
 		event = "Flicker",
 	},
@@ -70,6 +74,7 @@ Shop.Bakery = {
 		kind = "Food",
 		price = 2_500_000,
 		restockChance = 30,
+		rarity = "Rare",
 		grantsEffect = "Slimed",
 	},
 	{
@@ -78,6 +83,7 @@ Shop.Bakery = {
 		kind = "Food",
 		price = 8_000_000,
 		restockChance = 100,
+		rarity = "Event",
 		grantsEffect = "Frostbitten",
 		event = "FrostFog",
 	},
@@ -87,6 +93,7 @@ Shop.Bakery = {
 		kind = "Food",
 		price = 25_000_000,
 		restockChance = 100,
+		rarity = "Event",
 		grantsEffect = "Gilded",
 		event = "GoldRush",
 	},
@@ -96,6 +103,7 @@ Shop.Bakery = {
 		kind = "Food",
 		price = 30_000_000,
 		restockChance = 10,
+		rarity = "Epic",
 		grantsEffect = "Stitched",
 	},
 	{
@@ -104,6 +112,7 @@ Shop.Bakery = {
 		kind = "Food",
 		price = 250_000_000,
 		restockChance = 2,
+		rarity = "Legendary",
 		grantsEffect = "Cursed",
 	},
 	{
@@ -112,6 +121,7 @@ Shop.Bakery = {
 		kind = "Food",
 		price = 300_000_000,
 		restockChance = 100,
+		rarity = "Event",
 		grantsEffect = "Bloodmoon",
 		event = "BloodMoon",
 	},
@@ -121,6 +131,7 @@ Shop.Bakery = {
 		kind = "Food",
 		price = 400_000_000,
 		restockChance = 3,
+		rarity = "Legendary",
 		effectChances = { { effect = "Mummy", chance = 25 }, { effect = "Batty", chance = 100 } },
 	},
 	{
@@ -129,6 +140,7 @@ Shop.Bakery = {
 		kind = "Food",
 		price = 2_000_000_000,
 		restockChance = 0.8,
+		rarity = "Mythic",
 		grantsEffect = "Hexed",
 	},
 	{
@@ -137,18 +149,28 @@ Shop.Bakery = {
 		kind = "Food",
 		price = 15_000_000_000,
 		restockChance = 0.2,
+		rarity = "Divine",
 		grantsEffect = "Eclipsed",
 	},
 } :: { Item }
 
 Shop.Workshop = {
-	{ id = "DustBuster", name = "Dust Buster", kind = "Vacuum", price = 0, restockChance = 100, tier = 1 },
+	{
+		id = "DustBuster",
+		name = "Dust Buster",
+		kind = "Vacuum",
+		price = 0,
+		restockChance = 100,
+		rarity = "Common",
+		tier = 1,
+	},
 	{
 		id = "BaitBell",
 		name = "Bait Bell",
 		kind = "Lure",
 		price = 10_000,
 		restockChance = 50,
+		rarity = "Uncommon",
 		singleUse = true,
 		maxRarity = "Legendary",
 	},
@@ -158,6 +180,7 @@ Shop.Workshop = {
 		kind = "Vacuum",
 		price = 50_000,
 		restockChance = 80,
+		rarity = "Common",
 		tier = 2,
 	},
 	{
@@ -166,6 +189,7 @@ Shop.Workshop = {
 		kind = "Vacuum",
 		price = 250_000,
 		restockChance = 60,
+		rarity = "Uncommon",
 		tier = 2,
 	},
 	{
@@ -174,10 +198,27 @@ Shop.Workshop = {
 		kind = "Vacuum",
 		price = 70_000_000,
 		restockChance = 25,
+		rarity = "Rare",
 		tier = 2,
 	},
-	{ id = "MoonVac", name = "Moon Vac", kind = "Vacuum", price = 150_000_000, restockChance = 15, tier = 2 },
-	{ id = "VoidVac", name = "Void Vac", kind = "Vacuum", price = 400_000_000, restockChance = 6, tier = 3 },
+	{
+		id = "MoonVac",
+		name = "Moon Vac",
+		kind = "Vacuum",
+		price = 150_000_000,
+		restockChance = 15,
+		rarity = "Epic",
+		tier = 2,
+	},
+	{
+		id = "VoidVac",
+		name = "Void Vac",
+		kind = "Vacuum",
+		price = 400_000_000,
+		restockChance = 6,
+		rarity = "Legendary",
+		tier = 3,
+	},
 	-- A convenience: it pays for itself in time saved once you hunt in zone 3.
 	{
 		id = "ReturnCharm",
@@ -185,6 +226,7 @@ Shop.Workshop = {
 		kind = "Charm",
 		price = 50_000,
 		restockChance = 60,
+		rarity = "Uncommon",
 		singleUse = true,
 	},
 } :: { Item }

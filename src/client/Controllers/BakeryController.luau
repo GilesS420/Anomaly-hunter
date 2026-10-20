@@ -1,7 +1,7 @@
 --!strict
--- The Haunted Bakery window. Opens when you use the prompt at the Bakery. Lists the cakes
--- for sale with what each bite can do, its price and a Buy button. Bought cakes go into your
--- Roblox hotbar, where you hold one in your mansion and click to set it out (CakeService).
+-- The Haunted Bakery window. Opens when you use the prompt at the Bakery. One card per cake
+-- (ShopCards): its picture, stock, price, rarity and what each bite can do; tap a card for
+-- its Buy button. Bought cakes go into your hotbar, where you hold one in your mansion and click to set it out (CakeService).
 -- The stock changes together with the Workshop's and a countdown shows when. The server
 -- checks everything (server/Services/BakeryService).
 
@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
+local ShopCards = require(script.Parent.Parent:WaitForChild("ShopCards"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
 local BakeryController = {}
@@ -18,14 +19,15 @@ type TreatRow = {
 	name: string,
 	price: number,
 	description: string,
+	rarity: string,
+	rarityColor: Color3,
+	look: string,
 	inStock: boolean,
 	count: number,
 	bought: number,
 	limit: number,
 }
 type View = { treats: { TreatRow }, secondsLeft: number, money: number }
-
-local TreatColor = Color3.fromRGB(255, 170, 90)
 
 local function countdown(seconds: number): string
 	seconds = math.max(0, math.floor(seconds))
@@ -39,6 +41,7 @@ function BakeryController.start()
 	local Buy = remotes:WaitForChild("Buy") :: RemoteFunction
 
 	local window = Ui.window("BakeryUi", "Haunted Bakery")
+	ShopCards.widen(window)
 	local restockAt = 0 -- os.clock() when the stock changes
 	local money = 0
 	local waiting = false -- a request is on its way; ignore more taps until it answers
@@ -65,28 +68,43 @@ function BakeryController.start()
 
 	local function showTreats(view: View)
 		updateStatus()
-		local full = UDim2.fromScale(1, 1)
-		for i, treat in view.treats do
-			local detail = treat.description
-			if treat.count > 0 then
-				detail = `You have {treat.count} · {detail}`
-			end
-			local name = `{treat.name} · {Format.money(treat.price)}`
-			local _, actions = Ui.row(window.list, i, name, TreatColor, detail)
-			local treatId = treat.id
-
-			if not treat.inStock then
-				Ui.button(actions, "Out of stock", Ui.Colors.off, full).AutoButtonColor = false
-			elseif treat.bought >= treat.limit then
-				Ui.button(actions, "Sold out", Ui.Colors.off, full).AutoButtonColor = false
+		local cards: { ShopCards.Card } = {}
+		for _, treat in view.treats do
+			local left = treat.limit - treat.bought
+			local stock, stockColor = `{left} in stock`, ShopCards.InStock
+			local action: ShopCards.Action
+			if not treat.inStock or left <= 0 then
+				stock, stockColor = "No stock", ShopCards.NoStock
+				action = { text = "No stock", color = Ui.Colors.off, enabled = false }
 			else
 				-- Too expensive still shows Buy (dimmed); the server says how much is missing.
-				local color = if money >= treat.price then Ui.Colors.buy else Ui.Colors.off
-				Ui.button(actions, "Buy", color, full).Activated:Connect(function()
-					ask(Buy, treatId)
-				end)
+				local treatId = treat.id
+				action = {
+					text = "Buy",
+					color = if money >= treat.price then Ui.Colors.buy else Ui.Colors.off,
+					enabled = true,
+					run = function()
+						ask(Buy, treatId)
+					end,
+				}
 			end
+			if treat.count > 0 then
+				stock ..= ` · you have {treat.count}`
+			end
+			table.insert(cards, {
+				key = treat.id,
+				name = treat.name,
+				look = treat.look,
+				rarity = treat.rarity,
+				rarityColor = treat.rarityColor,
+				effect = treat.description,
+				stock = stock,
+				stockColor = stockColor,
+				price = treat.price,
+				action = action,
+			})
 		end
+		ShopCards.show(window.list, cards)
 	end
 
 	function render(view: View?)

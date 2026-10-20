@@ -1,6 +1,7 @@
 --!strict
--- The Hunter's Workshop window. Opens when you use the prompt at the Workshop; shows every
--- item with what it does, its price and a button: Buy, Equip, Using, Out of stock or Sold out.
+-- The Hunter's Workshop window. Opens when you use the prompt at the Workshop. One card per
+-- item (ShopCards): its icon, stock, price, rarity and what it does; tap a card for its
+-- button: Buy, Equip, Using or No stock.
 -- A countdown shows when the stock changes; the window refreshes by itself when it does.
 -- The server checks every purchase (server/Services/WorkshopService).
 
@@ -8,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
+local ShopCards = require(script.Parent.Parent:WaitForChild("ShopCards"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
 local WorkshopController = {}
@@ -18,6 +20,8 @@ type Row = {
 	kind: string,
 	price: number,
 	description: string,
+	rarity: string,
+	rarityColor: Color3,
 	tool: boolean,
 	inStock: boolean,
 	owned: boolean,
@@ -27,12 +31,6 @@ type Row = {
 	limit: number,
 }
 type View = { items: { Row }, secondsLeft: number, money: number }
-
-local kindColors: { [string]: Color3 } = {
-	Vacuum = Color3.fromRGB(120, 200, 255),
-	Lure = Color3.fromRGB(255, 160, 120),
-	Charm = Color3.fromRGB(160, 255, 200),
-}
 
 local function countdown(seconds: number): string
 	seconds = math.max(0, math.floor(seconds))
@@ -47,6 +45,7 @@ function WorkshopController.start()
 	local Equip = remotes:WaitForChild("Equip") :: RemoteFunction
 
 	local window = Ui.window("WorkshopUi", "Hunter's Workshop")
+	ShopCards.widen(window)
 	local restockAt = 0 -- os.clock() when the stock changes
 	local money = 0
 	local waiting = false -- a request is on its way; ignore more taps until it answers
@@ -80,39 +79,55 @@ function WorkshopController.start()
 		money = view.money
 		updateStatus()
 
-		for i, item in view.items do
-			local detail = item.description
-			if not item.tool and item.count > 0 then
-				detail = `You have {item.count} · {detail}`
-			end
-			local name = if item.price > 0 then `{item.name} · {Format.money(item.price)}` else item.name
-			local _, actions = Ui.row(window.list, i, name, kindColors[item.kind] or Ui.Colors.text, detail)
-			local size = UDim2.fromScale(1, 1)
+		local cards: { ShopCards.Card } = {}
+		for _, item in view.items do
 			local itemId = item.id
-
+			local left = item.limit - item.bought
+			local stock, stockColor = `{left} in stock`, ShopCards.InStock
+			local action: ShopCards.Action
 			if item.tool and item.owned then
-				if item.equipped then
-					local using = Ui.button(actions, "Using", Ui.Colors.off, size)
-					using.AutoButtonColor = false
-				else
-					Ui.button(actions, "Equip", Ui.Colors.equip, size).Activated:Connect(function()
-						ask(Equip, itemId)
-					end)
-				end
-			elseif not item.inStock then
-				local out = Ui.button(actions, "Out of stock", Ui.Colors.off, size)
-				out.AutoButtonColor = false
-			elseif not item.tool and item.bought >= item.limit then
-				local sold = Ui.button(actions, "Sold out", Ui.Colors.off, size)
-				sold.AutoButtonColor = false
+				stock = if item.equipped then "Owned · using it" else "Owned"
+				action = if item.equipped
+					then { text = "Using", color = Ui.Colors.off, enabled = false }
+					else {
+						text = "Equip",
+						color = Ui.Colors.equip,
+						enabled = true,
+						run = function()
+							ask(Equip, itemId)
+						end,
+					}
+			elseif not item.inStock or left <= 0 then
+				stock, stockColor = "No stock", ShopCards.NoStock
+				action = { text = "No stock", color = Ui.Colors.off, enabled = false }
 			else
 				-- Too expensive still shows Buy (dimmed); the server says how much is missing.
-				local color = if money >= item.price then Ui.Colors.buy else Ui.Colors.off
-				Ui.button(actions, "Buy", color, size).Activated:Connect(function()
-					ask(Buy, itemId)
-				end)
+				action = {
+					text = "Buy",
+					color = if money >= item.price then Ui.Colors.buy else Ui.Colors.off,
+					enabled = true,
+					run = function()
+						ask(Buy, itemId)
+					end,
+				}
 			end
+			if not item.tool and item.count > 0 then
+				stock ..= ` · you have {item.count}`
+			end
+			table.insert(cards, {
+				key = item.id,
+				name = item.name,
+				icon = Ui.Icons[item.kind],
+				rarity = item.rarity,
+				rarityColor = item.rarityColor,
+				effect = item.description,
+				stock = stock,
+				stockColor = stockColor,
+				price = item.price,
+				action = action,
+			})
 		end
+		ShopCards.show(window.list, cards)
 	end
 
 	local function refresh()

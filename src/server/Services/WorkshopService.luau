@@ -20,6 +20,7 @@ local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local Counter = require(script.Parent.Parent.Counter)
 local DataService = require(script.Parent.DataService)
 local HuntService = require(script.Parent.HuntService)
+local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
 
 local WorkshopService = {}
@@ -30,6 +31,8 @@ export type Row = {
 	kind: string,
 	price: number,
 	description: string,
+	rarity: string, -- the tag on the card (Shop.Item.rarity)
+	rarityColor: Color3,
 	tool: boolean,
 	inStock: boolean,
 	owned: boolean, -- tools: you have it
@@ -81,6 +84,8 @@ local function viewFor(data: DataService.Data): View
 			kind = item.kind :: string,
 			price = item.price,
 			description = Workshop.describe(item),
+			rarity = item.rarity,
+			rarityColor = MonsterModel.color(item.rarity),
 			tool = Workshop.isTool(item),
 			inStock = Workshop.inStock(item, slot),
 			owned = Workshop.owns(data.inventory, item),

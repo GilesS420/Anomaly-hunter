@@ -57,21 +57,6 @@ type Tab = "Monsters" | "Cakes" | "Tools" | "Favorited"
 
 local Tabs = { "Monsters", "Cakes", "Tools", "Favorited" } :: { Tab }
 local Heart = Color3.fromRGB(235, 60, 90)
-local Icons = { Vacuum = "🌀", Lure = "🔔", Charm = "🧿" }
-
--- Puts a copy of a preview model in the card's viewport, looking at it from the front.
-local function picture(viewport: ViewportFrame, model: Model)
-	local copy = model:Clone()
-	copy.Parent = viewport
-	local frame, size = copy:GetBoundingBox()
-	local reach = math.max(size.X, size.Y, size.Z)
-	local camera = Instance.new("Camera")
-	camera.FieldOfView = 40
-	local from = frame.Position + Vector3.new(reach * 0.5, reach * 0.35, -reach * 1.6)
-	camera.CFrame = CFrame.lookAt(from, frame.Position)
-	camera.Parent = viewport
-	viewport.CurrentCamera = camera
-end
 
 function InventoryController.start()
 	local player = Players.LocalPlayer
@@ -79,7 +64,6 @@ function InventoryController.start()
 	local GetView = remotes:WaitForChild("GetView") :: RemoteFunction
 	local Lock = remotes:WaitForChild("Lock") :: RemoteFunction
 	local Equip = remotes:WaitForChild("Equip") :: RemoteFunction
-	local playerGui = player:WaitForChild("PlayerGui")
 
 	local window = Ui.window("BackpackUi", "Backpack")
 	local panel = window.gui:FindFirstChild("Panel") :: Frame
@@ -210,31 +194,8 @@ function InventoryController.start()
 		Ui.corner(button, 10)
 		Ui.rim(button, if selected == key then Ui.Colors.lamp else rim, if selected == key then 3 else 2)
 
-		if look then
-			local viewport = Instance.new("ViewportFrame")
-			viewport.BackgroundTransparency = 1
-			viewport.Size = UDim2.new(1, 0, 1, -20)
-			viewport.Ambient = Color3.fromRGB(170, 160, 190)
-			viewport.LightColor = Color3.new(1, 1, 1)
-			viewport.LightDirection = Vector3.new(-0.4, -1, 0.6)
-			viewport.Parent = button
-			local folder = playerGui:FindFirstChild("InventoryPreviews")
-			local model = if folder then folder:FindFirstChild(look) else nil
-			if model and model:IsA("Model") then
-				picture(viewport, model)
-			else
-				-- Not built yet (just caught or bought): it turns up within a second.
-				task.spawn(function()
-					local holder = playerGui:WaitForChild("InventoryPreviews", 5)
-					local late = if holder then holder:WaitForChild(look, 5) else nil
-					if late and late:IsA("Model") and viewport.Parent then
-						picture(viewport, late)
-					end
-				end)
-			end
-		elseif icon then
-			local glyph = Ui.text(button, icon, UDim2.new(1, 0, 1, -20), Ui.Colors.text, false, 48)
-			glyph.TextXAlignment = Enum.TextXAlignment.Center
+		if look or icon then
+			Ui.picture(button, UDim2.new(1, 0, 1, -20), look, icon)
 		end
 		local label = Ui.text(button, caption, UDim2.new(1, -8, 0, 18), Ui.Colors.text, true, 15)
 		label.AnchorPoint = Vector2.new(0.5, 1)
@@ -317,7 +278,7 @@ function InventoryController.start()
 				key,
 				if item.cake then Ui.Colors.sell else Ui.Colors.equip,
 				item.look,
-				Icons[item.kind],
+				Ui.Icons[item.kind],
 				caption,
 				if item.cake then { "CakeId", item.id } else nil
 			)
