@@ -260,13 +260,19 @@ local function onStartCatch(player: Player, model: unknown)
 		return
 	end
 
-	-- 3. Room in the bag.
+	-- 3. A vacuum in your hand (holding it also made it the vacuum you use).
+	if not HuntService.heldVacuum(player) then
+		Notify.toast(player, "Hold your vacuum to catch! Pick it in your hotbar.")
+		return
+	end
+
+	-- 4. Room in the bag.
 	if HuntService.isBagFull(player) then
 		Notify.toast(player, "Your bag is full. Bring your catch home first!")
 		return
 	end
 
-	-- 4. Room at home.
+	-- 5. Room at home.
 	if not MansionService.hasRoom(player) then
 		Notify.toast(
 			player,
@@ -275,7 +281,7 @@ local function onStartCatch(player: Player, model: unknown)
 		return
 	end
 
-	-- 5. Close enough for the vacuum's beam.
+	-- 6. Close enough for the vacuum's beam.
 	local vacuumId = data.equipped.vacuum
 	local reach = Catching.reach(vacuumId)
 	if distanceTo(player, model) > reach then
@@ -284,7 +290,7 @@ local function onStartCatch(player: Player, model: unknown)
 		return
 	end
 
-	-- 6. Strong enough vacuum.
+	-- 7. Strong enough vacuum.
 	if not Catching.canVacuum(vacuumId, spawned.size, spawned.rarity) then
 		local tier = Catching.requiredTier(spawned.size, spawned.rarity)
 		local vacuumName = vacuumByTier[tier]

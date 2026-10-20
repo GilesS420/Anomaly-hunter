@@ -1956,6 +1956,32 @@ do
 	check("stored monster didn't gain weight", near(stored.kg, 20))
 end
 
+-- Hand-held tool looks: every Workshop item has one, held by a part named Handle at the
+-- origin, every part sized and named once.
+do
+	local ToolLooks = require("../src/shared/Config/ToolLooks")
+	local ok = true
+	for _, item in Shop.Workshop do
+		local recipe = ToolLooks.ById[item.id]
+		if not recipe then
+			ok = false
+			print(`  {item.id} has no hand-held look`)
+			continue
+		end
+		local names, handle = {}, false
+		for _, p in recipe() do
+			if names[p.name] or #p.size ~= 3 or p.size[1] <= 0 or p.size[2] <= 0 or p.size[3] <= 0 then
+				ok = false
+				print(`  {item.id}: bad or doubled part {p.name}`)
+			end
+			names[p.name] = true
+			handle = handle or (p.name == "Handle" and p.at[1] == 0 and p.at[2] == 0 and p.at[3] == 0)
+		end
+		ok = ok and handle
+	end
+	check("every Workshop item has a hand-held look with a Handle at the grip", ok)
+end
+
 if failures > 0 then
 	error(`{failures} check(s) failed`)
 end

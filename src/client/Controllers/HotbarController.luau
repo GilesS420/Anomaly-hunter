@@ -1,13 +1,13 @@
 --!strict
 -- Our own hotbar, in place of Roblox's, and the bottom row of the Backpack: nine numbered
--- slots holding Tools from your inventory (cakes and the monsters in it). Press 1 to 9 or
--- click/tap a slot to hold that Tool, again to put it away.
--- Like Roblox's: a Tool keeps its slot, and a new one goes in the first empty slot (cakes
--- before monsters when several arrive at once). With the Backpack open every slot shows, and
--- you can drag a card onto a slot, drag slots onto each other to swap them, or drag one off
--- the bar to keep it in the Backpack only (InventoryController).
--- The server tags each Tool with Section ("Cake" or "Monster") and Order (CakeService,
--- InventoryService).
+-- slots holding Tools from your inventory (vacuums, Bait Bells, Return Charms, cakes and the
+-- monsters in it). Press 1 to 9 or click/tap a slot to hold that Tool, again to put it away.
+-- Like Roblox's: a Tool keeps its slot, and a new one goes in the first empty slot (tools,
+-- then cakes, then monsters when several arrive at once). With the Backpack open every slot
+-- shows, and you can drag a card onto a slot, drag slots onto each other to swap them, or
+-- drag one off the bar to keep it in the Backpack only (InventoryController).
+-- The server tags each Tool with Section ("Tool", "Cake" or "Monster") and Order
+-- (HuntService, CakeService, InventoryService).
 
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
@@ -20,8 +20,9 @@ local Drag = require(script.Parent.Parent:WaitForChild("Drag"))
 local HotbarController = {}
 
 local Slots = 9
-local SectionOrder = { Cake = 1, Monster = 2 }
+local SectionOrder = { Tool = 1, Cake = 2, Monster = 3 }
 local SectionColor = {
+	Tool = Ui.Colors.buy,
 	Cake = Ui.Colors.sell,
 	Monster = Ui.Colors.equip,
 }
@@ -236,7 +237,7 @@ function HotbarController.start()
 
 	-- Drops Tools that are gone and puts new ones in the first empty slots.
 	local function arrange()
-		local have = HotbarController.tools() -- sorted, so cakes fill in before monsters
+		local have = HotbarController.tools() -- sorted, so tools fill in first, then cakes, then monsters
 		local present: { [Tool]: boolean } = {}
 		for _, tool in have do
 			present[tool] = true
