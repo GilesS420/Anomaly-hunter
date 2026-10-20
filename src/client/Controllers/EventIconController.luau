@@ -1,8 +1,10 @@
 --!strict
 -- While a Watcher event is live, its icon sits in the bottom-right corner of the screen (on
 -- phones, above the jump button). Hover over it (or tap it) to see the event's name and how
--- long is left.
--- Reads the workspace attributes WatcherEvent and WatcherEventEnd (WatcherService).
+-- long is left. It comes with the weather, at the start of the 30 second warning, and shows
+-- how long until the event starts until then.
+-- Reads the workspace attributes WatcherEvent, WatcherEventEnd, WatcherNext and WatcherSkyAt
+-- (WatcherService).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -77,8 +79,14 @@ function EventIconController.start()
 		pinned = not pinned
 	end)
 
+	-- The live event, or else the one being warned about.
+	local function showing(): Events.WatcherEvent?
+		return Events.find(workspace:GetAttribute("WatcherEvent"))
+			or Events.find(workspace:GetAttribute("WatcherNext"))
+	end
+
 	local function refresh()
-		local event = Events.find(workspace:GetAttribute("WatcherEvent"))
+		local event = showing()
 		icon.Visible = event ~= nil and not Ui.anyWindowOpen("BackpackUi")
 		if not event then
 			pinned = false
@@ -91,14 +99,21 @@ function EventIconController.start()
 		title.Text = event.name
 	end
 	workspace:GetAttributeChangedSignal("WatcherEvent"):Connect(refresh)
+	workspace:GetAttributeChangedSignal("WatcherNext"):Connect(refresh)
 	Ui.windowsChanged:Connect(refresh)
 	refresh()
 
 	RunService.Heartbeat:Connect(function()
 		tip.Visible = icon.Visible and (hovering or pinned)
 		if tip.Visible then
-			local ends = tonumber(workspace:GetAttribute("WatcherEventEnd")) or 0
-			left.Text = `{Watcher.clock(math.max(ends - workspace:GetServerTimeNow(), 0))} left`
+			local now = workspace:GetServerTimeNow()
+			if workspace:GetAttribute("WatcherEvent") then
+				local ends = tonumber(workspace:GetAttribute("WatcherEventEnd")) or 0
+				left.Text = `{Watcher.clock(ends - now)} left`
+			else
+				local starts = tonumber(workspace:GetAttribute("WatcherSkyAt")) or 0
+				left.Text = `Starts in {Watcher.clock(starts - now)}`
+			end
 		end
 	end)
 end
