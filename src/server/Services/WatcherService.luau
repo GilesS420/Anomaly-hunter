@@ -564,7 +564,6 @@ function WatcherService.capture(model: Model, vacuumId: string): Value.CaughtMon
 		effects = Spawning.rollCatchEffects(vacuumId, random),
 		variant = Spawning.rollVariant(vacuumId, random),
 		familiarity = 0,
-		fed = true,
 	}
 end
 

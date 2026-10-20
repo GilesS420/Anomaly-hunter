@@ -2,9 +2,7 @@
 -- Sell value of a caught monster:
 --   baseValue x size (a Titan's grows with its weight, Util/Weight) x effects x familiarity x wing boost x catch variant
 -- Effect bonuses add up (1 + sum(multiplier - 1)). Combos replace their two
--- ingredients. Unfed (hungry) monsters only sell for base value x size x variant (a Gold
--- coat doesn't go to sleep). Call Util/Care.settle
--- first so familiarity and fed are up to date.
+-- ingredients. Call Util/Care.settle first so familiarity is up to date.
 
 local Effects = require("../Config/Effects")
 local Monsters = require("../Config/Monsters")
@@ -22,8 +20,6 @@ export type CaughtMonster = {
 	size: string,
 	effects: { string },
 	familiarity: number, -- 0 to 1, as of grownAt
-	fed: boolean, -- kept up to date by Util/Care.settle; hungry monsters sell for base x size
-	fedUntil: number?, -- os.time() when it gets hungry (set when it enters the mansion)
 	grownAt: number?, -- os.time() its familiarity was last brought up to date
 	storedAt: number?, -- os.time() it went into Storage (nil while in the mansion), see Util/Storage
 	locked: boolean?, -- locked monsters can't be sold
@@ -99,10 +95,6 @@ function Value.sellValue(caught: CaughtMonster, wingsOwned: number): number
 	local value = monster.baseValue
 		* Weight.valueMultiplier(caught.size, caught.kg)
 		* Value.variantMultiplier(caught.variant)
-	if not caught.fed then
-		return math.floor(value)
-	end
-
 	local familiarity = 1 + math.clamp(caught.familiarity, 0, 1) * (Value.FamiliarityMaxMultiplier - 1)
 	local wingBoost = 1 + math.max(wingsOwned - 1, 0) * Wings.ValueBoostPerWing
 	return math.floor(value * Value.effectMultiplier(caught.effects) * familiarity * wingBoost)

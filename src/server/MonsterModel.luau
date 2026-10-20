@@ -1,7 +1,7 @@
 --!strict
 -- Builds how a monster looks, with its name floating above it. Used for wild monsters in
--- zones and for the ones roaming a mansion (those get a third line saying if they're fed and
--- glow dimmer while they're hungry). Every monster wears a price tag: what the Collector pays
+-- zones and for the ones roaming a mansion (those get a third line saying how familiar they
+-- are). Every monster wears a price tag: what the Collector pays
 -- for a mansion monster, and base value x size (what it's worth before effects, Familiarity
 -- and wings) for a wild one.
 -- Monsters with a look in Config/Looks are stud-style block models whose limbs are joined
@@ -32,8 +32,7 @@ export type Info = {
 	effects: { string }?, -- merged into combos already (Value.resolveEffects)
 	variant: string?, -- catch variant: "Silver", "Gold", "Shiny" or "Rainbow"
 	owner: string?,
-	status: string?, -- mansion monsters: "Fed · 45% familiar" (see Util/Care.status)
-	hungry: boolean?, -- mansion monsters: dims the glow and puts the effects to sleep
+	status: string?, -- mansion monsters: "45% familiar" (see Util/Care.status)
 	value: number?, -- mansion monsters: what the Collector pays right now (Util/Value.sellValue);
 	-- left out, the tag shows base value x size
 	kg: number?, -- mansion monsters: its weight (a Titan is drawn bigger as it grows)
@@ -41,7 +40,7 @@ export type Info = {
 	-- radius (MonsterModel.roamRadius); it stands that high above the floor
 }
 
--- What the tag shows: the given value, or base value x size (an unfed monster with no effects).
+-- What the tag shows: the given value, or base value x size (no effects, Familiarity or wings).
 local function tagValue(info: Info): number
 	if info.value then
 		return info.value
@@ -51,7 +50,6 @@ local function tagValue(info: Info): number
 		size = info.size,
 		effects = {},
 		familiarity = 0,
-		fed = false,
 		kg = info.kg,
 	}
 	local ok, value = pcall(Value.sellValue, plain, 1)
@@ -97,13 +95,11 @@ function MonsterModel.roamRadius(radius: number): number
 	return math.min(radius, WeightConfig.MaxRoamRadius)
 end
 
-local FedColor = Color3.fromRGB(255, 190, 230)
-local HungryColor = Color3.fromRGB(255, 120, 70)
+local FamiliarColor = Color3.fromRGB(255, 190, 230)
 
 -- Price tag colours, the same spooky style as the shop windows (client Ui.Colors).
 local TagPanel = Color3.fromRGB(18, 14, 26)
 local TagLamp = Color3.fromRGB(255, 176, 84) -- lantern orange
-local TagHungry = Color3.fromRGB(150, 140, 165) -- a hungry monster sells for less: the tag dims
 local TagHeight = 26 -- pixels, on top of the name label
 
 -- One line of text in the name label.
@@ -132,7 +128,7 @@ local function line(
 	label.Parent = parent
 end
 
--- "Big Rare · Ghost, Werewolf" (effects fall asleep while the monster is hungry).
+-- "Big Rare · Ghost, Werewolf".
 local function detailsText(info: Info): string
 	local details = `{info.size} {info.rarity}`
 	if info.kg then
@@ -144,8 +140,7 @@ local function detailsText(info: Info): string
 		for _, effectId in effects do
 			table.insert(names, Format.name(effectId))
 		end
-		local asleep = if info.hungry then " (asleep)" else ""
-		details ..= ` · {table.concat(names, ", ")}{asleep}`
+		details ..= ` · {table.concat(names, ", ")}`
 	end
 	return details
 end
@@ -159,7 +154,7 @@ local function lookKey(info: Info): string
 	return `{table.concat(info.effects or {}, ",")}|{info.variant or ""}|{scale}`
 end
 
--- Updates the label and glow after a mansion monster was fed, got hungry or got an effect.
+-- Updates the label after a mansion monster got more familiar or got an effect.
 function MonsterModel.refresh(model: Model, info: Info)
 	local body = model.PrimaryPart
 	if not body then
@@ -176,23 +171,13 @@ function MonsterModel.refresh(model: Model, info: Info)
 	local status = billboard and billboard:FindFirstChild("Status")
 	if status and status:IsA("TextLabel") then
 		status.Text = info.status or ""
-		status.TextColor3 = if info.hungry then HungryColor else FedColor
+		status.TextColor3 = FamiliarColor
 	end
 	local tag = billboard and billboard:FindFirstChild("Value")
 	local price = tag and tag:FindFirstChild("Price")
 	if tag and price and price:IsA("TextLabel") then
 		price.Text = Format.money(tagValue(info))
-		local color = if info.hungry then TagHungry else TagLamp
-		price.TextColor3 = color
-		local rim = tag:FindFirstChildOfClass("UIStroke")
-		if rim then
-			rim.Color = color
-		end
-	end
-	body.Material = if info.hungry then Enum.Material.SmoothPlastic else Enum.Material.Neon
-	local light = body:FindFirstChildOfClass("PointLight")
-	if light then
-		light.Brightness = if info.hungry then 0.3 else 1.2
+		price.TextColor3 = TagLamp
 	end
 end
 
@@ -434,7 +419,7 @@ function MonsterModel.build(info: Info): Model
 	light.Parent = body
 
 	-- "$1.2M" price tag / "Wisp Jack" / "Big Rare · Ghost, Werewolf" / mansion monsters:
-	-- "Fed · 45% familiar"
+	-- "45% familiar"
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "Label"
 	billboard.Adornee = body
@@ -455,7 +440,7 @@ function MonsterModel.build(info: Info): Model
 	if info.status then
 		line(billboard, "Name", name, Color3.new(1, 1, 1), row(top), row(26.4), true)
 		line(billboard, "Details", "", color, row(top + 26.4), row(19.8), false)
-		line(billboard, "Status", "", FedColor, row(top + 46.2), row(19.8), false)
+		line(billboard, "Status", "", FamiliarColor, row(top + 46.2), row(19.8), false)
 	else
 		line(billboard, "Name", name, Color3.new(1, 1, 1), row(top), row(25.3), true)
 		line(billboard, "Details", "", color, row(top + 25.3), row(20.7), false)

@@ -246,7 +246,6 @@ function SpawnService.capture(model: Model, vacuumId: string): Value.CaughtMonst
 		effects = Spawning.rollCatchEffects(vacuumId, random),
 		variant = Spawning.rollVariant(vacuumId, random),
 		familiarity = 0,
-		fed = true,
 	}
 end
 

@@ -27,9 +27,6 @@ end
 -- Call when a monster comes out of Storage, before it goes back into the mansion.
 function Storage.unstore(caught: Value.CaughtMonster, now: number)
 	local paused = math.max(0, now - (caught.storedAt or now))
-	if caught.fedUntil then
-		caught.fedUntil += paused
-	end
 	if caught.grownAt then
 		caught.grownAt = math.min(caught.grownAt + paused, now)
 	end

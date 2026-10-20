@@ -1,8 +1,7 @@
 --!strict
 -- The Backpack: everything you own, anywhere in the game. Two tabs:
---   Items     your tools (equip them right here) and how many of each treat, bell and charm.
---             Give on a treat lists your mansion monsters so you pick who eats it; Set out
---             puts it down where you stand in your mansion for the monsters to nibble
+--   Items     your tools (equip them right here) and how many of each cake, bell and charm.
+--             Cakes are also in the Roblox hotbar, where you hold one to set it out
 --             (CakeService).
 --   Monsters  every monster in your mansion and in Storage, most valuable first. Store one to
 --             make room (it's paused there, see Util/Storage), place it back when a wing has
@@ -14,11 +13,10 @@
 --   Move     client -> server (uid) -> Result      mansion -> Storage, or Storage -> mansion
 --   Lock     client -> server (uid) -> Result      locks or unlocks a monster
 --   Equip    client -> server (itemId) -> Result   puts an owned tool into use
---   Give     client -> server (itemId, uid) -> Result   gives a treat to a mansion monster
---   SetOut   client -> server (itemId) -> Result   sets a treat out as a cake where you stand
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Care = require(ReplicatedStorage.Shared.Util.Care)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.Inventory)
@@ -27,13 +25,10 @@ local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
-local CakeService = require(script.Parent.CakeService)
-local CareService = require(script.Parent.CareService)
 local DataService = require(script.Parent.DataService)
 local HuntService = require(script.Parent.HuntService)
 local MansionService = require(script.Parent.MansionService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
-local Notify = require(script.Parent.Parent.Notify)
 local WorkshopService = require(script.Parent.WorkshopService)
 
 local InventoryService = {}
@@ -45,7 +40,6 @@ export type MonsterRow = {
 	color: Color3, -- rarity colour
 	stored: boolean,
 	locked: boolean,
-	blocked: { [string]: string }, -- treat id -> why it can't have that treat ("Has it", "Full")
 }
 export type ItemRow = {
 	id: string,
@@ -53,8 +47,6 @@ export type ItemRow = {
 	details: string,
 	tool: boolean,
 	equipped: boolean,
-	treat: boolean, -- a Bakery treat: can be given to a monster
-	confirm: boolean, -- expensive treat: giving it needs a second tap
 }
 export type View = {
 	monsters: { MonsterRow },
@@ -78,11 +70,6 @@ local GetView = remote("GetView")
 local Move = remote("Move")
 local Lock = remote("Lock")
 local Equip = remote("Equip")
-local Give = remote("Give")
-local SetOut = remote("SetOut")
-
-local ConfirmGiveFrom = 1_000_000 -- giving a treat this expensive needs a second tap
-local blockedText: { [string]: string } = { HasEffect = "Has it", NoRoom = "Full" }
 
 local kindOrder = { Vacuum = 1, Food = 2, Lure = 3, Charm = 4 }
 
@@ -107,16 +94,6 @@ local function monsterRow(caught: Value.CaughtMonster, stored: boolean, value: n
 		table.insert(parts, table.concat(names, ", "))
 	end
 	table.insert(parts, Format.money(value))
-	if not stored and not caught.fed then
-		table.insert(parts, "Hungry")
-	end
-	local blocked = {}
-	for _, item in Shop.Bakery do
-		local reason = if stored then "Stored" else blockedText[Care.canTreat(caught, item)]
-		if reason then
-			blocked[item.id] = reason
-		end
-	end
 	return {
 		uid = caught.uid,
 		name = Format.name(caught.monsterId),
@@ -124,7 +101,6 @@ local function monsterRow(caught: Value.CaughtMonster, stored: boolean, value: n
 		color = MonsterModel.color(monster.rarity),
 		stored = stored,
 		locked = caught.locked == true,
-		blocked = blocked,
 	}
 end
 
@@ -167,7 +143,7 @@ local function itemRows(data: DataService.Data): { ItemRow }
 		local equipSlot = Workshop.equipSlot(item)
 		local details
 		if item.kind == "Food" then
-			details = `x{count} · {Care.describe(item)}`
+			details = `x{count} · {Cakes.describe(item)} · hold it from your hotbar to set it out`
 		elseif tool then
 			details = Workshop.describe(item)
 		else
@@ -179,8 +155,6 @@ local function itemRows(data: DataService.Data): { ItemRow }
 			details = details,
 			tool = Workshop.isTool(item),
 			equipped = equipSlot ~= nil and equipped[equipSlot] == item.id,
-			treat = item.kind == "Food",
-			confirm = item.kind == "Food" and item.price >= ConfirmGiveFrom,
 		})
 		order[item.id] = (kindOrder[item.kind] or 9) * 1e15 + item.price
 	end
@@ -274,26 +248,6 @@ Equip.OnServerInvoke = function(player: Player, itemId: unknown): Result
 	end
 	local ok, message = WorkshopService.equip(data, itemId)
 	HuntService.refreshItems(player) -- the bag size follows the vacuum
-	return { ok = ok, message = message, view = viewFor(data) }
-end
-
-Give.OnServerInvoke = function(player: Player, itemId: unknown, uid: unknown): Result
-	local data = DataService.get(player)
-	if not data then
-		return Loading
-	end
-	local ok, message = CareService.giveTreat(player, uid, itemId)
-	Notify.toast(player, message)
-	return { ok = ok, message = message, view = viewFor(data) }
-end
-
-SetOut.OnServerInvoke = function(player: Player, itemId: unknown): Result
-	local data = DataService.get(player)
-	if not data then
-		return Loading
-	end
-	local ok, message = CakeService.setOut(player, itemId)
-	Notify.toast(player, message)
 	return { ok = ok, message = message, view = viewFor(data) }
 end
 

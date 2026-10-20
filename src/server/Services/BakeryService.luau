@@ -1,28 +1,25 @@
 --!strict
--- The Haunted Bakery: buy treats for your monsters. Hold the prompt at
+-- The Haunted Bakery: buy cakes to set out for your monsters. Hold the prompt at
 -- Workspace.Hub.Landmarks.Bakery to open the window. The stock changes every 5 minutes, at
 -- the same moment as the Workshop's and by the same rules (Util/Workshop), and you can buy up
--- to Shop.ConsumablesPerRestock of each treat per restock. Bought treats go into your
--- Backpack, where you give them to a monster or set them out in your mansion as a cake
--- (InventoryService, CakeService; Util/Care says what a treat does).
--- Everyday feeding is free with Feed all (CareService), here or anywhere.
+-- to Shop.ConsumablesPerRestock of each cake per restock. Bought cakes go into your Roblox
+-- hotbar, where you hold one in your mansion and click to set it out (CakeService;
+-- Util/Cakes says what a cake does).
 --
 -- Remotes in ReplicatedStorage.BakeryRemotes:
 --   Open     server -> client (counter: Vector3)   the player used the Bakery prompt
---   GetShop  client -> server () -> View?          the treats for sale and your monsters
+--   GetShop  client -> server () -> View?          the cakes for sale
 --   Buy      client -> server (itemId) -> Result
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Care = require(ReplicatedStorage.Shared.Util.Care)
+local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
-local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
-local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local Counter = require(script.Parent.Parent.Counter)
+local CakeService = require(script.Parent.CakeService)
 local DataService = require(script.Parent.DataService)
-local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
 
 local BakeryService = {}
@@ -37,14 +34,7 @@ export type TreatRow = {
 	bought: number, -- bought since the last restock
 	limit: number, -- most you can buy per restock
 }
-export type MonsterRow = {
-	uid: string,
-	name: string, -- "Big Gravepup · $45K"
-	details: string, -- "Ghost · Fed · 45% familiar"
-	color: Color3, -- rarity colour
-	hungry: boolean,
-}
-export type View = { treats: { TreatRow }, monsters: { MonsterRow }, secondsLeft: number, money: number }
+export type View = { treats: { TreatRow }, secondsLeft: number, money: number }
 export type Result = { ok: boolean, message: string, view: View? }
 
 local remotes = Instance.new("Folder")
@@ -69,43 +59,6 @@ local function countdown(seconds: number): string
 	return string.format("%d:%02d", seconds // 60, seconds % 60)
 end
 
-local function monsterRows(data: DataService.Data): { MonsterRow }
-	local now = os.time()
-	local rows: { MonsterRow } = {}
-	local values: { [string]: number } = {}
-	for _, caught in data.monsters do
-		local monster = Monsters[caught.monsterId]
-		local uid = caught.uid
-		if not monster or not uid then
-			continue
-		end
-		Care.settle(caught, now)
-		local ok, value = pcall(Value.sellValue, caught, data.wingsOwned)
-		values[uid] = if ok then value else 0
-
-		local parts = {}
-		for _, effectId in Value.resolveEffects(caught.effects) do
-			table.insert(parts, Format.name(effectId))
-		end
-		local effects = if #parts > 0 then `{table.concat(parts, ", ")} · ` else ""
-		table.insert(rows, {
-			uid = uid,
-			name = `{caught.variant or ""}{if caught.variant then " " else ""}{caught.size} {Format.name(
-				caught.monsterId
-			)} · {Format.money(values[uid])}`,
-			details = `{effects}{Care.status(caught)}`,
-			color = MonsterModel.color(monster.rarity),
-			hungry = not caught.fed,
-		})
-	end
-	-- The most valuable first: that's where a treat is worth the most.
-	table.sort(rows, function(a, b)
-		local va, vb = values[a.uid], values[b.uid]
-		return if va == vb then a.uid < b.uid else va > vb
-	end)
-	return rows
-end
-
 local function viewFor(data: DataService.Data): View
 	local slot = currentSlot()
 	local bought = Workshop.boughtThisSlot(data.shop, slot)
@@ -115,7 +68,7 @@ local function viewFor(data: DataService.Data): View
 			id = item.id,
 			name = item.name,
 			price = item.price,
-			description = Care.describe(item),
+			description = Cakes.describe(item),
 			inStock = Workshop.inStock(item, slot),
 			count = data.inventory[item.id] or 0,
 			bought = bought[item.id] or 0,
@@ -127,7 +80,6 @@ local function viewFor(data: DataService.Data): View
 	end)
 	return {
 		treats = treats,
-		monsters = monsterRows(data),
 		secondsLeft = Workshop.restockAt(slot) - os.time(),
 		money = data.money,
 	}
@@ -146,7 +98,7 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 	if not Counter.isNear(player, counter) then
 		return { ok = false, message = "Walk up to the Bakery to shop.", view = viewFor(data) }
 	end
-	local item = if typeof(itemId) == "string" then Care.treat(itemId) else nil
+	local item = if typeof(itemId) == "string" then Cakes.item(itemId) else nil
 	local slot = currentSlot()
 	local bought = Workshop.boughtThisSlot(data.shop, slot)
 	local check =
@@ -156,7 +108,9 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 	if check == "Ok" and item and DataService.addMoney(player, -item.price) then
 		data.inventory[item.id] = (data.inventory[item.id] or 0) + 1
 		bought[item.id] = (bought[item.id] or 0) + 1
-		message = `Bought a {item.name}! Give it to a monster from your Backpack.`
+		message =
+			`Bought a {item.name}! It's in your hotbar: hold it in your mansion and click to set it out.`
+		CakeService.syncTools(player)
 		Notify.toast(player, message)
 		return { ok = true, message = message, view = viewFor(data) }
 	elseif check == "TooPoor" and item then
