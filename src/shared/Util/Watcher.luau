@@ -59,6 +59,56 @@ function Watcher.eyesAfter(eyes: number, event: Events.WatcherEvent): number
 	return math.min(eyes + 1, Events.EyesToAwaken)
 end
 
+-- The global schedule: every server works out the same events at the same times from the
+-- clock alone (workspace:GetServerTimeNow, Unix seconds), so hopping servers never finds a
+-- different or rarer event. Slot 1 starts its calm at Epoch; each slot is a calm gap, the
+-- warning and the event, and the next slot's calm starts when it ends. A slot's gap and
+-- event are rolled from its number (Rng.seeded), and the eyes carry over from slot to slot.
+Watcher.Epoch = 1792454400 -- 2026-10-20 00:00 UTC
+
+export type Slot = {
+	index: number,
+	event: Events.WatcherEvent,
+	eyes: number, -- open before this event plays
+	warnAt: number, -- the calm ends and the warning starts
+	startAt: number, -- the event starts
+	endAt: number, -- the event ends and the next slot's calm starts
+}
+
+local function slot(index: number, from: number, eyes: number, lastId: string?): Slot
+	local rng = Rng.seeded(`watcher:{index}`)
+	local warnAt = from + Watcher.gap(rng)
+	local event = Watcher.pick(lastId, eyes, rng)
+	local startAt = warnAt + Events.WarningSeconds
+	return {
+		index = index,
+		event = event,
+		eyes = eyes,
+		warnAt = warnAt,
+		startAt = startAt,
+		endAt = startAt + (event.durationSeconds or 180),
+	}
+end
+
+function Watcher.nextSlot(previous: Slot): Slot
+	return slot(
+		previous.index + 1,
+		previous.endAt,
+		Watcher.eyesAfter(previous.eyes, previous.event),
+		previous.event.id
+	)
+end
+
+-- The slot that is in its calm, warning or event at `time`. Walks the schedule from Epoch,
+-- so call it once and then step with nextSlot.
+function Watcher.slotAt(time: number): Slot
+	local current = slot(1, Watcher.Epoch, 0, nil)
+	while current.endAt <= time do
+		current = Watcher.nextSlot(current)
+	end
+	return current
+end
+
 -- How many event monsters appear for this many players in the server.
 function Watcher.monsterCount(players: number): number
 	return math.clamp(math.ceil(players * Events.MonstersPerPlayer), Events.MinMonsters, Events.MaxMonsters)

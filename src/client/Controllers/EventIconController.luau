@@ -1,6 +1,7 @@
 --!strict
--- While a Watcher event is live, its icon sits at the bottom of the screen, just above the
--- hotbar. Hover over it (or tap it on a phone) to see the event's name and how long is left.
+-- While a Watcher event is live, its icon sits in the bottom-right corner of the screen (on
+-- phones, above the jump button). Hover over it (or tap it) to see the event's name and how
+-- long is left.
 -- Reads the workspace attributes WatcherEvent and WatcherEventEnd (WatcherService).
 
 local Players = game:GetService("Players")
@@ -28,15 +29,14 @@ function EventIconController.start()
 	gui.DisplayOrder = 6
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-	-- Matches the hotbar's slot size, so the icon lines up just above it.
 	local small = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	local slot = if small then 46 else 60
 	local size = if small then 44 else 54
+	local lift = if small then 150 else 16 -- phones keep the jump button in that corner
 
 	local icon = Ui.button(gui, "", Ui.Colors.equip, UDim2.fromOffset(size, size))
 	icon.Name = "EventIcon"
-	icon.AnchorPoint = Vector2.new(0.5, 1)
-	icon.Position = UDim2.new(0.5, 0, 1, -(8 + slot + 10))
+	icon.AnchorPoint = Vector2.new(1, 1)
+	icon.Position = UDim2.new(1, -16, 1, -lift)
 	icon.TextScaled = true
 	icon.Font = Enum.Font.GothamBold
 	icon.Visible = false
@@ -50,8 +50,8 @@ function EventIconController.start()
 
 	local tip = Instance.new("Frame")
 	tip.Name = "Tooltip"
-	tip.AnchorPoint = Vector2.new(0.5, 1)
-	tip.Position = UDim2.new(0.5, 0, 0, -8)
+	tip.AnchorPoint = Vector2.new(1, 1) -- above the icon, kept on screen
+	tip.Position = UDim2.new(1, 0, 0, -8)
 	tip.Size = UDim2.fromOffset(190, 52)
 	tip.BackgroundColor3 = Ui.Colors.panel
 	tip.Visible = false

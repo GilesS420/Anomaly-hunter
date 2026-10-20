@@ -251,6 +251,37 @@ do
 		Watcher.pick("Flicker", Events.EyesToAwaken, clockRng).id == "WatcherAwakens"
 	)
 
+	-- The global schedule: worked out from the clock alone, so every server agrees.
+	local day = Watcher.Epoch + 3 * 86400 + 1234
+	local here, there = Watcher.slotAt(day), Watcher.slotAt(day)
+	check(
+		"every server works out the same event at the same time",
+		here.index == there.index and here.event.id == there.event.id and here.warnAt == there.warnAt
+	)
+	check("the slot found is the one under way", here.endAt > day and here.index > 1)
+	local walk = Watcher.slotAt(Watcher.Epoch)
+	local seamless, spaced, awakened, sameTwice = true, true, false, false
+	for _ = 1, 400 do
+		local after = Watcher.nextSlot(walk)
+		local gap = after.warnAt - walk.endAt
+		seamless = seamless and after.index == walk.index + 1
+		spaced = spaced and gap >= Events.GapMinSeconds and gap <= Events.GapMaxSeconds
+		awakened = awakened or after.event.awakening == true
+		sameTwice = sameTwice or after.event.id == walk.event.id
+		if walk.event.awakening then
+			seamless = seamless and after.eyes == 0
+		end
+		walk = after
+	end
+	check("scheduled events come 5 to 10 minutes apart, one after another", seamless and spaced)
+	check("The Watcher Awakens comes round in the schedule", awakened)
+	check("the schedule never plays the same event twice in a row", not sameTwice)
+	local again = Watcher.slotAt(walk.startAt)
+	check(
+		"finding a slot from the clock matches stepping to it",
+		again.index == walk.index and again.event.id == walk.event.id
+	)
+
 	local eyes = 0
 	for _ = 1, Events.EyesToAwaken do
 		eyes = Watcher.eyesAfter(eyes, Watcher.pick(nil, eyes, clockRng))
