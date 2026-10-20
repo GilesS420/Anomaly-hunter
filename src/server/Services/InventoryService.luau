@@ -309,47 +309,8 @@ local HeldSize = 3 -- studs, the longest side of a carried monster whatever its 
 local SyncSeconds = 1
 local placing: { [Player]: boolean } = {}
 
--- Arms raised over the head while carrying a monster: the shoulder joints turned up (R15
--- and R6). The old C0 is kept in an attribute so putting the monster away lowers them again.
-local ArmsUp = CFrame.Angles(math.rad(165), 0, 0)
-local Shoulders = {
-	{ "RightUpperArm", "RightShoulder" },
-	{ "LeftUpperArm", "LeftShoulder" },
-	{ "Torso", "Right Shoulder" },
-	{ "Torso", "Left Shoulder" },
-}
-local function shoulders(character: Model): { Motor6D }
-	local found = {}
-	for _, path in Shoulders do
-		local part = character:FindFirstChild(path[1])
-		local joint = if part then part:FindFirstChild(path[2]) else nil
-		if joint and joint:IsA("Motor6D") then
-			table.insert(found, joint)
-		end
-	end
-	return found
-end
-local function raiseArms(character: Model, up: boolean)
-	local joints = shoulders(character)
-	if #joints == 0 then
-		warn(`InventoryService: {character.Name} has no shoulder joints to raise`)
-	end
-	for _, joint in joints do
-		local rest = joint:GetAttribute("RestC0")
-		if typeof(rest) ~= "CFrame" then
-			rest = joint.C0
-			joint:SetAttribute("RestC0", rest)
-		end
-		-- R6 shoulders face sideways, so they lift round their own Z instead
-		local turn = if joint.Name == "Right Shoulder"
-			then CFrame.Angles(0, 0, math.rad(165))
-			elseif joint.Name == "Left Shoulder" then CFrame.Angles(0, 0, math.rad(-165))
-			else ArmsUp
-		joint.C0 = if up then (rest :: CFrame) * turn else rest :: CFrame
-	end
-end
-
--- A small copy of the monster, carried over your head with both arms up. The Tool has no
+-- A small copy of the monster, carried over your head (every client raises the carrier's
+-- arms, CarryController). The Tool has no
 -- Handle (so Roblox doesn't put it in one hand with its own hold pose): the copy is welded on
 -- top of your head when you take it out, and unwelded when you put it away.
 local function monsterTool(player: Player, caught: Value.CaughtMonster, rarity: string): Tool
@@ -388,10 +349,7 @@ local function monsterTool(player: Player, caught: Value.CaughtMonster, rarity: 
 			weld:Destroy()
 			weld = nil
 		end
-		if carrier then
-			raiseArms(carrier, false)
-			carrier = nil
-		end
+		carrier = nil
 	end
 	local function carry()
 		local character = tool.Parent
@@ -411,7 +369,6 @@ local function monsterTool(player: Player, caught: Value.CaughtMonster, rarity: 
 		end
 		drop()
 		carrier = character
-		raiseArms(character, true)
 		local joint = Instance.new("Weld")
 		joint.Name = "CarryWeld"
 		joint.Part0 = head
