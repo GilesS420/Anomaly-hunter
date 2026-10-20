@@ -4,6 +4,8 @@
 --                                  the catch meter fills by itself (about 1-3 seconds)
 --   keep holding until it's full   caught! Bring it to the zone's Exit
 --   let go early                   it gets away (but stays dazed for a moment, so try again)
+-- Only with a vacuum in your hand (or nothing, so the server can say to pick one): a press
+-- while holding a cake, a monster or the Bait Bell is that item's click, not a catch.
 -- No dragging and the camera never locks. The server decides everything (reach, vacuum
 -- strength, timing, see server/Services/CatchService.luau); this only sends "start"/"stop"
 -- and draws the meter.
@@ -30,6 +32,13 @@ local target: Model? = nil -- the monster this press asked the server to catch (
 local held: Model? = nil -- the monster the server says we're catching right now
 local heldSeconds = 0 -- fallback timing if the model's attributes haven't arrived yet
 local heldSince = 0
+
+-- True unless the hand holds a Tool that isn't a vacuum.
+local function handFree(): boolean
+	local character = player.Character
+	local tool = if character then character:FindFirstChildOfClass("Tool") else nil
+	return tool == nil or tool:GetAttribute("VacuumId") ~= nil
+end
 
 local function isPointer(input: InputObject): boolean
 	return input.UserInputType == Enum.UserInputType.MouseButton1
@@ -207,7 +216,7 @@ function CatchController.start()
 		then
 			letGo()
 		end
-		if processed or not isPointer(input) or pressing then
+		if processed or not isPointer(input) or pressing or not handFree() then
 			return
 		end
 		local model = monsterAt(input.Position)

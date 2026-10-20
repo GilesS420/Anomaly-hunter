@@ -13,7 +13,10 @@
 --   UseReturnCharm  client -> server ()  (the Return Charm button)
 --   UseBaitBell     client -> server ()  (the Bait Bell button: a rarer monster comes to you)
 -- Player attributes ReturnCharms and BaitBells (numbers) mirror how many the player owns, so
--- the buttons only show when there is one to use. Carrying / CarryingSize name the latest
+-- the buttons only show when there is one to use. Every owned vacuum, the Bait Bells and the
+-- Return Charms are also Tools in the hotbar (Section "Tool"): catching only works with a
+-- vacuum in your hand (heldVacuum), holding one makes it the vacuum you use, and clicking
+-- with the bell or charm in hand uses one. Carrying / CarryingSize name the latest
 -- catch in the bag, CarryingCount and BagSize say how full it is.
 
 local Players = game:GetService("Players")
@@ -23,13 +26,16 @@ local Catching = require(ReplicatedStorage.Shared.Util.Catching)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
 local Layout = require(ReplicatedStorage.Shared.Config.Layout)
+local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
+local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local Zones = require(ReplicatedStorage.Shared.Config.Zones)
 local DataService = require(script.Parent.DataService)
 local MansionService = require(script.Parent.MansionService)
 local Notify = require(script.Parent.Parent.Notify)
 local PlotService = require(script.Parent.PlotService)
 local SpawnService = require(script.Parent.SpawnService)
+local ToolModel = require(script.Parent.Parent.ToolModel)
 local World = require(script.Parent.Parent.World)
 
 local HuntService = {}
@@ -170,13 +176,103 @@ local function goHome(player: Player, deliver: boolean)
 	end
 end
 
+-- The vacuum in the player's hand right now, or nil.
+function HuntService.heldVacuum(player: Player): string?
+	local character = player.Character
+	local tool = if character then character:FindFirstChildOfClass("Tool") else nil
+	local id = if tool then tool:GetAttribute("VacuumId") else nil
+	return if typeof(id) == "string" then id else nil
+end
+
+-- Holding a vacuum makes it the one you use (reach, strength, bag).
+local function holdVacuum(player: Player, itemId: string)
+	local data = DataService.get(player)
+	local item = Workshop.item(itemId)
+	if data and item and Workshop.equipSlot(item) == "vacuum" and Workshop.owns(data.inventory, item) then
+		data.equipped.vacuum = item.id
+		setCarrying(player, carrying[player]) -- the bag size follows the vacuum
+	end
+end
+
+-- The hotbar Tool an item should be right now (its name carries the count), or nil for none.
+local function toolName(data: DataService.Data, item: Shop.Item): string?
+	if Workshop.isTool(item) then
+		return if Workshop.owns(data.inventory, item) then item.name else nil
+	end
+	local count = itemCount(data, item.id)
+	return if count > 0 then `{item.name} x{count}` else nil
+end
+
+-- Makes the hotbar match the vacuums, Bait Bells and Return Charms the player owns: one
+-- Tool each, in Workshop order.
+local function syncTools(player: Player)
+	local data = DataService.get(player)
+	local backpack = player:FindFirstChildOfClass("Backpack")
+	if not data or not backpack then
+		return
+	end
+	local have: { [string]: Tool } = {}
+	local containers: { Instance } = { backpack }
+	if player.Character then
+		table.insert(containers, player.Character)
+	end
+	for _, container in containers do
+		for _, child in container:GetChildren() do
+			local id = child:GetAttribute("ToolId")
+			if child:IsA("Tool") and typeof(id) == "string" then
+				local item = Workshop.item(id)
+				local name = if item then toolName(data, item) else nil
+				if not name or have[id] then
+					child:Destroy()
+				else
+					have[id] = child
+					child.Name = name
+				end
+			end
+		end
+	end
+	for _, item in Shop.Workshop do
+		local name = toolName(data, item)
+		if not name or have[item.id] then
+			continue
+		end
+		local tool = ToolModel.tool(item.id, name)
+		if not tool then
+			continue
+		end
+		tool:SetAttribute("ToolId", item.id)
+		tool:SetAttribute("Section", "Tool")
+		tool:SetAttribute("Order", item.price)
+		if Workshop.isTool(item) then
+			tool:SetAttribute("VacuumId", item.id)
+			tool.ToolTip = "Hold it and press and HOLD on a monster to catch it"
+			tool.Equipped:Connect(function()
+				holdVacuum(player, item.id)
+			end)
+		elseif item.id == "BaitBell" then
+			tool.ToolTip = "Click in a zone to ring it: a rarer monster comes to you"
+			tool.Activated:Connect(function()
+				HuntService.useBaitBell(player)
+			end)
+		elseif item.id == "ReturnCharm" then
+			tool.ToolTip = "Click to go home with your catch"
+			tool.Activated:Connect(function()
+				HuntService.useReturnCharm(player)
+			end)
+		end
+		tool.Parent = backpack
+	end
+end
+
 -- Updates the ReturnCharms, BaitBells and BagSize attributes (the client shows each button
--- only if it's above 0). Call it after anything changes the inventory or the equipped vacuum.
+-- only if it's above 0) and the hotbar Tools. Call it after anything changes the inventory or
+-- the equipped vacuum.
 function HuntService.refreshItems(player: Player)
 	local data = DataService.get(player)
 	player:SetAttribute("ReturnCharms", if data then itemCount(data, "ReturnCharm") else 0)
 	player:SetAttribute("BaitBells", if data then itemCount(data, "BaitBell") else 0)
 	setCarrying(player, carrying[player])
+	syncTools(player)
 end
 
 function HuntService.isCarrying(player: Player): boolean
@@ -253,7 +349,7 @@ local function enterZone(player: Player, zone: Zones.Zone, arrival: BasePart, fa
 	player:SetAttribute("Zone", zone.id)
 	player:SetAttribute("Hearts", Zones.MaxHearts)
 	Notify.toast(player, `Entering {zone.name}`)
-	Notify.toast(player, "Press and HOLD on a monster to catch it!")
+	Notify.toast(player, "Hold your vacuum (hotbar), then press and HOLD on a monster to catch it!")
 	PlotService.teleport(player, standAbove(arrival, facing))
 end
 
@@ -269,9 +365,14 @@ local function onCharacter(player: Player, character: Model)
 	end)
 end
 
-UseReturnCharm.OnServerEvent:Connect(function(player)
+-- Uses a Return Charm (the button, R, or clicking with the charm in hand).
+function HuntService.useReturnCharm(player: Player)
 	local data = DataService.get(player)
-	if not data or (player:GetAttribute("Zone") == nil and not carrying[player]) then
+	if not data then
+		return
+	end
+	if player:GetAttribute("Zone") == nil and not carrying[player] then
+		Notify.toast(player, "You're already home. The Return Charm works on a hunt.")
 		return
 	end
 	if itemCount(data, "ReturnCharm") <= 0 then
@@ -281,12 +382,17 @@ UseReturnCharm.OnServerEvent:Connect(function(player)
 	useItem(data, "ReturnCharm")
 	HuntService.refreshItems(player)
 	goHome(player, true)
-end)
+end
 
-UseBaitBell.OnServerEvent:Connect(function(player)
+-- Rings a Bait Bell (the button, B, or clicking with the bell in hand).
+function HuntService.useBaitBell(player: Player)
 	local data = DataService.get(player)
 	local zone = Hunt.zoneById(player:GetAttribute("Zone"))
-	if not data or not zone then
+	if not data then
+		return
+	end
+	if not zone then
+		Notify.toast(player, "Ring the Bait Bell in a zone to call a monster.")
 		return
 	end
 	if itemCount(data, "BaitBell") <= 0 then
@@ -311,7 +417,10 @@ UseBaitBell.OnServerEvent:Connect(function(player)
 		HuntService.refreshItems(player)
 	end
 	Notify.toast(player, message)
-end)
+end
+
+UseReturnCharm.OnServerEvent:Connect(HuntService.useReturnCharm)
+UseBaitBell.OnServerEvent:Connect(HuntService.useBaitBell)
 
 -- Connects one zone's gate and exit. Only zones that exist in Workspace.Zones are wired.
 local function wireZone(zone: Zones.Zone)
@@ -379,6 +488,7 @@ function HuntService.start()
 	local function onPlayer(player: Player)
 		player.CharacterAdded:Connect(function(character)
 			onCharacter(player, character)
+			task.defer(syncTools, player) -- the Backpack is new after every respawn
 		end)
 		if player.Character then
 			task.spawn(onCharacter, player, player.Character)
