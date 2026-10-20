@@ -1,12 +1,17 @@
 --!strict
--- The Backpack: everything you own, anywhere in the game. Two tabs:
---   Items     your tools (equip them right here) and how many of each cake, bell and charm.
---             Cakes are also in the Roblox hotbar, where you hold one to set it out
---             (CakeService).
+-- The inventory: everything you own, anywhere in the game, in three sections (the client
+-- draws them, InventoryController):
 --   Monsters  every monster in your mansion and in Storage, most valuable first. Store one to
---             make room (it's paused there, see Util/Storage), place it back when a wing has
---             room, and Lock the ones you never want to sell by accident.
+--             make room (it's paused there, see Util/Storage) and Lock the ones you never want
+--             to sell by accident. Monsters in Storage are also Tools in the hotbar: hold one
+--             and click in your mansion to place it there.
+--   Cakes     how many of each cake you have. They are Tools in the hotbar too (CakeService).
+--   Tools     your vacuums (equip them right here), Bait Bells and Return Charms.
 -- Catches that don't fit in the mansion land in Storage by themselves (MansionService.addMonster).
+--
+-- Hotbar Tools carry attributes the client sorts and groups them by: Section ("Cake" or
+-- "Monster") and Order (cakes by price, monsters most valuable first). Monster Tools also
+-- carry MonsterUid.
 --
 -- Remotes in ReplicatedStorage.InventoryRemotes:
 --   GetView  client -> server () -> View?
@@ -14,6 +19,7 @@
 --   Lock     client -> server (uid) -> Result      locks or unlocks a monster
 --   Equip    client -> server (itemId) -> Result   puts an owned tool into use
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
@@ -29,6 +35,8 @@ local DataService = require(script.Parent.DataService)
 local HuntService = require(script.Parent.HuntService)
 local MansionService = require(script.Parent.MansionService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
+local Notify = require(script.Parent.Parent.Notify)
+local RoamService = require(script.Parent.RoamService)
 local WorkshopService = require(script.Parent.WorkshopService)
 
 local InventoryService = {}
@@ -47,6 +55,7 @@ export type ItemRow = {
 	details: string,
 	tool: boolean,
 	equipped: boolean,
+	cake: boolean, -- a Bakery cake (the Cakes section), else the Tools section
 }
 export type View = {
 	monsters: { MonsterRow },
@@ -143,7 +152,7 @@ local function itemRows(data: DataService.Data): { ItemRow }
 		local equipSlot = Workshop.equipSlot(item)
 		local details
 		if item.kind == "Food" then
-			details = `x{count} · {Cakes.describe(item)} · hold it from your hotbar to set it out`
+			details = `x{count} · {Cakes.describe(item)}`
 		elseif tool then
 			details = Workshop.describe(item)
 		else
@@ -155,6 +164,7 @@ local function itemRows(data: DataService.Data): { ItemRow }
 			details = details,
 			tool = Workshop.isTool(item),
 			equipped = equipSlot ~= nil and equipped[equipSlot] == item.id,
+			cake = item.kind == "Food",
 		})
 		order[item.id] = (kindOrder[item.kind] or 9) * 1e15 + item.price
 	end
@@ -251,8 +261,149 @@ Equip.OnServerInvoke = function(player: Player, itemId: unknown): Result
 	return { ok = ok, message = message, view = viewFor(data) }
 end
 
+-- Monsters in Storage as hotbar Tools ------------------------------------------------------
+
+local PlaceAhead = 4 -- studs in front of you
+local SyncSeconds = 1
+local placing: { [Player]: boolean } = {}
+
+-- A small glowing orb in the monster's rarity colour, to hold.
+local function monsterTool(player: Player, caught: Value.CaughtMonster, rarity: string): Tool
+	local tool = Instance.new("Tool")
+	tool.CanBeDropped = false
+	tool.RequiresHandle = true
+	tool.ToolTip = "Click in your mansion to place it there"
+	tool:SetAttribute("Section", "Monster")
+	tool:SetAttribute("MonsterUid", caught.uid)
+	local handle = Instance.new("Part")
+	handle.Name = "Handle"
+	handle.Shape = Enum.PartType.Ball
+	handle.Size = Vector3.one * 1.2
+	handle.Material = Enum.Material.Neon
+	handle.Color = MonsterModel.color(rarity)
+	handle.CanCollide = false
+	handle.Massless = true
+	handle.Parent = tool
+	local light = Instance.new("PointLight")
+	light.Color = handle.Color
+	light.Range = 6
+	light.Parent = handle
+	tool.Grip = CFrame.new(0, 0, -0.4)
+	tool.Activated:Connect(function()
+		InventoryService.place(player, caught.uid or "")
+	end)
+	return tool
+end
+
+-- Makes the hotbar's monster Tools match Storage: one per stored monster, named and ordered
+-- by value. Called every second, so catches, sales and moves all show up by themselves.
+function InventoryService.syncMonsterTools(player: Player)
+	local data = DataService.get(player)
+	local backpack = player:FindFirstChildOfClass("Backpack")
+	if not data or not backpack then
+		return
+	end
+	local stored: { [string]: Value.CaughtMonster } = {}
+	for _, caught in data.storage do
+		if caught.uid then
+			stored[caught.uid] = caught
+		end
+	end
+	local have: { [string]: Tool } = {}
+	local containers: { Instance } = { backpack }
+	if player.Character then
+		table.insert(containers, player.Character)
+	end
+	for _, container in containers do
+		for _, child in container:GetChildren() do
+			local uid = child:GetAttribute("MonsterUid")
+			if child:IsA("Tool") and typeof(uid) == "string" then
+				if not stored[uid] or have[uid] then
+					child:Destroy()
+				else
+					have[uid] = child
+				end
+			end
+		end
+	end
+	for uid, caught in stored do
+		local monster = Monsters[caught.monsterId]
+		if monster then
+			local tool = have[uid] or monsterTool(player, caught, monster.rarity)
+			local variant = if caught.variant then `{caught.variant} ` else ""
+			tool.Name = `{variant}{caught.size} {Format.name(caught.monsterId)}`
+			tool:SetAttribute("Order", -price(caught, data.wingsOwned))
+			if not tool.Parent then
+				tool.Parent = backpack
+			end
+		end
+	end
+end
+
+local function tryPlace(player: Player, uid: string): string
+	local data = DataService.get(player)
+	if not data then
+		return Loading.message
+	end
+	local character = player.Character
+	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	local spot = if root and root:IsA("BasePart")
+		then MansionService.floorSpot(player, root.Position + root.CFrame.LookVector * PlaceAhead, 3)
+		else nil
+	if not spot then
+		return "Stand inside your mansion to place it."
+	end
+	local result, caught = MansionService.move(player, uid)
+	local name = if caught then Format.name(caught.monsterId) else "That monster"
+	if result == "MansionFull" then
+		return "Your mansion is full. Store or sell a monster first, or buy a new wing."
+	elseif result ~= "Ok" then
+		return "That monster is gone."
+	end
+	-- It appears at a free spot; walk it over to where you clicked.
+	task.delay(0.5, function()
+		local model = MansionService.monsterModels(player)[uid]
+		if model then
+			RoamService.teleport(model, spot.X, spot.Z, 2)
+		end
+	end)
+	return `{name} is back in your mansion!`
+end
+
+-- Places a stored monster in the mansion, in front of the player (they clicked with it).
+function InventoryService.place(player: Player, uid: string)
+	if placing[player] then
+		return
+	end
+	placing[player] = true
+	local ok, message = pcall(tryPlace, player, uid)
+	placing[player] = nil
+	if ok then
+		Notify.toast(player, message)
+		InventoryService.syncMonsterTools(player)
+	else
+		warn(`InventoryService: placing a monster failed: {message}`)
+	end
+end
+
 function InventoryService.start()
 	remotes.Parent = ReplicatedStorage
+	Players.PlayerRemoving:Connect(function(player)
+		placing[player] = nil
+	end)
+	task.spawn(function()
+		while true do
+			task.wait(SyncSeconds)
+			for _, player in Players:GetPlayers() do
+				local ok, err = pcall(function()
+					InventoryService.syncMonsterTools(player)
+				end)
+				if not ok then
+					warn(`InventoryService: syncing {player.Name}'s monster tools failed: {err}`)
+				end
+			end
+		end
+	end)
 end
 
 return InventoryService
