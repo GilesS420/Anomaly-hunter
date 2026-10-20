@@ -34,6 +34,8 @@ local Storage = require("../src/shared/Util/Storage")
 local Tools = require("../src/shared/Config/Tools")
 local Variants = require("../src/shared/Config/Variants")
 local InventoryConfig = require("../src/shared/Config/Inventory")
+local Weight = require("../src/shared/Util/Weight")
+local WeightConfig = require("../src/shared/Config/Weight")
 
 local failures = 0
 local function check(name: string, ok: boolean)
@@ -1645,6 +1647,73 @@ do
 	check("stored monster didn't grow", near(caught.familiarity, before))
 	check("storage has room below the limit", Storage.hasRoom(InventoryConfig.StorageSlots - 1))
 	check("storage is full at the limit", not Storage.hasRoom(InventoryConfig.StorageSlots))
+end
+
+-- Weight and Titans (Util/Weight): weight grows from timestamps, sizes follow it, Titans cap.
+do
+	local caught: any = { monsterId = "Gravepup", size = "Normal", effects = {}, familiarity = 0, fed = true }
+	Weight.settle(caught, 0, fakeRandom(1))
+	check("a new monster gets a weight in its size", caught.kg >= 20 and caught.kg < 40 and caught.kgAt == 0)
+	check("weight picks the size", Weight.sizeFor(caught.kg) == "Normal")
+	caught.kg = 20
+	local day = 24 * 3600
+	Weight.settle(caught, day)
+	check("it grows 1% an hour", near(caught.kg, 20 * math.exp(0.24)))
+	check("still Normal after a day", caught.size == "Normal")
+	caught.effects = { "Slimed", "Ghost" }
+	check("effects speed growth up", near(Weight.rate(caught), 0.03))
+	check("it grows into the next size", Weight.settle(caught, 2 * day) and caught.size == "Big")
+	check("settling twice at once changes nothing", not Weight.settle(caught, 2 * day))
+	Weight.settle(caught, 100 * day)
+	check("a monster becomes a Titan", caught.size == "Titan")
+	check("Titans stop at the max weight", near(caught.kg, WeightConfig.MaxKg))
+	check(
+		"a Titan at max weight hits the top value",
+		near(Weight.valueMultiplier("Titan", caught.kg), WeightConfig.TitanMaxValue)
+	)
+	check("a new Titan is worth x10", near(Weight.valueMultiplier("Titan", WeightConfig.StartKg.Titan), 10))
+	check(
+		"a Titan is drawn at most TitanMaxScale",
+		near(Weight.drawScale("Titan", caught.kg), WeightConfig.TitanMaxScale)
+	)
+	check(
+		"a new Titan starts at TitanStartScale",
+		near(Weight.drawScale("Titan", 320), WeightConfig.TitanStartScale)
+	)
+	check("other sizes draw at their Sizes scale", near(Weight.drawScale("Huge", 100), 1.7))
+	check(
+		"value uses the Titan multiplier",
+		Value.sellValue(
+			{ monsterId = "Gravepup", size = "Titan", kg = 320, effects = {}, familiarity = 0, fed = false },
+			1
+		) == 100_000
+	)
+	local big: any = { size = "Big", effects = {}, kg = 15, kgAt = 0 }
+	Weight.settle(big, 0)
+	check("sizes never shrink", big.size == "Big")
+	check(
+		"weight text",
+		Weight.text(54.7) == "54 kg" and Weight.text(1250) == "1.2 t" and Weight.text(5.25) == "5.2 kg"
+	)
+	check(
+		"Titans are never rolled wild",
+		(function()
+			for _, s in Sizes do
+				if s.id == "Titan" then
+					return s.weight == 0
+				end
+			end
+			return false
+		end)()
+	)
+
+	-- Storage pauses weight too.
+	local stored: any =
+		{ monsterId = "Gravepup", size = "Normal", effects = {}, familiarity = 0, kg = 20, kgAt = 0 }
+	Storage.store(stored, 0)
+	Storage.unstore(stored, 10 * day)
+	Weight.settle(stored, 10 * day)
+	check("stored monster didn't gain weight", near(stored.kg, 20))
 end
 
 if failures > 0 then
