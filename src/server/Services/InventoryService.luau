@@ -305,36 +305,111 @@ end
 -- Monsters in Storage as hotbar Tools ------------------------------------------------------
 
 local PlaceAhead = 4 -- studs in front of you
-local HeldRadius = 1.1 -- studs, a held monster's size whatever its real size
+local HeldSize = 3 -- studs, the longest side of a carried monster whatever its real size
 local SyncSeconds = 1
 local placing: { [Player]: boolean } = {}
 
--- A small copy of the monster, to hold. Its Body (already welded to every block) becomes the
--- Handle.
+-- Arms raised over the head while carrying a monster: the shoulder joints turned up (R15
+-- and R6). The old C0 is kept in an attribute so putting the monster away lowers them again.
+local ArmsUp = CFrame.Angles(math.rad(165), 0, 0)
+local Shoulders = {
+	{ "RightUpperArm", "RightShoulder" },
+	{ "LeftUpperArm", "LeftShoulder" },
+	{ "Torso", "Right Shoulder" },
+	{ "Torso", "Left Shoulder" },
+}
+local function shoulders(character: Model): { Motor6D }
+	local found = {}
+	for _, path in Shoulders do
+		local part = character:FindFirstChild(path[1])
+		local joint = if part then part:FindFirstChild(path[2]) else nil
+		if joint and joint:IsA("Motor6D") then
+			table.insert(found, joint)
+		end
+	end
+	return found
+end
+local function raiseArms(character: Model, up: boolean)
+	for _, joint in shoulders(character) do
+		local rest = joint:GetAttribute("RestC0")
+		if typeof(rest) ~= "CFrame" then
+			rest = joint.C0
+			joint:SetAttribute("RestC0", rest)
+		end
+		-- R6 shoulders face sideways, so they lift round their own Z instead
+		local turn = if joint.Name == "Right Shoulder"
+			then CFrame.Angles(0, 0, math.rad(165))
+			elseif joint.Name == "Left Shoulder" then CFrame.Angles(0, 0, math.rad(-165))
+			else ArmsUp
+		joint.C0 = if up then (rest :: CFrame) * turn else rest :: CFrame
+	end
+end
+
+-- A small copy of the monster, carried over your head with both arms up. The Tool has no
+-- Handle (so Roblox doesn't put it in one hand with its own hold pose): the copy is welded on
+-- top of your head when you take it out, and unwelded when you put it away.
 local function monsterTool(player: Player, caught: Value.CaughtMonster, rarity: string): Tool
 	local tool = Instance.new("Tool")
 	tool.CanBeDropped = false
-	tool.RequiresHandle = true
+	tool.RequiresHandle = false
 	tool.ToolTip = "Click in your mansion to place it there"
 	tool:SetAttribute("Section", "Monster")
 	tool:SetAttribute("MonsterUid", caught.uid)
 	local model = monsterLook(caught, rarity)
-	model:ScaleTo(HeldRadius / MonsterModel.radius("Normal", caught.monsterId))
-	local handle = model.PrimaryPart :: BasePart
-	handle.Name = "Handle"
+	local _, size = model:GetBoundingBox()
+	model:ScaleTo(model:GetScale() * HeldSize / math.max(size.X, size.Y, size.Z))
+	local box, boxSize = model:GetBoundingBox()
+	local body = model.PrimaryPart :: BasePart
+	-- where the body sits relative to the bottom middle of the copy
+	local fromBottom = (box * CFrame.new(0, -boxSize.Y / 2, 0)):ToObjectSpace(body.CFrame)
+	local parts: { BasePart } = {}
 	for _, child in model:GetChildren() do
 		if child:IsA("BasePart") then
 			child.Anchored = false
 			child.Massless = true
 			child.CanCollide = false
 			child.CanQuery = false
+			child.CanTouch = false
+			table.insert(parts, child)
 		end
 		child.Parent = tool
 	end
 	model:Destroy()
-	-- Held up in front of you, facing you. With no turn in the grip the Handle stays upright
-	-- (its -Z forward); the grip moves it up and out from the hand and turns it round.
-	tool.Grip = (CFrame.new(0, HeldRadius * 0.7, -(HeldRadius + 0.4)) * CFrame.Angles(0, math.pi, 0)):Inverse()
+
+	local weld: WeldConstraint? = nil
+	tool.Equipped:Connect(function()
+		local character = tool.Parent
+		local head = if character then character:FindFirstChild("Head") else nil
+		if not character or not character:IsA("Model") or not head or not head:IsA("BasePart") then
+			return
+		end
+		raiseArms(character, true)
+		-- Move the whole copy so its bottom rests just above the head, facing where you face.
+		local target = head.CFrame * CFrame.new(0, head.Size.Y / 2 + 0.6, 0) * fromBottom
+		local shift = target * body.CFrame:Inverse()
+		for _, part in parts do
+			part.CFrame = shift * part.CFrame
+		end
+		local joint = Instance.new("WeldConstraint")
+		joint.Part0 = head
+		joint.Part1 = body
+		joint.Parent = body
+		weld = joint
+	end)
+	tool.Unequipped:Connect(function()
+		if weld then
+			weld:Destroy()
+			weld = nil
+		end
+		if player.Character then
+			raiseArms(player.Character, false)
+		end
+	end)
+	tool.Destroying:Connect(function()
+		if weld and player.Character then
+			raiseArms(player.Character, false)
+		end
+	end)
 	tool.Activated:Connect(function()
 		InventoryService.place(player, caught.uid or "")
 	end)
