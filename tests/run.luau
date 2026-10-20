@@ -999,6 +999,73 @@ do
 		end
 	end
 	check("an effect that completes a combo still fits", count == 50)
+	-- Event effects: every launch event with an effect has a chance, and its effect exists.
+	local eventsOk = true
+	for _, event in Events.List do
+		if event.launch and event.effect then
+			local effect = Effects.List[event.effect]
+			eventsOk = eventsOk and effect ~= nil and (event.effectChance or 0) > 0
+		end
+	end
+	check("every launch event's effect exists and has a chance", eventsOk)
+	check(
+		"Frost Fog, Sugar Rush and Gold Rush give their own effects",
+		(Events.find("FrostFog") :: any).effect == "Frostbitten"
+			and (Events.find("SugarRush") :: any).effect == "Sugarcoated"
+			and (Events.find("GoldRush") :: any).effect == "Gilded"
+	)
+	check("event odds start at the event's chance", near(Haunting.eventChance(6, 0, 1), 6))
+	check("Familiarity raises event odds", Haunting.eventChance(6, 1, 1) > 6)
+
+	local frost = Events.find("FrostFog") :: any
+	local frostHits, frostRandom = 0, fakeRandom(5)
+	for _ = 1, 20_000 do
+		local id = Haunting.eventRoll(monster({}), 1, frost, frostRandom)
+		if id == "Frostbitten" then
+			frostHits += 1
+		end
+	end
+	check("about 6% of Frost Fog rolls frost a new monster", math.abs(frostHits / 20_000 - 0.06) < 0.01)
+	check(
+		"a monster that already has the event's effect gets nothing",
+		Haunting.eventRoll(monster({ "Frostbitten" }), 1, frost, alwaysHit :: any) == nil
+	)
+	local gotId, after =
+		Haunting.eventRoll(monster({ "Cobwebbed", "Possessed", "Slimed" }), 1, frost, alwaysHit :: any)
+	check(
+		"a full monster swaps its weakest effect for a stronger event effect",
+		gotId == "Frostbitten"
+			and after ~= nil
+			and #after == 3
+			and table.find(after, "Cobwebbed") == nil
+			and table.find(after, "Frostbitten") ~= nil
+	)
+	check(
+		"a full monster keeps stronger effects",
+		Haunting.withEffect({ "Mummy", "Batty", "Ghost" }, "Sugarcoated") == nil
+	)
+	check(
+		"effects in a combo are never swapped out",
+		Haunting.withEffect({ "Vampire", "Batty", "Cobwebbed" }, "Gilded") ~= nil
+			and table.find(
+					Haunting.withEffect({ "Vampire", "Batty", "Cobwebbed" }, "Gilded") :: any,
+					"Vampire"
+				)
+				~= nil
+	)
+	local watcher = Events.find("WatcherAwakens") :: any
+	local others, watched, otherRandom = 0, 0, fakeRandom(9)
+	for _ = 1, 50_000 do
+		local id = Haunting.eventRoll(monster({}), 1, watcher, otherRandom)
+		if id == "Watched" then
+			watched += 1
+		elseif id then
+			others += 1
+		end
+	end
+	check("The Watcher Awakens rarely gives Watched", watched > 0 and watched / 50_000 < 0.006)
+	check("The Watcher Awakens can give the other events' effects", others > watched)
+
 	check(
 		"a new combo is spotted",
 		Value.newCombo({ "Batty", "Ghost" }, Value.resolveEffects({ "Batty", "Ghost", "Vampire" })) == "Count"
@@ -1211,7 +1278,8 @@ end
 -- materials; head extras stack above the monster and the label clears them.
 do
 	local EffectLooks = require("../src/shared/Config/EffectLooks")
-	local materials = { Metal = true, SmoothPlastic = true, Fabric = true, Foil = true }
+	local materials =
+		{ Metal = true, SmoothPlastic = true, Fabric = true, Foil = true, Ice = true, Glass = true }
 	local missing = {}
 	for id in Effects.List do
 		if not EffectLooks.Styles[id] then

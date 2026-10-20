@@ -320,6 +320,34 @@ EffectLooks.Styles = {
 		},
 		auras = { { kind = "Mist", color = { 170, 210, 255 } } },
 	},
+	Frostbitten = {
+		-- Pale icy skin under a thin frosted crust, with frost sparkling off it.
+		tint = { color = { 190, 225, 255 }, mix = 0.55 },
+		glow = { 150, 235, 255 },
+		shell = { color = { 220, 245, 255 }, transparency = 0.6, material = "Ice" },
+		auras = {
+			{ kind = "Sparkle", color = { 215, 245, 255 } },
+			{ kind = "Mist", color = { 200, 235, 255 } },
+		},
+	},
+	Sugarcoated = {
+		-- A glossy pink candy shell with sprinkles glinting on it.
+		tint = { color = { 255, 170, 210 }, mix = 0.3 },
+		shell = { color = { 255, 150, 200 }, transparency = 0.45, material = "Glass" },
+		auras = {
+			{ kind = "Sparkle", color = { 255, 120, 190 } },
+			{ kind = "Sparkle", color = { 140, 230, 255 } },
+			{ kind = "Sparkle", color = { 255, 240, 120 } },
+		},
+	},
+	Gilded = {
+		-- Thin gold veins cracking through a darkened skin (not the all-over foil of a Gold
+		-- catch variant, nor the thick gold straps of a Mimic).
+		tint = { color = { 70, 52, 30 }, mix = 0.35 },
+		wrap = { colors = { Gold, { 230, 170, 20 } }, thickness = 0.05, material = "Foil" },
+		glow = Gold,
+		auras = { { kind = "Sparkle", color = Gold } },
+	},
 	Bloodmoon = {
 		tint = { color = { 150, 20, 30 }, mix = 0.45 },
 		glow = { 255, 40, 40 },
