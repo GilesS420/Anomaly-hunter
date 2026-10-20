@@ -1,17 +1,21 @@
 --!strict
--- Our own hotbar, in place of Roblox's: nine slots along the bottom of the screen holding the
--- Tools in your Backpack, cakes first (cheapest first), then the monsters in Storage (most
--- valuable first). Press 1 to 9 or click/tap a slot to hold that Tool, again to put it away.
--- The bar stays centred on however many slots are in use, and a Tool keeps its place: new
--- ones slot in by section and order, but nothing reshuffles while you play.
--- The server sorts nothing; it tags each Tool with Section ("Cake" or "Monster") and Order
--- (CakeService, InventoryService). Anything past nine is still in the Backpack window.
+-- Our own hotbar, in place of Roblox's, and the bottom row of the Backpack: nine numbered
+-- slots holding Tools from your inventory (cakes and the monsters in it). Press 1 to 9 or
+-- click/tap a slot to hold that Tool, again to put it away.
+-- Like Roblox's: a Tool keeps its slot, and a new one goes in the first empty slot (cakes
+-- before monsters when several arrive at once). With the Backpack open every slot shows, and
+-- you can drag a card onto a slot, drag slots onto each other to swap them, or drag one off
+-- the bar to keep it in the Backpack only (InventoryController).
+-- The server tags each Tool with Section ("Cake" or "Monster") and Order (CakeService,
+-- InventoryService).
 
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
 
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
+
+local Drag = require(script.Parent.Parent:WaitForChild("Drag"))
 
 local HotbarController = {}
 
@@ -88,6 +92,73 @@ function HotbarController.toggle(tool: Tool)
 	end
 end
 
+-- Filled in by start().
+local slots: { [number]: Tool } = {} -- slot number -> Tool
+local benched: { [Tool]: boolean } = {} -- dragged off the bar: Backpack only
+local open = false
+local buttons: { TextButton } = {}
+local refresh: () -> () = function() end
+
+local function slotOf(tool: Tool): number?
+	for i = 1, Slots do
+		if slots[i] == tool then
+			return i
+		end
+	end
+	return nil
+end
+
+-- The slot under a screen point, if any.
+function HotbarController.slotAt(at: Vector2): number?
+	for i, button in buttons do
+		if Drag.over(button, at) then
+			return i
+		end
+	end
+	return nil
+end
+
+-- Puts a Tool in a slot. Whatever was there moves to the Tool's old slot, or off the bar.
+function HotbarController.put(tool: Tool, slot: number)
+	local from = slotOf(tool)
+	local other = slots[slot]
+	benched[tool] = nil
+	if from then
+		slots[from] = nil
+	end
+	if other and other ~= tool then
+		if from then
+			slots[from] = other
+		else
+			benched[other] = true
+		end
+	end
+	slots[slot] = tool
+	refresh()
+end
+
+-- Takes a Tool off the bar; it stays in the Backpack.
+function HotbarController.bench(tool: Tool)
+	local from = slotOf(tool)
+	if from then
+		slots[from] = nil
+	end
+	benched[tool] = true
+	refresh()
+end
+
+-- Calls `fn` whenever a Tool comes or goes (picked up, placed, bought, used).
+local changeHooks: { () -> () } = {}
+function HotbarController.onChange(fn: () -> ())
+	table.insert(changeHooks, fn)
+end
+
+-- The Backpack opened or closed: open shows every slot, to drop things on.
+function HotbarController.setOpen(isOpen: boolean)
+	open = isOpen
+	refresh()
+end
+
 function HotbarController.start()
 	task.spawn(hideRobloxBackpack)
 	local player = Players.LocalPlayer
@@ -96,6 +167,7 @@ function HotbarController.start()
 	gui.Name = "HotbarUi"
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = false
+	gui.DisplayOrder = 6 -- over the Backpack window, which it is the bottom row of
 	gui.Parent = player:WaitForChild("PlayerGui")
 
 	local small = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
@@ -115,8 +187,6 @@ function HotbarController.start()
 	layout.Padding = UDim.new(0, gap)
 	layout.Parent = bar
 
-	local shown: { Tool } = {}
-	local buttons: { TextButton } = {}
 	for i = 1, Slots do
 		local button = Ui.button(bar, "", Ui.Colors.off, UDim2.fromOffset(size, size))
 		button.Name = `Slot{i}`
@@ -131,69 +201,100 @@ function HotbarController.start()
 			number.Position = UDim2.fromOffset(-6, -5)
 		end
 		button:SetAttribute("Paint", "")
-		button.Activated:Connect(function()
-			local tool = shown[i]
+		Drag.attach(button, function()
+			local tool = slots[i]
+			return if tool then tool.Name else ""
+		end, function()
+			local tool = slots[i]
 			if tool then
 				HotbarController.toggle(tool)
 			end
+		end, function(at)
+			local tool = slots[i]
+			if not tool then
+				return
+			end
+			local target = HotbarController.slotAt(at)
+			if target then
+				HotbarController.put(tool, target)
+			else
+				HotbarController.bench(tool)
+			end
+		end, function()
+			local tool: Tool? = slots[i]
+			return open and tool ~= nil
 		end)
 		buttons[i] = button
 	end
 
-	-- Keeps the Tools already on the bar where they are, drops the ones that are gone and
-	-- slots new ones in before the first one they sort ahead of.
-	local function arrange(): { Tool }
-		local have = HotbarController.tools()
+	-- Drops Tools that are gone and puts new ones in the first empty slots.
+	local function arrange()
+		local have = HotbarController.tools() -- sorted, so cakes fill in before monsters
 		local present: { [Tool]: boolean } = {}
 		for _, tool in have do
 			present[tool] = true
 		end
-		local kept: { Tool } = {}
-		local placed: { [Tool]: boolean } = {}
-		for _, tool in shown do
-			if present[tool] then
-				table.insert(kept, tool)
-				placed[tool] = true
+		for i = 1, Slots do
+			local tool = slots[i]
+			if tool and not present[tool] then
+				slots[i] = nil
+			end
+		end
+		for tool in benched do
+			if not present[tool] then
+				benched[tool] = nil
 			end
 		end
 		for _, tool in have do
-			if not placed[tool] then
-				local at = #kept + 1
-				for i, other in kept do
-					if before(tool, other) then
-						at = i
+			if not slotOf(tool) and not benched[tool] then
+				for i = 1, Slots do
+					if not slots[i] then
+						slots[i] = tool
 						break
 					end
 				end
-				table.insert(kept, at, tool)
 			end
 		end
-		return kept
 	end
 
-	-- Only touches a slot when what it shows changed, so nothing flickers.
+	-- Only touches a slot when what it shows changed, so nothing flickers. Closed, the bar
+	-- shows the slots up to the last one in use; open, all nine.
 	local function render()
-		shown = arrange()
+		arrange()
+		local last = 0
+		for i = 1, Slots do
+			if slots[i] then
+				last = i
+			end
+		end
 		local character = player.Character
 		for i, button in buttons do
-			local tool: Tool? = shown[i]
-			if button.Visible ~= (tool ~= nil) then
-				button.Visible = tool ~= nil
+			local tool: Tool? = slots[i]
+			local visible = open or i <= last
+			if button.Visible ~= visible then
+				button.Visible = visible
 			end
-			if tool then
-				if button.Text ~= tool.Name then
-					button.Text = tool.Name
-				end
-				local held = tool.Parent == character
-				local section = tool:GetAttribute("Section") :: string
-				local paint = if held then "Held" else section or ""
-				if button:GetAttribute("Paint") ~= paint then
-					button:SetAttribute("Paint", paint)
-					Ui.paint(button, if held then Ui.Colors.lamp else SectionColor[section] or Ui.Colors.off)
-				end
+			local text = if tool then tool.Name else ""
+			if button.Text ~= text then
+				button.Text = text
+			end
+			local held = tool ~= nil and tool.Parent == character
+			local section = if tool then tool:GetAttribute("Section") :: string else nil
+			local paint = if held then "Held" elseif tool then section or "" else "Empty"
+			if button:GetAttribute("Paint") ~= paint then
+				button:SetAttribute("Paint", paint)
+				Ui.paint(
+					button,
+					if held
+						then Ui.Colors.lamp
+						elseif tool then SectionColor[section] or Ui.Colors.off
+						else Ui.Colors.off
+				)
+				button.BackgroundTransparency = if tool then 0 else 0.6
 			end
 		end
 	end
+	refresh = render
 
 	-- Redraw once per frame at most, whenever a Tool comes, goes, moves to your hand or is
 	-- renamed. Waiting a frame also skips the moment a Tool is between Backpack and hand.
@@ -226,8 +327,21 @@ function HotbarController.start()
 		changed()
 	end
 	local function watch(container: Instance)
-		container.ChildAdded:Connect(watchTool)
-		container.ChildRemoved:Connect(changed)
+		local function toolsChanged(child: Instance)
+			if child:IsA("Tool") then
+				for _, hook in changeHooks do
+					task.spawn(hook)
+				end
+			end
+		end
+		container.ChildAdded:Connect(function(child)
+			watchTool(child)
+			toolsChanged(child)
+		end)
+		container.ChildRemoved:Connect(function(child)
+			changed()
+			toolsChanged(child)
+		end)
 		for _, child in container:GetChildren() do
 			watchTool(child)
 		end
@@ -248,7 +362,7 @@ function HotbarController.start()
 			return
 		end
 		local slot = table.find(Keys, input.KeyCode)
-		local tool = if slot then shown[slot] else nil
+		local tool = if slot then slots[slot] else nil
 		if tool then
 			HotbarController.toggle(tool)
 		end

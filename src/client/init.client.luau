@@ -15,6 +15,8 @@ local TravelController = require(script.Controllers.TravelController)
 local InventoryController = require(script.Controllers.InventoryController)
 local CakeController = require(script.Controllers.CakeController)
 local HotbarController = require(script.Controllers.HotbarController)
+local CarryController = require(script.Controllers.CarryController)
+local PickupController = require(script.Controllers.PickupController)
 local SkyController = require(script.Controllers.SkyController)
 
 local controllers: { { start: () -> () } } = {
@@ -30,6 +32,8 @@ local controllers: { { start: () -> () } } = {
 	InventoryController,
 	CakeController,
 	HotbarController,
+	CarryController,
+	PickupController,
 	SkyController,
 }
 

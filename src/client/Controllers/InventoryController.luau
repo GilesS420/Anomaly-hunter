@@ -1,20 +1,24 @@
 --!strict
 -- The Backpack window. Opens from the HUD's Backpack button (or G on a keyboard), anywhere in
--- the game. Tabs down the left, and everything you own as little picture cards:
---   Monsters   mansion and Storage, most valuable first. A box marks the ones in Storage.
+-- the game. Tabs down the left, everything in your inventory as little picture cards, and
+-- the hotbar as its bottom row (HotbarController):
+--   Monsters   the monsters you picked up (press E on one in your mansion; Storage on the
+--              server), most valuable first. Hold one and click in your mansion to put it
+--              back.
 --   Cakes      how many of each you have.
 --   Tools      vacuums, Bait Bells and Return Charms.
 --   Favorited  the monsters you hearted.
--- Tap a card to see what it is along the bottom, with its button: Store (mansion monster),
--- Hold (stored monster or cake: it goes in your hand, then click in your mansion) or Equip
--- (vacuum). The heart on a monster favourites it, and the Collector never sells favourites.
--- Holding uses the same Tools as our hotbar (HotbarController); the pictures are preview
--- models the server keeps in PlayerGui.InventoryPreviews (server/Services/InventoryService).
+-- Tap a card to see what it is along the bottom, with its button: Hold (monster or cake) or
+-- Equip (vacuum). Drag a monster or cake card onto a hotbar slot to put it there. The heart
+-- on a monster favourites it, and the Collector never sells favourites.
+-- The pictures are preview models the server keeps in PlayerGui.InventoryPreviews
+-- (server/Services/InventoryService).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
+local Drag = require(script.Parent.Parent:WaitForChild("Drag"))
 local HotbarController = require(script.Parent.HotbarController)
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
@@ -73,7 +77,6 @@ function InventoryController.start()
 	local player = Players.LocalPlayer
 	local remotes = ReplicatedStorage:WaitForChild("InventoryRemotes")
 	local GetView = remotes:WaitForChild("GetView") :: RemoteFunction
-	local Move = remotes:WaitForChild("Move") :: RemoteFunction
 	local Lock = remotes:WaitForChild("Lock") :: RemoteFunction
 	local Equip = remotes:WaitForChild("Equip") :: RemoteFunction
 	local playerGui = player:WaitForChild("PlayerGui")
@@ -82,8 +85,12 @@ function InventoryController.start()
 	local panel = window.gui:FindFirstChild("Panel") :: Frame
 	local limit = panel:FindFirstChildOfClass("UISizeConstraint")
 	if limit then
-		limit.MaxSize = Vector2.new(780, 620)
+		limit.MaxSize = Vector2.new(780, 600)
 	end
+	-- Sits just above the hotbar, which is the window's bottom row.
+	panel.AnchorPoint = Vector2.new(0.5, 1)
+	panel.Position = UDim2.new(0.5, 0, 1, -80)
+	panel.Size = UDim2.new(0.92, 0, 1, -130)
 	local small = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	local sideWidth = if small then 96 else 116
 	local cell = if small then Vector2.new(84, 96) else Vector2.new(100, 112)
@@ -190,7 +197,8 @@ function InventoryController.start()
 		rim: Color3,
 		look: string?,
 		icon: string?,
-		caption: string
+		caption: string,
+		toolTag: { string }? -- { attribute, value } of its hotbar Tool, to drag onto the hotbar
 	)
 		local button = Instance.new("TextButton")
 		button.Name = key
@@ -232,17 +240,41 @@ function InventoryController.start()
 		label.AnchorPoint = Vector2.new(0.5, 1)
 		label.Position = UDim2.new(0.5, 0, 1, -3)
 		label.TextXAlignment = Enum.TextXAlignment.Center
-		button.Activated:Connect(function()
+		local function select()
 			selected = key
 			render()
-		end)
+		end
+		if toolTag then
+			Drag.attach(
+				button,
+				function()
+					return caption
+				end,
+				select,
+				function(at)
+					local slot = HotbarController.slotAt(at)
+					if not slot then
+						return
+					end
+					for _, tool in HotbarController.tools() do
+						if tool:GetAttribute(toolTag[1]) == toolTag[2] then
+							HotbarController.put(tool, slot)
+							return
+						end
+					end
+				end
+			)
+		else
+			button.Activated:Connect(select)
+		end
 		return button, label
 	end
 
 	local function monsterCards(rows: { MonsterRow })
 		for i, monster in rows do
 			local key = `m:{monster.uid}`
-			local button, label = card(i, key, monster.color, monster.look, nil, monster.value)
+			local button, label =
+				card(i, key, monster.color, monster.look, nil, monster.value, { "MonsterUid", monster.uid })
 			label.TextColor3 = Ui.Colors.money
 			local heart = Instance.new("TextButton")
 			heart.Name = "Heart"
@@ -260,24 +292,15 @@ function InventoryController.start()
 			heart.Activated:Connect(function()
 				call(Lock, uid)
 			end)
-			if monster.stored then
-				local box = Ui.text(button, "📦", UDim2.fromOffset(22, 22), Ui.Colors.text, false, 18)
-				box.Position = UDim2.fromOffset(4, 3)
-				box.ZIndex = 3
-			end
 			if selected == key then
 				pickName.Text = monster.name
 				pickName.TextColor3 = monster.color
-				pickDetails.Text = monster.details .. (if monster.stored then " · in Storage" else "")
+				pickDetails.Text = monster.details
 				action.Visible = true
-				action.Text = if monster.stored then "Hold" else "Store"
-				Ui.paint(action, if monster.stored then Ui.Colors.buy else Ui.Colors.off)
+				action.Text = "Hold"
+				Ui.paint(action, Ui.Colors.buy)
 				onAction = function()
-					if monster.stored then
-						hold("MonsterUid", uid)
-					else
-						call(Move, uid)
-					end
+					hold("MonsterUid", uid)
 				end
 			end
 		end
@@ -295,7 +318,8 @@ function InventoryController.start()
 				if item.cake then Ui.Colors.sell else Ui.Colors.equip,
 				item.look,
 				Icons[item.kind],
-				caption
+				caption,
+				if item.cake then { "CakeId", item.id } else nil
 			)
 			if selected == key then
 				pickName.Text = item.name
@@ -338,13 +362,13 @@ function InventoryController.start()
 		if tab == "Monsters" or tab == "Favorited" then
 			local rows: { MonsterRow } = {}
 			for _, monster in current.monsters do
-				if tab == "Monsters" or monster.locked then
+				if monster.stored and (tab == "Monsters" or monster.locked) then
 					table.insert(rows, monster)
 				end
 			end
 			if tab == "Monsters" then
 				window.status.Text =
-					`Mansion {current.mansionCount}/{current.mansionCapacity} · Storage {current.storageCount}/{current.storageCapacity}`
+					`{current.storageCount}/{current.storageCapacity} · Press E on a monster in your mansion to pick it up`
 			else
 				window.status.Text = if #rows > 0
 					then "The Collector never sells these"
@@ -377,12 +401,33 @@ function InventoryController.start()
 		end
 		window.status.Text = "Loading..."
 		window.open(nil)
+		HotbarController.setOpen(true)
 		local ok, result = pcall(GetView.InvokeServer, GetView)
 		view = if ok then result else nil
 		if window.isOpen() then
 			render()
 		end
 	end
+
+	window.onClose = function()
+		HotbarController.setOpen(false)
+	end
+	-- Picking a monster up, placing one or using a cake changes the cards: fetch them again.
+	local refetching = false
+	HotbarController.onChange(function()
+		if not window.isOpen() or refetching then
+			return
+		end
+		refetching = true
+		task.delay(0.3, function()
+			refetching = false
+			local ok, result = pcall(GetView.InvokeServer, GetView)
+			if ok and result and window.isOpen() then
+				view = result
+				render()
+			end
+		end)
+	end)
 
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if not processed and input.KeyCode == Enum.KeyCode.G then
