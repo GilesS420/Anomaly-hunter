@@ -58,13 +58,23 @@ local function hash(text: string): number
 	return h
 end
 
--- True if the item is for sale in this slot. Free starter tools always are.
-function Workshop.inStock(item: Shop.Item, slot: number): boolean
+-- True if the item is for sale in this slot. Free starter tools always are; an event treat
+-- is exactly while its Watcher event (`liveEvent`, an id) is live. `chanceMultiplier` raises
+-- the restock chances (Sugar Rush), and anything in stock without it stays in stock.
+function Workshop.inStock(
+	item: Shop.Item,
+	slot: number,
+	liveEvent: string?,
+	chanceMultiplier: number?
+): boolean
+	if item.event then
+		return item.event == liveEvent
+	end
 	if item.price <= 0 then
 		return true
 	end
 	local roll = (hash(`{slot}:{item.id}`) % 10000) / 100 -- 0 to 99.99
-	return roll < item.restockChance
+	return roll < item.restockChance * math.max(chanceMultiplier or 1, 1)
 end
 
 -- Tools (vacuums) are kept forever and equipped; everything else is used up.
@@ -106,7 +116,9 @@ function Workshop.canBuy(
 	slot: number,
 	money: number,
 	inventory: { [string]: number },
-	boughtThisSlot: number
+	boughtThisSlot: number,
+	liveEvent: string?,
+	chanceMultiplier: number?
 ): BuyResult
 	if not item then
 		return "Unknown"
@@ -114,7 +126,7 @@ function Workshop.canBuy(
 	if Workshop.isTool(item) and Workshop.owns(inventory, item) then
 		return "Owned"
 	end
-	if not Workshop.inStock(item, slot) then
+	if not Workshop.inStock(item, slot, liveEvent, chanceMultiplier) then
 		return "OutOfStock"
 	end
 	if boughtThisSlot >= Workshop.limit(item) then

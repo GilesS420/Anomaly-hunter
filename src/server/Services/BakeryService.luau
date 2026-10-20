@@ -14,6 +14,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
+local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
@@ -55,6 +56,17 @@ local function currentSlot(): number
 	return Workshop.slotAt(os.time())
 end
 
+-- The Watcher event that's live right now (WatcherService keeps the attribute), or nil.
+local function liveEvent(): Events.WatcherEvent?
+	return Events.find(workspace:GetAttribute("WatcherEvent"))
+end
+
+-- What the live event changes about the stock: its id (event treats) and the restock boost.
+local function stockBoost(): (string?, number?)
+	local event = liveEvent()
+	return if event then event.id else nil, if event then event.bakeryStockMultiplier else nil
+end
+
 local function countdown(seconds: number): string
 	return string.format("%d:%02d", seconds // 60, seconds % 60)
 end
@@ -62,14 +74,19 @@ end
 local function viewFor(data: DataService.Data): View
 	local slot = currentSlot()
 	local bought = Workshop.boughtThisSlot(data.shop, slot)
+	local eventId, stockMultiplier = stockBoost()
 	local treats: { TreatRow } = {}
 	for _, item in Shop.Bakery do
+		local inStock = Workshop.inStock(item, slot, eventId, stockMultiplier)
+		if item.event and not inStock then
+			continue -- event treats only show up during their event
+		end
 		table.insert(treats, {
 			id = item.id,
 			name = item.name,
 			price = item.price,
 			description = Cakes.describe(item),
-			inStock = Workshop.inStock(item, slot),
+			inStock = inStock,
 			count = data.inventory[item.id] or 0,
 			bought = bought[item.id] or 0,
 			limit = Workshop.limit(item),
@@ -101,8 +118,16 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 	local item = if typeof(itemId) == "string" then Cakes.item(itemId) else nil
 	local slot = currentSlot()
 	local bought = Workshop.boughtThisSlot(data.shop, slot)
-	local check =
-		Workshop.canBuy(item, slot, data.money, data.inventory, if item then bought[item.id] or 0 else 0)
+	local eventId, stockMultiplier = stockBoost()
+	local check = Workshop.canBuy(
+		item,
+		slot,
+		data.money,
+		data.inventory,
+		if item then bought[item.id] or 0 else 0,
+		eventId,
+		stockMultiplier
+	)
 
 	local message
 	if check == "Ok" and item and DataService.addMoney(player, -item.price) then
@@ -119,6 +144,8 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 		message = `You bought all {Workshop.limit(item)} this restock. More in {countdown(
 			Workshop.restockAt(slot) - os.time()
 		)}.`
+	elseif check == "OutOfStock" and item and item.event then
+		message = `The {item.name} is only sold during its Watcher event.`
 	elseif check == "OutOfStock" then
 		message = `Out of stock. The Bakery restocks in {countdown(Workshop.restockAt(slot) - os.time())}.`
 	else

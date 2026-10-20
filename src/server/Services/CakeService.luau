@@ -14,6 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CakeConfig = require(ReplicatedStorage.Shared.Config.Cakes)
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
+local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Rng = require(ReplicatedStorage.Shared.Util.Rng)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
@@ -298,7 +299,9 @@ local function check(player: Player)
 			continue
 		end
 		cake.saved.checkedAt = now
-		if not Rng.chance(CakeConfig.BiteChance, random) then
+		local event = Events.find(workspace:GetAttribute("WatcherEvent"))
+		local biteChance = CakeConfig.BiteChance * (if event then event.cakeBiteMultiplier or 1 else 1)
+		if not Rng.chance(biteChance, random) then
 			continue
 		end
 		-- Only monsters within the cake's reach come over.

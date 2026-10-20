@@ -27,9 +27,13 @@ Cakes.BiteEffectChance = 50 -- percent a bite rolls for the effect at all
 Cakes.Reach = {
 	PumpkinCandy = 8,
 	FangFudge = 9,
+	StaticCupcake = 10,
 	EctoplasmPie = 10,
+	FrostTart = 11,
+	GildedTruffle = 12,
 	StitchCupcake = 12,
 	CursedCake = 14,
+	BloodMoonPie = 14,
 	BoneMarrowMousse = 15,
 	WitchsBrewTart = 18,
 	EclipseEclair = 22,
@@ -108,6 +112,39 @@ Cakes.Looks = {
 		topping = "Moon",
 		toppingColor = { 255, 230, 150 },
 		glow = { 255, 180, 80 },
+	},
+	-- Event treats (only sold while their Watcher event is live).
+	StaticCupcake = {
+		tiers = 1,
+		sponge = { 150, 160, 190 },
+		icing = { 190, 210, 255 },
+		topping = "Drips",
+		toppingColor = { 170, 220, 255 },
+		glow = { 170, 220, 255 },
+	},
+	FrostTart = {
+		tiers = 1,
+		sponge = { 200, 220, 240 },
+		icing = { 235, 248, 255 },
+		topping = "Candy",
+		toppingColor = { 140, 210, 255 },
+		glow = { 180, 235, 255 },
+	},
+	GildedTruffle = {
+		tiers = 1,
+		sponge = { 60, 40, 25 },
+		icing = { 255, 205, 30 },
+		topping = "Runes",
+		toppingColor = { 255, 230, 120 },
+		glow = { 255, 200, 60 },
+	},
+	BloodMoonPie = {
+		tiers = 2,
+		sponge = { 90, 20, 25 },
+		icing = { 180, 20, 30 },
+		topping = "Moon",
+		toppingColor = { 255, 70, 55 },
+		glow = { 255, 40, 40 },
 	},
 } :: { [string]: Look }
 

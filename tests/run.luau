@@ -790,6 +790,39 @@ do
 	end
 	check("every cake has a look and real effects", cakesOk)
 
+	-- Event treats: only in stock while their Watcher event is live; Sugar Rush raises the odds.
+	local frostTart = Cakes.item("FrostTart") :: any
+	check(
+		"an event treat is only in stock during its event",
+		frostTart ~= nil
+			and Workshop.inStock(frostTart, 1, "FrostFog")
+			and not Workshop.inStock(frostTart, 1, nil)
+			and not Workshop.inStock(frostTart, 1, "GoldRush")
+	)
+	local treatsOk = true
+	for _, item in Shop.Bakery do
+		if item.event then
+			local event = Events.find(item.event)
+			treatsOk = treatsOk and event ~= nil and event.launch and event.effect == item.grantsEffect
+		end
+	end
+	check("every event treat gives its event's effect", treatsOk)
+	local eclair = Cakes.item("EclipseEclair") :: any
+	local plain, rushed, lost = 0, 0, false
+	for slot = 1, 20_000 do
+		local before = Workshop.inStock(eclair, slot)
+		local after = Workshop.inStock(eclair, slot, "SugarRush", 3)
+		plain += if before then 1 else 0
+		rushed += if after then 1 else 0
+		lost = lost or (before and not after)
+	end
+	check("Sugar Rush triples restock chances", rushed > plain * 2.5 and not lost)
+	check(
+		"an event treat can only be bought during its event",
+		Workshop.canBuy(frostTart, 1, 1e12, {}, 0) == "OutOfStock"
+			and Workshop.canBuy(frostTart, 1, 1e12, {}, 0, "FrostFog") == "Ok"
+	)
+
 	local foodEffectsOk = true
 	for id, effect in Effects.List do
 		if effect.source == "Food" then
