@@ -6,8 +6,10 @@
 
 local CakeConfig = require("../Config/Cakes")
 local Effects = require("../Config/Effects")
+local Layout = require("../Config/Layout")
 local Shop = require("../Config/Shop")
 local Format = require("./Format")
+local Mansion = require("./Mansion")
 local Rng = require("./Rng")
 local Value = require("./Value")
 
@@ -108,6 +110,34 @@ function Cakes.isDone(cake: Placed, now: number): boolean
 	return cake.bitesLeft <= 0 or now >= Cakes.expiresAt(cake)
 end
 
+-- How far a cake reaches, in studs (a circle round it on the floor).
+function Cakes.reach(itemId: string): number
+	return CakeConfig.Reach[itemId] or CakeConfig.DefaultReach
+end
+
+-- The mansion's floor area in square studs (every owned wing that has a spot in the layout).
+function Cakes.floorArea(wingsOwned: number): number
+	local area = 0
+	for _, wing in Mansion.ownedWings(wingsOwned) do
+		local spot = Layout.Wings[wing.id]
+		if spot then
+			area += spot.width * spot.depth
+		end
+	end
+	return area
+end
+
+-- The chance (0 to 1) that a monster roaming the mansion is within this cake's reach at a
+-- check: the share of the floor its circle covers. Used while the owner is offline.
+function Cakes.reachShare(itemId: string, wingsOwned: number): number
+	local area = Cakes.floorArea(wingsOwned)
+	if area <= 0 then
+		return 1
+	end
+	local reach = Cakes.reach(itemId)
+	return math.min(1, math.pi * reach * reach / area)
+end
+
 -- How many cakes can stand at once.
 function Cakes.limit(wingsOwned: number): number
 	return wingsOwned * CakeConfig.PerWing
@@ -154,19 +184,25 @@ function Cakes.bite(cake: Placed, caught: Value.CaughtMonster, random: Random?):
 end
 
 -- Plays back every check missed since cake.checkedAt (up to now, or until the cake is done),
--- with the same odds as when the owner is online. Returns the bites, in order.
+-- with the same odds as when the owner is online: at each check every monster is within reach
+-- with the chance Cakes.reachShare. Returns the bites, in order.
 function Cakes.catchUp(
 	cake: Placed,
 	monsters: { Value.CaughtMonster },
 	now: number,
+	wingsOwned: number,
 	random: Random?
 ): { Bite }
 	local bites: { Bite } = {}
 	local untilTime = math.min(now, Cakes.expiresAt(cake))
+	local share = Cakes.reachShare(cake.itemId, wingsOwned) * 100
+	local function inReach(): boolean
+		return Rng.chance(share, random)
+	end
 	while cake.bitesLeft > 0 and cake.checkedAt + CakeConfig.CheckSeconds <= untilTime do
 		cake.checkedAt += CakeConfig.CheckSeconds
 		if Rng.chance(CakeConfig.BiteChance, random) then
-			local eater = Cakes.pickEater(cake, monsters, random)
+			local eater = Cakes.pickEater(cake, monsters, random, inReach)
 			if eater then
 				table.insert(bites, Cakes.bite(cake, eater, random))
 			end
@@ -175,8 +211,8 @@ function Cakes.catchUp(
 	return bites
 end
 
--- One short line saying what a cake does, with the real odds per bite:
--- "Each bite: 50% Slimed (x2)", or "Each bite: 12.5% Mummy (x4), 37.5% Batty (x3)".
+-- One short line saying what a cake does, with its reach and the real odds per bite:
+-- "Reach 10 studs · Each bite: 50% Slimed (x2)".
 function Cakes.describe(item: Shop.Item): string
 	local odds = {}
 	local left = CakeConfig.BiteEffectChance / 100 -- chance the roll gets this far
@@ -189,7 +225,7 @@ function Cakes.describe(item: Shop.Item): string
 			table.insert(odds, `{percent}% {Format.name(effect.id)} (x{effect.multiplier})`)
 		end
 	end
-	return `Each bite: {table.concat(odds, ", ")}`
+	return `Reach {Cakes.reach(item.id)} studs · Each bite: {table.concat(odds, ", ")}`
 end
 
 return Cakes

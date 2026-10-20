@@ -3,8 +3,8 @@
 -- hotbar and click while standing in one of your wings). Monsters come for a bite, and a bite
 -- may give them a mutation (the treat's effect, Config/Shop.Bakery).
 --
--- Every CheckSeconds each cake rolls BiteChance. On a hit, a monster in the mansion that
--- hasn't had a bite of it yet comes over (monsters the effect can still land on first). A
+-- Every CheckSeconds each cake rolls BiteChance. On a hit, a monster within the cake's Reach
+-- that hasn't had a bite of it yet comes over (monsters the effect can still land on first). A
 -- bite rolls BiteEffectChance, then the treat's own odds (Util/Care.pickEffect). A cake is
 -- gone after Bites bites or Minutes minutes, whichever comes first.
 --
@@ -19,6 +19,22 @@ Cakes.BiteChance = 10 -- percent per check
 Cakes.CheckSeconds = 30
 Cakes.PerWing = 1 -- cakes out at once per owned wing (the Foyer counts)
 Cakes.BiteEffectChance = 50 -- percent a bite rolls for the effect at all
+
+-- How far each cake reaches (studs, a circle round it on the floor): only monsters inside it
+-- come for a bite. Better cakes reach further. A wing is 40 x 40 studs. Hover over (or tap)
+-- a placed cake to see its circle. Offline, a monster counts as in reach with the share of
+-- the mansion floor the circle covers (Util/Cakes.reachShare), so the odds match.
+Cakes.Reach = {
+	PumpkinCandy = 8,
+	FangFudge = 9,
+	EctoplasmPie = 10,
+	StitchCupcake = 12,
+	CursedCake = 14,
+	BoneMarrowMousse = 15,
+	WitchsBrewTart = 18,
+	EclipseEclair = 22,
+} :: { [string]: number }
+Cakes.DefaultReach = 8
 
 export type Topping = "Candy" | "Fangs" | "Drips" | "Stitches" | "Runes" | "Bones" | "Bubbles" | "Moon"
 
