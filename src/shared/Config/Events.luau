@@ -1,31 +1,61 @@
 --!strict
--- Watcher events. Server-wide Hunger rises with time players spend in zones; each
--- threshold fires the next event in the main area. Rates are placeholders.
+-- Watcher events: every few minutes the Watcher stirs and an event changes the sky for the
+-- whole server. Events are passive: players keep doing what they were doing while the sky
+-- changes and their mansion monsters pick up the event's boosts. Numbers are placeholders.
 --
--- One cycle runs the events that are built, in level order: Hunger fills to the first
--- event's threshold, that event plays, Hunger keeps filling to the next one, and after the
--- last event Hunger starts again from 0. Hunger doesn't rise while an event is playing.
+-- The clock (Util/Watcher, server/Services/WatcherService):
+--   calm      a random gap of GapMinSeconds to GapMaxSeconds after the last event ends
+--   warning   WarningSeconds before the event; the sky already starts to change
+--   live      the event's durationSeconds; then calm again
+-- The next event is picked by weight and is never the one that just played. Each event opens
+-- one of the Watcher's eyes; once EyesToAwaken are open, the next event is The Watcher Awakens
+-- (the event marked `awakening`), which closes them all again.
+
+export type Rgb = { number } -- { red, green, blue }, 0 to 255 (Color3.fromRGB)
+
+-- How an event changes the sky. Lighting values are set on the server and reach everyone;
+-- the sky pieces (moon, eye, aurora, sparkles, flashes) are drawn by each client around its
+-- own camera (client/Controllers/SkyController), so players in zones see them too.
+export type Sky = {
+	ambient: Rgb?, -- Lighting.Ambient
+	outdoorAmbient: Rgb?, -- Lighting.OutdoorAmbient
+	brightness: number?, -- Lighting.Brightness (the night is 2.4)
+	tint: Rgb?, -- colour filter over the whole screen
+	saturation: number?, -- -1 (grey) to 1 (vivid)
+	atmosphere: { color: Rgb, decay: Rgb, density: number, haze: number }?,
+	moon: { color: Rgb, size: number, coin: boolean? }?, -- a big disc in the sky; coin: flat and gold
+	eye: boolean?, -- the Watcher's giant eye, looking around
+	aurora: Rgb?, -- slow waving bands of light
+	sparkles: Rgb?, -- specks drifting down everywhere
+	flashes: boolean?, -- the whole sky flashes now and then, like a dying bulb
+}
 
 export type WatcherEvent = {
 	id: string,
 	name: string, -- shown to players
-	level: number,
 	launch: boolean,
+	weight: number?, -- how often it's picked by the clock (nil: never picked by weight)
+	awakening: boolean?, -- plays when all the eyes are open
 	effect: string?, -- haunted effect that can roll while the event is live
 	durationSeconds: number?,
-	monsters: { [string]: number }?, -- event monster id -> spawn weight
+	monsters: { [string]: number }?, -- event monster id -> spawn weight (optional bonus to catch)
 	effectOddsMultiplier: number?, -- mansion effect odds while live (Blood Moon doubles them)
 	growthMultiplier: number?, -- extra growth spurt rolls while live (Config/Weight.EventSpurtChance)
+	sky: Sky?,
+	warning: string?, -- toast everyone sees when the warning starts
 	announce: string?, -- toast everyone sees when it starts
 }
 
 local Events = {}
 
-Events.HungerPerPlayerMinute = 1 -- each player in a zone adds this much Hunger per minute
-Events.HungerThresholds = { 60, 150, 280, 450, 700 } -- by event level
+Events.GapMinSeconds = 5 * 60
+Events.GapMaxSeconds = 10 * 60
+Events.WarningSeconds = 30
+Events.EyesToAwaken = 5
 
--- How many event monsters appear at the start of an event: this many per player in the
--- server, clamped between Min and Max, so everyone gets a chance.
+-- How many event monsters (the Flicker and Blood Moon Phantoms, an optional bonus to catch)
+-- appear at the start of an event: this many per player in the server, clamped between Min
+-- and Max, so everyone gets a chance.
 Events.MonstersPerPlayer = 1
 Events.MinMonsters = 4
 Events.MaxMonsters = 10
@@ -46,37 +76,130 @@ Events.DriftAreas = {
 
 Events.List = {
 	{
+		id = "FrostFog",
+		name = "Frost Fog",
+		launch = true,
+		weight = 30,
+		durationSeconds = 180,
+		sky = {
+			ambient = { 80, 110, 150 },
+			outdoorAmbient = { 110, 150, 200 },
+			tint = { 205, 230, 255 },
+			saturation = -0.15,
+			atmosphere = { color = { 160, 205, 240 }, decay = { 70, 115, 170 }, density = 0.42, haze = 2 },
+			aurora = { 120, 230, 255 },
+			sparkles = { 210, 240, 255 },
+		},
+		warning = "The air turns icy cold...",
+		announce = "Frost Fog rolls in! An icy aurora lights up the sky.",
+	},
+	{
+		id = "SugarRush",
+		name = "Sugar Rush",
+		launch = true,
+		weight = 25,
+		durationSeconds = 180,
+		growthMultiplier = 2,
+		sky = {
+			ambient = { 70, 115, 65 },
+			outdoorAmbient = { 105, 170, 90 },
+			tint = { 215, 255, 195 },
+			saturation = 0.15,
+			atmosphere = { color = { 150, 220, 115 }, decay = { 45, 110, 45 }, density = 0.33, haze = 1.6 },
+			sparkles = { 230, 255, 160 },
+		},
+		warning = "Something sweet is in the air...",
+		announce = "Sugar Rush! A green sugar sky, and monsters grow faster.",
+	},
+	{
+		id = "GoldRush",
+		name = "Gold Rush",
+		launch = true,
+		weight = 15,
+		durationSeconds = 180,
+		sky = {
+			ambient = { 130, 95, 50 },
+			outdoorAmbient = { 200, 145, 70 },
+			tint = { 255, 228, 180 },
+			saturation = 0.1,
+			atmosphere = { color = { 240, 180, 90 }, decay = { 150, 85, 25 }, density = 0.3, haze = 1.4 },
+			moon = { color = { 255, 205, 80 }, size = 34, coin = true },
+			sparkles = { 255, 215, 110 },
+		},
+		warning = "Coins jingle somewhere in the dark...",
+		announce = "Gold Rush! A golden sky and a coin moon.",
+	},
+	{
 		id = "Flicker",
 		name = "Flicker",
-		level = 1,
 		launch = true,
+		weight = 20,
 		effect = "Poltergeist",
 		durationSeconds = 180,
 		monsters = { Flickerwick = 70, StaticShade = 30 },
-		announce = "The Watcher stirs... the streetlights are failing! Phantoms drift between the mansions.",
+		sky = {
+			ambient = { 30, 30, 40 },
+			outdoorAmbient = { 40, 40, 55 },
+			brightness = 1.2,
+			tint = { 205, 210, 235 },
+			saturation = -0.45,
+			atmosphere = { color = { 45, 45, 60 }, decay = { 12, 12, 18 }, density = 0.45, haze = 1.5 },
+			flashes = true,
+		},
+		warning = "The streetlights buzz and dim...",
+		announce = "Flicker! The lights are failing and Phantoms drift between the mansions.",
 	},
 	{
 		id = "BloodMoon",
 		name = "Blood Moon",
-		level = 2,
 		launch = true,
+		weight = 10,
 		effect = "Bloodmoon",
 		durationSeconds = 240,
 		monsters = { CrimsonWisp = 70, Moonhowler = 30 },
 		effectOddsMultiplier = 2,
 		growthMultiplier = 2,
-		announce = "A Blood Moon rises! Phantoms roam the main area, haunted effects are twice as likely and monsters grow.",
+		sky = {
+			ambient = { 70, 20, 20 },
+			outdoorAmbient = { 150, 30, 30 },
+			tint = { 255, 170, 170 },
+			atmosphere = { color = { 190, 50, 50 }, decay = { 100, 0, 0 }, density = 0.35, haze = 1.5 },
+			moon = { color = { 255, 70, 55 }, size = 44 },
+		},
+		warning = "The moon is turning red...",
+		announce = "A Blood Moon rises! Haunted effects are twice as likely, monsters grow and Phantoms roam.",
 	},
-	{ id = "MimicNight", name = "Mimic Night", level = 3, launch = false, effect = "Mimic" },
-	{ id = "BreachStorm", name = "Breach Storm", level = 4, launch = false },
+	{ id = "MimicNight", name = "Mimic Night", launch = false, effect = "Mimic" },
+	{ id = "BreachStorm", name = "Breach Storm", launch = false },
 	{
 		id = "WatcherAwakens",
 		name = "The Watcher Awakens",
-		level = 5,
 		launch = true,
+		awakening = true,
 		effect = "Watched",
+		durationSeconds = 300,
 		growthMultiplier = 3,
+		sky = {
+			ambient = { 55, 25, 75 },
+			outdoorAmbient = { 80, 35, 110 },
+			tint = { 225, 195, 255 },
+			saturation = -0.1,
+			atmosphere = { color = { 95, 45, 125 }, decay = { 35, 0, 45 }, density = 0.4, haze = 2 },
+			eye = true,
+		},
+		warning = "All five eyes are open. The Watcher is waking up...",
+		announce = "THE WATCHER AWAKENS! Its eye is on every mansion.",
 	},
 } :: { WatcherEvent }
+
+-- Finds an event by id.
+function Events.find(id: string?): WatcherEvent?
+	for _, event in Events.List do
+		if event.id == id then
+			return event
+		end
+	end
+	return nil
+end
 
 return Events

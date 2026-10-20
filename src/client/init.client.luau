@@ -15,6 +15,7 @@ local TravelController = require(script.Controllers.TravelController)
 local InventoryController = require(script.Controllers.InventoryController)
 local CakeController = require(script.Controllers.CakeController)
 local HotbarController = require(script.Controllers.HotbarController)
+local SkyController = require(script.Controllers.SkyController)
 
 local controllers: { { start: () -> () } } = {
 	ToastController,
@@ -29,6 +30,7 @@ local controllers: { { start: () -> () } } = {
 	InventoryController,
 	CakeController,
 	HotbarController,
+	SkyController,
 }
 
 for _, controller in controllers do

@@ -207,26 +207,68 @@ check(
 	string.find(Hunt.lockedReason(4, 6) or "", "future update") ~= nil
 )
 
--- Watcher: Hunger cycle, meter and event monsters.
+-- Watcher: the event clock, the eyes and event monsters.
 do
-	local steps = Watcher.cycle({ Flicker = true, BloodMoon = true })
+	local clockRng = fakeRandom(11)
+	local shortest, longest = math.huge, 0
+	for _ = 1, 5_000 do
+		local gap = Watcher.gap(clockRng)
+		shortest = math.min(shortest, gap)
+		longest = math.max(longest, gap)
+	end
 	check(
-		"the cycle is Flicker then Blood Moon",
-		#steps == 2 and steps[1].event.id == "Flicker" and steps[2].event.id == "BloodMoon"
+		"events come 5 to 10 minutes apart",
+		shortest >= 5 * 60 and longest <= 10 * 60 and shortest < 5.5 * 60 and longest > 9.5 * 60
+	)
+
+	local repeats, awakenings, counts = 0, 0, {} :: { [string]: number }
+	local last: string? = nil
+	for _ = 1, 20_000 do
+		local event = Watcher.pick(last, 0, clockRng)
+		if event.id == last then
+			repeats += 1
+		end
+		if event.awakening then
+			awakenings += 1
+		end
+		counts[event.id] = (counts[event.id] or 0) + 1
+		last = event.id
+	end
+	check("the same event never plays twice in a row", repeats == 0)
+	check("The Watcher Awakens only comes with all eyes open", awakenings == 0)
+	check("events that aren't launched never play", counts.MimicNight == nil and counts.BreachStorm == nil)
+	check("Frost Fog is commoner than Blood Moon", (counts.FrostFog or 0) > (counts.BloodMoon or 0) * 2)
+	check(
+		"every weighted launch event can play",
+		counts.FrostFog ~= nil
+			and counts.SugarRush ~= nil
+			and counts.GoldRush ~= nil
+			and counts.Flicker ~= nil
+			and counts.BloodMoon ~= nil
 	)
 	check(
-		"Flicker comes at 60 Hunger, Blood Moon at 150",
-		steps[1].threshold == 60 and steps[2].threshold == 150
+		"all eyes open means The Watcher Awakens",
+		Watcher.pick("Flicker", Events.EyesToAwaken, clockRng).id == "WatcherAwakens"
 	)
-	check("events that aren't built are skipped", #Watcher.cycle({ Flicker = true, MimicNight = true }) == 1)
-	check("8 hunters fill 8 Hunger a minute", near(Watcher.gain(8, 60), 8))
-	check("nobody hunting means no Hunger", Watcher.gain(0, 60) == 0)
-	check("the meter is half full at 30 of 60", near(Watcher.meter(30, steps, 1), 0.5))
-	check(
-		"the meter restarts after Flicker",
-		near(Watcher.meter(60, steps, 2), 0) and near(Watcher.meter(105, steps, 2), 0.5)
-	)
-	check("the meter never overflows", Watcher.meter(999, steps, 1) == 1)
+
+	local eyes = 0
+	for _ = 1, Events.EyesToAwaken do
+		eyes = Watcher.eyesAfter(eyes, Watcher.pick(nil, eyes, clockRng))
+	end
+	check("each event opens an eye", eyes == Events.EyesToAwaken)
+	eyes = Watcher.eyesAfter(eyes, Watcher.pick(nil, eyes, clockRng))
+	check("The Watcher Awakens closes all the eyes", eyes == 0)
+
+	local skies = true
+	for _, event in Events.List do
+		if event.launch and not event.sky then
+			skies = false
+		end
+	end
+	check("every launch event has its own sky", skies)
+	check("Events.find finds by id", (Events.find("BloodMoon") :: any).name == "Blood Moon")
+	check("Events.find returns nil for unknown ids", Events.find("Nope") == nil and Events.find(nil) == nil)
+
 	check("at least 4 event monsters", Watcher.monsterCount(1) == Events.MinMonsters)
 	check("one event monster per player", Watcher.monsterCount(7) == 7)
 	check("at most 10 event monsters", Watcher.monsterCount(30) == Events.MaxMonsters)
@@ -235,7 +277,7 @@ do
 	local eventRng = fakeRandom(3)
 	local wrong, wicks = 0, 0
 	for _ = 1, 20_000 do
-		local m = Watcher.rollMonster(steps[1].event, eventRng)
+		local m = Watcher.rollMonster(Events.find("Flicker") :: any, eventRng)
 		if m.event ~= "Flicker" then
 			wrong += 1
 		elseif m.id == "Flickerwick" then
