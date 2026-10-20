@@ -1,8 +1,10 @@
 --!strict
--- The Collector: sells the monsters roaming your mansion for money. Hold the prompt at
--- Workspace.Hub.Landmarks.Collector to open the sell window. Prices come from
--- Util/Value.sellValue (size, effects, familiarity and wings all count). Monsters in Storage are offered too
--- (at the value they had when stored). Locked monsters and the Vault are never offered here.
+-- The Collector: sells the monsters in your Backpack (Storage) for money, saved ones from
+-- earlier visits included. Monsters roaming your mansion aren't offered: pick one up first
+-- (E next to it). Hold the prompt at Workspace.Hub.Landmarks.Collector to open the sell
+-- window. Prices come from Util/Value.sellValue (size, effects, familiarity and wings all
+-- count), at the value a monster had when stored. Hearted (locked) monsters are listed but
+-- can't be sold; the Vault is never offered here.
 --
 -- Remotes in ReplicatedStorage.CollectorRemotes:
 --   Open     server -> client (counter: Vector3)   the player used the Collector prompt
@@ -11,7 +13,6 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Care = require(ReplicatedStorage.Shared.Util.Care)
 local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
@@ -40,6 +41,7 @@ export type Row = {
 	color: Color3, -- rarity colour
 	price: number,
 	confirm: boolean, -- rare enough that the window asks "are you sure?" first
+	locked: boolean, -- hearted in the Backpack: shown, but not for sale
 }
 export type Offer = { monsters: { Row }, total: number }
 export type Result = { ok: boolean, message: string, offer: Offer? }
@@ -68,24 +70,19 @@ local confirmOrder = Rarities[Shop.ConfirmSellFrom].order
 local function price(caught: Value.CaughtMonster, wingsOwned: number): number
 	local ok, value = pcall(Value.sellValue, caught, wingsOwned)
 	if not ok then
-		return 0 -- an unknown monster or effect sells for nothing (and isn't listed)
+		-- An unknown monster or effect sells for nothing (and isn't listed): say why in Output.
+		warn(`CollectorService: can't price {caught.monsterId} ({caught.uid}): {value}`)
+		return 0
 	end
 	local event = Events.find(workspace:GetAttribute("WatcherEvent"))
 	local multiplier = if event then event.sellMultiplier or 1 else 1
 	return math.floor(value * multiplier)
 end
 
--- Every monster that can be sold: unlocked, in the mansion or in Storage. Mansion monsters
--- are brought up to date first; stored ones are paused, so they keep their stored state.
+-- Every monster that can be sold: the unlocked ones in the Backpack (Storage). They're
+-- paused there, so they keep the state they were stored with.
 local function sellable(data: DataService.Data): { Value.CaughtMonster }
 	local list = {}
-	local now = os.time()
-	for _, caught in data.monsters do
-		Care.settle(caught, now) -- up-to-date Familiarity
-		if not caught.locked then
-			table.insert(list, caught)
-		end
-	end
 	for _, caught in data.storage do
 		if not caught.locked then
 			table.insert(list, caught)
@@ -97,7 +94,7 @@ end
 local function offerFor(data: DataService.Data): Offer
 	local rows: { Row } = {}
 	local total = 0
-	for _, caught in sellable(data) do
+	for _, caught in data.storage do
 		local monster = Monsters[caught.monsterId]
 		local value = price(caught, data.wingsOwned)
 		if not monster or not caught.uid or value <= 0 then
@@ -126,10 +123,17 @@ local function offerFor(data: DataService.Data): Offer
 			color = MonsterModel.color(monster.rarity),
 			price = value,
 			confirm = rarity ~= nil and rarity.order >= confirmOrder,
+			locked = caught.locked == true,
 		})
-		total += value
+		if not caught.locked then
+			total += value
+		end
 	end
+	-- Most valuable first; hearted ones after the rest.
 	table.sort(rows, function(a, b)
+		if a.locked ~= b.locked then
+			return b.locked
+		end
 		return if a.price == b.price then a.uid < b.uid else a.price > b.price
 	end)
 	return { monsters = rows, total = total }

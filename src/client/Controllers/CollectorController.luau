@@ -1,6 +1,6 @@
 --!strict
 -- The Collector's sell window. Opens when you use the prompt at the Collector; lists every
--- monster in your mansion, most valuable first, laid out like the SELL sketch (2026-10-20):
+-- monster in your Backpack (not the ones roaming the mansion), most valuable first, laid out like the SELL sketch (2026-10-20):
 --   [picture]  Name     Effects:  [ Vampire, Slimed ]   [ Sell ]
 --              $1.2M · 54 kg
 -- and a Sell All button that stays at the bottom while the list scrolls. Legendary and rarer
@@ -28,6 +28,7 @@ type Row = {
 	color: Color3,
 	price: number,
 	confirm: boolean,
+	locked: boolean,
 }
 type Offer = { monsters: { Row }, total: number }
 
@@ -97,10 +98,19 @@ local function card(list: ScrollingFrame, order: number, monster: Row, sell: () 
 	text.TextWrapped = true
 	text.TextYAlignment = Enum.TextYAlignment.Top
 
-	local button = Ui.button(row, "Sell", Ui.Colors.sell, UDim2.fromOffset(SellWidth, 44))
+	local button = Ui.button(
+		row,
+		if monster.locked then "♥ Kept" else "Sell",
+		if monster.locked then Ui.Colors.off else Ui.Colors.sell,
+		UDim2.fromOffset(SellWidth, 44)
+	)
 	button.AnchorPoint = Vector2.new(1, 0.5)
 	button.Position = UDim2.fromScale(1, 0.5)
-	if monster.confirm then
+	if monster.locked then
+		-- Hearted in the Backpack: un-heart it there to sell it.
+		button.AutoButtonColor = false
+		row.BackgroundTransparency = 0.4
+	elseif monster.confirm then
 		Ui.confirmButton(button, "Sure?", sell)
 	else
 		button.Activated:Connect(sell)
@@ -139,14 +149,21 @@ function CollectorController.start()
 			window.status.Text = "Your save is still loading..."
 			return
 		end
-		local count = #offer.monsters
-		if count == 0 then
-			window.status.Text = "Nothing to sell. Catch some monsters first (locked ones stay out of here)."
+		local uids = {}
+		for _, monster in offer.monsters do
+			if not monster.locked then
+				table.insert(uids, monster.uid)
+			end
+		end
+		local count = #uids
+		if #offer.monsters == 0 then
+			window.status.Text =
+				"Your Backpack has no monsters. Press E next to one in your mansion to pick it up."
 			return
 		end
-		window.status.Text = `{count} monster{if count == 1 then "" else "s"} · worth {Format.money(
-			offer.total
-		)} · most valuable first`
+		window.status.Text = if count == 0
+			then "Every monster here is hearted (♥ Kept). Un-heart one in your Backpack to sell it."
+			else `{count} to sell · worth {Format.money(offer.total)} · most valuable first`
 
 		for i, monster in offer.monsters do
 			local uid = monster.uid
@@ -155,16 +172,15 @@ function CollectorController.start()
 			end)
 		end
 
+		if count == 0 then
+			return
+		end
 		local all = Ui.button(
 			window.footer,
 			`Sell All · {count} for {Format.money(offer.total)}`,
 			Ui.Colors.sell,
 			UDim2.fromScale(1, 1)
 		)
-		local uids = {}
-		for _, monster in offer.monsters do
-			table.insert(uids, monster.uid)
-		end
 		Ui.confirmButton(all, `Sell all {count}? Tap again`, function()
 			sell(uids)
 		end)
