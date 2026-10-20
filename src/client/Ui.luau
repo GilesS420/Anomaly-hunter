@@ -39,6 +39,21 @@ export type Window = {
 
 local WalkAwayDistance = 22 -- studs from the counter before the window closes by itself
 
+-- Every window made by Ui.window, so the hotbar can step aside while one is open.
+local windows: { ScreenGui } = {}
+local windowsChanged = Instance.new("BindableEvent")
+Ui.windowsChanged = windowsChanged.Event -- fires when any window opens or closes
+
+-- True when a window other than `except` (by name) is open.
+function Ui.anyWindowOpen(except: string?): boolean
+	for _, gui in windows do
+		if gui.Enabled and gui.Name ~= except then
+			return true
+		end
+	end
+	return false
+end
+
 function Ui.corner(parent: Instance, pixels: number)
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, pixels)
@@ -238,6 +253,10 @@ function Ui.window(name: string, titleText: string): Window
 	footer.Parent = panel
 
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	table.insert(windows, gui)
+	gui:GetPropertyChangedSignal("Enabled"):Connect(function()
+		windowsChanged:Fire()
+	end)
 
 	local window: Window
 	local watching: RBXScriptConnection? = nil

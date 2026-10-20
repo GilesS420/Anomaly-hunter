@@ -212,15 +212,15 @@ local function toggle()
 	end
 end
 
--- The small Admin button on the left edge of the screen (works with a tap too).
+-- The small Admin button in the top-left corner, under Roblox's menu buttons and clear of the
+-- Money and Backpack column (works with a tap too).
 local function buildOpener()
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "AdminButton"
 	gui.ResetOnSpawn = false
 	gui.DisplayOrder = 4
 	local opener = Ui.button(gui, "Admin", Ui.Colors.confirm, UDim2.fromOffset(80, 36))
-	opener.AnchorPoint = Vector2.new(0, 0.5)
-	opener.Position = UDim2.new(0, 8, 0.5, 0)
+	opener.Position = UDim2.fromOffset(16, 8)
 	opener.Activated:Connect(toggle)
 	gui.Parent = player:WaitForChild("PlayerGui")
 end

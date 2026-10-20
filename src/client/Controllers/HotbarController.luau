@@ -180,6 +180,13 @@ function HotbarController.start()
 	bar.Position = UDim2.new(0.5, 0, 1, -8)
 	bar.Size = UDim2.fromOffset(Slots * size + (Slots - 1) * gap, size)
 	bar.Parent = gui
+	-- A shop, the Collector or the Admin panel is open: the bar would cover its bottom
+	-- buttons, so it hides until that window closes. It stays with the Backpack window.
+	local function stepAside()
+		bar.Visible = not Ui.anyWindowOpen("BackpackUi")
+	end
+	Ui.windowsChanged:Connect(stepAside)
+	stepAside()
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
