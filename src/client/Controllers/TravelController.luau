@@ -1,5 +1,5 @@
 --!strict
--- Fast-travel buttons in a row at the top middle of the screen: Portals, Bakery, Workshop
+-- Fast-travel buttons in a row at the top middle of the screen: Portals, Shops, Sell
 -- (Config/Travel.Destinations). Tap or click one to jump there. They only show in the hub
 -- (player attribute Zone is not set); in a zone the exit or a Return Charm takes you home.
 -- The server checks everything again, see TravelService.
@@ -57,8 +57,7 @@ local function buildUi(): (Frame, { TextButton })
 		button.AutoButtonColor = true
 		button.Text = destination.label
 		button:SetAttribute("Destination", destination.id)
-		Ui.corner(button, 12)
-		Ui.paint(button, color)
+		Ui.paint(button, color) -- square corners, unlike the other buttons
 		local padding = Instance.new("UIPadding")
 		padding.PaddingLeft = UDim.new(0, 10)
 		padding.PaddingRight = UDim.new(0, 10)

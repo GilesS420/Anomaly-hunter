@@ -3,8 +3,8 @@
 --   * In the open hub (not on a mansion plot, not in a zone) hunters walk at
 --     Config/Travel.HubWalkSpeed; everywhere else at the normal StarterPlayer speed.
 --     A Slow attack (player attribute Slowed, MonsterAiService) always wins.
---   * Fast travel: the buttons at the top of the screen jump you to the Zone Gates, the
---     Haunted Bakery or the Hunter's Workshop. Only from the hub and with nothing in your
+--   * Fast travel: the buttons at the top of the screen jump you to the Zone Gates, between
+--     the Haunted Bakery and the Hunter's Workshop, or the Collector. Only from the hub and with nothing in your
 --     vacuum, so it never replaces the Return Charm (which gets you OUT of a zone).
 --
 -- Remotes in ReplicatedStorage.TravelRemotes:
@@ -70,13 +70,41 @@ local function inFront(frame: CFrame, size: Vector3): CFrame
 	return CFrame.lookAt(standAt, Vector3.new(centre.X, standAt.Y, centre.Z))
 end
 
-local function landmarkSpot(name: string): CFrame?
+local function landmarkBounds(name: string): (CFrame?, Vector3?)
 	local landmark = World.find(World.find(World.find(workspace, "Hub"), "Landmarks"), name)
 	if not landmark then
-		return nil
+		return nil, nil
 	end
-	local frame, size = bounds(landmark)
+	return bounds(landmark)
+end
+
+local function landmarkSpot(name: string): CFrame?
+	local frame, size = landmarkBounds(name)
 	return if frame and size then inFront(frame, size) else nil
+end
+
+-- A spot just as far from two landmarks (on the line halfway between them), out toward the
+-- middle of the hub, looking at the gap between them, so both are in view.
+local function betweenSpot(a: string, b: string): CFrame?
+	local frameA, sizeA = landmarkBounds(a)
+	local frameB, sizeB = landmarkBounds(b)
+	if not (frameA and sizeA and frameB and sizeB) then
+		return landmarkSpot(a) or landmarkSpot(b)
+	end
+	local flat = Vector3.new(1, 0, 1)
+	local centreA, centreB = frameA.Position, frameB.Position
+	local middle = (centreA + centreB) / 2
+	local across = (centreB - centreA) * flat
+	local out = Vector3.new(-middle.X, 0, -middle.Z)
+	if across.Magnitude > 0.1 then
+		out -= across.Unit * out:Dot(across.Unit) -- stay on the halfway line
+	end
+	out = if out.Magnitude > 0.1 then out.Unit else Vector3.xAxis
+	local reach = math.max(sizeA.X, sizeA.Z, sizeB.X, sizeB.Z) / 2
+	local bottom = math.min(centreA.Y - sizeA.Y / 2, centreB.Y - sizeB.Y / 2)
+	local spot = middle + out * (reach + TravelConfig.StandOff * 2)
+	local standAt = Vector3.new(spot.X, bottom + 4, spot.Z)
+	return CFrame.lookAt(standAt, Vector3.new(middle.X, standAt.Y, middle.Z))
 end
 
 -- In front of the middle of the row of gates.
@@ -104,11 +132,14 @@ local function portalSpot(): CFrame?
 	return inFront(row, Vector3.new(reach * 2, 1, reach * 2))
 end
 
-local function destinationSpot(id: string): CFrame?
-	if id == "Portals" then
+local function destinationSpot(destination: TravelConfig.Destination): CFrame?
+	local landmarks = destination.landmarks
+	if not landmarks or #landmarks == 0 then
 		return portalSpot()
+	elseif #landmarks == 1 then
+		return landmarkSpot(landmarks[1])
 	end
-	return landmarkSpot(id)
+	return betweenSpot(landmarks[1], landmarks[2])
 end
 
 local function validDestination(id: any): TravelConfig.Destination?
@@ -136,7 +167,7 @@ FastTravel.OnServerEvent:Connect(function(player, id)
 	if now - (lastTrip[player] or -math.huge) < TravelConfig.Cooldown then
 		return
 	end
-	local spot = destinationSpot(destination.id)
+	local spot = destinationSpot(destination)
 	if not spot then
 		warn(`TravelService: nothing to travel to for {destination.id} (see Workspace > Hub)`)
 		return

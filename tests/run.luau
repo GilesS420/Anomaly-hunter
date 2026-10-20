@@ -1792,14 +1792,20 @@ do
 		ids[destination.id] = true
 	end
 	check(
-		"fast travel goes to the portals and both shops",
-		ids.Portals and ids.Bakery and ids.Workshop or false
+		"fast travel goes to the portals, the shops and the Collector",
+		ids.Portals and ids.Shops and ids.Sell or false
 	)
 	local landmarks = {}
 	for _, spot in Layout.Landmarks do
 		landmarks[spot.name] = true
 	end
-	check("fast-travel shops are hub landmarks", landmarks.Bakery and landmarks.Workshop or false)
+	local real = true
+	for _, destination in TravelConfig.Destinations do
+		for _, name in destination.landmarks or {} do
+			real = real and landmarks[name] == true
+		end
+	end
+	check("fast-travel landmarks are hub landmarks", real)
 end
 
 -- Storage (Util/Storage): a stored monster is paused and comes back as it went in.

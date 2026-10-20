@@ -6,6 +6,9 @@ export type Destination = {
 	id: string, -- what the button sends to the server
 	label: string, -- button text
 	color: { number }, -- button colour, RGB
+	-- Hub.Landmarks to land at: one, in front of it; two, at a spot just as far from both
+	-- (in front of the pair). None: the row of Zone Gates.
+	landmarks: { string }?,
 }
 
 return {
@@ -19,7 +22,7 @@ return {
 	StandOff = 10,
 	Destinations = {
 		{ id = "Portals", label = "Portals", color = { 60, 140, 110 } },
-		{ id = "Bakery", label = "Bakery", color = { 200, 110, 140 } },
-		{ id = "Workshop", label = "Workshop", color = { 110, 80, 200 } },
+		{ id = "Shops", label = "Shops", color = { 160, 95, 170 }, landmarks = { "Bakery", "Workshop" } },
+		{ id = "Sell", label = "Sell", color = { 205, 135, 30 }, landmarks = { "Collector" } },
 	} :: { Destination },
 }
