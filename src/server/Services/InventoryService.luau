@@ -263,7 +263,7 @@ Move.OnServerInvoke = function(player: Player, uid: unknown): Result
 	local message
 	if result == "Ok" then
 		message = if caught and caught.storedAt
-			then `{name} is in Storage now. It's paused until you place it back.`
+			then `Picked up {name}. It's paused in your inventory until you place it back.`
 			else `{name} is back in your mansion!`
 	elseif result == "MansionFull" then
 		message = "Your mansion is full. Store or sell a monster first, or buy a new wing."
@@ -271,6 +271,9 @@ Move.OnServerInvoke = function(player: Player, uid: unknown): Result
 		message = `Storage is full ({InventoryConfig.StorageSlots}). Sell some at the Collector first.`
 	else
 		message = "That monster is gone."
+	end
+	if result ~= "Ok" then
+		Notify.toast(player, message) -- E in the mansion has no window to show it in
 	end
 	return { ok = result == "Ok", message = message, view = viewFor(data) }
 end
