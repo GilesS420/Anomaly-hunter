@@ -43,6 +43,7 @@ export type Sky = {
 export type WatcherEvent = {
 	id: string,
 	name: string, -- shown to players
+	icon: string?, -- emoji on the event's button at the bottom of the screen while it's live
 	launch: boolean,
 	weight: number?, -- how often it's picked by the clock (nil: never picked by weight)
 	awakening: boolean?, -- plays when all the eyes are open
@@ -97,6 +98,7 @@ Events.List = {
 	{
 		id = "FrostFog",
 		name = "Frost Fog",
+		icon = "❄️",
 		launch = true,
 		weight = 30,
 		effect = "Frostbitten",
@@ -118,6 +120,7 @@ Events.List = {
 	{
 		id = "SugarRush",
 		name = "Sugar Rush",
+		icon = "🍬",
 		launch = true,
 		weight = 25,
 		effect = "Sugarcoated",
@@ -142,6 +145,7 @@ Events.List = {
 	{
 		id = "GoldRush",
 		name = "Gold Rush",
+		icon = "💰",
 		launch = true,
 		weight = 15,
 		effect = "Gilded",
@@ -165,6 +169,7 @@ Events.List = {
 	{
 		id = "Flicker",
 		name = "Flicker",
+		icon = "⚡",
 		launch = true,
 		weight = 20,
 		effect = "Poltergeist",
@@ -188,6 +193,7 @@ Events.List = {
 	{
 		id = "BloodMoon",
 		name = "Blood Moon",
+		icon = "🩸",
 		launch = true,
 		weight = 10,
 		effect = "Bloodmoon",
@@ -213,6 +219,7 @@ Events.List = {
 	{
 		id = "WatcherAwakens",
 		name = "The Watcher Awakens",
+		icon = "👁️",
 		launch = true,
 		awakening = true,
 		effect = "Watched",
