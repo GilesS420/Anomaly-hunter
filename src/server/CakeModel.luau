@@ -1,8 +1,12 @@
 --!strict
 -- Builds a cake from its look (Config/Cakes.Looks): a plate, 1 to 3 tiers of sponge with
 -- icing, and a topping that says what it is (fangs on Fang Fudge, bones on the Bone Marrow
--- Mousse, a moon on the Eclipse Éclair). The same model sits on the mansion floor and in your
--- hand (CakeModel.tool).
+-- Mousse, a moon on the Eclipse Éclair), with piped cream round every tier and sprinkles.
+-- The same model sits on the mansion floor and in your hand (CakeModel.tool).
+--
+-- Every part is placed relative to an invisible, unrotated Root at the bottom middle, which
+-- is the PrimaryPart (and the Tool's Handle). Roblox cylinders lie along X, so the discs are
+-- turned upright; pivoting by Root keeps them upright.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -27,7 +31,7 @@ local fallback: CakeConfig.Look = {
 }
 
 -- Builds the cake at the origin (its plate's bottom at y = 0), scaled by `scale`, anchored.
--- Its PrimaryPart is the plate.
+-- Its PrimaryPart is Root.
 function CakeModel.build(itemId: string, scale: number): Model
 	local look = CakeConfig.Looks[itemId] or fallback
 	local model = Instance.new("Model")
@@ -74,21 +78,75 @@ function CakeModel.build(itemId: string, scale: number): Model
 		)
 	end
 
-	local plate = disc("Plate", 0.2, Radius + 0.4, 0, Color3.fromRGB(235, 235, 235))
-	model.PrimaryPart = plate
+	local root = part(
+		"Root",
+		Enum.PartType.Block,
+		Vector3.new(0.4, 0.2, 0.4),
+		CFrame.new(0, 0, 0),
+		Color3.new(1, 1, 1)
+	)
+	root.Transparency = 1
+	model.PrimaryPart = root
+
+	local white = Color3.fromRGB(240, 240, 240)
+	local plate = disc("Plate", 0.15, Radius + 0.45, 0, white)
+	disc("PlateRim", 0.08, Radius + 0.55, 0.12, Color3.fromRGB(210, 200, 215))
 
 	local sponge, icing, topping = rgb(look.sponge), rgb(look.icing), rgb(look.toppingColor)
+	local cream = icing:Lerp(Color3.new(1, 1, 1), 0.45) -- piping, a lighter icing
+	-- `count` beads round a circle of radius r at height y.
+	local function beads(name: string, count: number, r: number, y: number, size: number, color: Color3)
+		for i = 1, count do
+			local angle = (i - 1) / count * math.pi * 2
+			part(
+				name,
+				Enum.PartType.Ball,
+				Vector3.one * size,
+				CFrame.new(math.cos(angle) * r, y, math.sin(angle) * r),
+				color
+			)
+		end
+	end
+
 	local y, radius = 0.2, Radius
-	for tier = 1, math.clamp(look.tiers, 1, 3) do
+	local tiers = math.clamp(look.tiers, 1, 3)
+	for tier = 1, tiers do
 		disc(`Tier{tier}`, TierHeight, radius, y, sponge)
-		disc(`Icing{tier}`, IcingHeight, radius + 0.05, y + TierHeight - 0.05, icing)
+		-- a band of filling round the middle, and icing that runs a little down the sides
+		disc(`Filling{tier}`, 0.14, radius + 0.03, y + TierHeight * 0.45, icing:Lerp(sponge, 0.5))
+		disc(`Icing{tier}`, IcingHeight, radius + 0.06, y + TierHeight - 0.05, icing)
+		disc(`IcingRun{tier}`, 0.3, radius + 0.04, y + TierHeight - 0.3, icing)
+		beads(
+			`Piping{tier}`,
+			math.floor(radius * 9),
+			radius - 0.05,
+			y + TierHeight + IcingHeight - 0.02,
+			0.26,
+			cream
+		)
+		beads(`Border{tier}`, math.floor(radius * 9), radius + 0.02, y + 0.06, 0.2, cream)
 		y += TierHeight + IcingHeight - 0.05
-		if tier < look.tiers then
+		if tier < tiers then
 			radius *= 0.7
 		end
 	end
 	local top = y -- top of the icing
 	local glowing = Enum.Material.Neon
+
+	-- Sprinkles on the top tier (the same pattern every time, so every copy matches).
+	local sprinkleColors = { cream, topping, sponge:Lerp(Color3.new(1, 1, 1), 0.3) }
+	for i = 1, 10 do
+		local angle = i * 2.4
+		local r = (radius - 0.45) * math.sqrt((i % 5 + 0.5) / 5)
+		part(
+			"Sprinkle",
+			Enum.PartType.Block,
+			Vector3.new(0.22, 0.06, 0.07),
+			CFrame.new(math.cos(angle) * r, top + 0.03, math.sin(angle) * r)
+				* CFrame.Angles(0, angle * 1.7, 0),
+			sprinkleColors[i % 3 + 1]
+		)
+	end
 
 	-- Points round the top, `count` of them, `inset` studs in from the edge.
 	local function ring(
@@ -207,22 +265,23 @@ function CakeModel.build(itemId: string, scale: number): Model
 			)
 		end
 	elseif look.topping == "Moon" then
-		-- A crescent: a glowing ball with a dark one biting into it.
+		-- A crescent standing up: a glowing disc with a dark one biting into it.
 		part(
 			"Moon",
-			Enum.PartType.Ball,
-			Vector3.new(0.9, 0.9, 0.3),
-			CFrame.new(0, top + 0.6, 0),
+			Enum.PartType.Cylinder,
+			Vector3.new(0.12, 1, 1),
+			CFrame.new(0, top + 0.6, 0) * CFrame.Angles(0, math.rad(90), 0),
 			topping,
 			glowing
 		)
 		part(
 			"Shadow",
-			Enum.PartType.Ball,
-			Vector3.new(0.8, 0.8, 0.34),
-			CFrame.new(0.25, top + 0.68, 0),
+			Enum.PartType.Cylinder,
+			Vector3.new(0.14, 0.85, 0.85),
+			CFrame.new(0.25, top + 0.68, 0) * CFrame.Angles(0, math.rad(90), 0),
 			sponge
 		)
+		beads("Star", 5, radius - 0.35, top + 0.1, 0.16, topping)
 	end
 
 	if look.glow then
@@ -236,7 +295,7 @@ function CakeModel.build(itemId: string, scale: number): Model
 	return model
 end
 
--- A Roblox Tool holding a small copy of the cake, for the hotbar. The plate is the Handle and
+-- A Roblox Tool holding a small copy of the cake, for the hotbar. Root is the Handle and
 -- everything else is welded to it.
 function CakeModel.tool(itemId: string, name: string): Tool
 	local tool = Instance.new("Tool")
@@ -262,8 +321,9 @@ function CakeModel.tool(itemId: string, name: string): Tool
 		child.Parent = tool
 	end
 	model:Destroy()
-	-- Held flat in front of the hand.
-	tool.Grip = CFrame.new(0, 0, -0.6)
+	-- Held upright on the palm, like a tray. While a tool is held the arm points forward, so
+	-- the hand's -Z is up and its -Y is forward: turn the cake's up (+Y) to the hand's -Z.
+	tool.Grip = (CFrame.new(0, -0.4, -0.15) * CFrame.Angles(math.rad(-90), 0, 0)):Inverse()
 	return tool
 end
 

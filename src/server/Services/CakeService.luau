@@ -2,8 +2,8 @@
 -- Cakes (rules in Util/Cakes, numbers and looks in Config/Cakes). Every cake you own sits in
 -- the Roblox hotbar as a Tool, one slot per kind ("Fang Fudge x3"). Hold one and click while
 -- standing in one of your wings to set it out on the floor in front of you. Every
--- Config/Cakes.CheckSeconds each cake rolls for a bite; on a hit a monster walks over, eats,
--- and may get a mutation. A cake is gone after its bites or when it goes stale.
+-- Config/Cakes.CheckSeconds each cake rolls for a bite; on a hit a monster within the cake's
+-- reach walks over, eats, and may get a mutation. A cake is gone after its bites or when it goes stale.
 --
 -- Cakes are saved (DataService.Data.cakes) and keep going while you're offline: when you come
 -- back, Util/Cakes.catchUp plays back the missed checks with the same odds and you get a
@@ -61,9 +61,12 @@ local function cakesFolder(): Folder
 	return folder :: Folder
 end
 
+-- "Fang Fudge / 2 bites left / 12:34 left"
 local function labelText(cake: Live): string
 	local left = cake.saved.bitesLeft
-	return `{cake.item.name}\n{if left == 1 then "1 bite left" else `{left} bites left`}`
+	local seconds = math.max(0, Cakes.expiresAt(cake.saved) - os.time())
+	local timer = string.format("%d:%02d left", seconds // 60, seconds % 60)
+	return `{cake.item.name}\n{if left == 1 then "1 bite left" else `{left} bites left`}\n{timer}`
 end
 
 -- Puts a saved cake on the floor. Nil if its plot or item is gone.
@@ -78,6 +81,19 @@ local function show(player: Player, saved: Cakes.Placed): Live?
 	model.Name = `Cake_{item.id}`
 	model:PivotTo(CFrame.new(at))
 	model:SetAttribute("OwnerId", player.UserId)
+	model:SetAttribute("Reach", Cakes.reach(item.id)) -- the client draws this circle on hover
+
+	-- Invisible, so the mouse (or a tap) can find the cake: the cake parts ignore rays.
+	local hitbox = Instance.new("Part")
+	hitbox.Name = "Hitbox"
+	hitbox.Shape = Enum.PartType.Cylinder
+	hitbox.Size = Vector3.new(4, CakeRadius * 2 + 1, CakeRadius * 2 + 1)
+	hitbox.CFrame = CFrame.new(at + Vector3.new(0, 2, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	hitbox.Transparency = 1
+	hitbox.Anchored = true
+	hitbox.CanCollide = false
+	hitbox.CanTouch = false
+	hitbox.Parent = model
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "Label"
@@ -86,8 +102,8 @@ local function show(player: Player, saved: Cakes.Placed): Live?
 	billboard.AlwaysOnTop = true
 	billboard.MaxDistance = 60
 	billboard.LightInfluence = 0
-	billboard.Size = UDim2.fromOffset(180, 44)
-	billboard.StudsOffset = Vector3.new(0, 4.5, 0)
+	billboard.Size = UDim2.fromOffset(180, 64)
+	billboard.StudsOffset = Vector3.new(0, 5.5, 0)
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
 	label.Size = UDim2.fromScale(1, 1)
@@ -283,9 +299,12 @@ local function check(player: Player)
 		if not Rng.chance(CakeConfig.BiteChance, random) then
 			continue
 		end
+		-- Only monsters within the cake's reach come over.
+		local reach = Cakes.reach(cake.item.id)
 		local eater = Cakes.pickEater(cake.saved, data.monsters, random, function(caught)
 			local model = if caught.uid then models[caught.uid] else nil
-			return model ~= nil and not RoamService.isHeld(model) and RoamService.position(model) ~= nil
+			local at = if model and not RoamService.isHeld(model) then RoamService.position(model) else nil
+			return at ~= nil and Vector2.new(at.X - cake.at.X, at.Z - cake.at.Z).Magnitude <= reach
 		end)
 		local uid = if eater then eater.uid else nil
 		local model = if uid then models[uid] else nil
@@ -318,7 +337,7 @@ local function restore(player: Player)
 	local lines: { string } = {}
 	for _, saved in table.clone(data.cakes) do
 		local item = Cakes.item(saved.itemId)
-		for _, b in Cakes.catchUp(saved, data.monsters, now, random) do
+		for _, b in Cakes.catchUp(saved, data.monsters, now, data.wingsOwned, random) do
 			local caught = find(data, b.uid)
 			if b.combo then
 				CareService.discoverCombo(data, b.combo)
@@ -375,6 +394,17 @@ function CakeService.start()
 		if list then
 			for _, cake in list do
 				cake.model:Destroy() -- still in the save: it keeps going offline
+			end
+		end
+	end)
+	-- The countdown on every label.
+	task.spawn(function()
+		while true do
+			task.wait(1)
+			for _, list in live do
+				for _, cake in list do
+					cake.label.Text = labelText(cake)
+				end
 			end
 		end
 	end)

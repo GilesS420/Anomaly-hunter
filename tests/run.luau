@@ -807,11 +807,11 @@ do
 	)
 	check(
 		"the odds shown are the real odds per bite",
-		Cakes.describe(fudge) == "Each bite: 17.5% Vampire (x2.5)"
+		Cakes.describe(fudge) == "Reach 9 studs · Each bite: 17.5% Vampire (x2.5)"
 	)
 	check(
 		"a chance cake shows each effect's real odds",
-		Cakes.describe(mousse) == "Each bite: 12.5% Mummy (x4), 37.5% Batty (x3)"
+		Cakes.describe(mousse) == "Reach 15 studs · Each bite: 12.5% Mummy (x4), 37.5% Batty (x3)"
 	)
 
 	-- A bite never feeds and goes to a monster the effect can land on first.
@@ -840,6 +840,21 @@ do
 	local count = Cakes.bite(Cakes.new("BoneMarrowMousse", 0, 0, 0, t0), batty, lucky)
 	check("Vampire + Batty from a bite makes a Count", count.effect == "Batty" and count.combo == "Count")
 	check("cakes allowed: one per wing", Cakes.limit(3) == 3 * CakeConfig.PerWing)
+	check(
+		"better cakes reach further",
+		Cakes.reach("EclipseEclair") > Cakes.reach("CursedCake")
+			and Cakes.reach("CursedCake") > Cakes.reach("PumpkinCandy")
+	)
+	local reachOk = true
+	for i = 2, #Shop.Bakery do
+		reachOk = reachOk and Cakes.reach(Shop.Bakery[i].id) >= Cakes.reach(Shop.Bakery[i - 1].id)
+	end
+	check("reach never shrinks as cakes get pricier", reachOk)
+	check(
+		"the reach share is the circle over the floor",
+		near(Cakes.reachShare("PumpkinCandy", 1), math.pi * 64 / 1600)
+			and Cakes.reachShare("PumpkinCandy", 2) < Cakes.reachShare("PumpkinCandy", 1)
+	)
 
 	-- Offline: catchUp plays back the missed checks with the same odds.
 	local herd = {}
@@ -851,7 +866,7 @@ do
 	local away = Cakes.new("PumpkinCandy", 0, 0, 0, t0)
 	check(
 		"no checks missed, no bites",
-		#Cakes.catchUp(away, herd, t0 + CakeConfig.CheckSeconds - 1, fake) == 0
+		#Cakes.catchUp(away, herd, t0 + CakeConfig.CheckSeconds - 1, 1, fake) == 0
 	)
 	local bitesSeen, runs = 0, 400
 	for _ = 1, runs do
@@ -862,12 +877,13 @@ do
 			m.uid = `m{i}`
 			table.insert(monsters, m)
 		end
-		bitesSeen += #Cakes.catchUp(c, monsters, t0 + 6 * 3600, fake)
+		bitesSeen += #Cakes.catchUp(c, monsters, t0 + 6 * 3600, 1, fake)
 	end
 	local checks = CakeConfig.Minutes * 60 / CakeConfig.CheckSeconds
 	local expected = 0
-	-- expected bites: each check hits with BiteChance while bites are left
-	local p = CakeConfig.BiteChance / 100
+	-- expected bites: a check bites with BiteChance, if one of the monsters that hasn't
+	-- eaten yet is within reach (each is, with the reach share of the Foyer's floor)
+	local share = Cakes.reachShare("PumpkinCandy", 1)
 	local dist = { [0] = 1 }
 	for _ = 1, checks do
 		local nextDist = {}
@@ -875,6 +891,7 @@ do
 			if k >= CakeConfig.Bites then
 				nextDist[k] = (nextDist[k] or 0) + v
 			else
+				local p = CakeConfig.BiteChance / 100 * (1 - (1 - share) ^ (10 - k))
 				nextDist[k + 1] = (nextDist[k + 1] or 0) + v * p
 				nextDist[k] = (nextDist[k] or 0) + v * (1 - p)
 			end
@@ -886,7 +903,7 @@ do
 	end
 	check("offline bites match the online odds", math.abs(bitesSeen / runs - expected) < 0.15)
 	local stale = Cakes.new("PumpkinCandy", 0, 0, 0, t0)
-	Cakes.catchUp(stale, herd, t0 + 6 * 3600, fake)
+	Cakes.catchUp(stale, herd, t0 + 6 * 3600, 1, fake)
 	check("a cake is done after its time, even offline", Cakes.isDone(stale, t0 + 6 * 3600))
 	check("a cake never checks past going stale", stale.checkedAt <= Cakes.expiresAt(stale))
 
