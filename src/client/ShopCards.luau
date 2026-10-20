@@ -35,19 +35,47 @@ ShopCards.InStock = Color3.fromRGB(140, 230, 140)
 ShopCards.NoStock = Color3.fromRGB(230, 110, 110)
 
 local small = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-local Height = if small then 84 else 100 -- a closed card
-local ActionsHeight = 46 -- the Buy / Robux strip an open card adds
+local Height = if small then 96 else 112 -- a closed card
+local ActionsHeight = 52 -- the Buy / Robux strip an open card adds
+ShopCards.Padding = 12 -- inside a card, all round
 
 local opened: { [ScrollingFrame]: string? } = {} -- the open card per window
 local shown: { [ScrollingFrame]: { Card } } = {} -- what each window shows, to redraw on a tap
 
--- Makes a shop window wider than the default, so the cards have room.
-function ShopCards.widen(window: Ui.Window)
+-- Sets a window up for cards: wider than the default, a gap between cards, and room round
+-- the list so a card's outline isn't cut off at the edges (or under the scrollbar). Without a
+-- footer (the shops) the list runs to the bottom of the window.
+function ShopCards.prepare(window: Ui.Window, hasFooter: boolean)
 	local panel = window.gui:FindFirstChild("Panel")
 	local limit = panel and panel:FindFirstChildOfClass("UISizeConstraint")
 	if limit then
 		limit.MaxSize = Vector2.new(760, 620)
 	end
+	local list = window.list
+	if not hasFooter then
+		list.Size = UDim2.new(1, 0, 1, -68)
+	end
+	local layout = list:FindFirstChildOfClass("UIListLayout")
+	if layout then
+		layout.Padding = UDim.new(0, 10)
+	end
+	local padding = Instance.new("UIPadding")
+	padding.PaddingLeft = UDim.new(0, 3)
+	padding.PaddingRight = UDim.new(0, list.ScrollBarThickness + 6)
+	padding.PaddingTop = UDim.new(0, 3)
+	padding.PaddingBottom = UDim.new(0, 3)
+	padding.Parent = list
+end
+
+-- The padding inside a card.
+function ShopCards.pad(card: GuiObject)
+	local pad = UDim.new(0, ShopCards.Padding)
+	local padding = Instance.new("UIPadding")
+	padding.PaddingLeft = pad
+	padding.PaddingRight = pad
+	padding.PaddingTop = pad
+	padding.PaddingBottom = pad
+	padding.Parent = card
 end
 
 -- A small rounded tag in the rarity's colour.
@@ -78,27 +106,22 @@ end
 
 local function draw(list: ScrollingFrame, order: number, card: Card)
 	local isOpen = opened[list] == card.key
-	local inner = Height - 16
+	local inner = Height - 2 * ShopCards.Padding
 
 	local row = Instance.new("TextButton")
 	row.Name = card.key
 	row.LayoutOrder = order
 	row.Text = ""
 	row.AutoButtonColor = false
-	row.Size = UDim2.new(1, -8, 0, Height + (if isOpen then ActionsHeight else 0))
+	row.Size = UDim2.new(1, 0, 0, Height + (if isOpen then ActionsHeight else 0))
 	row.BackgroundColor3 = Ui.Colors.row
 	row.Parent = list
 	Ui.corner(row, 10)
 	Ui.rim(row, if isOpen then Ui.Colors.lamp else Color3.fromRGB(58, 48, 78), if isOpen then 2 else 1)
-	local padding = Instance.new("UIPadding")
-	padding.PaddingLeft = UDim.new(0, 8)
-	padding.PaddingRight = UDim.new(0, 10)
-	padding.PaddingTop = UDim.new(0, 8)
-	padding.PaddingBottom = UDim.new(0, 8)
-	padding.Parent = row
+	ShopCards.pad(row)
 
 	ShopCards.pictureBox(row, inner, card.rarityColor, card.look, card.icon)
-	local left = inner + 12
+	local left = inner + 16
 
 	-- Name, stock and price.
 	local middle = Instance.new("Frame")
@@ -118,19 +141,19 @@ local function draw(list: ScrollingFrame, order: number, card: Card)
 	right.BackgroundTransparency = 1
 	right.AnchorPoint = Vector2.new(1, 0)
 	right.Position = UDim2.fromScale(1, 0)
-	right.Size = UDim2.new(0.45, -6, 0, inner)
+	right.Size = UDim2.new(0.45, -12, 0, inner)
 	right.Parent = row
-	ShopCards.pill(right, card.rarity, card.rarityColor, UDim2.new(0.6, 0, 0, 24))
-	local effect = Ui.text(right, card.effect, UDim2.new(1, 0, 1, -30), Ui.Colors.muted, false, 14)
-	effect.Position = UDim2.fromOffset(0, 30)
+	ShopCards.pill(right, card.rarity, card.rarityColor, UDim2.new(0.6, 0, 0, 26))
+	local effect = Ui.text(right, card.effect, UDim2.new(1, 0, 1, -34), Ui.Colors.muted, false, 15)
+	effect.Position = UDim2.fromOffset(0, 34)
 	effect.TextWrapped = true
 	effect.TextYAlignment = Enum.TextYAlignment.Top
 
 	if isOpen then
 		local actions = Instance.new("Frame")
 		actions.BackgroundTransparency = 1
-		actions.Position = UDim2.fromOffset(left, inner + 8)
-		actions.Size = UDim2.new(1, -left, 0, ActionsHeight - 8)
+		actions.Position = UDim2.fromOffset(left, inner + 12)
+		actions.Size = UDim2.new(1, -left, 0, ActionsHeight - 12)
 		actions.Parent = row
 		local action = card.action
 		local main = Ui.button(actions, action.text, action.color, UDim2.new(0.5, -6, 1, 0))
