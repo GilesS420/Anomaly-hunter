@@ -1,6 +1,7 @@
 --!strict
--- Watcher rules: the Hunger cycle, the meter, and event monster rolls. Pure functions so
--- they can be tested outside Roblox. See Config/Events for how a cycle runs.
+-- Watcher rules: the event clock (gaps, which event is next, the eyes) and event monster
+-- rolls. Pure functions so they can be tested outside Roblox. See Config/Events for how the
+-- clock runs.
 
 local Events = require("../Config/Events")
 local Monsters = require("../Config/Monsters")
@@ -8,41 +9,54 @@ local Rng = require("./Rng")
 
 local Watcher = {}
 
-export type Step = { event: Events.WatcherEvent, threshold: number }
+-- Seconds of calm after an event, before the next warning: anywhere from GapMinSeconds to
+-- GapMaxSeconds, so nobody can time it to the second.
+function Watcher.gap(random: Random?): number
+	local rng = random or Random.new()
+	return Events.GapMinSeconds + (Events.GapMaxSeconds - Events.GapMinSeconds) * rng:NextNumber()
+end
 
--- The events in one cycle, in level order: launch events whose id is in `built` (the
--- server passes the events it knows how to play), each with its Hunger threshold.
-function Watcher.cycle(built: { [string]: boolean }): { Step }
-	local steps: { Step } = {}
+-- The events the clock picks from by weight (launch events with a weight).
+function Watcher.pool(): { Events.WatcherEvent }
+	local list: { Events.WatcherEvent } = {}
 	for _, event in Events.List do
-		local threshold = Events.HungerThresholds[event.level]
-		if event.launch and built[event.id] and threshold then
-			table.insert(steps, { event = event, threshold = threshold })
+		if event.launch and (event.weight or 0) > 0 then
+			table.insert(list, event)
 		end
 	end
-	table.sort(steps, function(a, b)
-		return a.event.level < b.event.level
-	end)
-	return steps
+	return list
 end
 
--- Hunger added over `seconds` with this many players in zones.
-function Watcher.gain(playersInZones: number, seconds: number): number
-	return math.max(playersInZones, 0) * Events.HungerPerPlayerMinute * seconds / 60
+-- The event that plays next. With all the eyes open it's The Watcher Awakens; otherwise one
+-- picked by weight, never the one that just played (`lastId`).
+function Watcher.pick(lastId: string?, eyes: number, random: Random?): Events.WatcherEvent
+	if eyes >= Events.EyesToAwaken then
+		for _, event in Events.List do
+			if event.launch and event.awakening then
+				return event
+			end
+		end
+	end
+	local options: { Events.WatcherEvent } = {}
+	for _, event in Watcher.pool() do
+		if event.id ~= lastId then
+			table.insert(options, event)
+		end
+	end
+	if #options == 0 then
+		options = Watcher.pool()
+	end
+	return Rng.pickWeighted(options, function(event)
+		return event.weight or 0
+	end, random)
 end
 
--- How full the meter is (0 to 1) on the way from the previous event to the next one.
-function Watcher.meter(hunger: number, steps: { Step }, nextIndex: number): number
-	local step = steps[nextIndex]
-	if not step then
+-- How many eyes are open after `event` played: one more, or none after the awakening.
+function Watcher.eyesAfter(eyes: number, event: Events.WatcherEvent): number
+	if event.awakening then
 		return 0
 	end
-	local previous = steps[nextIndex - 1]
-	local from = if previous then previous.threshold else 0
-	if step.threshold <= from then
-		return 1
-	end
-	return math.clamp((hunger - from) / (step.threshold - from), 0, 1)
+	return math.min(eyes + 1, Events.EyesToAwaken)
 end
 
 -- How many event monsters appear for this many players in the server.

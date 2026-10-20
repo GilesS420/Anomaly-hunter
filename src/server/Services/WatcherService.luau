@@ -1,20 +1,26 @@
 --!strict
--- The Watcher: server-wide Hunger rises while players hunt in zones, and each threshold
--- fires the next event in the main area (rules in Shared.Config.Events and Util.Watcher).
---   Flicker     the streetlights fail, night falls, Flickerwick and Static Shade drift
---               between the mansions
---   Blood Moon  red sky, Crimson Wisp and Moonhowler appear, and haunted effect odds double
---               (WatcherService.current().effectOddsMultiplier, for the mansion effect rolls)
+-- The Watcher: every 5 to 10 minutes it stirs and an event changes the sky for the whole
+-- server (the clock and the events are in Shared.Config.Events, the rules in Util.Watcher).
+-- Events are passive: the sky changes, and while one is live the mansion rolls read its
+-- boosts from WatcherService.current() (effect, effectOddsMultiplier, growthMultiplier).
+--   Flicker     the streetlights fail too, and Flickerwick and Static Shade drift between
+--               the mansions (an optional bonus to catch)
+--   Blood Moon  Crimson Wisp and Moonhowler drift between the mansions, same as Flicker
 -- Event monsters are caught in the main area like any other monster (CatchService) and fly
 -- straight home to the mansion. Whatever is left when the event ends fades away.
 --
+-- The server changes Lighting (seen everywhere); the moon, eye, aurora, sparkles and flashes
+-- are drawn by each client (client/Controllers/SkyController) from the attributes below.
+--
 -- World pieces (built as grey placeholders if missing, never moved or changed if there):
---   Workspace.Hub.WatcherMeter   a Part (or Model) in Watcher Square; the Hunger meter floats above it
+--   Workspace.Hub.WatcherMeter   a Part (or Model) in Watcher Square; the Watcher's eyes float above it
 --   Workspace.Hub.Streetlights   a Folder; every light inside fails during Flicker
 -- Event monsters appear in Workspace.Hub.EventMonsters.
 --
--- Workspace attributes, for a HUD later: WatcherEvent (id while one is live, else nil),
--- WatcherEventEnd (server time it ends), WatcherHunger, WatcherNext (id of the next event).
+-- Workspace attributes: WatcherEvent (id while one is live, else nil), WatcherEventEnd
+-- (server time it ends), WatcherNext (id of the event being warned about), WatcherSky (id
+-- whose sky is showing, from the warning to the end), WatcherSkyAt (server time that sky is
+-- fully in), WatcherEyes (how many eyes are open).
 
 local Lighting = game:GetService("Lighting")
 local HttpService = game:GetService("HttpService")
@@ -46,22 +52,27 @@ export type Spawned = {
 
 type Handler = { start: () -> (), stop: () -> () }
 
+type Phase = "Calm" | "Warning" | "Live"
+
 local GroundTop = 0.1 -- top of the hub floor (see WorldBuilder)
 local Group = "Hub:Event" -- RoamService group for event monsters
 local FadeWaitMax = 10 -- seconds a monster being caught may stay after its event ends
 local LightTween = TweenInfo.new(3, Enum.EasingStyle.Sine)
+local SummonSkySeconds = 3 -- a summoned event skips the warning, so its sky comes in quickly
 
 local random = Random.new()
 local live: { [Model]: Spawned } = {}
 local handlers: { [string]: Handler } = {}
-local steps: { Watcher.Step } = {}
-local hunger = 0
-local nextIndex = 1
-local current: Events.WatcherEvent? = nil
-local endsAt = 0
+local phase: Phase = "Calm"
+local current: Events.WatcherEvent? = nil -- live event
+local upcoming: Events.WatcherEvent? = nil -- the event being warned about
+local nextAt = 0 -- server time the calm or the warning ends
+local endsAt = 0 -- server time the live event ends
+local eyes = 0
+local lastId: string? = nil
 
 -- Meter GUI pieces, set in buildMeter.
-local meterFill: Frame? = nil
+local meterEyes: { Frame } = {}
 local meterText: TextLabel? = nil
 
 local function driftRects(): { Roam.Rect }
@@ -107,9 +118,12 @@ end
 
 type Saved = { [Instance]: { [string]: any } }
 
+-- How each property looked before any event touched it (the night). Kept for good: nothing
+-- else changes Lighting while the game runs, and a sky that replaces another mid-tween must
+-- still go back to the night, not to the half-changed colours.
 local saved: Saved = {}
 
-local function tweenTo(instance: Instance, goal: { [string]: any })
+local function tweenTo(instance: Instance, goal: { [string]: any }, info: TweenInfo)
 	local before = saved[instance] or {}
 	for property in goal do
 		if before[property] == nil then
@@ -117,7 +131,7 @@ local function tweenTo(instance: Instance, goal: { [string]: any })
 		end
 	end
 	saved[instance] = before
-	TweenService:Create(instance, LightTween, goal):Play()
+	TweenService:Create(instance, info, goal):Play()
 end
 
 local function restoreLighting()
@@ -126,7 +140,6 @@ local function restoreLighting()
 			TweenService:Create(instance, LightTween, before):Play()
 		end
 	end
-	table.clear(saved)
 end
 
 -- An effect made just for one event, removed again when it ends.
@@ -138,6 +151,82 @@ local function temporary<T>(className: string, name: string): T
 	local instance = Instance.new(className)
 	instance.Name = name
 	return (instance :: any) :: T
+end
+
+local function rgb(color: Events.Rgb): Color3
+	return Color3.fromRGB(color[1], color[2], color[3])
+end
+
+local SkyNames = { "WatcherSkyTint", "WatcherSkyAtmosphere" }
+
+-- Eases the sky into `event`'s look over `seconds` (the warning, so it's fully in when the
+-- event starts). Replaces whatever sky was showing.
+local function applySky(event: Events.WatcherEvent, seconds: number)
+	local sky = event.sky
+	if not sky then
+		return
+	end
+	local info = TweenInfo.new(seconds, Enum.EasingStyle.Sine)
+
+	local goal: { [string]: any } = {}
+	if sky.ambient then
+		goal.Ambient = rgb(sky.ambient)
+	end
+	if sky.outdoorAmbient then
+		goal.OutdoorAmbient = rgb(sky.outdoorAmbient)
+	end
+	-- Always set, so a sky that follows a darker one doesn't keep its brightness.
+	goal.Brightness = sky.brightness
+		or (saved[Lighting] and saved[Lighting].Brightness)
+		or Lighting.Brightness
+	tweenTo(Lighting, goal, info)
+
+	local tint = temporary("ColorCorrectionEffect", "WatcherSkyTint") :: ColorCorrectionEffect
+	tint.TintColor = Color3.new(1, 1, 1)
+	tint.Parent = Lighting
+	TweenService:Create(tint, info, {
+		TintColor = if sky.tint then rgb(sky.tint) else Color3.new(1, 1, 1),
+		Saturation = sky.saturation or 0,
+	}):Play()
+
+	local atmosphere = sky.atmosphere
+	if atmosphere then
+		local goalAtmosphere = {
+			Color = rgb(atmosphere.color),
+			Decay = rgb(atmosphere.decay),
+			Density = atmosphere.density,
+			Haze = atmosphere.haze,
+		}
+		local existing = Lighting:FindFirstChildOfClass("Atmosphere")
+		if existing and existing.Name ~= "WatcherSkyAtmosphere" then
+			tweenTo(existing, goalAtmosphere, info)
+		else
+			local made = temporary("Atmosphere", "WatcherSkyAtmosphere") :: Atmosphere
+			made.Density = 0
+			made.Parent = Lighting
+			TweenService:Create(made, info, goalAtmosphere):Play()
+		end
+	end
+end
+
+-- Eases the sky back to the night.
+local function clearSky()
+	restoreLighting()
+	for _, name in SkyNames do
+		local made = Lighting:FindFirstChild(name)
+		if made then
+			made.Name = `{name}Fading` -- so the next sky makes a fresh one
+			if made:IsA("ColorCorrectionEffect") then
+				TweenService:Create(made, LightTween, { TintColor = Color3.new(1, 1, 1), Saturation = 0 })
+					:Play()
+			elseif made:IsA("Atmosphere") then
+				TweenService:Create(made, LightTween, { Density = 0 }):Play()
+			end
+			task.delay(LightTween.Time, function()
+				made:Destroy()
+			end)
+		end
+	end
 end
 
 ------------------------------------------------------------------------------------------
@@ -223,9 +312,9 @@ end
 ------------------------------------------------------------------------------------------
 -- The events
 
+-- Extra pieces for one event, on top of its sky (Config/Events).
 handlers.Flicker = {
 	start = function()
-		tweenTo(Lighting, { ClockTime = 0, Brightness = Lighting.Brightness * 0.5 })
 		flickering += 1
 		local mine = flickering
 		task.spawn(function()
@@ -251,49 +340,6 @@ handlers.Flicker = {
 	stop = function()
 		flickering += 1 -- ends the stutter loop
 		setAllLamps(true)
-		restoreLighting()
-	end,
-}
-
-handlers.BloodMoon = {
-	start = function()
-		local red = Color3.fromRGB(150, 30, 30)
-		tweenTo(Lighting, { ClockTime = 0, OutdoorAmbient = red, Ambient = Color3.fromRGB(70, 20, 20) })
-
-		local tint = temporary("ColorCorrectionEffect", "BloodMoonTint") :: ColorCorrectionEffect
-		tint.TintColor = Color3.new(1, 1, 1)
-		tint.Parent = Lighting
-		TweenService:Create(tint, LightTween, { TintColor = Color3.fromRGB(255, 170, 170) }):Play()
-
-		local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
-		if atmosphere and atmosphere.Name ~= "BloodMoonAtmosphere" then
-			tweenTo(atmosphere, { Color = Color3.fromRGB(190, 50, 50), Decay = Color3.fromRGB(100, 0, 0) })
-		else
-			local made = temporary("Atmosphere", "BloodMoonAtmosphere") :: Atmosphere
-			made.Density = 0.35
-			made.Haze = 1.5
-			made.Glare = 0
-			made.Color = Color3.fromRGB(190, 50, 50)
-			made.Decay = Color3.fromRGB(100, 0, 0)
-			made.Parent = Lighting
-		end
-	end,
-	stop = function()
-		restoreLighting()
-		for _, name in { "BloodMoonTint", "BloodMoonAtmosphere" } do
-			local made = Lighting:FindFirstChild(name)
-			if made then
-				-- Let the colours ease back first.
-				task.delay(LightTween.Time, function()
-					if current == nil or current.id ~= "BloodMoon" then
-						made:Destroy()
-					end
-				end)
-				if made:IsA("ColorCorrectionEffect") then
-					TweenService:Create(made, LightTween, { TintColor = Color3.new(1, 1, 1) }):Play()
-				end
-			end
-		end
 	end,
 }
 
@@ -353,50 +399,65 @@ local function fadeOut(model: Model)
 end
 
 ------------------------------------------------------------------------------------------
--- Hunger and the event clock
+-- The event clock
+
+local function now(): number
+	return workspace:GetServerTimeNow()
+end
+
+local OpenEye = Color3.fromRGB(190, 110, 255)
+local ClosedEye = Color3.fromRGB(35, 28, 45)
 
 local function publish()
-	local step = steps[nextIndex]
-	workspace:SetAttribute("WatcherHunger", math.floor(hunger))
-	workspace:SetAttribute("WatcherNext", if step then step.event.id else nil)
+	local sky = if phase == "Live" then current elseif phase == "Warning" then upcoming else nil
 	workspace:SetAttribute("WatcherEvent", if current then current.id else nil)
 	workspace:SetAttribute("WatcherEventEnd", if current then endsAt else nil)
+	workspace:SetAttribute("WatcherNext", if phase == "Warning" and upcoming then upcoming.id else nil)
+	workspace:SetAttribute("WatcherSky", if sky then sky.id else nil)
+	workspace:SetAttribute("WatcherEyes", eyes)
 
-	local fill, text = meterFill, meterText
-	if not fill or not text then
+	for index, eye in meterEyes do
+		eye.BackgroundColor3 = if index <= eyes then OpenEye else ClosedEye
+	end
+	local text = meterText
+	if not text then
 		return
 	end
-	local event = current
-	if event then
-		local left = endsAt - workspace:GetServerTimeNow()
-		local duration = event.durationSeconds or 1
-		fill.Size = UDim2.fromScale(math.clamp(left / duration, 0, 1), 1)
-		fill.BackgroundColor3 = Color3.fromRGB(220, 40, 40)
-		text.Text = `{string.upper(event.name)}! {Watcher.clock(left)} left`
-	elseif step then
-		fill.Size = UDim2.fromScale(Watcher.meter(hunger, steps, nextIndex), 1)
-		fill.BackgroundColor3 = Color3.fromRGB(150, 70, 220)
-		text.Text = `Next: {step.event.name} ({math.floor(hunger)} / {step.threshold})`
+	if phase == "Live" and current then
+		text.Text = `{string.upper(current.name)}! {Watcher.clock(endsAt - now())} left`
+	elseif phase == "Warning" then
+		text.Text = "Something stirs..."
+	elseif eyes >= Events.EyesToAwaken then
+		text.Text = "All eyes are open..."
 	else
-		fill.Size = UDim2.fromScale(0, 1)
-		text.Text = "The Watcher sleeps"
+		text.Text = "The Watcher rests"
 	end
 end
 
-local function startEvent(step: Watcher.Step)
-	local event = step.event
+local function startEvent(event: Events.WatcherEvent, skySeconds: number?)
+	if skySeconds then
+		applySky(event, skySeconds)
+		workspace:SetAttribute("WatcherSkyAt", now() + skySeconds)
+	end
+	phase = "Live"
 	current = event
-	endsAt = workspace:GetServerTimeNow() + (event.durationSeconds or 120)
+	upcoming = nil
+	endsAt = now() + (event.durationSeconds or 180)
 	Notify.toastAll(event.announce or `{event.name} has begun!`)
 
-	xpcall(handlers[event.id].start, function(err)
-		warn(`WatcherService: {event.id} failed to start its effects: {err}`)
-	end)
+	local handler = handlers[event.id]
+	if handler then
+		xpcall(handler.start, function(err)
+			warn(`WatcherService: {event.id} failed to start its effects: {err}`)
+		end)
+	end
 
-	local rects = driftRects()
-	for _ = 1, Watcher.monsterCount(#Players:GetPlayers()) do
-		if not spawnOne(event, rects) then
-			break -- too crowded
+	if event.monsters then
+		local rects = driftRects()
+		for _ = 1, Watcher.monsterCount(#Players:GetPlayers()) do
+			if not spawnOne(event, rects) then
+				break -- too crowded
+			end
 		end
 	end
 	publish()
@@ -408,45 +469,48 @@ local function endEvent()
 		return
 	end
 	current = nil
-	xpcall(handlers[event.id].stop, function(err)
-		warn(`WatcherService: {event.id} failed to clean up its effects: {err}`)
-	end)
+	local handler = handlers[event.id]
+	if handler then
+		xpcall(handler.stop, function(err)
+			warn(`WatcherService: {event.id} failed to clean up its effects: {err}`)
+		end)
+	end
+	clearSky()
 	for model, spawned in live do
 		if spawned.event == event.id then
 			task.spawn(fadeOut, model)
 		end
 	end
-	Notify.toastAll(`{event.name} is over. The Watcher grows hungry again...`)
+	Notify.toastAll(`{event.name} is over. The sky calms down.`)
 
-	nextIndex += 1
-	if nextIndex > #steps then
-		nextIndex = 1
-		hunger = 0 -- a new cycle
-	end
+	eyes = Watcher.eyesAfter(eyes, event)
+	lastId = event.id
+	phase = "Calm"
+	nextAt = now() + Watcher.gap(random)
 	publish()
 end
 
-local function playersInZones(): number
-	local count = 0
-	for _, player in Players:GetPlayers() do
-		if player:GetAttribute("Zone") ~= nil then
-			count += 1
-		end
-	end
-	return count
+local function startWarning(event: Events.WatcherEvent)
+	phase = "Warning"
+	upcoming = event
+	nextAt = now() + Events.WarningSeconds
+	applySky(event, Events.WarningSeconds)
+	workspace:SetAttribute("WatcherSkyAt", nextAt)
+	Notify.toastAll(event.warning or "The Watcher stirs...")
 end
 
-local function tick(seconds: number)
-	if current then
-		if workspace:GetServerTimeNow() >= endsAt then
+local function tick()
+	if phase == "Live" then
+		if now() >= endsAt then
 			endEvent()
 		end
-	else
-		hunger += Watcher.gain(playersInZones(), seconds)
-		local step = steps[nextIndex]
-		if step and hunger >= step.threshold then
-			startEvent(step)
+	elseif phase == "Warning" then
+		local event = upcoming
+		if event and now() >= nextAt then
+			startEvent(event)
 		end
+	elseif now() >= nextAt then
+		startWarning(Watcher.pick(lastId, eyes, random))
 	end
 	publish()
 end
@@ -483,13 +547,13 @@ end
 
 local function buildMeter(hub: Instance)
 	local part = World.part(World.find(hub, "WatcherMeter")) or buildMeterPart(hub)
-	local existing = part:FindFirstChild("HungerMeter")
+	local existing = part:FindFirstChild("HungerMeter") or part:FindFirstChild("EyeMeter")
 	if existing then
 		existing:Destroy()
 	end
 
 	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "HungerMeter"
+	billboard.Name = "EyeMeter"
 	billboard.Adornee = part
 	billboard.LightInfluence = 0
 	billboard.MaxDistance = 400
@@ -511,31 +575,50 @@ local function buildMeter(hub: Instance)
 		textLabel.Parent = billboard
 		return textLabel
 	end
-	label("THE WATCHER'S HUNGER", 0, 0.3, true)
+	label("THE WATCHER", 0, 0.3, true)
 
-	local bar = Instance.new("Frame")
-	bar.Name = "Bar"
-	bar.Position = UDim2.fromScale(0.05, 0.36)
-	bar.Size = UDim2.fromScale(0.9, 0.26)
-	bar.BackgroundColor3 = Color3.fromRGB(25, 20, 30)
-	bar.BorderSizePixel = 0
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0.5, 0)
-	corner.Parent = bar
-	local outline = Instance.new("UIStroke")
-	outline.Color = Color3.fromRGB(200, 180, 230)
-	outline.Thickness = 2
-	outline.Parent = bar
-	local fill = Instance.new("Frame")
-	fill.Name = "Fill"
-	fill.Size = UDim2.fromScale(0, 1)
-	fill.BorderSizePixel = 0
-	fill.BackgroundColor3 = Color3.fromRGB(150, 70, 220)
-	corner:Clone().Parent = fill
-	fill.Parent = bar
-	bar.Parent = billboard
+	-- One eye per event; all open means The Watcher Awakens is next.
+	local row = Instance.new("Frame")
+	row.Name = "Eyes"
+	row.Position = UDim2.fromScale(0.15, 0.35)
+	row.Size = UDim2.fromScale(0.7, 0.28)
+	row.BackgroundTransparency = 1
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.VerticalAlignment = Enum.VerticalAlignment.Center
+	layout.Padding = UDim.new(0, 8)
+	layout.Parent = row
+	table.clear(meterEyes)
+	for index = 1, Events.EyesToAwaken do
+		local eye = Instance.new("Frame")
+		eye.Name = `Eye{index}`
+		eye.LayoutOrder = index
+		eye.Size = UDim2.fromScale(0.16, 1)
+		eye.SizeConstraint = Enum.SizeConstraint.RelativeYY
+		eye.BackgroundColor3 = ClosedEye
+		eye.BorderSizePixel = 0
+		local round = Instance.new("UICorner")
+		round.CornerRadius = UDim.new(0.5, 0)
+		round.Parent = eye
+		local outline = Instance.new("UIStroke")
+		outline.Color = Color3.fromRGB(200, 180, 230)
+		outline.Thickness = 2
+		outline.Parent = eye
+		local pupil = Instance.new("Frame")
+		pupil.Name = "Pupil"
+		pupil.AnchorPoint = Vector2.new(0.5, 0.5)
+		pupil.Position = UDim2.fromScale(0.5, 0.5)
+		pupil.Size = UDim2.fromScale(0.35, 0.35)
+		pupil.BackgroundColor3 = Color3.fromRGB(15, 10, 20)
+		pupil.BorderSizePixel = 0
+		round:Clone().Parent = pupil
+		pupil.Parent = eye
+		eye.Parent = row
+		table.insert(meterEyes, eye)
+	end
+	row.Parent = billboard
 
-	meterFill = fill
 	meterText = label("", 0.68, 0.3, false)
 	billboard.Parent = part
 end
@@ -567,43 +650,41 @@ function WatcherService.capture(model: Model, vacuumId: string): Value.CaughtMon
 	}
 end
 
--- The event playing right now, or nil. Mansion effect rolls (#11) read its
--- effectOddsMultiplier and effect from here.
+-- The event playing right now, or nil. Mansion rolls read its effect, effectOddsMultiplier
+-- and growthMultiplier from here.
 function WatcherService.current(): Events.WatcherEvent?
 	return current
 end
 
--- Starts the next event right away (the "Summon an Event" developer product, #27, and the
--- /summon test command). False if an event is already playing.
-function WatcherService.summon(): boolean
-	local step = steps[nextIndex]
-	if current or not step then
+-- Starts an event right away, skipping the warning: the one named `id` (Studio /event), or
+-- else the one the clock would pick next (/summon, and the "Summon an Event" developer
+-- product, #27). False if an event is already playing or `id` isn't a launch event.
+function WatcherService.summon(id: string?): boolean
+	if phase == "Live" then
 		return false
 	end
-	hunger = math.max(hunger, step.threshold)
-	startEvent(step)
+	local event = if id then Events.find(id) else upcoming or Watcher.pick(lastId, eyes, random)
+	if not event or not event.launch then
+		return false
+	end
+	startEvent(event, SummonSkySeconds)
 	return true
 end
 
 function WatcherService.start()
-	local built: { [string]: boolean } = {}
-	for id in handlers do
-		built[id] = true
-	end
-	steps = Watcher.cycle(built)
-
 	local hub = hubFolder()
 	findLamps(hub)
 	buildMeter(hub)
+	nextAt = now() + Watcher.gap(random)
 	publish()
 
 	task.spawn(function()
 		while true do
-			local seconds = task.wait(1)
+			task.wait(1)
 			-- One bad second must never stop the Watcher for good.
 			xpcall(tick, function(err)
 				warn(`WatcherService: {err}\n{debug.traceback()}`)
-			end, seconds)
+			end)
 		end
 	end)
 end

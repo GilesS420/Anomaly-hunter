@@ -4,7 +4,9 @@
 --   /money 1000000    adds money (a negative number takes some away; 5k, 2.5m and 1b work too)
 --   /wings 3          sets how many wings your mansion has (1 to 6) and rebuilds it
 --   /clearmonsters    empties your mansion and Storage
---   /summon           starts the next Watcher event right away (Flicker, then Blood Moon)
+--   /summon           starts the next Watcher event right away (skipping its warning)
+--   /event BloodMoon  starts that Watcher event right away (/event alone lists them;
+--                     any capitals: /event frostfog works too)
 --   /give VoidVac     gives a Workshop item or Bakery cake for free (tools are equipped;
 --                     /give BaitBell 5 or /give PumpkinCandy 3 gives several)
 --   /haunt            every monster in your mansion picks up a roaming effect right now
@@ -24,6 +26,7 @@ local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 
 local Format = require(ReplicatedStorage.Shared.Util.Format)
+local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Sizes = require(ReplicatedStorage.Shared.Config.Sizes)
 local Zones = require(ReplicatedStorage.Shared.Config.Zones)
@@ -113,6 +116,23 @@ commands["/summon"] = function(player)
 	if not WatcherService.summon() then
 		Notify.toast(player, "An event is already playing. Wait for it to end first.")
 	end
+end
+
+commands["/event"] = function(player, argument)
+	local wanted = string.lower((string.gsub(argument or "", "%s", "")))
+	local ids: { string } = {}
+	for _, event in Events.List do
+		if event.launch then
+			table.insert(ids, event.id)
+			if string.lower(event.id) == wanted then
+				if not WatcherService.summon(event.id) then
+					Notify.toast(player, "An event is already playing. Wait for it to end first.")
+				end
+				return
+			end
+		end
+	end
+	Notify.toast(player, `Try /event with one of: {table.concat(ids, ", ")}`)
 end
 
 commands["/give"] = function(player, argument)
@@ -305,7 +325,7 @@ function DevService.start()
 		useTextChatCommands()
 	end
 	print(
-		`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /give <item> [count], /summon, /skip <hours>, /haunt, /calm, /attack`
+		`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /give <item> [count], /summon, /event <name>, /skip <hours>, /haunt, /calm, /attack`
 	)
 end
 
