@@ -1,6 +1,8 @@
 --!strict
 -- The Watcher: every 5 to 10 minutes it stirs and an event changes the sky for the whole
 -- server (the clock and the events are in Shared.Config.Events, the rules in Util.Watcher).
+-- The schedule is global: every server plays the same event at the same time, so hopping
+-- servers never finds a rarer one.
 -- Events are passive: the sky changes, and while one is live the mansion rolls read its
 -- boosts from WatcherService.current() (effect, effectOddsMultiplier, growthMultiplier).
 --   Flicker     the streetlights fail too, and Flickerwick and Static Shade drift between
@@ -67,10 +69,12 @@ local handlers: { [string]: Handler } = {}
 local phase: Phase = "Calm"
 local current: Events.WatcherEvent? = nil -- live event
 local upcoming: Events.WatcherEvent? = nil -- the event being warned about
-local nextAt = 0 -- server time the calm or the warning ends
 local endsAt = 0 -- server time the live event ends
 local eyes = 0
-local lastId: string? = nil
+-- Where the global schedule is (Util/Watcher.slotAt): every server plays the same events at
+-- the same times. Set in start.
+local schedule: Watcher.Slot? = nil
+local summoned = false -- the live event was summoned in this server only (Studio /event)
 
 -- The meter's eyes and count line, set in buildMeter. The live event and its time left are
 -- shown on each player's screen instead (client/Controllers/EventIconController).
@@ -437,7 +441,7 @@ local function publish()
 	end
 end
 
-local function startEvent(event: Events.WatcherEvent, skySeconds: number?)
+local function startEvent(event: Events.WatcherEvent, ends: number, skySeconds: number?)
 	if skySeconds then
 		applySky(event, skySeconds)
 		workspace:SetAttribute("WatcherSkyAt", now() + skySeconds)
@@ -445,7 +449,7 @@ local function startEvent(event: Events.WatcherEvent, skySeconds: number?)
 	phase = "Live"
 	current = event
 	upcoming = nil
-	endsAt = now() + (event.durationSeconds or 180)
+	endsAt = ends
 	Notify.toastAll(event.announce or `{event.name} has begun!`)
 
 	local handler = handlers[event.id]
@@ -486,34 +490,48 @@ local function endEvent()
 	end
 	Notify.toastAll(`{event.name} is over. The sky calms down.`)
 
-	eyes = Watcher.eyesAfter(eyes, event)
-	lastId = event.id
 	phase = "Calm"
-	nextAt = now() + Watcher.gap(random)
+	summoned = false
 	publish()
 end
 
-local function startWarning(event: Events.WatcherEvent)
+local function startWarning(event: Events.WatcherEvent, startsAt: number)
 	phase = "Warning"
 	upcoming = event
-	nextAt = now() + Events.WarningSeconds
-	applySky(event, Events.WarningSeconds)
-	workspace:SetAttribute("WatcherSkyAt", nextAt)
+	applySky(event, math.max(startsAt - now(), 1))
+	workspace:SetAttribute("WatcherSkyAt", startsAt)
 	Notify.toastAll(event.warning or "The Watcher stirs...")
 end
 
 local function tick()
-	if phase == "Live" then
-		if now() >= endsAt then
+	local slot = schedule :: Watcher.Slot
+	local time = now()
+	if summoned and time >= endsAt then
+		endEvent()
+	end
+	-- Step the schedule on, ending its event as its slot runs out.
+	while time >= slot.endAt do
+		if phase == "Live" and not summoned then
 			endEvent()
 		end
-	elseif phase == "Warning" then
-		local event = upcoming
-		if event and now() >= nextAt then
-			startEvent(event)
+		slot = Watcher.nextSlot(slot)
+	end
+	schedule = slot
+	eyes = slot.eyes
+
+	-- A summoned event holds the sky until it ends; then the schedule picks up where it is.
+	if not summoned then
+		if time >= slot.startAt then
+			if phase ~= "Live" then
+				-- Straight from the warning the sky is already in; joining late, it comes in fast.
+				local skySeconds = if phase == "Warning" and upcoming == slot.event
+					then nil
+					else SummonSkySeconds
+				startEvent(slot.event, slot.endAt, skySeconds)
+			end
+		elseif time >= slot.warnAt and phase ~= "Warning" then
+			startWarning(slot.event, slot.startAt)
 		end
-	elseif now() >= nextAt then
-		startWarning(Watcher.pick(lastId, eyes, random))
 	end
 	publish()
 end
@@ -662,12 +680,12 @@ end
 -- What the Watcher is, written on a noticeboard in Watcher Square (both sides). Built at
 -- Hub.WatcherSign if it's missing; move it anywhere in Studio and it stays put.
 local SignText = {
-	"Every 5 to 10 minutes the Watcher stirs and an event takes over the whole server.",
+	"Every 5 to 10 minutes the Watcher stirs and an event begins, at the same time in every server.",
 	"The sky changes, with a 30 second warning first.",
 	"Monsters in your mansion can catch the event's special effect.",
 	"The shops and the Collector get boosts, and some events bring a limited Bakery treat.",
 	"Each event opens one eye. When all 5 are open, The Watcher Awakens!",
-	"Hover over the icon above your hotbar to see how long an event has left.",
+	"Hover over the event icon in the bottom-right corner to see how long it has left.",
 }
 
 local function paintSign(board: BasePart, face: Enum.NormalId)
@@ -771,18 +789,21 @@ function WatcherService.current(): Events.WatcherEvent?
 	return current
 end
 
--- Starts an event right away, skipping the warning: the one named `id` (Studio /event), or
--- else the one the clock would pick next (/summon, and the "Summon an Event" developer
--- product, #27). False if an event is already playing or `id` isn't a launch event.
+-- Starts an event right away in this server only, skipping the warning: the one named `id`
+-- (Studio /event), or else the schedule's next one (/summon). It opens no eye, and when it
+-- ends the server goes back to the global schedule. False if an event is already playing or
+-- `id` isn't a launch event.
 function WatcherService.summon(id: string?): boolean
-	if phase == "Live" then
+	local slot = schedule
+	if phase == "Live" or not slot then
 		return false
 	end
-	local event = if id then Events.find(id) else upcoming or Watcher.pick(lastId, eyes, random)
+	local event = if id then Events.find(id) else slot.event
 	if not event or not event.launch then
 		return false
 	end
-	startEvent(event, SummonSkySeconds)
+	summoned = true
+	startEvent(event, now() + (event.durationSeconds or 180), SummonSkySeconds)
 	return true
 end
 
@@ -791,8 +812,10 @@ function WatcherService.start()
 	findLamps(hub)
 	buildMeter(hub)
 	buildSign(hub)
-	nextAt = now() + Watcher.gap(random)
-	publish()
+	-- Walks the schedule from its start, once; tick steps it on from here, and joins an
+	-- event or warning that is already under way.
+	schedule = Watcher.slotAt(now())
+	tick()
 
 	task.spawn(function()
 		while true do

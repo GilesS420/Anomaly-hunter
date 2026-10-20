@@ -10,6 +10,7 @@ local Shop = require("../Config/Shop")
 local Sizes = require("../Config/Sizes")
 local Tools = require("../Config/Tools")
 local Variants = require("../Config/Variants")
+local Rng = require("./Rng")
 
 local Workshop = {}
 
@@ -48,15 +49,7 @@ function Workshop.boughtThisSlot(
 	return shop.bought
 end
 
--- 32-bit FNV-1a hash. The multiply is split in two so it stays exact in a double.
-local function hash(text: string): number
-	local h = 2166136261
-	for i = 1, #text do
-		h = bit32.bxor(h, string.byte(text, i))
-		h = (bit32.lshift(h, 24) + h * 403) % 4294967296 -- h * 16777619, mod 2^32
-	end
-	return h
-end
+local hash = Rng.hash
 
 -- True if the item is for sale in this slot. Free starter tools always are; an event treat
 -- is exactly while its Watcher event (`liveEvent`, an id) is live. `chanceMultiplier` raises
