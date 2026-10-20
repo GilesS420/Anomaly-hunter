@@ -58,14 +58,16 @@ Layout.Plots = {
 } :: { PlotSpot }
 
 -- Wing floors inside a plot: Foyer in the middle with Library and Ballroom either side,
--- and the later wings in a second row behind them. Plot-local, see WingSpot.
+-- and the later wings in a second row behind them. Neighbouring wings sit almost wall to
+-- wall, so a mansion reads as one building: 1 stud apart, just room for the trim on both walls, and
+-- the corner pillars of neighbouring wings meet. Plot-local, see WingSpot.
 Layout.Wings = {
 	Foyer = { x = 0, z = -10, width = 40, depth = 40 },
-	Library = { x = -42, z = -10, width = 40, depth = 40 },
-	Ballroom = { x = 42, z = -10, width = 40, depth = 40 },
-	Attic = { x = -42, z = 32, width = 40, depth = 40 },
-	Crypt = { x = 42, z = 32, width = 40, depth = 40 },
-	Garden = { x = 0, z = 32, width = 40, depth = 40 },
+	Library = { x = -41, z = -10, width = 40, depth = 40 },
+	Ballroom = { x = 41, z = -10, width = 40, depth = 40 },
+	Attic = { x = -41, z = 31, width = 40, depth = 40 },
+	Crypt = { x = 41, z = 31, width = 40, depth = 40 },
+	Garden = { x = 0, z = 31, width = 40, depth = 40 },
 } :: { [string]: WingSpot }
 
 -- Where the owner appears on their plot, plot-local (in front of the Foyer).
