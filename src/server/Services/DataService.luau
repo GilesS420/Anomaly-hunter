@@ -146,6 +146,24 @@ local function loadPlayer(player: Player)
 	end
 end
 
+-- Saves the player's profile a few seconds from now (once, however often it's asked), for
+-- changes that shouldn't wait for the next auto-save or for leaving, like moving monsters.
+local SaveDelay = 5
+local saving: { [Player]: boolean } = {}
+function DataService.saveSoon(player: Player)
+	if saving[player] then
+		return
+	end
+	saving[player] = true
+	task.delay(SaveDelay, function()
+		saving[player] = nil
+		local profile = profiles[player]
+		if profile and profile:IsActive() then
+			profile:Save()
+		end
+	end)
+end
+
 function DataService.start()
 	Players.PlayerAdded:Connect(loadPlayer)
 	Players.PlayerRemoving:Connect(function(player)

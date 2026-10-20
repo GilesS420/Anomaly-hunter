@@ -330,7 +330,11 @@ local function shoulders(character: Model): { Motor6D }
 	return found
 end
 local function raiseArms(character: Model, up: boolean)
-	for _, joint in shoulders(character) do
+	local joints = shoulders(character)
+	if #joints == 0 then
+		warn(`InventoryService: {character.Name} has no shoulder joints to raise`)
+	end
+	for _, joint in joints do
 		local rest = joint:GetAttribute("RestC0")
 		if typeof(rest) ~= "CFrame" then
 			rest = joint.C0
@@ -362,7 +366,6 @@ local function monsterTool(player: Player, caught: Value.CaughtMonster, rarity: 
 	local body = model.PrimaryPart :: BasePart
 	-- where the body sits relative to the bottom middle of the copy
 	local fromBottom = (box * CFrame.new(0, -boxSize.Y / 2, 0)):ToObjectSpace(body.CFrame)
-	local parts: { BasePart } = {}
 	for _, child in model:GetChildren() do
 		if child:IsA("BasePart") then
 			child.Anchored = false
@@ -370,46 +373,56 @@ local function monsterTool(player: Player, caught: Value.CaughtMonster, rarity: 
 			child.CanCollide = false
 			child.CanQuery = false
 			child.CanTouch = false
-			table.insert(parts, child)
 		end
 		child.Parent = tool
 	end
 	model:Destroy()
 
-	local weld: WeldConstraint? = nil
-	tool.Equipped:Connect(function()
-		local character = tool.Parent
-		local head = if character then character:FindFirstChild("Head") else nil
-		if not character or not character:IsA("Model") or not head or not head:IsA("BasePart") then
-			return
-		end
-		raiseArms(character, true)
-		-- Move the whole copy so its bottom rests just above the head, facing where you face.
-		local target = head.CFrame * CFrame.new(0, head.Size.Y / 2 + 0.6, 0) * fromBottom
-		local shift = target * body.CFrame:Inverse()
-		for _, part in parts do
-			part.CFrame = shift * part.CFrame
-		end
-		local joint = Instance.new("WeldConstraint")
-		joint.Part0 = head
-		joint.Part1 = body
-		joint.Parent = body
-		weld = joint
-	end)
-	tool.Unequipped:Connect(function()
+	-- Carried while the Tool is on your character, whichever way it got there (hotbar, Backpack
+	-- window, respawn). A Weld with its offset written out, not a WeldConstraint: that one
+	-- keeps wherever the parts happen to be, which differs between server and client.
+	local weld: Weld? = nil
+	local carrier: Model? = nil
+	local function drop()
 		if weld then
 			weld:Destroy()
 			weld = nil
 		end
-		if player.Character then
-			raiseArms(player.Character, false)
+		if carrier then
+			raiseArms(carrier, false)
+			carrier = nil
 		end
-	end)
-	tool.Destroying:Connect(function()
-		if weld and player.Character then
-			raiseArms(player.Character, false)
+	end
+	local function carry()
+		local character = tool.Parent
+		local head = if character then character:FindFirstChild("Head") else nil
+		if
+			not character
+			or not character:IsA("Model")
+			or not character:FindFirstChildOfClass("Humanoid")
+			or not head
+			or not head:IsA("BasePart")
+		then
+			drop()
+			return
 		end
-	end)
+		if carrier == character then
+			return
+		end
+		drop()
+		carrier = character
+		raiseArms(character, true)
+		local joint = Instance.new("Weld")
+		joint.Name = "CarryWeld"
+		joint.Part0 = head
+		joint.Part1 = body
+		-- the copy's bottom just above the head, facing where you face
+		joint.C0 = CFrame.new(0, head.Size.Y / 2 + 0.6, 0) * fromBottom
+		joint.Parent = body
+		weld = joint
+	end
+	tool.AncestryChanged:Connect(carry)
+	tool.Destroying:Connect(drop)
 	tool.Activated:Connect(function()
 		InventoryService.place(player, caught.uid or "")
 	end)
