@@ -962,7 +962,7 @@ do
 	table.insert(batty.effects, "Mummy") -- Mummy can't land again, so the mousse gives Batty
 	local count = Cakes.bite(Cakes.new("BoneMarrowMousse", 0, 0, 0, t0), batty, lucky)
 	check("Vampire + Batty from a bite makes a Count", count.effect == "Batty" and count.combo == "Count")
-	check("cakes allowed: one per wing", Cakes.limit(3) == 3 * CakeConfig.PerWing)
+	check("cakes allowed: several per wing", Cakes.limit(3) == 3 * CakeConfig.PerWing and Cakes.limit(1) > 1)
 	check(
 		"better cakes reach further",
 		Cakes.reach("EclipseEclair") > Cakes.reach("CursedCake")

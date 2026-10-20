@@ -17,7 +17,7 @@ Cakes.Minutes = 15
 Cakes.Bites = 3
 Cakes.BiteChance = 10 -- percent per check
 Cakes.CheckSeconds = 30
-Cakes.PerWing = 1 -- cakes out at once per owned wing (the Foyer counts)
+Cakes.PerWing = 5 -- cakes out at once per owned wing (the Foyer counts): 5 to start, 30 with every wing
 Cakes.BiteEffectChance = 50 -- percent a bite rolls for the effect at all
 
 -- How far each cake reaches (studs, a circle round it on the floor): only monsters inside it

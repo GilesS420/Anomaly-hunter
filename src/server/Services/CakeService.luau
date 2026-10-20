@@ -193,7 +193,7 @@ local function tryPlace(player: Player, itemId: string): (boolean, string)
 	end
 	if #data.cakes >= Cakes.limit(data.wingsOwned) then
 		return false,
-			`You already have {#data.cakes} out (one per wing). Wait until one is eaten up, or buy a new wing.`
+			`You already have {#data.cakes} cakes out, the most your mansion holds ({CakeConfig.PerWing} per wing). Wait until one is eaten up, or buy a new wing.`
 	end
 	local character = player.Character
 	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
