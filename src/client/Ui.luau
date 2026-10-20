@@ -25,6 +25,9 @@ Ui.Colors = {
 	confirm = Color3.fromRGB(200, 60, 70),
 }
 
+-- Pictures for the Workshop's items, which have no preview model (Shop.Item kind).
+Ui.Icons = { Vacuum = "🌀", Lure = "🔔", Charm = "🧿" } :: { [string]: string }
+
 export type Window = {
 	gui: ScreenGui,
 	title: TextLabel,
@@ -169,6 +172,54 @@ function Ui.confirmButton(button: TextButton, question: string, action: () -> ()
 			end
 		end)
 	end)
+end
+
+-- Puts a copy of a preview model in a viewport, looking at it from the front.
+local function frame(viewport: ViewportFrame, model: Model)
+	local copy = model:Clone()
+	copy.Parent = viewport
+	local box, size = copy:GetBoundingBox()
+	local reach = math.max(size.X, size.Y, size.Z)
+	local camera = Instance.new("Camera")
+	camera.FieldOfView = 40
+	local from = box.Position + Vector3.new(reach * 0.5, reach * 0.35, -reach * 1.6)
+	camera.CFrame = CFrame.lookAt(from, box.Position)
+	camera.Parent = viewport
+	viewport.CurrentCamera = camera
+end
+
+-- A picture of a monster or cake: `look` names one of the preview models the server keeps in
+-- PlayerGui.InventoryPreviews (server/Services/InventoryService). Without a look (or for a
+-- vacuum or charm) it shows `icon`, a big emoji, instead.
+function Ui.picture(parent: Instance, size: UDim2, look: string?, icon: string?): GuiObject
+	if not look then
+		local glyph = Ui.text(parent, icon or "", size, Ui.Colors.text, false, 48)
+		glyph.TextXAlignment = Enum.TextXAlignment.Center
+		return glyph
+	end
+	local viewport = Instance.new("ViewportFrame")
+	viewport.BackgroundTransparency = 1
+	viewport.Size = size
+	viewport.Ambient = Color3.fromRGB(170, 160, 190)
+	viewport.LightColor = Color3.new(1, 1, 1)
+	viewport.LightDirection = Vector3.new(-0.4, -1, 0.6)
+	viewport.Parent = parent
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+	local folder = playerGui:FindFirstChild("InventoryPreviews")
+	local model = if folder then folder:FindFirstChild(look) else nil
+	if model and model:IsA("Model") then
+		frame(viewport, model)
+	else
+		-- Not built yet (just caught or bought, or you just joined): it turns up within seconds.
+		task.spawn(function()
+			local holder = playerGui:WaitForChild("InventoryPreviews", 5)
+			local late = if holder then holder:WaitForChild(look, 5) else nil
+			if late and late:IsA("Model") and viewport.Parent then
+				frame(viewport, late)
+			end
+		end)
+	end
+	return viewport
 end
 
 -- Removes every row from a list (keeps its layout).

@@ -477,6 +477,16 @@ do
 		end
 	end
 	check("every Workshop item has a description", described)
+	local tagged = true
+	for _, list in { Shop.Workshop, Shop.Bakery } do
+		for _, item in list do
+			local event = item.rarity == "Event"
+			if not (Rarities[item.rarity] or event) or event ~= (item.event ~= nil) then
+				tagged = false
+			end
+		end
+	end
+	check("every shop item has a rarity tag (Event for event treats)", tagged)
 end
 
 -- Bait Bell: the lured monster is one rarity up, but never above Legendary.

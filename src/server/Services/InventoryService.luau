@@ -98,13 +98,17 @@ local function price(caught: Value.CaughtMonster, wingsOwned: number): number
 end
 
 -- One preview per look: the same monster with the same effects and variant looks the same.
-local function lookOf(caught: Value.CaughtMonster): string
+-- The Collector's rows use it too.
+function InventoryService.lookOf(caught: Value.CaughtMonster): string
 	return `{caught.monsterId}|{table.concat(Value.resolveEffects(caught.effects), ",")}|{caught.variant or ""}`
 end
+local lookOf = InventoryService.lookOf
 
-local function cakeLook(itemId: string): string
+-- Every cake has a preview, so the Bakery can show the ones you don't have yet.
+function InventoryService.cakeLook(itemId: string): string
 	return `Cake|{itemId}`
 end
+local cakeLook = InventoryService.cakeLook
 
 -- The monster built at Normal size with its effects and variant, without its name label.
 local function monsterLook(caught: Value.CaughtMonster, rarity: string): Model
@@ -481,7 +485,7 @@ function InventoryService.place(player: Player, uid: string)
 end
 
 -- Keeps the player's hidden preview models in step with what they own: one per monster look
--- and per cake. Built once each, removed when nothing uses them any more.
+-- and one per Bakery cake. Built once each, removed when nothing uses them any more.
 function InventoryService.syncPreviews(player: Player)
 	local data = DataService.get(player)
 	local playerGui = player:FindFirstChildOfClass("PlayerGui")
@@ -511,10 +515,8 @@ function InventoryService.syncPreviews(player: Player)
 		end
 	end
 	for _, item in Shop.Bakery do
-		if (data.inventory[item.id] or 0) > 0 then
-			wanted[cakeLook(item.id)] = function()
-				return CakeModel.build(item.id, 1)
-			end
+		wanted[cakeLook(item.id)] = function()
+			return CakeModel.build(item.id, 1)
 		end
 	end
 	for _, child in folder:GetChildren() do

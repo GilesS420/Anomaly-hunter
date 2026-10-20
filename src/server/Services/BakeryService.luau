@@ -21,6 +21,8 @@ local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local Counter = require(script.Parent.Parent.Counter)
 local CakeService = require(script.Parent.CakeService)
 local DataService = require(script.Parent.DataService)
+local InventoryService = require(script.Parent.InventoryService)
+local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
 
 local BakeryService = {}
@@ -29,7 +31,10 @@ export type TreatRow = {
 	id: string,
 	name: string,
 	price: number,
-	description: string,
+	description: string, -- reach and the effect odds per bite
+	rarity: string, -- the tag on the card (Shop.Item.rarity)
+	rarityColor: Color3,
+	look: string, -- the cake's preview model in PlayerGui.InventoryPreviews
 	inStock: boolean,
 	count: number, -- how many you have
 	bought: number, -- bought since the last restock
@@ -86,6 +91,9 @@ local function viewFor(data: DataService.Data): View
 			name = item.name,
 			price = item.price,
 			description = Cakes.describe(item),
+			rarity = item.rarity,
+			rarityColor = MonsterModel.color(item.rarity),
+			look = InventoryService.cakeLook(item.id),
 			inStock = inStock,
 			count = data.inventory[item.id] or 0,
 			bought = bought[item.id] or 0,

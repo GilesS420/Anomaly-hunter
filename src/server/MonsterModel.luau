@@ -68,6 +68,7 @@ local rarityColors: { [string]: Color3 } = {
 	Phantom = Color3.fromRGB(200, 215, 255),
 	Nightmare = Color3.fromRGB(230, 40, 150),
 	Eldritch = Color3.fromRGB(40, 255, 200),
+	Event = Color3.fromRGB(255, 90, 60), -- the shops' tag for event treats
 }
 
 function MonsterModel.color(rarityId: string): Color3

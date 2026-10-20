@@ -18,8 +18,10 @@ local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Rarities = require(ReplicatedStorage.Shared.Config.Rarities)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
+local Weight = require(ReplicatedStorage.Shared.Util.Weight)
 local Counter = require(script.Parent.Parent.Counter)
 local DataService = require(script.Parent.DataService)
+local InventoryService = require(script.Parent.InventoryService)
 local MansionService = require(script.Parent.MansionService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
@@ -31,6 +33,10 @@ export type Row = {
 	monsterId: string,
 	name: string,
 	details: string, -- "Big Rare · Ghost"
+	kind: string, -- "Shiny Big Rare": variant, size and rarity
+	effects: { string }, -- effect names, for the Effects box
+	weight: string?, -- "54 kg"
+	look: string, -- the preview model in PlayerGui.InventoryPreviews (InventoryService)
 	color: Color3, -- rarity colour
 	price: number,
 	confirm: boolean, -- rare enough that the window asks "are you sure?" first
@@ -99,12 +105,13 @@ local function offerFor(data: DataService.Data): Offer
 		end
 		local rarity = Rarities[monster.rarity]
 		local variant = if caught.variant then `{caught.variant} ` else ""
-		local details = `{variant}{caught.size} {monster.rarity}`
-		if #caught.effects > 0 then
-			local names = {}
-			for _, effectId in Value.resolveEffects(caught.effects) do
-				table.insert(names, Format.name(effectId))
-			end
+		local kind = `{variant}{caught.size} {monster.rarity}`
+		local details = kind
+		local names = {}
+		for _, effectId in Value.resolveEffects(caught.effects) do
+			table.insert(names, Format.name(effectId))
+		end
+		if #names > 0 then
 			details ..= ` · {table.concat(names, ", ")}`
 		end
 		table.insert(rows, {
@@ -112,6 +119,10 @@ local function offerFor(data: DataService.Data): Offer
 			monsterId = caught.monsterId,
 			name = Format.name(caught.monsterId),
 			details = details,
+			kind = kind,
+			effects = names,
+			weight = if caught.kg then Weight.text(caught.kg) else nil,
+			look = InventoryService.lookOf(caught),
 			color = MonsterModel.color(monster.rarity),
 			price = value,
 			confirm = rarity ~= nil and rarity.order >= confirmOrder,

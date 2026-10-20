@@ -1,13 +1,18 @@
 --!strict
 -- The Collector's sell window. Opens when you use the prompt at the Collector; lists every
--- monster in your mansion with its price (highest first). Sell one, or Sell all. Legendary
--- and rarer monsters, and Sell all, need a second tap so nothing valuable goes by accident.
+-- monster in your mansion, most valuable first, laid out like the SELL sketch (2026-10-20):
+--   [picture]  Name     Effects:  [ Vampire, Slimed ]   [ Sell ]
+--              $1.2M · 54 kg
+-- and a Sell All button that stays at the bottom while the list scrolls. Legendary and rarer
+-- monsters, and Sell all, need a second tap so nothing valuable goes by accident.
 -- The server works out every price and does the selling (server/Services/CollectorService).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
+local ShopCards = require(script.Parent.Parent:WaitForChild("ShopCards"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
 local CollectorController = {}
@@ -16,11 +21,95 @@ type Row = {
 	uid: string,
 	name: string,
 	details: string,
+	kind: string,
+	effects: { string },
+	weight: string?,
+	look: string,
 	color: Color3,
 	price: number,
 	confirm: boolean,
 }
 type Offer = { monsters: { Row }, total: number }
+
+local small = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+local Height = if small then 88 else 104
+local SellWidth = if small then 84 else 120
+
+-- One monster: picture, name, kind, price and weight, its effects in a box, and Sell.
+local function card(list: ScrollingFrame, order: number, monster: Row, sell: () -> ())
+	local inner = Height - 16
+	local row = Instance.new("Frame")
+	row.LayoutOrder = order
+	row.Size = UDim2.new(1, -8, 0, Height)
+	row.BackgroundColor3 = Ui.Colors.row
+	row.Parent = list
+	Ui.corner(row, 10)
+	Ui.rim(row, Color3.fromRGB(58, 48, 78), 1)
+	local padding = Instance.new("UIPadding")
+	padding.PaddingLeft = UDim.new(0, 8)
+	padding.PaddingRight = UDim.new(0, 10)
+	padding.PaddingTop = UDim.new(0, 8)
+	padding.PaddingBottom = UDim.new(0, 8)
+	padding.Parent = row
+
+	ShopCards.pictureBox(row, inner, monster.color, monster.look)
+	local left = inner + 12
+
+	local middle = Instance.new("Frame")
+	middle.BackgroundTransparency = 1
+	middle.Position = UDim2.fromOffset(left, 0)
+	middle.Size = UDim2.new(0.5, -left, 1, 0)
+	middle.Parent = row
+	Ui.text(middle, monster.name, UDim2.fromScale(1, 0.28), monster.color, true, 22)
+	local kind = Ui.text(middle, monster.kind, UDim2.fromScale(1, 0.2), Ui.Colors.muted, false, 15)
+	kind.Position = UDim2.fromScale(0, 0.3)
+	local price =
+		Ui.text(middle, Format.money(monster.price), UDim2.fromScale(1, 0.3), Ui.Colors.money, true, 26)
+	price.Position = UDim2.fromScale(0, 0.5)
+	local weight = Ui.text(middle, monster.weight or "", UDim2.fromScale(1, 0.2), Ui.Colors.muted, false, 15)
+	weight.Position = UDim2.fromScale(0, 0.8)
+
+	-- Effects in a box, like the sketch.
+	local effects = Instance.new("Frame")
+	effects.BackgroundTransparency = 1
+	effects.Position = UDim2.fromScale(0.5, 0)
+	effects.Size = UDim2.new(0.5, -SellWidth - 10, 1, 0)
+	effects.Parent = row
+	Ui.text(effects, "Effects:", UDim2.new(1, 0, 0, 18), Ui.Colors.muted, true, 15)
+	local box = Instance.new("Frame")
+	box.Position = UDim2.fromOffset(0, 22)
+	box.Size = UDim2.new(1, 0, 1, -22)
+	box.BackgroundColor3 = Color3.fromRGB(14, 11, 20)
+	box.Parent = effects
+	Ui.corner(box, 6)
+	Ui.rim(box, Color3.fromRGB(58, 48, 78), 1)
+	local boxPadding = Instance.new("UIPadding")
+	boxPadding.PaddingLeft = UDim.new(0, 6)
+	boxPadding.PaddingRight = UDim.new(0, 6)
+	boxPadding.PaddingTop = UDim.new(0, 4)
+	boxPadding.Parent = box
+	local none = #monster.effects == 0
+	local names = if none then "None" else table.concat(monster.effects, ", ")
+	local text = Ui.text(
+		box,
+		names,
+		UDim2.fromScale(1, 1),
+		if none then Ui.Colors.muted else Ui.Colors.text,
+		false,
+		15
+	)
+	text.TextWrapped = true
+	text.TextYAlignment = Enum.TextYAlignment.Top
+
+	local button = Ui.button(row, "Sell", Ui.Colors.sell, UDim2.fromOffset(SellWidth, 44))
+	button.AnchorPoint = Vector2.new(1, 0.5)
+	button.Position = UDim2.fromScale(1, 0.5)
+	if monster.confirm then
+		Ui.confirmButton(button, "Sure?", sell)
+	else
+		button.Activated:Connect(sell)
+	end
+end
 
 function CollectorController.start()
 	local remotes = ReplicatedStorage:WaitForChild("CollectorRemotes")
@@ -29,6 +118,7 @@ function CollectorController.start()
 	local Sell = remotes:WaitForChild("Sell") :: RemoteFunction
 
 	local window = Ui.window("CollectorUi", "The Collector")
+	ShopCards.widen(window)
 	local selling = false
 	local render: (offer: Offer?) -> ()
 
@@ -58,32 +148,20 @@ function CollectorController.start()
 			window.status.Text = "Nothing to sell. Catch some monsters first (locked ones stay out of here)."
 			return
 		end
-		window.status.Text =
-			`{count} monster{if count == 1 then "" else "s"} · worth {Format.money(offer.total)}`
+		window.status.Text = `{count} monster{if count == 1 then "" else "s"} · worth {Format.money(
+			offer.total
+		)} · most valuable first`
 
 		for i, monster in offer.monsters do
-			local _, actions = Ui.row(window.list, i, monster.name, monster.color, monster.details)
-			local button = Ui.button(
-				actions,
-				`Sell {Format.money(monster.price)}`,
-				Ui.Colors.sell,
-				UDim2.fromScale(1, 1)
-			)
 			local uid = monster.uid
-			if monster.confirm then
-				Ui.confirmButton(button, "Sure?", function()
-					sell({ uid })
-				end)
-			else
-				button.Activated:Connect(function()
-					sell({ uid })
-				end)
-			end
+			card(window.list, i, monster, function()
+				sell({ uid })
+			end)
 		end
 
 		local all = Ui.button(
 			window.footer,
-			`Sell all {count} for {Format.money(offer.total)}`,
+			`Sell All · {count} for {Format.money(offer.total)}`,
 			Ui.Colors.sell,
 			UDim2.fromScale(1, 1)
 		)
