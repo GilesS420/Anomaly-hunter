@@ -1714,20 +1714,20 @@ do
 	check("and keeps growing past any old cap", titan.kg > 10000)
 	check("a Titan's price has no limit", Weight.valueMultiplier("Titan", titan.kg) > 500)
 	check(
-		"but its drawing stops at TitanMaxScale",
-		near(Weight.drawScale("Titan", titan.kg), WeightConfig.TitanMaxScale)
+		"and its drawing keeps growing too",
+		Weight.drawScale("Titan", titan.kg * 4) > Weight.drawScale("Titan", titan.kg)
 	)
 	check(
 		"a new Titan starts at TitanStartScale",
-		near(Weight.drawScale("Titan", 200), WeightConfig.TitanStartScale)
+		near(Weight.drawScale("Titan", 500), WeightConfig.TitanStartScale)
 	)
 	check("other sizes draw at their Sizes scale", near(Weight.drawScale("Huge", 50), 1.7))
 	check(
 		"value uses the weight",
 		Value.sellValue(
-			{ monsterId = "Gravepup", size = "Titan", kg = 200, effects = {}, familiarity = 0 } :: any,
+			{ monsterId = "Gravepup", size = "Titan", kg = 500, effects = {}, familiarity = 0 } :: any,
 			1
-		) == 100_000
+		) == 250_000
 	)
 	local big: any = { size = "Big", familiarity = 0, kg = 15, kgAt = 0, gene = "Mighty" }
 	Weight.spurt(big, fakeRandom(7))

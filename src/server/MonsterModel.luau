@@ -76,15 +76,13 @@ end
 
 -- Orb radius in studs for a size (Normal = 1.5). Monsters whose look grows them (the Watcher
 -- event monsters) get a bigger orb, so they keep their distance and stand on the floor.
--- A Titan's grows with its weight (kg) up to Config/Weight.TitanMaxScale, and never past that
--- unless it was already bigger as a Colossal.
+-- A Titan's keeps growing with its weight (kg), and never drops below its Colossal size.
 function MonsterModel.radius(sizeId: string, monsterId: string?, kg: number?): number
 	local look = monsterId and Looks[monsterId]
 	local grow = if look and look.grow then look.grow else 1
 	local radius = Spawning.BaseRadius * Weight.drawScale(sizeId, kg) * grow
 	if sizeId == "Titan" then
-		local cap = Spawning.BaseRadius * WeightConfig.TitanMaxScale
-		radius = math.min(radius, math.max(cap, Spawning.radius("Colossal") * grow))
+		radius = math.max(radius, Spawning.radius("Colossal") * grow)
 	end
 	return radius
 end
