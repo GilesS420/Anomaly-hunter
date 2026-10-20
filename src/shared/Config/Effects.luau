@@ -1,6 +1,6 @@
 --!strict
 -- Haunted effects. Bonuses add up: total = 1 + sum(multiplier - 1).
--- A monster holds up to MaxSlots effects.
+-- A monster can hold every effect at once (no cap, Giles 2026-10-20).
 
 export type Source = "Roam" | "Food" | "Catch" | "Event" | "Survive"
 
@@ -20,7 +20,6 @@ export type Combo = {
 
 local Effects = {}
 
-Effects.MaxSlots = 3
 -- Percent each of a vacuum's catch effects (Config/Tools) lands on a catch (balance sheet input).
 Effects.CatchChance = 25
 

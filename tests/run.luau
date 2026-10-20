@@ -767,8 +767,8 @@ do
 		Cakes.fits(withEffects({ "PumpkinHead" }), candy) == "HasEffect"
 	)
 	check(
-		"a cake's effect doesn't fit a monster with 3 effects",
-		Cakes.fits(withEffects({ "Ghost", "Mummy", "Possessed" }), candy) == "NoRoom"
+		"a cake's effect still fits a monster with many effects",
+		Cakes.fits(withEffects({ "Ghost", "Mummy", "Possessed", "Slimed", "Werewolf" }), candy) == "Ok"
 	)
 	check(
 		"a combo counts as one effect",
@@ -1026,19 +1026,16 @@ do
 	local random = fakeRandom(11)
 	local picked = Haunting.roll(monster({}), 1, nil, random, true)
 	check("a forced roll picks a Roam effect", picked ~= nil and Effects.List[picked].source == "Roam")
-	check(
-		"a full monster picks up nothing",
-		Haunting.roll(monster({ "Ghost", "Slimed", "PumpkinHead" }), 1, nil, random, true) == nil
-	)
-	-- Vampire on a monster with Batty and two more: only Vampire fits, because it merges into a Count.
-	local count = 0
-	for _ = 1, 50 do
-		local id = Haunting.roll(monster({ "Batty", "Ghost", "Slimed" }), 1, nil, random, true)
-		if id == "Vampire" then
-			count += 1
-		end
+	local three = Haunting.roll(monster({ "Ghost", "Slimed", "PumpkinHead" }), 1, nil, random, true)
+	check("a monster with 3 effects still picks up a new one", three ~= nil)
+	local allRoam: { string } = {}
+	for _, option in Haunting.pool(nil) do
+		table.insert(allRoam, option.id)
 	end
-	check("an effect that completes a combo still fits", count == 50)
+	check(
+		"a monster with every Roam effect picks up nothing",
+		Haunting.roll(monster(allRoam), 1, nil, random, true) == nil
+	)
 	-- Event effects: every launch event with an effect has a chance, and its effect exists.
 	local eventsOk = true
 	for _, event in Events.List do
@@ -1073,26 +1070,21 @@ do
 	local gotId, after =
 		Haunting.eventRoll(monster({ "Cobwebbed", "Possessed", "Slimed" }), 1, frost, alwaysHit :: any)
 	check(
-		"a full monster swaps its weakest effect for a stronger event effect",
-		gotId == "Frostbitten"
-			and after ~= nil
-			and #after == 3
-			and table.find(after, "Cobwebbed") == nil
-			and table.find(after, "Frostbitten") ~= nil
+		"a monster with 3 effects simply gains the event effect",
+		gotId == "Frostbitten" and after ~= nil and #after == 4 and table.find(after, "Cobwebbed") ~= nil
 	)
-	check(
-		"a full monster keeps stronger effects",
-		Haunting.withEffect({ "Mummy", "Batty", "Ghost" }, "Sugarcoated") == nil
-	)
-	check(
-		"effects in a combo are never swapped out",
-		Haunting.withEffect({ "Vampire", "Batty", "Cobwebbed" }, "Gilded") ~= nil
-			and table.find(
-					Haunting.withEffect({ "Vampire", "Batty", "Cobwebbed" }, "Gilded") :: any,
-					"Vampire"
-				)
-				~= nil
-	)
+	local every: { string } = {}
+	for id in Effects.List do
+		local next = Haunting.withEffect(every, id)
+		if next then
+			every = next
+		end
+	end
+	local total = 0
+	for _ in Effects.List do
+		total += 1
+	end
+	check("a monster can hold every effect at once", #every == total)
 	local watcher = Events.find("WatcherAwakens") :: any
 	local others, watched, otherRandom = 0, 0, fakeRandom(9)
 	for _ = 1, 50_000 do

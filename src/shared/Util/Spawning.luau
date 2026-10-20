@@ -117,7 +117,6 @@ function Spawning.rollCatchEffects(vacuumId: string, random: Random?): { string 
 	for _, effectId in candidates do
 		if
 			Effects.List[effectId]
-			and #effects < Effects.MaxSlots
 			and not table.find(effects, effectId)
 			and Rng.chance(Effects.CatchChance, random)
 		then

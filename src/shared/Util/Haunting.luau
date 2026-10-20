@@ -72,43 +72,14 @@ function Haunting.eventChance(base: number, familiarity: number, wingsOwned: num
 	return math.min(100, base * Haunting.chance(familiarity, wingsOwned, nil) / Effects.RoamChance)
 end
 
--- The monster's effects with `effectId` added, or nil if it can't take it. A monster with no
--- room swaps out its weakest plain effect (one that isn't part of a combo), but only for a
--- stronger one.
+-- The monster's effects with `effectId` added, or nil if it already has it.
 function Haunting.withEffect(effects: { string }, effectId: string): { string }?
-	local fit = Value.fits(effects, effectId)
-	if fit == "Ok" then
-		local after = table.clone(effects)
-		table.insert(after, effectId)
-		return after
-	elseif fit == "HasEffect" then
+	if Value.fits(effects, effectId) ~= "Ok" then
 		return nil
 	end
-	local incoming = Effects.List[effectId]
-	if not incoming then
-		return nil
-	end
-	local resolved = Value.resolveEffects(effects)
-	local plain: { string } = {}
-	for _, id in effects do
-		local effect = Effects.List[id]
-		if effect and table.find(resolved, id) and effect.multiplier < incoming.multiplier then
-			table.insert(plain, id)
-		end
-	end
-	table.sort(plain, function(a, b)
-		local ma, mb = Effects.List[a].multiplier, Effects.List[b].multiplier
-		return if ma == mb then a < b else ma < mb
-	end)
-	for _, weakest in plain do
-		local without = table.clone(effects)
-		table.remove(without, table.find(without, weakest) :: number)
-		if Value.fits(without, effectId) == "Ok" then
-			table.insert(without, effectId)
-			return without
-		end
-	end
-	return nil
+	local after = table.clone(effects)
+	table.insert(after, effectId)
+	return after
 end
 
 -- The effects of the other launch events (for The Watcher Awakens' otherEffectsChance).

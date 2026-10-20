@@ -15,7 +15,7 @@ local Value = require("./Value")
 
 local Cakes = {}
 
-export type Fit = "Ok" | "Unknown" | "HasEffect" | "NoRoom"
+export type Fit = "Ok" | "Unknown" | "HasEffect"
 
 -- A cake standing in a mansion, as saved (DataService.Data.cakes). x, y, z are relative to the
 -- player's plot, because the plot can be a different one next time they join.
@@ -56,7 +56,7 @@ function Cakes.effectChances(item: Shop.Item): { Shop.EffectChance }
 end
 
 -- Whether one of this cake's effects could still land on this monster: not when it already
--- has them, or they wouldn't fit (combos count as one).
+-- has them all.
 function Cakes.fits(caught: Value.CaughtMonster, item: Shop.Item?): Fit
 	if not item or item.kind ~= "Food" then
 		return "Unknown"
