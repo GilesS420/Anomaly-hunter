@@ -27,6 +27,8 @@ local Roam = require(ReplicatedStorage.Shared.Util.Roam)
 local Rooms = require(ReplicatedStorage.Shared.Config.Rooms)
 local Storage = require(ReplicatedStorage.Shared.Util.Storage)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
+local Weight = require(ReplicatedStorage.Shared.Util.Weight)
+local WeightConfig = require(ReplicatedStorage.Shared.Config.Weight)
 local Wings = require(ReplicatedStorage.Shared.Config.Wings)
 local DataService = require(script.Parent.DataService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
@@ -365,7 +367,13 @@ local function updateSign(state: State)
 	end
 end
 
--- What the orb shows: name, size, rarity, effects, whether it's fed and what it sells for.
+-- How wide a mansion monster walks (a Titan is drawn bigger, see MonsterModel.roamRadius).
+local function roamRadiusOf(caught: Value.CaughtMonster): number
+	return MonsterModel.roamRadius(MonsterModel.radius(caught.size, caught.monsterId, caught.kg))
+end
+
+-- What the orb shows: name, size, weight, rarity, effects, catch variant, whether it's fed and
+-- what it sells for.
 local function infoFor(player: Player, caught: Value.CaughtMonster, rarity: string): MonsterModel.Info
 	local data = DataService.get(player)
 	local ok, value = pcall(Value.sellValue, caught, if data then data.wingsOwned else 1)
@@ -373,6 +381,9 @@ local function infoFor(player: Player, caught: Value.CaughtMonster, rarity: stri
 		monsterId = caught.monsterId,
 		rarity = rarity,
 		size = caught.size,
+		kg = caught.kg,
+		roamRadius = roamRadiusOf(caught),
+		variant = caught.variant,
 		effects = Value.resolveEffects(caught.effects), -- combos show as one
 		owner = player.DisplayName,
 		status = Care.status(caught),
@@ -395,7 +406,7 @@ local function spawnMonster(state: State, caught: Value.CaughtMonster)
 	if #state.rects == 0 then
 		return -- no floors to stand on (layout missing; already warned)
 	end
-	local radius = MonsterModel.radius(caught.size, caught.monsterId)
+	local radius = roamRadiusOf(caught)
 	local spot = Roam.findFreePoint(state.rects, radius, RoamService.bodies(state.group), random)
 	if not spot then
 		local data = DataService.get(state.player)
@@ -479,6 +490,7 @@ local function repair(data: DataService.Data, joining: boolean)
 			caught.grownAt = math.max(caught.grownAt, now)
 		end
 		Care.settle(caught, now)
+		Weight.settle(caught, now, random) -- weight always grows offline (Storage pauses it)
 	end
 end
 
@@ -624,6 +636,7 @@ local function place(player: Player, data: DataService.Data, caught: Value.Caugh
 		caught.uid = HttpService:GenerateGUID(false)
 	end
 	Care.settle(caught, os.time()) -- arrives fed
+	Weight.settle(caught, os.time(), random) -- just caught: gets its weight and starts growing
 	table.insert(data.monsters, caught)
 	local state = mansions[player]
 	if state then
@@ -797,7 +810,63 @@ function MansionService.refreshMonsters(player: Player)
 	end
 end
 
+-- Brings every mansion monster's weight up to date. The ones that grew a size (or a Titan
+-- that grew a step) are rebuilt bigger, and the owner hears about it.
+function MansionService.grow(player: Player)
+	local state = mansions[player]
+	local data = DataService.get(player)
+	if not state or not data then
+		return
+	end
+	local now = os.time()
+	local grown: { Value.CaughtMonster } = {}
+	local news: { string } = {}
+	for _, caught in data.monsters do
+		local scale = Weight.drawScale(caught.size, caught.kg)
+		local wasTitan = caught.size == "Titan"
+		local newSize = Weight.settle(caught, now, random)
+		if newSize or Weight.drawScale(caught.size, caught.kg) ~= scale then
+			table.insert(grown, caught)
+		end
+		if newSize and caught.size == "Titan" and not wasTitan then
+			table.insert(
+				news,
+				`Your {Format.name(caught.monsterId)} became a TITAN! It's too big for your mansion now.`
+			)
+		elseif newSize then
+			table.insert(news, `Your {Format.name(caught.monsterId)} grew {caught.size}!`)
+		end
+	end
+	if #news > 2 then
+		Notify.toast(player, `{#news} of your monsters grew bigger!`)
+	else
+		for _, text in news do
+			Notify.toast(player, text)
+		end
+	end
+	for _, caught in grown do
+		for _, child in state.monsters:GetChildren() do
+			if child:GetAttribute("Uid") == caught.uid then
+				if child:IsA("Model") then
+					RoamService.remove(child)
+				end
+				child:Destroy()
+			end
+		end
+		spawnMonster(state, caught)
+	end
+	MansionService.refreshMonsters(player) -- the weights and price tags of the others
+end
+
 function MansionService.start()
+	task.spawn(function()
+		while true do
+			task.wait(WeightConfig.GrowthTickSeconds)
+			for player in mansions do
+				MansionService.grow(player)
+			end
+		end
+	end)
 	DataService.onLoaded(function(player)
 		tryBuild(player)
 	end)

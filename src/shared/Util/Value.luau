@@ -1,6 +1,6 @@
 --!strict
 -- Sell value of a caught monster:
---   baseValue x size x effects x familiarity x wing boost x catch variant
+--   baseValue x size (a Titan's grows with its weight, Util/Weight) x effects x familiarity x wing boost x catch variant
 -- Effect bonuses add up (1 + sum(multiplier - 1)). Combos replace their two
 -- ingredients. Unfed (hungry) monsters only sell for base value x size x variant (a Gold
 -- coat doesn't go to sleep). Call Util/Care.settle
@@ -8,9 +8,9 @@
 
 local Effects = require("../Config/Effects")
 local Monsters = require("../Config/Monsters")
-local Sizes = require("../Config/Sizes")
 local Variants = require("../Config/Variants")
 local Wings = require("../Config/Wings")
+local Weight = require("./Weight")
 
 local Value = {}
 
@@ -28,6 +28,8 @@ export type CaughtMonster = {
 	storedAt: number?, -- os.time() it went into Storage (nil while in the mansion), see Util/Storage
 	locked: boolean?, -- locked monsters can't be sold
 	variant: string?, -- catch variant (Config/Variants): "Silver", "Gold", "Shiny", "Rainbow"
+	kg: number?, -- weight, kept up to date by Util/Weight.settle (its size follows it)
+	kgAt: number?, -- os.time() its weight was last brought up to date
 }
 
 local variantMultipliers: { [string]: number } = {}
@@ -38,15 +40,6 @@ end
 -- x2 for Silver, x5 for Gold...; 1 for none (or one that no longer exists).
 function Value.variantMultiplier(variantId: string?): number
 	return if variantId then variantMultipliers[variantId] or 1 else 1
-end
-
-local function sizeMultiplier(sizeId: string): number
-	for _, size in Sizes do
-		if size.id == sizeId then
-			return size.valueMultiplier
-		end
-	end
-	error("unknown size " .. sizeId)
 end
 
 -- Turns a list of effect ids into effect and combo ids, merging any combo recipes.
@@ -103,7 +96,9 @@ function Value.sellValue(caught: CaughtMonster, wingsOwned: number): number
 	local monster = Monsters[caught.monsterId]
 	assert(monster, "unknown monster " .. caught.monsterId)
 
-	local value = monster.baseValue * sizeMultiplier(caught.size) * Value.variantMultiplier(caught.variant)
+	local value = monster.baseValue
+		* Weight.valueMultiplier(caught.size, caught.kg)
+		* Value.variantMultiplier(caught.variant)
 	if not caught.fed then
 		return math.floor(value)
 	end

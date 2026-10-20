@@ -10,6 +10,8 @@
 -- on to catch: for a block model it's an invisible ball around it.
 -- Effects and the catch variant change the look (Config/EffectLooks): a Gold monster is gold,
 -- a Vampire wears a cape. When they change, refresh rebuilds the blocks.
+-- Mansion monsters also show their weight; a Titan is drawn bigger as it grows (Util/Weight)
+-- but walks the floors at a capped width, so it sticks out through the walls.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -18,6 +20,8 @@ local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Looks = require(ReplicatedStorage.Shared.Config.Looks)
 local Spawning = require(ReplicatedStorage.Shared.Util.Spawning)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
+local Weight = require(ReplicatedStorage.Shared.Util.Weight)
+local WeightConfig = require(ReplicatedStorage.Shared.Config.Weight)
 
 local MonsterModel = {}
 
@@ -32,6 +36,9 @@ export type Info = {
 	hungry: boolean?, -- mansion monsters: dims the glow and puts the effects to sleep
 	value: number?, -- mansion monsters: what the Collector pays right now (Util/Value.sellValue);
 	-- left out, the tag shows base value x size
+	kg: number?, -- mansion monsters: its weight (a Titan is drawn bigger as it grows)
+	roamRadius: number?, -- mansion monsters: the width it walks at, if less than its drawn
+	-- radius (MonsterModel.roamRadius); it stands that high above the floor
 }
 
 -- What the tag shows: the given value, or base value x size (an unfed monster with no effects).
@@ -39,8 +46,14 @@ local function tagValue(info: Info): number
 	if info.value then
 		return info.value
 	end
-	local plain: Value.CaughtMonster =
-		{ monsterId = info.monsterId, size = info.size, effects = {}, familiarity = 0, fed = false }
+	local plain: Value.CaughtMonster = {
+		monsterId = info.monsterId,
+		size = info.size,
+		effects = {},
+		familiarity = 0,
+		fed = false,
+		kg = info.kg,
+	}
 	local ok, value = pcall(Value.sellValue, plain, 1)
 	return if ok then value else 0
 end
@@ -65,9 +78,23 @@ end
 
 -- Orb radius in studs for a size (Normal = 1.5). Monsters whose look grows them (the Watcher
 -- event monsters) get a bigger orb, so they keep their distance and stand on the floor.
-function MonsterModel.radius(sizeId: string, monsterId: string?): number
+-- A Titan's grows with its weight (kg) up to Config/Weight.TitanMaxScale, and never past that
+-- unless it was already bigger as a Colossal.
+function MonsterModel.radius(sizeId: string, monsterId: string?, kg: number?): number
 	local look = monsterId and Looks[monsterId]
-	return Spawning.radius(sizeId) * (if look and look.grow then look.grow else 1)
+	local grow = if look and look.grow then look.grow else 1
+	local radius = Spawning.BaseRadius * Weight.drawScale(sizeId, kg) * grow
+	if sizeId == "Titan" then
+		local cap = Spawning.BaseRadius * WeightConfig.TitanMaxScale
+		radius = math.min(radius, math.max(cap, Spawning.radius("Colossal") * grow))
+	end
+	return radius
+end
+
+-- The width a mansion monster walks at: its radius, capped at Config/Weight.MaxRoamRadius so
+-- a Titan still fits through the rooms (its drawn blocks clip through the walls instead).
+function MonsterModel.roamRadius(radius: number): number
+	return math.min(radius, WeightConfig.MaxRoamRadius)
 end
 
 local FedColor = Color3.fromRGB(255, 190, 230)
@@ -108,6 +135,9 @@ end
 -- "Big Rare · Ghost, Werewolf" (effects fall asleep while the monster is hungry).
 local function detailsText(info: Info): string
 	local details = `{info.size} {info.rarity}`
+	if info.kg then
+		details ..= ` · {Weight.text(info.kg)}`
+	end
 	local effects = info.effects
 	if effects and #effects > 0 then
 		local names = {}
@@ -123,9 +153,10 @@ end
 -- Builds (or rebuilds) the blocks for the monster's look with its effects; set further down.
 local dressModel: (model: Model, info: Info) -> ()
 
--- Which effects and variant the blocks were built with.
+-- Which effects, variant and drawn size the blocks were built with.
 local function lookKey(info: Info): string
-	return `{table.concat(info.effects or {}, ",")}|{info.variant or ""}`
+	local scale = Weight.drawScale(info.size, info.kg)
+	return `{table.concat(info.effects or {}, ",")}|{info.variant or ""}|{scale}`
 end
 
 -- Updates the label and glow after a mansion monster was fed, got hungry or got an effect.
@@ -216,14 +247,14 @@ local function buildLook(
 	look: EffectLooks.DressedLook,
 	scale: number,
 	radius: number
-)
+): number
 	-- Walkers are drawn with their feet at y = -2 (Normal size) but stand radius + 0.5 below
 	-- Body's centre (Roam places them that way), so shift them to keep their feet on the floor.
-	-- Grown floaters (event monsters) would dangle into the floor the same way, so they're lifted
-	-- to hover a little above it.
+	-- Grown floaters (event monsters) and Titans would dangle into the floor the same way, so
+	-- they're lifted to hover a little above it. Returns the shift.
 	local lift = if look.gait == "walk"
 		then 2 * scale - (radius + 0.5)
-		elseif look.grow then 2.4 * scale - (radius + 0.5)
+		elseif look.grow or scale > Spawning.scale("Colossal") then 2.4 * scale - (radius + 0.5)
 		else 0
 	for _, piece: EffectLooks.Piece in look.pieces :: any do
 		local part = Instance.new("Part")
@@ -304,6 +335,7 @@ local function buildLook(
 		part.Parent = model
 	end
 	model:SetAttribute("Gait", look.gait)
+	return lift
 end
 
 -- Particles an effect or variant gives off (sparkles, mist, drips).
@@ -351,23 +383,23 @@ function dressModel(model: Model, info: Info)
 			child:Destroy()
 		end
 	end
-	local radius = MonsterModel.radius(info.size, info.monsterId)
+	local radius = MonsterModel.radius(info.size, info.monsterId, info.kg)
 	local scale = radius / Spawning.BaseRadius
 	local look = EffectLooks.dress(base, info.effects, info.variant)
-	buildLook(model, body, look, scale, radius)
+	local lift = buildLook(model, body, look, scale, info.roamRadius or radius)
 	for _, aura in look.auras or {} do
 		addAura(body, aura, radius)
 	end
 	local billboard = body:FindFirstChild("Label")
 	if billboard and billboard:IsA("BillboardGui") then
-		billboard.StudsOffset = Vector3.new(0, look.top * scale + 1.6, 0)
+		billboard.StudsOffset = Vector3.new(0, lift + look.top * scale + 1.6, 0)
 	end
 	-- Tells the client to pick up the new swinging joints (RoamController).
 	model:SetAttribute("LookVersion", ((model:GetAttribute("LookVersion") :: number?) or 0) + 1)
 end
 
 function MonsterModel.build(info: Info): Model
-	local radius = MonsterModel.radius(info.size, info.monsterId)
+	local radius = MonsterModel.radius(info.size, info.monsterId, info.kg)
 	local color = MonsterModel.color(info.rarity)
 
 	local model = Instance.new("Model")
