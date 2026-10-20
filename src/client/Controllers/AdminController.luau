@@ -1,8 +1,8 @@
 --!strict
 -- The admin panel: buttons for every admin command (server/Services/DevService.luau), so
 -- nobody has to remember the chat commands. Only admins see it: the server sets an "Admin"
--- attribute on them (see server/Admins.luau). Press F2 or the Admin button on the left of
--- the screen to open and close it. Each button sends
+-- attribute on them (see server/Admins.luau). Press F2 to open and close it (there's
+-- no button on screen, Giles 2026-10-20). Each button sends
 --   ReplicatedStorage.Remotes.AdminCommand   client -> server: (command, argument?)
 -- and the server checks again that you're an admin before doing anything. Results come
 -- back as the usual toasts.
@@ -212,26 +212,12 @@ local function toggle()
 	end
 end
 
--- The small Admin button in the top-left corner, under Roblox's menu buttons and clear of the
--- Money and Backpack column (works with a tap too).
-local function buildOpener()
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "AdminButton"
-	gui.ResetOnSpawn = false
-	gui.DisplayOrder = 4
-	local opener = Ui.button(gui, "Admin", Ui.Colors.confirm, UDim2.fromOffset(80, 36))
-	opener.Position = UDim2.fromOffset(16, 8)
-	opener.Activated:Connect(toggle)
-	gui.Parent = player:WaitForChild("PlayerGui")
-end
-
 function AdminController.start()
 	while not player:GetAttribute("Admin") do
 		player:GetAttributeChangedSignal("Admin"):Wait()
 	end
 	remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AdminCommand") :: RemoteEvent
 	build()
-	buildOpener()
 	UserInputService.InputBegan:Connect(function(inputObject, processed)
 		if not processed and inputObject.KeyCode == Enum.KeyCode.F2 then
 			toggle()
