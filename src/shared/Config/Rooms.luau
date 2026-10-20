@@ -758,7 +758,7 @@ local function wingShell(
 )
 	local hw, hd = width / 2, depth / 2
 	part(parts, "Floor", { width, 1, depth }, { 0, -0.5, 0 }, floorColor, "WoodPlanks", true)
-	part(parts, "Threshold", { 2, 1, 8 }, { foyerSide * (hw + 1), -0.5, 0 }, Stone, "Slate", true)
+	part(parts, "Threshold", { 1, 1, 8 }, { foyerSide * (hw + 0.5), -0.5, 0 }, Stone, "Slate", true)
 
 	local doorW, doorTop = 8, 10
 	local archway: Opening = {
@@ -1220,7 +1220,7 @@ local function backShell(
 )
 	local hw, hd = width / 2, depth / 2
 	part(parts, "Floor", { width, 1, depth }, { 0, -0.5, 0 }, floor, floorMaterial, true)
-	part(parts, "Threshold", { 8, 1, 2 }, { 0, -0.5, -hd - 1 }, Stone, "Slate", true)
+	part(parts, "Threshold", { 8, 1, 1 }, { 0, -0.5, -hd - 0.5 }, Stone, "Slate", true)
 	wallRun(parts, "Front", width, {
 		{
 			from = width / 2 - 4,
@@ -1615,7 +1615,7 @@ function Rooms.Garden(width: number, depth: number, owned: { [string]: boolean }
 	local Hedge, Cobble, Dirt = { 30, 44, 30 }, { 72, 70, 74 }, { 58, 44, 32 }
 	local FountainStone = { 104, 102, 108 }
 	part(parts, "Floor", { width, 1, depth }, { 0, -0.5, 0 }, { 50, 54, 36 }, "Grass", true)
-	part(parts, "Threshold", { 8, 1, 2 }, { 0, -0.5, -hd - 1 }, Stone, "Slate", true)
+	part(parts, "Threshold", { 8, 1, 1 }, { 0, -0.5, -hd - 0.5 }, Stone, "Slate", true)
 	cornerPillars(parts, hw, hd)
 
 	-- Hedges between the corner pillars, with a gap at the front under an iron arch.
