@@ -1,13 +1,15 @@
 --!strict
 -- The Backpack window. Opens from the HUD's Backpack button (or G on a keyboard), anywhere in
--- the game. Three tabs at the bottom:
---   Monsters  mansion and Storage, most valuable first. Store sends one to Storage; Hold puts
---             a stored one in your hand, then click in your mansion to place it. Lock keeps it
---             away from the Collector.
---   Cakes     how many of each you have; Hold one, then click in your mansion to set it out.
---   Tools     vacuums (tap Equip to use one), Bait Bells and Return Charms.
--- Holding uses the same Tools as our hotbar (HotbarController).
--- The server does every change and sends the new list back (server/Services/InventoryService).
+-- the game. Tabs down the left, and everything you own as little picture cards:
+--   Monsters   mansion and Storage, most valuable first. A box marks the ones in Storage.
+--   Cakes      how many of each you have.
+--   Tools      vacuums, Bait Bells and Return Charms.
+--   Favorited  the monsters you hearted.
+-- Tap a card to see what it is along the bottom, with its button: Store (mansion monster),
+-- Hold (stored monster or cake: it goes in your hand, then click in your mansion) or Equip
+-- (vacuum). The heart on a monster favourites it, and the Collector never sells favourites.
+-- Holding uses the same Tools as our hotbar (HotbarController); the pictures are preview
+-- models the server keeps in PlayerGui.InventoryPreviews (server/Services/InventoryService).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,6 +25,8 @@ type MonsterRow = {
 	name: string,
 	details: string,
 	color: Color3,
+	value: string,
+	look: string,
 	stored: boolean,
 	locked: boolean,
 }
@@ -33,6 +37,9 @@ type ItemRow = {
 	tool: boolean,
 	equipped: boolean,
 	cake: boolean,
+	kind: string,
+	count: number,
+	look: string?,
 }
 type View = {
 	monsters: { MonsterRow },
@@ -42,33 +49,101 @@ type View = {
 	storageCount: number,
 	storageCapacity: number,
 }
-type Tab = "Monsters" | "Cakes" | "Tools"
+type Tab = "Monsters" | "Cakes" | "Tools" | "Favorited"
 
-local StoredColor = Color3.fromRGB(120, 140, 170)
+local Tabs = { "Monsters", "Cakes", "Tools", "Favorited" } :: { Tab }
+local Heart = Color3.fromRGB(235, 60, 90)
+local Icons = { Vacuum = "🌀", Lure = "🔔", Charm = "🧿" }
+
+-- Puts a copy of a preview model in the card's viewport, looking at it from the front.
+local function picture(viewport: ViewportFrame, model: Model)
+	local copy = model:Clone()
+	copy.Parent = viewport
+	local frame, size = copy:GetBoundingBox()
+	local reach = math.max(size.X, size.Y, size.Z)
+	local camera = Instance.new("Camera")
+	camera.FieldOfView = 40
+	local from = frame.Position + Vector3.new(reach * 0.5, reach * 0.35, -reach * 1.6)
+	camera.CFrame = CFrame.lookAt(from, frame.Position)
+	camera.Parent = viewport
+	viewport.CurrentCamera = camera
+end
 
 function InventoryController.start()
+	local player = Players.LocalPlayer
 	local remotes = ReplicatedStorage:WaitForChild("InventoryRemotes")
 	local GetView = remotes:WaitForChild("GetView") :: RemoteFunction
 	local Move = remotes:WaitForChild("Move") :: RemoteFunction
 	local Lock = remotes:WaitForChild("Lock") :: RemoteFunction
 	local Equip = remotes:WaitForChild("Equip") :: RemoteFunction
+	local playerGui = player:WaitForChild("PlayerGui")
 
 	local window = Ui.window("BackpackUi", "Backpack")
+	local panel = window.gui:FindFirstChild("Panel") :: Frame
+	local limit = panel:FindFirstChildOfClass("UISizeConstraint")
+	if limit then
+		limit.MaxSize = Vector2.new(780, 620)
+	end
+	local small = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	local sideWidth = if small then 96 else 116
+	local cell = if small then Vector2.new(84, 96) else Vector2.new(100, 112)
+
+	-- Tabs down the left; the cards fill the rest.
+	local side = Instance.new("Frame")
+	side.Name = "Tabs"
+	side.BackgroundTransparency = 1
+	side.Position = UDim2.fromOffset(0, 68)
+	side.Size = UDim2.new(0, sideWidth, 1, -68 - 62)
+	side.Parent = panel
+	local sideLayout = Instance.new("UIListLayout")
+	sideLayout.Padding = UDim.new(0, 8)
+	sideLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	sideLayout.Parent = side
+
+	local list = window.list
+	list.Position = UDim2.fromOffset(sideWidth + 10, 68)
+	list.Size = UDim2.new(1, -(sideWidth + 10), 1, -68 - 62)
+	local oldLayout = list:FindFirstChildOfClass("UIListLayout")
+	if oldLayout then
+		oldLayout:Destroy()
+	end
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize = UDim2.fromOffset(cell.X, cell.Y)
+	grid.CellPadding = UDim2.fromOffset(8, 8)
+	grid.SortOrder = Enum.SortOrder.LayoutOrder
+	grid.Parent = list
+	local gridPadding = Instance.new("UIPadding")
+	gridPadding.PaddingTop = UDim.new(0, 4)
+	gridPadding.PaddingLeft = UDim.new(0, 4)
+	gridPadding.Parent = list
+
+	-- The bottom bar: what the selected card is, and its button.
+	local footer = window.footer
+	local pickName = Ui.text(footer, "", UDim2.new(1, -130, 0, 26), Ui.Colors.text, true, 22)
+	local pickDetails = Ui.text(footer, "", UDim2.new(1, -130, 0, 20), Ui.Colors.muted, false, 16)
+	pickDetails.Position = UDim2.fromOffset(0, 28)
+	local action = Ui.button(footer, "", Ui.Colors.buy, UDim2.new(0, 120, 1, 0))
+	action.AnchorPoint = Vector2.new(1, 0)
+	action.Position = UDim2.fromScale(1, 0)
+	action.Visible = false
+
 	local tab: Tab = "Monsters"
 	local view: View? = nil
+	local selected: string? = nil -- "m:<uid>" or "i:<itemId>"
 	local busy = false
 	local render: () -> ()
+	local onAction: (() -> ())? = nil
 
-	-- Three tab buttons side by side in the footer.
-	local tabs: { [Tab]: TextButton } = {}
-	for i, name: Tab in { "Monsters", "Cakes", "Tools" } :: { Tab } do
-		local button = Ui.button(window.footer, name, Ui.Colors.off, UDim2.new(1 / 3, -4, 1, 0))
-		button.Position = UDim2.new((i - 1) / 3, if i == 1 then 0 else 2, 0, 0)
+	local tabButtons: { [Tab]: TextButton } = {}
+	for i, name: Tab in Tabs do
+		local button = Ui.button(side, name, Ui.Colors.off, UDim2.new(1, 0, 0, 44))
+		button.LayoutOrder = i
 		button.Activated:Connect(function()
 			tab = name
+			selected = nil
 			render()
 		end)
-		tabs[name] = button
+		tabButtons[name] = button
 	end
 
 	local function call(fn: RemoteFunction, ...: string)
@@ -92,7 +167,7 @@ function InventoryController.start()
 	local function hold(attribute: string, value: string)
 		for _, tool in HotbarController.tools() do
 			if tool:GetAttribute(attribute) == value then
-				if tool.Parent ~= Players.LocalPlayer.Character then
+				if tool.Parent ~= player.Character then
 					HotbarController.toggle(tool)
 				end
 				window.close()
@@ -102,81 +177,180 @@ function InventoryController.start()
 		window.status.Text = "Not in your hotbar yet. Try again in a second."
 	end
 
-	local function monsterRows(rows: { MonsterRow })
+	action.Activated:Connect(function()
+		if onAction then
+			onAction()
+		end
+	end)
+
+	-- A card: a picture (or an icon), a small line along the bottom, a coloured rim.
+	local function card(
+		order: number,
+		key: string,
+		rim: Color3,
+		look: string?,
+		icon: string?,
+		caption: string
+	)
+		local button = Instance.new("TextButton")
+		button.Name = key
+		button.LayoutOrder = order
+		button.Text = ""
+		button.AutoButtonColor = true
+		button.BackgroundColor3 = Ui.Colors.row
+		button.Parent = list
+		Ui.corner(button, 10)
+		Ui.rim(button, if selected == key then Ui.Colors.lamp else rim, if selected == key then 3 else 2)
+
+		if look then
+			local viewport = Instance.new("ViewportFrame")
+			viewport.BackgroundTransparency = 1
+			viewport.Size = UDim2.new(1, 0, 1, -20)
+			viewport.Ambient = Color3.fromRGB(170, 160, 190)
+			viewport.LightColor = Color3.new(1, 1, 1)
+			viewport.LightDirection = Vector3.new(-0.4, -1, 0.6)
+			viewport.Parent = button
+			local folder = playerGui:FindFirstChild("InventoryPreviews")
+			local model = if folder then folder:FindFirstChild(look) else nil
+			if model and model:IsA("Model") then
+				picture(viewport, model)
+			else
+				-- Not built yet (just caught or bought): it turns up within a second.
+				task.spawn(function()
+					local holder = playerGui:WaitForChild("InventoryPreviews", 5)
+					local late = if holder then holder:WaitForChild(look, 5) else nil
+					if late and late:IsA("Model") and viewport.Parent then
+						picture(viewport, late)
+					end
+				end)
+			end
+		elseif icon then
+			local glyph = Ui.text(button, icon, UDim2.new(1, 0, 1, -20), Ui.Colors.text, false, 48)
+			glyph.TextXAlignment = Enum.TextXAlignment.Center
+		end
+		local label = Ui.text(button, caption, UDim2.new(1, -8, 0, 18), Ui.Colors.text, true, 15)
+		label.AnchorPoint = Vector2.new(0.5, 1)
+		label.Position = UDim2.new(0.5, 0, 1, -3)
+		label.TextXAlignment = Enum.TextXAlignment.Center
+		button.Activated:Connect(function()
+			selected = key
+			render()
+		end)
+		return button, label
+	end
+
+	local function monsterCards(rows: { MonsterRow })
 		for i, monster in rows do
-			local details = monster.details
-				.. (if monster.stored then " · Storage" else "")
-				.. (if monster.locked then " · Locked" else "")
-			local _, actions = Ui.row(window.list, i, monster.name, monster.color, details)
-			local move = Ui.button(
-				actions,
-				if monster.stored then "Hold" else "Store",
-				if monster.stored then Ui.Colors.buy else StoredColor,
-				UDim2.new(0.6, -4, 1, 0)
-			)
-			local lock = Ui.button(
-				actions,
-				if monster.locked then "Unlock" else "Lock",
-				if monster.locked then Ui.Colors.confirm else Ui.Colors.off,
-				UDim2.new(0.4, 0, 1, 0)
-			)
-			lock.Position = UDim2.fromScale(0.6, 0)
+			local key = `m:{monster.uid}`
+			local button, label = card(i, key, monster.color, monster.look, nil, monster.value)
+			label.TextColor3 = Ui.Colors.money
+			local heart = Instance.new("TextButton")
+			heart.Name = "Heart"
+			heart.BackgroundTransparency = 1
+			heart.AnchorPoint = Vector2.new(1, 0)
+			heart.Position = UDim2.new(1, -2, 0, 0)
+			heart.Size = UDim2.fromOffset(28, 28)
+			heart.Font = Enum.Font.GothamBold
+			heart.Text = if monster.locked then "♥" else "♡"
+			heart.TextColor3 = if monster.locked then Heart else Ui.Colors.muted
+			heart.TextSize = 24
+			heart.ZIndex = 3
+			heart.Parent = button
 			local uid = monster.uid
-			local stored = monster.stored
-			move.Activated:Connect(function()
-				if stored then
-					hold("MonsterUid", uid)
-				else
-					call(Move, uid)
-				end
-			end)
-			lock.Activated:Connect(function()
+			heart.Activated:Connect(function()
 				call(Lock, uid)
 			end)
+			if monster.stored then
+				local box = Ui.text(button, "📦", UDim2.fromOffset(22, 22), Ui.Colors.text, false, 18)
+				box.Position = UDim2.fromOffset(4, 3)
+				box.ZIndex = 3
+			end
+			if selected == key then
+				pickName.Text = monster.name
+				pickName.TextColor3 = monster.color
+				pickDetails.Text = monster.details .. (if monster.stored then " · in Storage" else "")
+				action.Visible = true
+				action.Text = if monster.stored then "Hold" else "Store"
+				Ui.paint(action, if monster.stored then Ui.Colors.buy else Ui.Colors.off)
+				onAction = function()
+					if monster.stored then
+						hold("MonsterUid", uid)
+					else
+						call(Move, uid)
+					end
+				end
+			end
 		end
 	end
 
-	local function itemRows(rows: { ItemRow })
+	local function itemCards(rows: { ItemRow })
 		for i, item in rows do
-			local _, actions = Ui.row(window.list, i, item.name, Ui.Colors.text, item.details)
-			if item.cake then
-				local button = Ui.button(actions, "Hold", Ui.Colors.sell, UDim2.fromScale(1, 1))
+			local key = `i:{item.id}`
+			local caption = if item.tool
+				then (if item.equipped then "Using" else item.name)
+				else `x{item.count}`
+			card(
+				i,
+				key,
+				if item.cake then Ui.Colors.sell else Ui.Colors.equip,
+				item.look,
+				Icons[item.kind],
+				caption
+			)
+			if selected == key then
+				pickName.Text = item.name
+				pickName.TextColor3 = Ui.Colors.text
+				pickDetails.Text = item.details
 				local id = item.id
-				button.Activated:Connect(function()
-					hold("CakeId", id)
-				end)
-			elseif item.tool then
-				local button = Ui.button(
-					actions,
-					if item.equipped then "Using" else "Equip",
-					if item.equipped then Ui.Colors.off else Ui.Colors.equip,
-					UDim2.fromScale(1, 1)
-				)
-				local id = item.id
-				button.Activated:Connect(function()
-					call(Equip, id)
-				end)
+				if item.cake then
+					action.Visible = true
+					action.Text = "Hold"
+					Ui.paint(action, Ui.Colors.sell)
+					onAction = function()
+						hold("CakeId", id)
+					end
+				elseif item.tool then
+					action.Visible = true
+					action.Text = if item.equipped then "Using" else "Equip"
+					Ui.paint(action, if item.equipped then Ui.Colors.off else Ui.Colors.equip)
+					onAction = function()
+						call(Equip, id)
+					end
+				end
 			end
 		end
 	end
 
 	function render()
-		Ui.clear(window.list)
-		for name, button in tabs do
+		Ui.clear(list)
+		for name, button in tabButtons do
 			Ui.paint(button, if name == tab then Ui.Colors.equip else Ui.Colors.off)
 		end
+		pickName.Text = ""
+		pickDetails.Text = "Tap a card"
+		action.Visible = false
+		onAction = nil
 		local current = view
 		if not current then
 			window.status.Text = "Your save is still loading..."
 			return
 		end
-		if tab == "Monsters" then
-			window.status.Text =
-				`Mansion {current.mansionCount}/{current.mansionCapacity} · Storage {current.storageCount}/{current.storageCapacity}`
-			if #current.monsters == 0 then
-				window.status.Text ..= " · Catch some monsters first!"
+		if tab == "Monsters" or tab == "Favorited" then
+			local rows: { MonsterRow } = {}
+			for _, monster in current.monsters do
+				if tab == "Monsters" or monster.locked then
+					table.insert(rows, monster)
+				end
 			end
-			monsterRows(current.monsters)
+			if tab == "Monsters" then
+				window.status.Text =
+					`Mansion {current.mansionCount}/{current.mansionCapacity} · Storage {current.storageCount}/{current.storageCapacity}`
+			else
+				window.status.Text = if #rows > 0
+					then "The Collector never sells these"
+					else "Tap the heart on a monster to keep it safe"
+			end
+			monsterCards(rows)
 		else
 			local cakes = tab == "Cakes"
 			local rows: { ItemRow } = {}
@@ -186,15 +360,13 @@ function InventoryController.start()
 				end
 			end
 			if #rows > 0 then
-				window.status.Text = if cakes
-					then "Hold a cake, then click in your mansion to set it out"
-					else "Your tools and supplies"
+				window.status.Text = if cakes then "Hold a cake, then click in your mansion" else "Your tools"
 			else
 				window.status.Text = if cakes
 					then "No cakes yet. Visit the Haunted Bakery!"
 					else "No tools yet. Visit the Hunter's Workshop!"
 			end
-			itemRows(rows)
+			itemCards(rows)
 		end
 	end
 
@@ -218,7 +390,7 @@ function InventoryController.start()
 		end
 	end)
 
-	local hud = Players.LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("HuntUi"):WaitForChild("Hud")
+	local hud = player:WaitForChild("PlayerGui"):WaitForChild("HuntUi"):WaitForChild("Hud")
 	local button = hud:WaitForChild("Backpack") :: TextButton
 	button.Activated:Connect(toggle)
 end

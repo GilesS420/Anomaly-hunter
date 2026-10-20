@@ -9,6 +9,10 @@
 --   Tools     your vacuums (equip them right here), Bait Bells and Return Charms.
 -- Catches that don't fit in the mansion land in Storage by themselves (MansionService.addMonster).
 --
+-- The client draws each monster and cake on a card from a preview model: one per look, kept
+-- in a hidden ScreenGui in the player's PlayerGui (InventoryPreviews), so only they get them.
+-- Rows name their preview in `look`.
+--
 -- Hotbar Tools carry attributes the client sorts and groups them by: Section ("Cake" or
 -- "Monster") and Order (cakes by price, monsters most valuable first). Monster Tools also
 -- carry MonsterUid.
@@ -31,6 +35,7 @@ local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
+local CakeModel = require(script.Parent.Parent.CakeModel)
 local DataService = require(script.Parent.DataService)
 local HuntService = require(script.Parent.HuntService)
 local MansionService = require(script.Parent.MansionService)
@@ -46,6 +51,8 @@ export type MonsterRow = {
 	name: string,
 	details: string, -- "Big Rare · Ghost · $1.2M"
 	color: Color3, -- rarity colour
+	value: string, -- "$1.2M"
+	look: string, -- the preview model's name in InventoryPreviews
 	stored: boolean,
 	locked: boolean,
 }
@@ -56,6 +63,9 @@ export type ItemRow = {
 	tool: boolean,
 	equipped: boolean,
 	cake: boolean, -- a Bakery cake (the Cakes section), else the Tools section
+	kind: string, -- Shop.Item kind: "Food", "Vacuum", "Lure" or "Charm"
+	count: number,
+	look: string?, -- cakes: the preview model's name in InventoryPreviews
 }
 export type View = {
 	monsters: { MonsterRow },
@@ -87,6 +97,32 @@ local function price(caught: Value.CaughtMonster, wingsOwned: number): number
 	return if ok then value else 0
 end
 
+-- One preview per look: the same monster with the same effects and variant looks the same.
+local function lookOf(caught: Value.CaughtMonster): string
+	return `{caught.monsterId}|{table.concat(Value.resolveEffects(caught.effects), ",")}|{caught.variant or ""}`
+end
+
+local function cakeLook(itemId: string): string
+	return `Cake|{itemId}`
+end
+
+-- The monster built at Normal size with its effects and variant, without its name label.
+local function monsterLook(caught: Value.CaughtMonster, rarity: string): Model
+	local model = MonsterModel.build({
+		monsterId = caught.monsterId,
+		rarity = rarity,
+		size = "Normal",
+		effects = Value.resolveEffects(caught.effects),
+		variant = caught.variant,
+	})
+	local body = model.PrimaryPart :: BasePart
+	local label = body:FindFirstChild("Label")
+	if label then
+		label:Destroy()
+	end
+	return model
+end
+
 local function monsterRow(caught: Value.CaughtMonster, stored: boolean, value: number): MonsterRow?
 	local monster = Monsters[caught.monsterId]
 	if not monster or not caught.uid then
@@ -108,6 +144,8 @@ local function monsterRow(caught: Value.CaughtMonster, stored: boolean, value: n
 		name = Format.name(caught.monsterId),
 		details = table.concat(parts, " · "),
 		color = MonsterModel.color(monster.rarity),
+		value = Format.money(value),
+		look = lookOf(caught),
 		stored = stored,
 		locked = caught.locked == true,
 	}
@@ -165,6 +203,9 @@ local function itemRows(data: DataService.Data): { ItemRow }
 			tool = Workshop.isTool(item),
 			equipped = equipSlot ~= nil and equipped[equipSlot] == item.id,
 			cake = item.kind == "Food",
+			kind = item.kind :: string,
+			count = count,
+			look = if item.kind == "Food" then cakeLook(item.id) else nil,
 		})
 		order[item.id] = (kindOrder[item.kind] or 9) * 1e15 + item.price
 	end
@@ -264,10 +305,12 @@ end
 -- Monsters in Storage as hotbar Tools ------------------------------------------------------
 
 local PlaceAhead = 4 -- studs in front of you
+local HeldRadius = 1.1 -- studs, a held monster's size whatever its real size
 local SyncSeconds = 1
 local placing: { [Player]: boolean } = {}
 
--- A small glowing orb in the monster's rarity colour, to hold.
+-- A small copy of the monster, to hold. Its Body (already welded to every block) becomes the
+-- Handle.
 local function monsterTool(player: Player, caught: Value.CaughtMonster, rarity: string): Tool
 	local tool = Instance.new("Tool")
 	tool.CanBeDropped = false
@@ -275,20 +318,23 @@ local function monsterTool(player: Player, caught: Value.CaughtMonster, rarity: 
 	tool.ToolTip = "Click in your mansion to place it there"
 	tool:SetAttribute("Section", "Monster")
 	tool:SetAttribute("MonsterUid", caught.uid)
-	local handle = Instance.new("Part")
+	local model = monsterLook(caught, rarity)
+	model:ScaleTo(HeldRadius / MonsterModel.radius("Normal", caught.monsterId))
+	local handle = model.PrimaryPart :: BasePart
 	handle.Name = "Handle"
-	handle.Shape = Enum.PartType.Ball
-	handle.Size = Vector3.one * 1.2
-	handle.Material = Enum.Material.Neon
-	handle.Color = MonsterModel.color(rarity)
-	handle.CanCollide = false
-	handle.Massless = true
-	handle.Parent = tool
-	local light = Instance.new("PointLight")
-	light.Color = handle.Color
-	light.Range = 6
-	light.Parent = handle
-	tool.Grip = CFrame.new(0, 0, -0.4)
+	for _, child in model:GetChildren() do
+		if child:IsA("BasePart") then
+			child.Anchored = false
+			child.Massless = true
+			child.CanCollide = false
+			child.CanQuery = false
+		end
+		child.Parent = tool
+	end
+	model:Destroy()
+	-- Held up in front of you, facing you. With no turn in the grip the Handle stays upright
+	-- (its -Z forward); the grip moves it up and out from the hand and turns it round.
+	tool.Grip = (CFrame.new(0, HeldRadius * 0.7, -(HeldRadius + 0.4)) * CFrame.Angles(0, math.pi, 0)):Inverse()
 	tool.Activated:Connect(function()
 		InventoryService.place(player, caught.uid or "")
 	end)
@@ -386,6 +432,57 @@ function InventoryService.place(player: Player, uid: string)
 	end
 end
 
+-- Keeps the player's hidden preview models in step with what they own: one per monster look
+-- and per cake. Built once each, removed when nothing uses them any more.
+function InventoryService.syncPreviews(player: Player)
+	local data = DataService.get(player)
+	local playerGui = player:FindFirstChildOfClass("PlayerGui")
+	if not data or not playerGui then
+		return
+	end
+	local holder = playerGui:FindFirstChild("InventoryPreviews") :: ScreenGui?
+	if not holder then
+		local gui = Instance.new("ScreenGui")
+		gui.Name = "InventoryPreviews"
+		gui.Enabled = false
+		gui.ResetOnSpawn = false
+		gui.Parent = playerGui
+		holder = gui
+	end
+	local folder = holder :: ScreenGui
+	local wanted: { [string]: () -> Model } = {}
+	for _, list in { data.monsters, data.storage } do
+		for _, caught in list do
+			local monster = Monsters[caught.monsterId]
+			local key = lookOf(caught)
+			if monster and not wanted[key] then
+				wanted[key] = function()
+					return monsterLook(caught, monster.rarity)
+				end
+			end
+		end
+	end
+	for _, item in Shop.Bakery do
+		if (data.inventory[item.id] or 0) > 0 then
+			wanted[cakeLook(item.id)] = function()
+				return CakeModel.build(item.id, 1)
+			end
+		end
+	end
+	for _, child in folder:GetChildren() do
+		if not wanted[child.Name] then
+			child:Destroy()
+		end
+	end
+	for key, build in wanted do
+		if not folder:FindFirstChild(key) then
+			local model = build()
+			model.Name = key
+			model.Parent = folder
+		end
+	end
+end
+
 function InventoryService.start()
 	remotes.Parent = ReplicatedStorage
 	Players.PlayerRemoving:Connect(function(player)
@@ -397,6 +494,7 @@ function InventoryService.start()
 			for _, player in Players:GetPlayers() do
 				local ok, err = pcall(function()
 					InventoryService.syncMonsterTools(player)
+					InventoryService.syncPreviews(player)
 				end)
 				if not ok then
 					warn(`InventoryService: syncing {player.Name}'s monster tools failed: {err}`)
