@@ -2,9 +2,8 @@
 -- The Haunted Bakery window. Opens when you use the prompt at the Bakery. Lists the cakes
 -- for sale with what each bite can do, its price and a Buy button. Bought cakes go into your
 -- Roblox hotbar, where you hold one in your mansion and click to set it out (CakeService).
--- Feed all at the bottom feeds every monster for free. The stock changes together with the
--- Workshop's and a countdown shows when. The server checks everything
--- (server/Services/BakeryService and CareService).
+-- The stock changes together with the Workshop's and a countdown shows when. The server
+-- checks everything (server/Services/BakeryService).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -24,17 +23,9 @@ type TreatRow = {
 	bought: number,
 	limit: number,
 }
-type MonsterRow = {
-	uid: string,
-	name: string,
-	details: string,
-	color: Color3,
-	hungry: boolean,
-}
-type View = { treats: { TreatRow }, monsters: { MonsterRow }, secondsLeft: number, money: number }
+type View = { treats: { TreatRow }, secondsLeft: number, money: number }
 
 local TreatColor = Color3.fromRGB(255, 170, 90)
-local HungryColor = Color3.fromRGB(215, 95, 50)
 
 local function countdown(seconds: number): string
 	seconds = math.max(0, math.floor(seconds))
@@ -46,7 +37,6 @@ function BakeryController.start()
 	local Open = remotes:WaitForChild("Open") :: RemoteEvent
 	local GetShop = remotes:WaitForChild("GetShop") :: RemoteFunction
 	local Buy = remotes:WaitForChild("Buy") :: RemoteFunction
-	local FeedAll = ReplicatedStorage:WaitForChild("CareRemotes"):WaitForChild("FeedAll") :: RemoteFunction
 
 	local window = Ui.window("BakeryUi", "Haunted Bakery")
 	local restockAt = 0 -- os.clock() when the stock changes
@@ -70,19 +60,6 @@ function BakeryController.start()
 		waiting = false
 		if ok and typeof(result) == "table" and result.view then
 			render(result.view)
-		end
-	end
-
-	local function feedAll()
-		if waiting then
-			return
-		end
-		waiting = true
-		pcall(FeedAll.InvokeServer, FeedAll)
-		local ok, view = pcall(GetShop.InvokeServer, GetShop)
-		waiting = false
-		if ok and window.isOpen() then
-			render(view)
 		end
 	end
 
@@ -110,19 +87,6 @@ function BakeryController.start()
 				end)
 			end
 		end
-
-		local count, hungry = #view.monsters, 0
-		for _, monster in view.monsters do
-			if monster.hungry then
-				hungry += 1
-			end
-		end
-		local text = if count == 0
-			then "Feed all · no monsters yet"
-			elseif hungry > 0 then `Feed all {count} · {hungry} hungry · free`
-			else `Feed all {count} · free`
-		local color = if hungry > 0 then HungryColor else Ui.Colors.buy
-		Ui.button(window.footer, text, color, full).Activated:Connect(feedAll)
 	end
 
 	function render(view: View?)

@@ -1,8 +1,7 @@
 --!strict
 -- The Collector: sells the monsters roaming your mansion for money. Hold the prompt at
 -- Workspace.Hub.Landmarks.Collector to open the sell window. Prices come from
--- Util/Value.sellValue (size, effects, familiarity and wings all count; a hungry monster
--- sells for base value x size, so the window says so). Monsters in Storage are offered too
+-- Util/Value.sellValue (size, effects, familiarity and wings all count). Monsters in Storage are offered too
 -- (at the value they had when stored). Locked monsters and the Vault are never offered here.
 --
 -- Remotes in ReplicatedStorage.CollectorRemotes:
@@ -68,7 +67,7 @@ local function sellable(data: DataService.Data): { Value.CaughtMonster }
 	local list = {}
 	local now = os.time()
 	for _, caught in data.monsters do
-		Care.settle(caught, now) -- up-to-date Familiarity, and hungry or not
+		Care.settle(caught, now) -- up-to-date Familiarity
 		if not caught.locked then
 			table.insert(list, caught)
 		end
@@ -99,9 +98,6 @@ local function offerFor(data: DataService.Data): Offer
 				table.insert(names, Format.name(effectId))
 			end
 			details ..= ` · {table.concat(names, ", ")}`
-		end
-		if not caught.fed then
-			details ..= " · Hungry: feed it to sell for more"
 		end
 		table.insert(rows, {
 			uid = caught.uid,

@@ -36,7 +36,7 @@ Shop.ConfirmSellFrom = "Legendary"
 -- a bite; a bite may give the cake's effect (a monster can't get an effect twice, and holds at
 -- most Effects.MaxSlots). Chance cakes (effectChances) may give one of several effects.
 -- Prices are x100 like the monsters so they keep the same size relative to what a monster
--- sells for. Feeding is free (Feed all), see Config/Care.
+-- sells for.
 Shop.Bakery = {
 	{
 		id = "PumpkinCandy",

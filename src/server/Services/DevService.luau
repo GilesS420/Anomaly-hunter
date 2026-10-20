@@ -5,11 +5,10 @@
 --   /wings 3          sets how many wings your mansion has (1 to 6) and rebuilds it
 --   /clearmonsters    empties your mansion and Storage
 --   /summon           starts the next Watcher event right away (Flicker, then Blood Moon)
---   /give VoidVac     gives a Workshop item or Bakery treat for free (tools are equipped;
+--   /give VoidVac     gives a Workshop item or Bakery cake for free (tools are equipped;
 --                     /give BaitBell 5 or /give PumpkinCandy 3 gives several)
---   /haunt            every fed monster in your mansion picks up a roaming effect right now
---   /skip 12          your monsters live 12 hours ahead: they grow Familiarity, and get
---                     hungry after a day (/skip 25 makes them all hungry)
+--   /haunt            every monster in your mansion picks up a roaming effect right now
+--   /skip 12          your monsters live 12 hours ahead: they grow Familiarity
 --   /calm             zone monsters leave you alone (type it again to let them attack)
 --   /attack           the closest monster in your zone attacks you right now
 --   /spawn Gravepup   brings that monster to you in the zone you're in (any monster, any zone;
@@ -30,6 +29,7 @@ local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Wings = require(ReplicatedStorage.Shared.Config.Wings)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
+local CakeService = require(script.Parent.CakeService)
 local CareService = require(script.Parent.CareService)
 local DataService = require(script.Parent.DataService)
 local HauntService = require(script.Parent.HauntService)
@@ -143,12 +143,13 @@ commands["/give"] = function(player, argument)
 		Notify.toast(player, `You now have {data.inventory[item.id]} x {item.name}.`)
 	end
 	HuntService.refreshItems(player)
+	CakeService.syncTools(player)
 end
 
 commands["/haunt"] = function(player)
 	local gained = HauntService.rollFor(player, true)
 	if gained == 0 then
-		Notify.toast(player, "No monster could take an effect (hungry, or no room left).")
+		Notify.toast(player, "No monster could take an effect (no room left).")
 	end
 end
 
@@ -156,13 +157,12 @@ commands["/skip"] = function(player, argument)
 	local hours = tonumber(argument)
 	local data = DataService.get(player)
 	if not hours or hours <= 0 or not data then
-		Notify.toast(player, "Try: /skip 12 (hours; /skip 25 makes your monsters hungry)")
+		Notify.toast(player, "Try: /skip 12 (hours)")
 		return
 	end
 	-- Moving every timestamp back is the same as that much time passing.
 	local seconds = math.floor(hours * 3600)
 	for _, caught in data.monsters do
-		caught.fedUntil = (caught.fedUntil or os.time()) - seconds
 		caught.grownAt = (caught.grownAt or os.time()) - seconds
 	end
 	CareService.refresh(player)

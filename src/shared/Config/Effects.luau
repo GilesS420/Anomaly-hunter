@@ -1,6 +1,6 @@
 --!strict
 -- Haunted effects. Bonuses add up: total = 1 + sum(multiplier - 1).
--- A monster holds up to MaxSlots effects. Unfed monsters have their effects go dormant.
+-- A monster holds up to MaxSlots effects.
 
 export type Source = "Roam" | "Food" | "Catch" | "Event" | "Survive"
 
@@ -24,7 +24,7 @@ Effects.MaxSlots = 3
 -- Percent each of a vacuum's catch effects (Config/Tools) lands on a catch (balance sheet input).
 Effects.CatchChance = 25
 
--- Roaming effects (Util/Haunting). Every RoamRollSeconds each fed monster in an online
+-- Roaming effects (Util/Haunting). Every RoamRollSeconds each monster in an online
 -- player's mansion rolls: RoamChance percent, raised by Familiarity (x(1 + bonus) at 100%),
 -- by every wing past the Foyer, and by a Watcher event's effectOddsMultiplier (Blood Moon x2).
 -- A hit picks a Roam effect by weight; while an event with an effect is live, that effect

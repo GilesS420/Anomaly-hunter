@@ -94,9 +94,6 @@ local function monsterRow(caught: Value.CaughtMonster, stored: boolean, value: n
 		table.insert(parts, table.concat(names, ", "))
 	end
 	table.insert(parts, Format.money(value))
-	if not stored and not caught.fed then
-		table.insert(parts, "Hungry")
-	end
 	return {
 		uid = caught.uid,
 		name = Format.name(caught.monsterId),

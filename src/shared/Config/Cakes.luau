@@ -1,8 +1,7 @@
 --!strict
 -- Cakes: every Bakery treat is a cake you set out in your mansion (hold it from the Roblox
 -- hotbar and click while standing in one of your wings). Monsters come for a bite, and a bite
--- may give them a mutation (the treat's effect, Config/Shop.Bakery). Cakes don't feed
--- monsters: feeding is Feed all (Config/Care).
+-- may give them a mutation (the treat's effect, Config/Shop.Bakery).
 --
 -- Every CheckSeconds each cake rolls BiteChance. On a hit, a monster in the mansion that
 -- hasn't had a bite of it yet comes over (monsters the effect can still land on first). A

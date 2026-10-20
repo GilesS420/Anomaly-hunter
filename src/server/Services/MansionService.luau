@@ -8,7 +8,7 @@
 --                 prompt to buy the wing
 --     OwnerSign   "<name>'s Mansion" and "3/8 monsters", floating above the Foyer
 --     Monsters    the owner's caught monsters, roaming around the owned wings (each label
---                 says if it's fed and how familiar it is, see CareService)
+--                 says how familiar it is, see CareService)
 -- Wings are bought in order (the Foyer is free). Each one makes room for more monsters and
 -- opens a new zone. Nothing here needs building in Studio.
 
@@ -365,7 +365,7 @@ local function updateSign(state: State)
 	end
 end
 
--- What the orb shows: name, size, rarity, effects, whether it's fed and what it sells for.
+-- What the orb shows: name, size, rarity, effects, Familiarity and what it sells for.
 local function infoFor(player: Player, caught: Value.CaughtMonster, rarity: string): MonsterModel.Info
 	local data = DataService.get(player)
 	local ok, value = pcall(Value.sellValue, caught, if data then data.wingsOwned else 1)
@@ -377,7 +377,6 @@ local function infoFor(player: Player, caught: Value.CaughtMonster, rarity: stri
 		variant = caught.variant,
 		owner = player.DisplayName,
 		status = Care.status(caught),
-		hungry = not caught.fed,
 		value = if ok then value else 0,
 	}
 end
@@ -456,8 +455,7 @@ local function spawnAll(state: State, data: DataService.Data)
 end
 
 -- Fixes up a save before the mansion uses it: wings in range, every monster has a uid
--- (saves from before uids existed), a list of effects and feeding times (saves from before
--- feeding start out fed). Brings every monster's Familiarity up to date; when the player
+-- (saves from before uids existed) and a list of effects. Brings every monster's Familiarity up to date; when the player
 -- just joined and Config/Care.GrowsOffline is off, the time they were away doesn't count.
 local function repair(data: DataService.Data, joining: boolean)
 	if typeof(data.wingsOwned) ~= "number" or data.wingsOwned ~= data.wingsOwned then
@@ -624,7 +622,7 @@ local function place(player: Player, data: DataService.Data, caught: Value.Caugh
 	if typeof(caught.uid) ~= "string" or caught.uid == "" then
 		caught.uid = HttpService:GenerateGUID(false)
 	end
-	Care.settle(caught, os.time()) -- arrives fed
+	Care.settle(caught, os.time())
 	table.insert(data.monsters, caught)
 	local state = mansions[player]
 	if state then
@@ -774,8 +772,8 @@ function MansionService.monsterModels(player: Player): { [string]: Model }
 	return out
 end
 
--- Updates every monster's label and glow from the save (after feeding, or as they get
--- hungry). Settle them first (Util/Care.settle) so the labels show how they are right now.
+-- Updates every monster's label from the save (after it got an effect, or as it gets more
+-- familiar). Settle them first (Util/Care.settle) so the labels show how they are right now.
 function MansionService.refreshMonsters(player: Player)
 	local state = mansions[player]
 	local data = DataService.get(player)

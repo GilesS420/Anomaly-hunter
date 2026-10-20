@@ -71,10 +71,8 @@ check("effect bonuses add up", near(Value.effectMultiplier({ "Slimed", "Mummy" }
 -- Vampire + Batty merge into Count (x10).
 check("combo replaces its recipe", near(Value.effectMultiplier({ "Vampire", "Batty" }), 10))
 
-local caught = { monsterId = "Gravepup", size = "Big", effects = { "Ghost" }, familiarity = 0, fed = true }
-check("fed value uses effects", Value.sellValue(caught, 1) == 45_000) -- 10,000 x 1.5 x 3
-caught.fed = false
-check("unfed value is base x size", Value.sellValue(caught, 1) == 15_000)
+local caught = { monsterId = "Gravepup", size = "Big", effects = { "Ghost" }, familiarity = 0 }
+check("value uses effects", Value.sellValue(caught, 1) == 45_000) -- 10,000 x 1.5 x 3
 
 -- Spawn rolls. The CLI has no Roblox Random, so use a small seeded stand-in.
 local function fakeRandom(seed: number): any
@@ -148,15 +146,10 @@ end
 -- Gold is checked after Shiny (0.5%), so it lands a little under its 3%.
 check("about 3% of Banshee Blower catches are Gold", math.abs(golds / 20_000 - 0.03) < 0.005)
 do
-	local plain: any = { monsterId = "Gravepup", size = "Normal", effects = {}, familiarity = 0, fed = true }
+	local plain: any = { monsterId = "Gravepup", size = "Normal", effects = {}, familiarity = 0 }
 	local gold: any = table.clone(plain)
 	gold.variant = "Gold"
 	check("a Gold monster sells for x5", Value.sellValue(gold, 1) == 5 * Value.sellValue(plain, 1))
-	plain.fed, gold.fed = false, false
-	check(
-		"a hungry Gold monster still keeps its x5",
-		Value.sellValue(gold, 1) == 5 * Value.sellValue(plain, 1)
-	)
 end
 
 -- Catching: vacuum tiers gate size and rarity.
@@ -684,9 +677,8 @@ do
 	)
 end
 
--- Feeding and Familiarity (Util/Care).
+-- Familiarity (Util/Care): it just grows with time, no hunger.
 do
-	local fed = CareConfig.FedHours * 3600
 	local grow = CareConfig.FamiliarityHours * 3600
 	local t0 = 1_000_000
 	local m: any = {
@@ -694,31 +686,19 @@ do
 		size = "Normal",
 		effects = {},
 		familiarity = 0,
-		fed = true,
-		fedUntil = t0 + fed,
 		grownAt = t0,
+		fed = false, -- an old save's hunger fields are cleared
+		fedUntil = t0,
 	}
-	Care.settle(m, t0 + fed / 2)
-	check("Familiarity grows while fed", near(m.familiarity, math.min(fed / 2 / grow, 1)) and m.fed)
-	Care.settle(m, t0 + fed * 3)
-	local atHungry = math.min(fed / grow, 1)
-	check("Familiarity stops growing once hungry", near(m.familiarity, atHungry) and not m.fed)
-	Care.settle(m, t0 + fed * 5)
-	check("settling again while hungry changes nothing", near(m.familiarity, atHungry))
-	check("a hungry monster needs food", Care.needsFood(m, t0 + fed * 5))
-	check("a hungry monster sells for base x size", Value.sellValue(m, 3) == 10_000)
+	Care.settle(m, t0 + grow / 2)
+	check("Familiarity grows with time", near(m.familiarity, 0.5))
+	check("old hunger fields are cleared", m.fed == nil and m.fedUntil == nil)
+	Care.settle(m, t0 + grow * 5)
+	check("Familiarity stops at 100%", m.familiarity == 1 and Care.status(m) == "Fully familiar")
 
-	Care.feed(m, t0 + fed * 5)
-	check("feeding makes it fed for a day", m.fed and m.fedUntil == t0 + fed * 6)
-	check("a just-fed monster doesn't need food", not Care.needsFood(m, t0 + fed * 5))
-	check("hours left counts down", Care.hoursLeft(m, t0 + fed * 5) == CareConfig.FedHours)
-
-	local fresh: any = { monsterId = "Gloomlet", size = "Normal", effects = {}, familiarity = 0, fed = false }
+	local fresh: any = { monsterId = "Gloomlet", size = "Normal", effects = {}, familiarity = 0 }
 	Care.settle(fresh, t0)
-	check(
-		"a monster without timestamps starts fed",
-		fresh.fed and fresh.fedUntil == t0 + fed and fresh.grownAt == t0
-	)
+	check("a monster without a timestamp grows from now", fresh.grownAt == t0 and fresh.familiarity == 0)
 	Care.settle(fresh, t0 - 50)
 	check("a clock that went back never shrinks or regrows", fresh.familiarity == 0 and fresh.grownAt == t0)
 
@@ -728,7 +708,7 @@ do
 	local candy = Cakes.item("PumpkinCandy") :: Shop.Item
 	local cursed = Cakes.item("CursedCake") :: Shop.Item
 	local function withEffects(effects: { string }): any
-		return { monsterId = "Gravepup", size = "Normal", effects = effects, familiarity = 0.95, fed = false }
+		return { monsterId = "Gravepup", size = "Normal", effects = effects, familiarity = 0.95 }
 	end
 	check("an unknown cake doesn't fit", Cakes.fits(withEffects({}), Cakes.item("VoidVac")) == "Unknown")
 	check(
@@ -844,8 +824,8 @@ do
 	)
 	local b = Cakes.bite(placed, fresh, lucky)
 	check(
-		"a bite gives the effect and uses up a bite, but doesn't feed",
-		b.effect == "PumpkinHead" and placed.bitesLeft == CakeConfig.Bites - 1 and fresh.fed == false
+		"a bite gives the effect and uses up a bite, nothing else",
+		b.effect == "PumpkinHead" and placed.bitesLeft == CakeConfig.Bites - 1 and fresh.familiarity == 0.95
 	)
 	check("a monster only bites a cake once", Cakes.pickEater(placed, { fresh }, fake) == nil)
 	local vamp = withEffects({ "Vampire" })
@@ -915,8 +895,8 @@ end
 
 -- Roaming effects (Util/Haunting).
 do
-	local function monster(effects: { string }, fed: boolean): any
-		return { monsterId = "Gravepup", size = "Normal", effects = effects, familiarity = 0, fed = fed }
+	local function monster(effects: { string }): any
+		return { monsterId = "Gravepup", size = "Normal", effects = effects, familiarity = 0 }
 	end
 	check(
 		"a new monster in the Foyer rolls at the base chance",
@@ -943,17 +923,16 @@ do
 	check("a live event adds its effect to the pool", hasEvent and #withEvent == 6)
 
 	local random = fakeRandom(11)
-	check("hungry monsters pick up nothing", Haunting.roll(monster({}, false), 1, nil, random, true) == nil)
-	local picked = Haunting.roll(monster({}, true), 1, nil, random, true)
+	local picked = Haunting.roll(monster({}), 1, nil, random, true)
 	check("a forced roll picks a Roam effect", picked ~= nil and Effects.List[picked].source == "Roam")
 	check(
 		"a full monster picks up nothing",
-		Haunting.roll(monster({ "Ghost", "Slimed", "PumpkinHead" }, true), 1, nil, random, true) == nil
+		Haunting.roll(monster({ "Ghost", "Slimed", "PumpkinHead" }), 1, nil, random, true) == nil
 	)
 	-- Vampire on a monster with Batty and two more: only Vampire fits, because it merges into a Count.
 	local count = 0
 	for _ = 1, 50 do
-		local id = Haunting.roll(monster({ "Batty", "Ghost", "Slimed" }, true), 1, nil, random, true)
+		local id = Haunting.roll(monster({ "Batty", "Ghost", "Slimed" }), 1, nil, random, true)
 		if id == "Vampire" then
 			count += 1
 		end
@@ -968,7 +947,7 @@ do
 	local hits = 0
 	local trials = 20000
 	for _ = 1, trials do
-		if Haunting.roll(monster({}, true), 1, nil, random) then
+		if Haunting.roll(monster({}), 1, nil, random) then
 			hits += 1
 		end
 	end
@@ -1654,9 +1633,9 @@ end
 
 -- Storage (Util/Storage): a stored monster is paused and comes back as it went in.
 do
-	local day = CareConfig.FedHours * 3600
+	local day = 24 * 3600
 	local caught: any = { monsterId = "Gravepup", size = "Normal", effects = {}, familiarity = 0 }
-	Care.settle(caught, 0) -- fed until `day`
+	Care.settle(caught, 0)
 	Care.settle(caught, 3600) -- an hour of growing
 	local before = caught.familiarity
 	Storage.store(caught, 3600)
@@ -1664,8 +1643,6 @@ do
 	Storage.unstore(caught, 3600 + 10 * day) -- ten days in Storage
 	check("taking it out clears storedAt", caught.storedAt == nil)
 	check("stored monster didn't grow", near(caught.familiarity, before))
-	check("stored monster didn't get hungry", caught.fed == true)
-	check("its hunger clock moved on", near(caught.fedUntil, day + 10 * day))
 	check("storage has room below the limit", Storage.hasRoom(InventoryConfig.StorageSlots - 1))
 	check("storage is full at the limit", not Storage.hasRoom(InventoryConfig.StorageSlots))
 end

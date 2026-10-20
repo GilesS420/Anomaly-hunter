@@ -37,8 +37,7 @@ function Haunting.pool(eventEffect: string?): { Option }
 	return options
 end
 
--- One roll for a monster: the effect it picks up, or nil. Hungry monsters never pick one up,
--- and it only picks effects the monster doesn't have yet that still fit. force skips the
+-- One roll for a monster: the effect it picks up, or nil. It only picks effects the monster doesn't have yet that still fit. force skips the
 -- chance (Studio /haunt). Doesn't change the monster.
 function Haunting.roll(
 	caught: Value.CaughtMonster,
@@ -47,9 +46,6 @@ function Haunting.roll(
 	random: Random?,
 	force: boolean?
 ): string?
-	if not caught.fed then
-		return nil
-	end
 	local odds = if event then event.effectOddsMultiplier else nil
 	if not force and not Rng.chance(Haunting.chance(caught.familiarity, wingsOwned, odds), random) then
 		return nil
