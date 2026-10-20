@@ -1,8 +1,10 @@
 --!strict
--- Weight rules (numbers in Config/Weight). Like Familiarity it works from timestamps
--- (os.time() seconds): call Weight.settle(monster, now) before reading its weight or size.
+-- Weight rules (numbers in Config/Weight). Works from timestamps (os.time() seconds) so
+-- growth rolls keep happening while nobody is looking: call Weight.settle(monster, now) after
+-- Care.settle and before reading its weight or size.
 -- Pure functions so they can be tested outside Roblox.
 
+local Rng = require("./Rng")
 local Sizes = require("../Config/Sizes")
 local WeightConfig = require("../Config/Weight")
 
@@ -11,27 +13,28 @@ local Weight = {}
 -- The fields of a caught monster (Util/Value.CaughtMonster) that weight uses.
 export type Growing = {
 	size: string,
-	effects: { string },
-	kg: number?, -- its weight; nil until it first settles (just caught, or an older save)
-	kgAt: number?, -- os.time() its weight was last brought up to date
+	familiarity: number,
+	kg: number?, -- its weight; nil until it first settles (just caught)
+	kgAt: number?, -- os.time() of its last growth check
+	gene: string?, -- hidden growth gene (Config/Weight.Genes), rolled with its weight
 }
 
-local order: { [string]: number } = {}
+local CheckSeconds = WeightConfig.CheckMinutes * 60
+
+local order: { [string]: number } = { None = 0 }
 local byId: { [string]: Sizes.Size } = {}
 for i, size in Sizes do
 	order[size.id] = i
 	byId[size.id] = size
 end
 
-local function startKg(sizeId: string): number
-	return (WeightConfig.StartKg :: { [string]: number })[sizeId] or WeightConfig.StartKg.Normal
+local genes: { [string]: WeightConfig.Gene } = {}
+for _, gene in WeightConfig.Genes do
+	genes[gene.id] = gene
 end
 
--- How far a Titan is from turning Titan (0) to MaxKg (1), on a log scale so every doubling
--- counts the same.
-local function titanProgress(kg: number): number
-	local from, to = WeightConfig.StartKg.Titan, WeightConfig.MaxKg
-	return math.clamp(math.log(kg / from) / math.log(to / from), 0, 1)
+local function startKg(sizeId: string): number
+	return (WeightConfig.StartKg :: { [string]: number })[sizeId] or WeightConfig.StartKg.Normal
 end
 
 -- The size a monster of this weight is drawn at.
@@ -47,38 +50,51 @@ end
 
 -- A random weight for a monster just caught at this size.
 function Weight.roll(sizeId: string, random: Random?): number
-	local from = startKg(sizeId)
-	local to = from * 2
-	for _, size in Sizes do
-		local start = startKg(size.id)
-		if start > from and start < to then
-			to = start
-		end
-	end
+	local size = byId[sizeId] or byId.Normal
 	local rng = random or Random.new()
-	return math.floor((from + rng:NextNumber() * (to - from)) * 10) / 10
+	local spread = WeightConfig.CatchSpread
+	local kg = size.valueMultiplier * WeightConfig.KgPerValue * (1 - spread + rng:NextNumber() * 2 * spread)
+	return math.floor(kg * 10) / 10
 end
 
--- Growth per hour as a share of its weight (0.02 = +2% an hour).
-function Weight.rate(caught: Growing): number
-	return WeightConfig.GrowthPerHour + #caught.effects * WeightConfig.GrowthPerEffect
+function Weight.rollGene(random: Random?): string
+	return Rng.pickWeighted(WeightConfig.Genes, function(gene)
+		return gene.weight
+	end, random).id
 end
 
--- Brings a monster's weight up to date at `now` and moves its size up when it got heavy
--- enough (sizes never go down). A monster without a weight gets one for its size and grows
--- from now on. Returns true if its size changed.
-function Weight.settle(caught: Growing, now: number, random: Random?): boolean
-	local kg = caught.kg
-	if typeof(kg) ~= "number" or kg ~= kg or kg <= 0 then
-		caught.kg = Weight.roll(caught.size, random)
-		caught.kgAt = now
+-- True if its gene still lets it grow past the size it is now.
+function Weight.canGrow(caught: Growing): boolean
+	local gene = genes[caught.gene or ""]
+	if not gene or not gene.maxSize then
+		return gene ~= nil
+	end
+	return (order[caught.size] or 0) < (order[gene.maxSize] or 0)
+end
+
+-- One growth spurt: adds SpurtMin to SpurtMax of its weight, but never past what its gene
+-- allows (it stops at the top of its gene's biggest size). Returns true if its size changed.
+function Weight.spurt(caught: Growing, random: Random?, ignoreGene: boolean?): boolean
+	if not ignoreGene and not Weight.canGrow(caught) then
 		return false
 	end
-	local from = caught.kgAt or now
-	local hours = math.max(0, now - from) / 3600
-	local grown = math.min(WeightConfig.MaxKg, kg * math.exp(Weight.rate(caught) * hours))
-	caught.kg = math.max(kg, grown)
-	caught.kgAt = math.max(from, now)
+	local rng = random or Random.new()
+	local kg = caught.kg or Weight.roll(caught.size, rng)
+	local share = WeightConfig.SpurtMin
+		+ rng:NextNumber() ^ WeightConfig.SpurtSkew * (WeightConfig.SpurtMax - WeightConfig.SpurtMin)
+	kg *= 1 + share
+	local gene = genes[caught.gene or ""]
+	if not ignoreGene and gene and gene.maxSize then
+		-- Stops just under the next size up from its gene's biggest.
+		local ceiling = math.huge
+		for _, size in Sizes do
+			if order[size.id] == (order[gene.maxSize] or 0) + 1 then
+				ceiling = startKg(size.id) - 0.1
+			end
+		end
+		kg = math.min(kg, math.max(ceiling, caught.kg or 0))
+	end
+	caught.kg = math.floor(kg * 10) / 10
 	local size = Weight.sizeFor(caught.kg :: number)
 	if (order[size] or 0) > (order[caught.size] or 0) then
 		caught.size = size
@@ -87,19 +103,56 @@ function Weight.settle(caught: Growing, now: number, random: Random?): boolean
 	return false
 end
 
--- What its size multiplies its value by: Config/Sizes, except a Titan, which goes from x10 up
--- to Config/Weight.TitanMaxValue as it keeps growing.
+-- Brings a monster's growth up to date at `now`: one SpurtChance roll for every CheckMinutes
+-- that passed while it was fully familiar (settle Familiarity first). A monster without a
+-- weight (just caught) gets one for its size and a gene. Returns true if its size changed.
+function Weight.settle(caught: Growing, now: number, random: Random?): boolean
+	local kg = caught.kg
+	if typeof(kg) ~= "number" or kg ~= kg or kg <= 0 or not caught.gene then
+		-- Just caught (or weighed under the first rules, before genes): weigh it afresh.
+		caught.kg = Weight.roll(caught.size, random)
+		caught.gene = Weight.rollGene(random)
+		caught.kgAt = now
+		return false
+	end
+	local from = caught.kgAt or now
+	local checks = math.floor(math.max(0, now - from) / CheckSeconds)
+	caught.kgAt = from + checks * CheckSeconds
+	if caught.familiarity < 1 or not Weight.canGrow(caught) then
+		return false
+	end
+	checks = math.min(checks, WeightConfig.MaxOfflineDays * 24 * 60 / WeightConfig.CheckMinutes)
+	local changed = false
+	for _ = 1, checks do
+		if Rng.chance(WeightConfig.SpurtChance, random) then
+			changed = Weight.spurt(caught, random) or changed
+		end
+	end
+	return changed
+end
+
+-- One minute of a live Watcher event with this growthMultiplier: an extra spurt roll.
+-- Returns whether it spurted and whether its size changed.
+function Weight.eventRoll(caught: Growing, growthMultiplier: number, random: Random?): (boolean, boolean)
+	if not caught.kg or not Weight.canGrow(caught) then
+		return false, false
+	end
+	if not Rng.chance(WeightConfig.EventSpurtChance * growthMultiplier, random) then
+		return false, false
+	end
+	return true, Weight.spurt(caught, random)
+end
+
+-- What its weight multiplies its value by: kg / KgPerValue. Without a weight (wild
+-- monsters) it's the size's multiplier from Config/Sizes.
 function Weight.valueMultiplier(sizeId: string, kg: number?): number
 	local size = byId[sizeId]
 	assert(size, "unknown size " .. sizeId)
-	if sizeId ~= "Titan" or not kg then
-		return size.valueMultiplier
-	end
-	return size.valueMultiplier + (WeightConfig.TitanMaxValue - size.valueMultiplier) * titanProgress(kg)
+	return if kg then kg / WeightConfig.KgPerValue else size.valueMultiplier
 end
 
--- How big it's drawn (Normal = 1): Config/Sizes, except a Titan, which grows in steps up to
--- Config/Weight.TitanMaxScale.
+-- How big it's drawn (Normal = 1): Config/Sizes, except a Titan, which grows a step every
+-- time it doubles in weight, up to Config/Weight.TitanMaxScale.
 function Weight.drawScale(sizeId: string, kg: number?): number
 	local size = byId[sizeId]
 	if not size then
@@ -108,9 +161,11 @@ function Weight.drawScale(sizeId: string, kg: number?): number
 	if sizeId ~= "Titan" or not kg then
 		return size.scale
 	end
-	local from, to, step =
-		WeightConfig.TitanStartScale, WeightConfig.TitanMaxScale, WeightConfig.TitanScaleStep
-	return math.min(to, from + math.floor((to - from) * titanProgress(kg) / step + 1e-6) * step)
+	local doublings = math.max(0, math.floor(math.log(kg / WeightConfig.StartKg.Titan, 2) + 1e-6))
+	return math.min(
+		WeightConfig.TitanMaxScale,
+		WeightConfig.TitanStartScale + doublings * WeightConfig.TitanScaleStep
+	)
 end
 
 -- "54 kg", "320 kg", "1.2 t".

@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Care = require(ReplicatedStorage.Shared.Util.Care)
 local CareConfig = require(ReplicatedStorage.Shared.Config.Care)
+local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
 local Layout = require(ReplicatedStorage.Shared.Config.Layout)
@@ -808,21 +809,43 @@ function MansionService.refreshMonsters(player: Player)
 	end
 end
 
--- Brings every mansion monster's weight up to date. The ones that grew a size (or a Titan
--- that grew a step) are rebuilt bigger, and the owner hears about it.
-function MansionService.grow(player: Player)
+-- The growthMultiplier of the Watcher event that's live right now, or nil.
+local function eventGrowth(): number?
+	local id = workspace:GetAttribute("WatcherEvent")
+	for _, event in Events.List do
+		if event.id == id then
+			return event.growthMultiplier
+		end
+	end
+	return nil
+end
+
+-- Brings every mansion monster's growth up to date (and, while a growing Watcher event is
+-- live, gives each one an extra spurt roll; MansionService.start calls this once a minute).
+-- `spurts` forces that many spurts on every monster, ignoring luck and genes (Studio /grow).
+-- The ones that grew a size (or a Titan that grew a step) are rebuilt bigger, and the owner
+-- hears about it.
+function MansionService.grow(player: Player, spurts: number?)
 	local state = mansions[player]
 	local data = DataService.get(player)
 	if not state or not data then
 		return
 	end
 	local now = os.time()
+	local growth = eventGrowth()
 	local grown: { Value.CaughtMonster } = {}
 	local news: { string } = {}
 	for _, caught in data.monsters do
 		local scale = Weight.drawScale(caught.size, caught.kg)
 		local wasTitan = caught.size == "Titan"
 		local newSize = Weight.settle(caught, now, random)
+		if growth then
+			local _, bigger = Weight.eventRoll(caught, growth, random)
+			newSize = bigger or newSize
+		end
+		for _ = 1, spurts or 0 do
+			newSize = Weight.spurt(caught, random, true) or newSize
+		end
 		if newSize or Weight.drawScale(caught.size, caught.kg) ~= scale then
 			table.insert(grown, caught)
 		end

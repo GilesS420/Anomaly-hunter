@@ -15,6 +15,7 @@ export type WatcherEvent = {
 	durationSeconds: number?,
 	monsters: { [string]: number }?, -- event monster id -> spawn weight
 	effectOddsMultiplier: number?, -- mansion effect odds while live (Blood Moon doubles them)
+	growthMultiplier: number?, -- extra growth spurt rolls while live (Config/Weight.EventSpurtChance)
 	announce: string?, -- toast everyone sees when it starts
 }
 
@@ -63,11 +64,19 @@ Events.List = {
 		durationSeconds = 240,
 		monsters = { CrimsonWisp = 70, Moonhowler = 30 },
 		effectOddsMultiplier = 2,
-		announce = "A Blood Moon rises! Phantoms roam the main area and haunted effects are twice as likely.",
+		growthMultiplier = 2,
+		announce = "A Blood Moon rises! Phantoms roam the main area, haunted effects are twice as likely and monsters grow.",
 	},
 	{ id = "MimicNight", name = "Mimic Night", level = 3, launch = false, effect = "Mimic" },
 	{ id = "BreachStorm", name = "Breach Storm", level = 4, launch = false },
-	{ id = "WatcherAwakens", name = "The Watcher Awakens", level = 5, launch = true, effect = "Watched" },
+	{
+		id = "WatcherAwakens",
+		name = "The Watcher Awakens",
+		level = 5,
+		launch = true,
+		effect = "Watched",
+		growthMultiplier = 3,
+	},
 } :: { WatcherEvent }
 
 return Events
