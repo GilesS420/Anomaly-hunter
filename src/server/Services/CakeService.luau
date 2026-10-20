@@ -169,6 +169,8 @@ function CakeService.syncTools(player: Player)
 		local count = data.inventory[item.id] or 0
 		if count > 0 and not have[item.id] then
 			local tool = CakeModel.tool(item.id, `{item.name} x{count}`)
+			tool:SetAttribute("Section", "Cake")
+			tool:SetAttribute("Order", item.price)
 			tool.Activated:Connect(function()
 				CakeService.place(player, item.id)
 			end)
