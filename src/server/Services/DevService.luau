@@ -182,7 +182,7 @@ commands["/haunt"] = function(player)
 		then HauntService.eventRollFor(player, event, true)
 		else HauntService.rollFor(player, true)
 	if gained == 0 then
-		Notify.toast(player, "No monster could take an effect (no room left).")
+		Notify.toast(player, "No monster could take an effect (they already have them all).")
 	end
 end
 

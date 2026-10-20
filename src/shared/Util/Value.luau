@@ -59,15 +59,9 @@ function Value.resolveEffects(effectIds: { string }): { string }
 	return resolved
 end
 
--- Whether one more effect fits on a monster: not one it already has, and the result (after
--- combos merge) holds at most Effects.MaxSlots.
-function Value.fits(effectIds: { string }, effectId: string): "Ok" | "HasEffect" | "NoRoom"
-	if table.find(effectIds, effectId) then
-		return "HasEffect"
-	end
-	local after = table.clone(effectIds)
-	table.insert(after, effectId)
-	return if #Value.resolveEffects(after) > Effects.MaxSlots then "NoRoom" else "Ok"
+-- Whether one more effect fits on a monster: any effect it doesn't have yet (there's no cap).
+function Value.fits(effectIds: { string }, effectId: string): "Ok" | "HasEffect"
+	return if table.find(effectIds, effectId) then "HasEffect" else "Ok"
 end
 
 -- The combo that appears in `after` but not in `before` (resolved effect lists), or nil.

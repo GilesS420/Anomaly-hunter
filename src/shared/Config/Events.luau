@@ -69,8 +69,7 @@ Events.WarningSeconds = 30
 Events.EyesToAwaken = 5
 
 -- While an event is live, every monster in the mansions of the players in the server rolls
--- for the event's effect this often (Util/Haunting.eventRoll). A monster with all its effect
--- slots full swaps its weakest plain effect for a stronger event effect.
+-- for the event's effect this often (Util/Haunting.eventRoll).
 Events.EffectRollSeconds = 30
 
 -- How many event monsters (the Flicker and Blood Moon Phantoms, an optional bonus to catch)

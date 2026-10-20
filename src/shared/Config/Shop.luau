@@ -34,8 +34,7 @@ Shop.ConsumablesPerRestock = 3
 Shop.ConfirmSellFrom = "Legendary"
 
 -- Haunted Bakery cakes. You set one out in your mansion (Config/Cakes) and monsters come for
--- a bite; a bite may give the cake's effect (a monster can't get an effect twice, and holds at
--- most Effects.MaxSlots). Chance cakes (effectChances) may give one of several effects.
+-- a bite; a bite may give the cake's effect (a monster can't get an effect twice). Chance cakes (effectChances) may give one of several effects.
 -- Prices are x100 like the monsters so they keep the same size relative to what a monster
 -- sells for. Event treats (`event`) are only in stock while their Watcher event is live, so
 -- an event's effect can be had after it's over.
