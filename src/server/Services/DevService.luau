@@ -1,6 +1,8 @@
 --!strict
--- Test commands for play testing in Studio (they do nothing in the real game). Type them
--- in the chat box:
+-- Admin commands for play testing. Only admins can use them (see server/Admins.luau: anyone
+-- in Studio, the game's owner and the UserIds listed there); for everyone else they do
+-- nothing. Admins can press the buttons in the admin panel (client AdminController, F2 or
+-- the Admin button) or type them in the chat box:
 --   /money 1000000    adds money (a negative number takes some away; 5k, 2.5m and 1b work too)
 --   /wings 3          sets how many wings your mansion has (1 to 6) and rebuilds it
 --   /clearmonsters    empties your mansion and Storage
@@ -20,6 +22,10 @@
 --                     add a size: /spawn TheBogKing Huge). Only you can catch it and it never
 --                     attacks. /spawn all brings every monster of the zone you're in.
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
+-- The panel uses one RemoteEvent, made only on the server:
+--   ReplicatedStorage.Remotes.AdminCommand   client -> server: (command: string, argument: string?)
+-- The server checks the player is an admin and the command exists before running it, so a
+-- player who fires it by hand gets nothing.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -45,6 +51,7 @@ local MansionService = require(script.Parent.MansionService)
 local Notify = require(script.Parent.Parent.Notify)
 local SpawnService = require(script.Parent.SpawnService)
 local WatcherService = require(script.Parent.WatcherService)
+local Admins = require(script.Parent.Parent.Admins)
 
 local DevService = {}
 
@@ -272,17 +279,56 @@ commands["/spawn"] = function(player, argument)
 	Notify.toast(player, `There's no monster called "{argument}". Try /spawn Gravepup`)
 end
 
+local MaxArgumentLength = 60
+
+-- Runs one command for an admin. Anything else (not an admin, unknown command, odd
+-- argument) is ignored.
+local function runCommand(player: Player, name: string, argument: string?)
+	local command = commands[string.lower(name)]
+	if not command or not Admins.isAdmin(player) then
+		return
+	end
+	if argument and (argument == "" or #argument > MaxArgumentLength) then
+		argument = nil
+	end
+	local ok, err = pcall(command, player, argument)
+	if not ok then
+		warn(`DevService: {name} failed: {err}`)
+	end
+end
+
 -- Runs a chat message if it's one of the commands above.
 local function run(player: Player, message: string)
 	local name, rest = string.match(message, "^%s*(/%S+)%s*(.-)%s*$")
-	local argument = rest
-	local command = name and commands[string.lower(name)]
-	if not command then
-		return
+	if name then
+		runCommand(player, name, rest)
 	end
-	local ok, err = pcall(command, player, if argument ~= "" then argument else nil)
-	if not ok then
-		warn(`DevService: {name} failed: {err}`)
+end
+
+-- The admin panel's buttons. Values from the client are checked: both must be strings.
+local function useAdminRemote()
+	local remotes = ReplicatedStorage:WaitForChild("Remotes")
+	local remote = Instance.new("RemoteEvent")
+	remote.Name = "AdminCommand"
+	remote.OnServerEvent:Connect(function(player: Player, name: unknown, argument: unknown)
+		if type(name) ~= "string" or #name > 20 then
+			return
+		end
+		runCommand(player, name, if type(argument) == "string" then argument else nil)
+	end)
+	remote.Parent = remotes
+end
+
+-- Marks admins so their client shows the panel (the server checks again on every command).
+local function markAdmins()
+	local function mark(player: Player)
+		if Admins.isAdmin(player) then
+			player:SetAttribute("Admin", true)
+		end
+	end
+	Players.PlayerAdded:Connect(mark)
+	for _, player in Players:GetPlayers() do
+		mark(player)
 	end
 end
 
@@ -319,17 +365,19 @@ local function useLegacyChat()
 end
 
 function DevService.start()
-	if not RunService:IsStudio() then
-		return
-	end
+	markAdmins()
+	useAdminRemote()
 	-- Only one of the two, so a command never runs twice.
 	if TextChatService.ChatVersion == Enum.ChatVersion.LegacyChatService then
 		useLegacyChat()
 	else
 		useTextChatCommands()
 	end
+	if not RunService:IsStudio() then
+		return
+	end
 	print(
-		`DevService (Studio only): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /give <item> [count], /summon, /event <name>, /skip <hours>, /haunt, /calm, /attack`
+		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /give <item> [count], /summon, /event <name>, /skip <hours>, /haunt, /calm, /attack`
 	)
 end
 
