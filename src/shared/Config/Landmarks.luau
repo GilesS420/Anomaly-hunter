@@ -807,6 +807,145 @@ function Landmarks.Collector(): { Part }
 	return parts
 end
 
+-- The Trading Booth: a midnight-blue swap shop under a blue and white awning, run by a
+-- hooded ghost broker with one teal and one pink eye (one for each side of a trade). A glass
+-- bell jar at each end of the counter holds a wisp on offer, a ledger and quill sit between
+-- them, shelves of wrapped parcels and crates line the back, two skeleton hands shake on the
+-- roof, and a plank nailed across the counter says it opens soon.
+local Midnight = { 40, 44, 72 }
+local Ghostly = { 220, 222, 236 }
+local SwapTeal = { 90, 240, 220 }
+local SwapPink = { 255, 120, 200 }
+
+function Landmarks.TradingBooth(): { Part }
+	local parts: { Part } = {}
+	local y = shop(parts, {
+		title = "Trading Booth",
+		wall = Midnight,
+		trim = { 140, 140, 160 },
+		roof = { 30, 32, 48 },
+		deck = { 50, 48, 60 },
+		sign = { 210, 205, 225 },
+		awning = { { 50, 60, 120 }, Ghostly },
+	})
+	local top = y + 3.5 -- the counter top
+
+	-- A bell jar at each end of the counter, each with a wisp up for trade.
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		local x = side * 7
+		local base = part(parts, `JarBase{tag}`, { 0.3, 1.8, 1.8 }, { x, top + 0.15, -1 }, Brass, "Metal")
+		base.shape = "Cylinder"
+		base.rot = { 0, 0, 90 }
+		local dome = part(parts, `JarDome{tag}`, { 1.4, 1.5, 1.5 }, { x, top + 1, -1 }, GlassTint, "Glass")
+		dome.shape = "Cylinder"
+		dome.rot = { 0, 0, 90 }
+		dome.transparency = 0.55
+		part(parts, `JarKnob{tag}`, { 0.4, 0.4, 0.4 }, { x, top + 1.9, -1 }, Brass, "Metal").shape = "Ball"
+		local color = if side < 0 then SwapTeal else SwapPink
+		local wisp = part(parts, `JarWisp{tag}`, { 0.7, 0.7, 0.7 }, { x, top + 1, -1 }, color, "Neon")
+		wisp.shape = "Ball"
+		wisp.light = { color = color, range = 10, brightness = 0.8 }
+	end
+
+	-- The ledger, an ink pot and a quill.
+	part(parts, "Ledger", { 2.2, 0.25, 1.6 }, { 0, top + 0.125, -1.2 }, Crimson, "Fabric")
+	part(parts, "LedgerPages", { 2, 0.12, 1.4 }, { 0, top + 0.31, -1.2 }, Cream, "SmoothPlastic")
+	local pot = part(parts, "InkPot", { 0.45, 0.45, 0.45 }, { 1.8, top + 0.225, -0.6 }, Ink, "SmoothPlastic")
+	pot.shape = "Cylinder"
+	pot.rot = { 0, 0, 90 }
+	part(parts, "Quill", { 0.1, 1.2, 0.25 }, { 1.95, top + 0.95, -0.6 }, Ghostly, "Fabric").rot =
+		{ 0, 0, -20 }
+
+	-- The broker: a hooded ghost behind the counter, low enough to stay under the awning.
+	local hz = 1.6
+	local robe = part(parts, "BrokerRobe", { 2.4, 4.8, 1.6 }, { 0, y + 2.4, hz }, Ghostly, "Fabric", true)
+	robe.transparency = 0.25
+	part(parts, "BrokerHood", { 2.2, 1.9, 1.9 }, { 0, y + 6.4, hz }, { 70, 50, 110 }, "Fabric", true)
+	part(parts, "BrokerFace", { 1.5, 1.2, 0.1 }, { 0, y + 6.3, hz - 1 }, Ink, "SmoothPlastic")
+	part(parts, "BrokerEyeLeft", { 0.35, 0.35, 0.05 }, { -0.35, y + 6.45, hz - 1.075 }, SwapTeal, "Neon")
+	part(parts, "BrokerEyeRight", { 0.35, 0.35, 0.05 }, { 0.35, y + 6.45, hz - 1.075 }, SwapPink, "Neon")
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		local arm = part(
+			parts,
+			`BrokerArm{tag}`,
+			{ 0.5, 0.5, 1.4 },
+			{ side * 1.45, y + 4.6, 0.3 },
+			Ghostly,
+			"Fabric"
+		)
+		arm.transparency = 0.25
+		part(
+			parts,
+			`BrokerHand{tag}`,
+			{ 0.45, 0.3, 0.45 },
+			{ side * 1.45, y + 4.5, -0.6 },
+			Skull,
+			"SmoothPlastic"
+		)
+	end
+	local glow = part(parts, "BrokerGlow", { 0.2, 0.2, 0.2 }, { 0, y + 6.4, hz - 1.5 }, SwapTeal, "Neon")
+	glow.transparency = 1
+	glow.light = { color = { 200, 200, 255 }, range = 9, brightness = 0.6 }
+
+	-- Shelves of wrapped parcels and crates behind him.
+	for s, x in { -9.5, 9.5 } do
+		for i, shelfTop in shelves(parts, `ParcelShelf{s}`, x, { 70, 60, 80 }) do
+			local items = {
+				{ -2.6, { 1.6, 1.2, 1.4 }, BoardWood, "Wood" },
+				{ -0.4, { 1.8, 0.9, 1.2 }, Canvas, "Fabric" },
+				{ 2.2, { 1.4, 1.6, 1.4 }, { 120, 90, 60 }, "Wood" },
+			}
+			for j, item in items do
+				if (s + i + j) % 4 ~= 0 then -- a few gaps so the shelves don't look stamped
+					local size = item[2]
+					part(
+						parts,
+						`Parcel{s}{i}{j}`,
+						size,
+						{ x + item[1], shelfTop + size[2] / 2, 16 },
+						item[3],
+						item[4]
+					)
+					part(
+						parts,
+						`Parcel{s}{i}{j}String`,
+						{ size[1] + 0.06, size[2] + 0.06, 0.12 },
+						{ x + item[1], shelfTop + size[2] / 2 + 0.03, 16 },
+						{ 150, 40, 50 },
+						"Fabric"
+					)
+				end
+			end
+		end
+	end
+
+	-- Two skeleton hands shaking on the roof, over the sign.
+	local roofTop = y + 18.9
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		part(parts, `ShakePost{tag}`, { 0.2, 0.5, 0.2 }, { side * 2, roofTop + 0.25, 3.5 }, Iron, "Metal")
+		part(
+			parts,
+			`ShakeArm{tag}`,
+			{ 2.6, 0.45, 0.45 },
+			{ side * 1.8, roofTop + 0.725, 3.5 },
+			Skull,
+			"SmoothPlastic"
+		)
+		local cuff = if side < 0 then SwapTeal else SwapPink
+		part(parts, `ShakeCuff{tag}`, { 0.8, 0.8, 0.8 }, { side * 3.5, roofTop + 0.725, 3.5 }, cuff, "Neon")
+	end
+	part(parts, "ShakeClasp", { 0.9, 0.75, 0.7 }, { 0, roofTop + 0.725, 3.5 }, Skull, "SmoothPlastic")
+
+	-- Not open yet: a plank nailed across the counter.
+	local plank = part(parts, "SoonPlank", { 14, 0.9, 0.2 }, { 0, y + 1.7, -2.35 }, BoardWood, "WoodPlanks")
+	plank.rot = { 0, 0, -6 }
+	plank.text = "Coming soon"
+	return parts
+end
+
 -- Recipes by landmark name (Layout.Landmarks), and which of their parts is the model's
 -- PrimaryPart: what Counter puts the prompt on.
 Landmarks.ByName = {
@@ -814,6 +953,7 @@ Landmarks.ByName = {
 	Bakery = Landmarks.Bakery,
 	Workshop = Landmarks.Workshop,
 	Collector = Landmarks.Collector,
+	TradingBooth = Landmarks.TradingBooth,
 } :: { [string]: () -> { Part } }
 
 Landmarks.Anchor = {
@@ -821,6 +961,7 @@ Landmarks.Anchor = {
 	Bakery = Landmarks.CounterSpot,
 	Workshop = Landmarks.CounterSpot,
 	Collector = Landmarks.CounterSpot,
+	TradingBooth = Landmarks.CounterSpot,
 } :: { [string]: string }
 
 return Landmarks

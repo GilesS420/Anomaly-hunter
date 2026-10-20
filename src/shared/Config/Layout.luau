@@ -90,7 +90,7 @@ Layout.Landmarks = {
 		x = 110,
 		z = 0,
 		width = 40,
-		depth = 30,
+		depth = 40,
 		height = 16,
 	},
 	{
