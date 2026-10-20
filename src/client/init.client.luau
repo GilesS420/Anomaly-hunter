@@ -19,6 +19,7 @@ local CarryController = require(script.Controllers.CarryController)
 local PickupController = require(script.Controllers.PickupController)
 local MonsterLabelController = require(script.Controllers.MonsterLabelController)
 local SkyController = require(script.Controllers.SkyController)
+local AdminController = require(script.Controllers.AdminController)
 
 local controllers: { { start: () -> () } } = {
 	ToastController,
@@ -37,6 +38,7 @@ local controllers: { { start: () -> () } } = {
 	PickupController,
 	MonsterLabelController,
 	SkyController,
+	AdminController,
 }
 
 for _, controller in controllers do
