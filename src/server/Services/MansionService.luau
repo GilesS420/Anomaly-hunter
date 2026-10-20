@@ -653,6 +653,7 @@ function MansionService.addMonster(player: Player, caught: Value.CaughtMonster):
 		return nil
 	end
 	if place(player, data, caught) then
+		DataService.saveSoon(player)
 		return "Mansion"
 	end
 	if not Storage.hasRoom(#data.storage) then
@@ -663,6 +664,7 @@ function MansionService.addMonster(player: Player, caught: Value.CaughtMonster):
 	end
 	Storage.store(caught, os.time())
 	table.insert(data.storage, caught)
+	DataService.saveSoon(player)
 	return "Storage"
 end
 
@@ -691,6 +693,7 @@ function MansionService.move(player: Player, uid: string): (MoveResult, Value.Ca
 		local caught = table.remove(data.storage, stored) :: Value.CaughtMonster
 		Storage.unstore(caught, os.time())
 		place(player, data, caught)
+		DataService.saveSoon(player)
 		return "Ok", caught
 	end
 	if not indexOf(data.monsters, uid) then
@@ -706,6 +709,7 @@ function MansionService.move(player: Player, uid: string): (MoveResult, Value.Ca
 	end
 	Storage.store(caught, os.time())
 	table.insert(data.storage, caught)
+	DataService.saveSoon(player)
 	return "Ok", caught
 end
 
