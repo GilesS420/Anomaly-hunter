@@ -14,6 +14,7 @@
 --
 -- World pieces (built as grey placeholders if missing, never moved or changed if there):
 --   Workspace.Hub.WatcherMeter   a Part (or Model) in Watcher Square; the Watcher's eyes float above it
+--   Workspace.Hub.WatcherSign    a Part; a noticeboard explaining the Watcher is painted on both faces
 --   Workspace.Hub.Streetlights   a Folder; every light inside fails during Flicker
 -- Event monsters appear in Workspace.Hub.EventMonsters.
 --
@@ -71,9 +72,11 @@ local endsAt = 0 -- server time the live event ends
 local eyes = 0
 local lastId: string? = nil
 
--- Meter GUI pieces, set in buildMeter.
-local meterEyes: { Frame } = {}
-local meterText: TextLabel? = nil
+-- The meter's eyes and count line, set in buildMeter. The live event and its time left are
+-- shown on each player's screen instead (client/Controllers/EventIconController).
+type MeterEye = { white: Frame, iris: Frame, glow: UIStroke }
+local meterEyes: { MeterEye } = {}
+local meterCount: TextLabel? = nil
 
 local function driftRects(): { Roam.Rect }
 	local rects = {}
@@ -405,8 +408,10 @@ local function now(): number
 	return workspace:GetServerTimeNow()
 end
 
-local OpenEye = Color3.fromRGB(190, 110, 255)
-local ClosedEye = Color3.fromRGB(35, 28, 45)
+local EyeWhite = Color3.fromRGB(235, 225, 240)
+local ClosedEye = Color3.fromRGB(40, 32, 52)
+local Glow = Color3.fromRGB(190, 110, 255)
+local Lamp = Color3.fromRGB(255, 176, 84) -- the lantern orange of the shop titles
 
 local function publish()
 	local sky = if phase == "Live" then current elseif phase == "Warning" then upcoming else nil
@@ -417,20 +422,18 @@ local function publish()
 	workspace:SetAttribute("WatcherEyes", eyes)
 
 	for index, eye in meterEyes do
-		eye.BackgroundColor3 = if index <= eyes then OpenEye else ClosedEye
+		local open = index <= eyes
+		eye.white.BackgroundColor3 = if open then EyeWhite else ClosedEye
+		eye.iris.Visible = open
+		eye.glow.Color = if open then Glow else Color3.fromRGB(90, 75, 110)
+		eye.glow.Thickness = if open then 3 else 2
 	end
-	local text = meterText
-	if not text then
-		return
-	end
-	if phase == "Live" and current then
-		text.Text = `{string.upper(current.name)}! {Watcher.clock(endsAt - now())} left`
-	elseif phase == "Warning" then
-		text.Text = "Something stirs..."
-	elseif eyes >= Events.EyesToAwaken then
-		text.Text = "All eyes are open..."
-	else
-		text.Text = "The Watcher rests"
+	local count = meterCount
+	if count then
+		count.Text = if eyes >= Events.EyesToAwaken
+			then "All eyes are open... it awakens next!"
+			else `{eyes} of {Events.EyesToAwaken} eyes open`
+		count.TextColor3 = if eyes >= Events.EyesToAwaken then Glow else Color3.new(1, 1, 1)
 	end
 end
 
@@ -545,6 +548,30 @@ local function buildMeterPart(hub: Instance): BasePart
 	return pillar
 end
 
+local function text(parent: Instance, value: string, y: number, height: number, font: Enum.Font): TextLabel
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Position = UDim2.fromScale(0.05, y)
+	label.Size = UDim2.fromScale(0.9, height)
+	label.Font = font
+	label.Text = value
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.TextScaled = true
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 2
+	stroke.Parent = label
+	label.Parent = parent
+	return label
+end
+
+local function round(parent: Instance)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0.5, 0)
+	corner.Parent = parent
+end
+
+-- A dark panel floating over the meter: "The Watcher" in the spooky font, five eyes (one
+-- opens per event; all open means The Watcher Awakens is next) and how many are open.
 local function buildMeter(hub: Instance)
 	local part = World.part(World.find(hub, "WatcherMeter")) or buildMeterPart(hub)
 	local existing = part:FindFirstChild("HungerMeter") or part:FindFirstChild("EyeMeter")
@@ -556,71 +583,159 @@ local function buildMeter(hub: Instance)
 	billboard.Name = "EyeMeter"
 	billboard.Adornee = part
 	billboard.LightInfluence = 0
-	billboard.MaxDistance = 400
-	billboard.Size = UDim2.fromOffset(320, 96)
-	billboard.StudsOffset = Vector3.new(0, part.Size.Y / 2 + 7, 0)
+	billboard.MaxDistance = 300
+	billboard.Size = UDim2.fromScale(16, 8) -- studs, so it sits in the world like a sign
+	billboard.StudsOffset = Vector3.new(0, part.Size.Y / 2 + 6, 0)
 
-	local function label(text: string, y: number, height: number, bold: boolean): TextLabel
-		local textLabel = Instance.new("TextLabel")
-		textLabel.BackgroundTransparency = 1
-		textLabel.Position = UDim2.fromScale(0, y)
-		textLabel.Size = UDim2.fromScale(1, height)
-		textLabel.Font = if bold then Enum.Font.GothamBlack else Enum.Font.GothamBold
-		textLabel.Text = text
-		textLabel.TextColor3 = Color3.new(1, 1, 1)
-		textLabel.TextScaled = true
-		local stroke = Instance.new("UIStroke")
-		stroke.Thickness = 1.5
-		stroke.Parent = textLabel
-		textLabel.Parent = billboard
-		return textLabel
-	end
-	label("THE WATCHER", 0, 0.3, true)
+	local panel = Instance.new("Frame")
+	panel.Name = "Panel"
+	panel.Size = UDim2.fromScale(1, 1)
+	panel.BackgroundColor3 = Color3.fromRGB(18, 14, 26)
+	panel.BackgroundTransparency = 0.15
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0.12, 0)
+	corner.Parent = panel
+	local rim = Instance.new("UIStroke")
+	rim.Color = Color3.fromRGB(96, 74, 140)
+	rim.Thickness = 3
+	rim.Parent = panel
+	panel.Parent = billboard
 
-	-- One eye per event; all open means The Watcher Awakens is next.
+	local title = text(panel, "The Watcher", 0.04, 0.32, Enum.Font.Creepster)
+	title.TextColor3 = Lamp
+
 	local row = Instance.new("Frame")
 	row.Name = "Eyes"
-	row.Position = UDim2.fromScale(0.15, 0.35)
-	row.Size = UDim2.fromScale(0.7, 0.28)
+	row.Position = UDim2.fromScale(0.05, 0.4)
+	row.Size = UDim2.fromScale(0.9, 0.3)
 	row.BackgroundTransparency = 1
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	layout.VerticalAlignment = Enum.VerticalAlignment.Center
-	layout.Padding = UDim.new(0, 8)
+	layout.Padding = UDim.new(0.03, 0)
 	layout.Parent = row
 	table.clear(meterEyes)
 	for index = 1, Events.EyesToAwaken do
-		local eye = Instance.new("Frame")
-		eye.Name = `Eye{index}`
-		eye.LayoutOrder = index
-		eye.Size = UDim2.fromScale(0.16, 1)
-		eye.SizeConstraint = Enum.SizeConstraint.RelativeYY
-		eye.BackgroundColor3 = ClosedEye
-		eye.BorderSizePixel = 0
-		local round = Instance.new("UICorner")
-		round.CornerRadius = UDim.new(0.5, 0)
-		round.Parent = eye
-		local outline = Instance.new("UIStroke")
-		outline.Color = Color3.fromRGB(200, 180, 230)
-		outline.Thickness = 2
-		outline.Parent = eye
+		-- An almond: a wide oval white with a purple iris and a slit pupil.
+		local white = Instance.new("Frame")
+		white.Name = `Eye{index}`
+		white.LayoutOrder = index
+		white.Size = UDim2.fromScale(0.16, 1)
+		white.BackgroundColor3 = ClosedEye
+		white.BorderSizePixel = 0
+		local shape = Instance.new("UIAspectRatioConstraint")
+		shape.AspectRatio = 1.7
+		shape.Parent = white
+		round(white)
+		local glow = Instance.new("UIStroke")
+		glow.Parent = white
+		local iris = Instance.new("Frame")
+		iris.Name = "Iris"
+		iris.AnchorPoint = Vector2.new(0.5, 0.5)
+		iris.Position = UDim2.fromScale(0.5, 0.5)
+		iris.Size = UDim2.fromScale(0.9, 0.9)
+		iris.SizeConstraint = Enum.SizeConstraint.RelativeYY
+		iris.BackgroundColor3 = Glow
+		iris.BorderSizePixel = 0
+		iris.Visible = false
+		round(iris)
 		local pupil = Instance.new("Frame")
 		pupil.Name = "Pupil"
 		pupil.AnchorPoint = Vector2.new(0.5, 0.5)
 		pupil.Position = UDim2.fromScale(0.5, 0.5)
-		pupil.Size = UDim2.fromScale(0.35, 0.35)
-		pupil.BackgroundColor3 = Color3.fromRGB(15, 10, 20)
+		pupil.Size = UDim2.fromScale(0.28, 0.8)
+		pupil.BackgroundColor3 = Color3.fromRGB(10, 6, 14)
 		pupil.BorderSizePixel = 0
-		round:Clone().Parent = pupil
-		pupil.Parent = eye
-		eye.Parent = row
-		table.insert(meterEyes, eye)
+		round(pupil)
+		pupil.Parent = iris
+		iris.Parent = white
+		white.Parent = row
+		table.insert(meterEyes, { white = white, iris = iris, glow = glow })
 	end
-	row.Parent = billboard
+	row.Parent = panel
 
-	meterText = label("", 0.68, 0.3, false)
+	meterCount = text(panel, "", 0.75, 0.2, Enum.Font.GothamBold)
 	billboard.Parent = part
+end
+
+-- What the Watcher is, written on a noticeboard in Watcher Square (both sides). Built at
+-- Hub.WatcherSign if it's missing; move it anywhere in Studio and it stays put.
+local SignText = {
+	"Every 5 to 10 minutes the Watcher stirs and an event takes over the whole server.",
+	"The sky changes, with a 30 second warning first.",
+	"Monsters in your mansion can catch the event's special effect.",
+	"The shops and the Collector get boosts, and some events bring a limited Bakery treat.",
+	"Each event opens one eye. When all 5 are open, The Watcher Awakens!",
+	"Hover over the icon above your hotbar to see how long an event has left.",
+}
+
+local function paintSign(board: BasePart, face: Enum.NormalId)
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = `Info{face.Name}`
+	gui.Face = face
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 50
+	gui.LightInfluence = 0.3
+	local title = Instance.new("TextLabel")
+	title.BackgroundTransparency = 1
+	title.Position = UDim2.fromScale(0.05, 0.03)
+	title.Size = UDim2.fromScale(0.9, 0.17)
+	title.Font = Enum.Font.Creepster
+	title.Text = "The Watcher"
+	title.TextColor3 = Lamp
+	title.TextScaled = true
+	title.Parent = gui
+	local body = Instance.new("TextLabel")
+	body.BackgroundTransparency = 1
+	body.Position = UDim2.fromScale(0.07, 0.22)
+	body.Size = UDim2.fromScale(0.86, 0.74)
+	body.Font = Enum.Font.GothamMedium
+	body.Text = "• " .. table.concat(SignText, "\n• ")
+	body.TextColor3 = Color3.fromRGB(235, 225, 240)
+	body.TextScaled = true
+	body.TextWrapped = true
+	body.TextXAlignment = Enum.TextXAlignment.Left
+	body.TextYAlignment = Enum.TextYAlignment.Top
+	body.LineHeight = 1.15
+	body.Parent = gui
+	gui.Parent = board
+end
+
+local function buildSign(hub: Instance)
+	local board = World.part(World.find(hub, "WatcherSign"))
+	if not board then
+		-- On the edge of the eye in the stones, in front of the meter, with two posts.
+		local base = CFrame.new(0, GroundTop + 1, -12)
+		local sign = block(
+			"WatcherSign",
+			Vector3.new(10, 6, 0.4),
+			base * CFrame.new(0, 4.5, 0),
+			Color3.fromRGB(30, 22, 38),
+			Enum.Material.WoodPlanks
+		)
+		for _, x in { -4.6, 4.6 } do
+			local post = block(
+				"Post",
+				Vector3.new(0.6, 7.5, 0.6),
+				base * CFrame.new(x, 3.75, 0),
+				Color3.fromRGB(40, 36, 46),
+				Enum.Material.Metal
+			)
+			post.Parent = sign
+		end
+		sign.Parent = hub
+		print("WatcherService: built Hub.WatcherSign")
+		board = sign
+	end
+	local found = board :: BasePart
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local old = found:FindFirstChild(`Info{face.Name}`)
+		if old then
+			old:Destroy()
+		end
+		paintSign(found, face)
+	end
 end
 
 ------------------------------------------------------------------------------------------
@@ -675,6 +790,7 @@ function WatcherService.start()
 	local hub = hubFolder()
 	findLamps(hub)
 	buildMeter(hub)
+	buildSign(hub)
 	nextAt = now() + Watcher.gap(random)
 	publish()
 
