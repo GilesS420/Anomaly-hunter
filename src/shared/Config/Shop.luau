@@ -18,6 +18,7 @@ export type Item = {
 	maxRarity: string?, -- Bait Bell: the rarest rarity it can bring
 	-- Bakery chance cakes: tried in order, the first that hits (and fits) is the effect.
 	effectChances: { EffectChance }?,
+	event: string?, -- Bakery event treat: only sold while this Watcher event is live
 }
 export type EffectChance = { effect: string, chance: number } -- chance in percent
 
@@ -36,7 +37,8 @@ Shop.ConfirmSellFrom = "Legendary"
 -- a bite; a bite may give the cake's effect (a monster can't get an effect twice, and holds at
 -- most Effects.MaxSlots). Chance cakes (effectChances) may give one of several effects.
 -- Prices are x100 like the monsters so they keep the same size relative to what a monster
--- sells for.
+-- sells for. Event treats (`event`) are only in stock while their Watcher event is live, so
+-- an event's effect can be had after it's over.
 Shop.Bakery = {
 	{
 		id = "PumpkinCandy",
@@ -55,12 +57,39 @@ Shop.Bakery = {
 		effectChances = { { effect = "Vampire", chance = 35 } },
 	},
 	{
+		id = "StaticCupcake",
+		name = "Static Cupcake",
+		kind = "Food",
+		price = 2_000_000,
+		restockChance = 100,
+		grantsEffect = "Poltergeist",
+		event = "Flicker",
+	},
+	{
 		id = "EctoplasmPie",
 		name = "Ectoplasm Pie",
 		kind = "Food",
 		price = 2_500_000,
 		restockChance = 30,
 		grantsEffect = "Slimed",
+	},
+	{
+		id = "FrostTart",
+		name = "Frost Tart",
+		kind = "Food",
+		price = 8_000_000,
+		restockChance = 100,
+		grantsEffect = "Frostbitten",
+		event = "FrostFog",
+	},
+	{
+		id = "GildedTruffle",
+		name = "Gilded Truffle",
+		kind = "Food",
+		price = 25_000_000,
+		restockChance = 100,
+		grantsEffect = "Gilded",
+		event = "GoldRush",
 	},
 	{
 		id = "StitchCupcake",
@@ -77,6 +106,15 @@ Shop.Bakery = {
 		price = 250_000_000,
 		restockChance = 2,
 		grantsEffect = "Cursed",
+	},
+	{
+		id = "BloodMoonPie",
+		name = "Blood Moon Pie",
+		kind = "Food",
+		price = 300_000_000,
+		restockChance = 100,
+		grantsEffect = "Bloodmoon",
+		event = "BloodMoon",
 	},
 	{
 		id = "BoneMarrowMousse",

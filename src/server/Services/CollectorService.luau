@@ -12,6 +12,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Care = require(ReplicatedStorage.Shared.Util.Care)
+local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Rarities = require(ReplicatedStorage.Shared.Config.Rarities)
@@ -56,9 +57,16 @@ Sell.Parent = remotes
 
 local confirmOrder = Rarities[Shop.ConfirmSellFrom].order
 
+-- What the Collector pays: the sell value, raised while a Watcher event with a
+-- sellMultiplier is live (Gold Rush).
 local function price(caught: Value.CaughtMonster, wingsOwned: number): number
 	local ok, value = pcall(Value.sellValue, caught, wingsOwned)
-	return if ok then value else 0 -- an unknown monster or effect sells for nothing (and isn't listed)
+	if not ok then
+		return 0 -- an unknown monster or effect sells for nothing (and isn't listed)
+	end
+	local event = Events.find(workspace:GetAttribute("WatcherEvent"))
+	local multiplier = if event then event.sellMultiplier or 1 else 1
+	return math.floor(value * multiplier)
 end
 
 -- Every monster that can be sold: unlocked, in the mansion or in Storage. Mansion monsters

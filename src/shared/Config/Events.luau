@@ -43,6 +43,9 @@ export type WatcherEvent = {
 	monsters: { [string]: number }?, -- event monster id -> spawn weight (optional bonus to catch)
 	effectOddsMultiplier: number?, -- mansion effect odds while live (Blood Moon doubles them)
 	growthMultiplier: number?, -- extra growth spurt rolls while live (Config/Weight.EventSpurtChance)
+	cakeBiteMultiplier: number?, -- cakes set out in mansions roll for bites this much more often
+	bakeryStockMultiplier: number?, -- Bakery restock chances while live (an item in stock stays in)
+	sellMultiplier: number?, -- the Collector pays this much more while live
 	sky: Sky?,
 	warning: string?, -- toast everyone sees when the warning starts
 	announce: string?, -- toast everyone sees when it starts
@@ -100,7 +103,7 @@ Events.List = {
 			sparkles = { 210, 240, 255 },
 		},
 		warning = "The air turns icy cold...",
-		announce = "Frost Fog rolls in! An icy aurora lights up the sky.",
+		announce = "Frost Fog rolls in! Monsters can freeze over, and the Bakery sells Frost Tarts.",
 	},
 	{
 		id = "SugarRush",
@@ -111,6 +114,8 @@ Events.List = {
 		effectChance = 6,
 		durationSeconds = 180,
 		growthMultiplier = 2,
+		cakeBiteMultiplier = 2,
+		bakeryStockMultiplier = 3,
 		sky = {
 			ambient = { 70, 115, 65 },
 			outdoorAmbient = { 105, 170, 90 },
@@ -120,7 +125,7 @@ Events.List = {
 			sparkles = { 230, 255, 160 },
 		},
 		warning = "Something sweet is in the air...",
-		announce = "Sugar Rush! A green sugar sky, and monsters grow faster.",
+		announce = "Sugar Rush! Cakes get eaten twice as fast, monsters grow and the Bakery is packed.",
 	},
 	{
 		id = "GoldRush",
@@ -130,6 +135,7 @@ Events.List = {
 		effect = "Gilded",
 		effectChance = 4,
 		durationSeconds = 180,
+		sellMultiplier = 1.25,
 		sky = {
 			ambient = { 130, 95, 50 },
 			outdoorAmbient = { 200, 145, 70 },
@@ -140,7 +146,7 @@ Events.List = {
 			sparkles = { 255, 215, 110 },
 		},
 		warning = "Coins jingle somewhere in the dark...",
-		announce = "Gold Rush! A golden sky and a coin moon.",
+		announce = "Gold Rush! The Collector pays 25% more and the Bakery sells Gilded Truffles.",
 	},
 	{
 		id = "Flicker",
@@ -161,7 +167,7 @@ Events.List = {
 			flashes = true,
 		},
 		warning = "The streetlights buzz and dim...",
-		announce = "Flicker! The lights are failing and Phantoms drift between the mansions.",
+		announce = "Flicker! The lights are failing, Phantoms drift between the mansions and the Bakery sells Static Cupcakes.",
 	},
 	{
 		id = "BloodMoon",
@@ -182,7 +188,7 @@ Events.List = {
 			moon = { color = { 255, 70, 55 }, size = 44 },
 		},
 		warning = "The moon is turning red...",
-		announce = "A Blood Moon rises! Haunted effects are twice as likely, monsters grow and Phantoms roam.",
+		announce = "A Blood Moon rises! Haunted effects are twice as likely, monsters grow, Phantoms roam and the Bakery sells Blood Moon Pies.",
 	},
 	{ id = "MimicNight", name = "Mimic Night", launch = false, effect = "Mimic" },
 	{ id = "BreachStorm", name = "Breach Storm", launch = false },
