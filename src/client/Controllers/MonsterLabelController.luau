@@ -1,6 +1,8 @@
 --!strict
 -- Monster info (price, name, details, familiarity) shows as a small card right next to the
--- mouse while you point at a monster, or where you tapped on a phone (for a few seconds).
+-- mouse while you point at a monster. On phones and tablets (no mouse) it shows for the
+-- monster you're looking at (the middle of the screen), just above it, or for a few seconds
+-- for one you tapped.
 -- The labels MonsterModel builds over each monster stay hidden; the card copies their text.
 --
 -- A monster is found by its press orb (Body) first. Big monsters (Titans) are drawn much
@@ -207,6 +209,25 @@ function MonsterLabelController.start()
 				current = monsterAt(at)
 			end
 			model = current
+		else
+			-- what you're looking at: the middle of the screen
+			local camera = workspace.CurrentCamera
+			frameCount += 1
+			if frameCount % 2 == 0 or (current and not current.Parent) then
+				current = monsterAt(camera.ViewportSize / 2)
+			end
+			model = current
+			if model then
+				-- just above the monster, centred on it
+				local frame, size = model:GetBoundingBox()
+				local top, onScreen =
+					camera:WorldToViewportPoint(frame.Position + Vector3.new(0, size.Y / 2, 0))
+				if onScreen then
+					at = Vector2.new(top.X - card.AbsoluteSize.X / 2 - 18, top.Y - card.AbsoluteSize.Y - 24)
+				else
+					model = nil
+				end
+			end
 		end
 		local label = if model then labelOf(model) else nil
 		if label then
@@ -214,8 +235,8 @@ function MonsterLabelController.start()
 			local view = workspace.CurrentCamera.ViewportSize
 			local size = card.AbsoluteSize
 			-- beside the pointer, kept on screen
-			local x = math.min(at.X + 18, view.X - size.X - 4)
-			local y = math.min(at.Y + 18, view.Y - size.Y - 4)
+			local x = math.clamp(at.X + 18, 4, math.max(4, view.X - size.X - 4))
+			local y = math.clamp(at.Y + 18, 4, math.max(4, view.Y - size.Y - 4))
 			card.Position = UDim2.fromOffset(x, y)
 			card.Visible = true
 		elseif card.Visible then
