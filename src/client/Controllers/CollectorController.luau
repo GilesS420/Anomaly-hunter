@@ -32,28 +32,23 @@ type Row = {
 type Offer = { monsters: { Row }, total: number }
 
 local small = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-local Height = if small then 88 else 104
+local Height = if small then 96 else 112
 local SellWidth = if small then 84 else 120
 
 -- One monster: picture, name, kind, price and weight, its effects in a box, and Sell.
 local function card(list: ScrollingFrame, order: number, monster: Row, sell: () -> ())
-	local inner = Height - 16
+	local inner = Height - 2 * ShopCards.Padding
 	local row = Instance.new("Frame")
 	row.LayoutOrder = order
-	row.Size = UDim2.new(1, -8, 0, Height)
+	row.Size = UDim2.new(1, 0, 0, Height)
 	row.BackgroundColor3 = Ui.Colors.row
 	row.Parent = list
 	Ui.corner(row, 10)
 	Ui.rim(row, Color3.fromRGB(58, 48, 78), 1)
-	local padding = Instance.new("UIPadding")
-	padding.PaddingLeft = UDim.new(0, 8)
-	padding.PaddingRight = UDim.new(0, 10)
-	padding.PaddingTop = UDim.new(0, 8)
-	padding.PaddingBottom = UDim.new(0, 8)
-	padding.Parent = row
+	ShopCards.pad(row)
 
 	ShopCards.pictureBox(row, inner, monster.color, monster.look)
-	local left = inner + 12
+	local left = inner + 16
 
 	local middle = Instance.new("Frame")
 	middle.BackgroundTransparency = 1
@@ -73,7 +68,7 @@ local function card(list: ScrollingFrame, order: number, monster: Row, sell: () 
 	local effects = Instance.new("Frame")
 	effects.BackgroundTransparency = 1
 	effects.Position = UDim2.fromScale(0.5, 0)
-	effects.Size = UDim2.new(0.5, -SellWidth - 10, 1, 0)
+	effects.Size = UDim2.new(0.5, -SellWidth - 16, 1, 0)
 	effects.Parent = row
 	Ui.text(effects, "Effects:", UDim2.new(1, 0, 0, 18), Ui.Colors.muted, true, 15)
 	local box = Instance.new("Frame")
@@ -84,9 +79,10 @@ local function card(list: ScrollingFrame, order: number, monster: Row, sell: () 
 	Ui.corner(box, 6)
 	Ui.rim(box, Color3.fromRGB(58, 48, 78), 1)
 	local boxPadding = Instance.new("UIPadding")
-	boxPadding.PaddingLeft = UDim.new(0, 6)
-	boxPadding.PaddingRight = UDim.new(0, 6)
-	boxPadding.PaddingTop = UDim.new(0, 4)
+	boxPadding.PaddingLeft = UDim.new(0, 8)
+	boxPadding.PaddingRight = UDim.new(0, 8)
+	boxPadding.PaddingTop = UDim.new(0, 6)
+	boxPadding.PaddingBottom = UDim.new(0, 6)
 	boxPadding.Parent = box
 	local none = #monster.effects == 0
 	local names = if none then "None" else table.concat(monster.effects, ", ")
@@ -118,7 +114,7 @@ function CollectorController.start()
 	local Sell = remotes:WaitForChild("Sell") :: RemoteFunction
 
 	local window = Ui.window("CollectorUi", "The Collector")
-	ShopCards.widen(window)
+	ShopCards.prepare(window, true)
 	local selling = false
 	local render: (offer: Offer?) -> ()
 

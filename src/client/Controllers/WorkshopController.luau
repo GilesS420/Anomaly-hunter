@@ -45,7 +45,7 @@ function WorkshopController.start()
 	local Equip = remotes:WaitForChild("Equip") :: RemoteFunction
 
 	local window = Ui.window("WorkshopUi", "Hunter's Workshop")
-	ShopCards.widen(window)
+	ShopCards.prepare(window, false)
 	local restockAt = 0 -- os.clock() when the stock changes
 	local money = 0
 	local waiting = false -- a request is on its way; ignore more taps until it answers

@@ -41,7 +41,7 @@ function BakeryController.start()
 	local Buy = remotes:WaitForChild("Buy") :: RemoteFunction
 
 	local window = Ui.window("BakeryUi", "Haunted Bakery")
-	ShopCards.widen(window)
+	ShopCards.prepare(window, false)
 	local restockAt = 0 -- os.clock() when the stock changes
 	local money = 0
 	local waiting = false -- a request is on its way; ignore more taps until it answers
@@ -97,7 +97,8 @@ function BakeryController.start()
 				look = treat.look,
 				rarity = treat.rarity,
 				rarityColor = treat.rarityColor,
-				effect = treat.description,
+				-- "Each bite" on its own line, under the reach.
+				effect = (string.gsub(treat.description, " · Each bite: ", "\nEach bite: ")),
 				stock = stock,
 				stockColor = stockColor,
 				price = treat.price,
