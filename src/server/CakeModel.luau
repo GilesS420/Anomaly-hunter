@@ -304,7 +304,7 @@ function CakeModel.tool(itemId: string, name: string): Tool
 	tool.RequiresHandle = true
 	tool.ToolTip = "Click in your mansion to set it out"
 	tool:SetAttribute("CakeId", itemId)
-	local model = CakeModel.build(itemId, 0.45)
+	local model = CakeModel.build(itemId, 0.38)
 	local handle = model.PrimaryPart :: BasePart
 	handle.Name = "Handle"
 	for _, child in model:GetChildren() do
@@ -321,9 +321,9 @@ function CakeModel.tool(itemId: string, name: string): Tool
 		child.Parent = tool
 	end
 	model:Destroy()
-	-- Held upright on the palm, like a tray. While a tool is held the arm points forward, so
-	-- the hand's -Z is up and its -Y is forward: turn the cake's up (+Y) to the hand's -Z.
-	tool.Grip = (CFrame.new(0, -0.4, -0.15) * CFrame.Angles(math.rad(-90), 0, 0)):Inverse()
+	-- Held upright on the palm, like a tray. A grip with no turn keeps the Handle upright (its
+	-- -Z forward), so the grip only moves the cake a little down and out from the hand.
+	tool.Grip = CFrame.new(0, 0.25, 0.7)
 	return tool
 end
 
