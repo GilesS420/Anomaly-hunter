@@ -10,6 +10,8 @@
 --   /haunt            every fed monster in your mansion picks up a roaming effect right now
 --   /skip 12          your monsters live 12 hours ahead: they grow Familiarity, and get
 --                     hungry after a day (/skip 25 makes them all hungry)
+--   /grow 100         your mansion monsters gain 100 hours of weight right now (sizes go up;
+--                     /grow 500 turns most of them into Titans)
 --   /calm             zone monsters leave you alone (type it again to let them attack)
 --   /attack           the closest monster in your zone attacks you right now
 --   /spawn Gravepup   brings that monster to you in the zone you're in (any monster, any zone;
@@ -167,6 +169,22 @@ commands["/skip"] = function(player, argument)
 	end
 	CareService.refresh(player)
 	Notify.toast(player, `Your monsters skipped {hours} hours ahead.`)
+end
+
+commands["/grow"] = function(player, argument)
+	local hours = tonumber(argument)
+	local data = DataService.get(player)
+	if not hours or hours <= 0 or not data then
+		Notify.toast(player, "Try: /grow 100 (hours of weight; /grow 500 makes Titans)")
+		return
+	end
+	-- Moving the weight clock back is the same as that much time passing.
+	local seconds = math.floor(hours * 3600)
+	for _, caught in data.monsters do
+		caught.kgAt = (caught.kgAt or os.time()) - seconds
+	end
+	MansionService.grow(player)
+	Notify.toast(player, `Your monsters gained {hours} hours of weight.`)
 end
 
 commands["/calm"] = function(player)
