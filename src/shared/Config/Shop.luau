@@ -16,8 +16,7 @@ export type Item = {
 	grantsEffect: string?,
 	singleUse: boolean?,
 	maxRarity: string?, -- Bait Bell: the rarest rarity it can bring
-	familiarity: number?, -- Bakery treats: how much of the Familiarity bar it fills (0 to 1)
-	-- Bakery chance treats: tried in order, the first that hits (and fits) is the effect.
+	-- Bakery chance cakes: tried in order, the first that hits (and fits) is the effect.
 	effectChances: { EffectChance }?,
 }
 export type EffectChance = { effect: string, chance: number } -- chance in percent
@@ -33,13 +32,11 @@ Shop.ConsumablesPerRestock = 3
 -- Selling a monster of this rarity or rarer at the Collector asks "are you sure?" first.
 Shop.ConfirmSellFrom = "Legendary"
 
--- Haunted Bakery treats. Each one feeds one monster, fills part of its Familiarity bar and
--- gives it the treat's effect (a monster can't get an effect twice, and holds at most
--- Effects.MaxSlots), so treats are for your best monsters. Chance treats (effectChances)
--- may give one of several effects, or none. Any treat can also be set out in the mansion
--- as a cake that several monsters nibble (Config/Care.Cake*, server/Services/CakeService). Prices are x100 like the monsters
--- so they keep the same size relative to what a monster sells for. Everyday feeding is free
--- (Feed all), see Config/Care.
+-- Haunted Bakery cakes. You set one out in your mansion (Config/Cakes) and monsters come for
+-- a bite; a bite may give the cake's effect (a monster can't get an effect twice, and holds at
+-- most Effects.MaxSlots). Chance cakes (effectChances) may give one of several effects.
+-- Prices are x100 like the monsters so they keep the same size relative to what a monster
+-- sells for. Feeding is free (Feed all), see Config/Care.
 Shop.Bakery = {
 	{
 		id = "PumpkinCandy",
@@ -48,7 +45,6 @@ Shop.Bakery = {
 		price = 50_000,
 		restockChance = 80,
 		grantsEffect = "PumpkinHead",
-		familiarity = 0.1,
 	},
 	{
 		id = "FangFudge",
@@ -57,7 +53,6 @@ Shop.Bakery = {
 		price = 800_000,
 		restockChance = 45,
 		effectChances = { { effect = "Vampire", chance = 35 } },
-		familiarity = 0.15,
 	},
 	{
 		id = "EctoplasmPie",
@@ -66,7 +61,6 @@ Shop.Bakery = {
 		price = 2_500_000,
 		restockChance = 30,
 		grantsEffect = "Slimed",
-		familiarity = 0.25,
 	},
 	{
 		id = "StitchCupcake",
@@ -75,7 +69,6 @@ Shop.Bakery = {
 		price = 30_000_000,
 		restockChance = 10,
 		grantsEffect = "Stitched",
-		familiarity = 0.3,
 	},
 	{
 		id = "CursedCake",
@@ -84,7 +77,6 @@ Shop.Bakery = {
 		price = 250_000_000,
 		restockChance = 2,
 		grantsEffect = "Cursed",
-		familiarity = 0.5,
 	},
 	{
 		id = "BoneMarrowMousse",
@@ -93,7 +85,6 @@ Shop.Bakery = {
 		price = 400_000_000,
 		restockChance = 3,
 		effectChances = { { effect = "Mummy", chance = 25 }, { effect = "Batty", chance = 100 } },
-		familiarity = 0.4,
 	},
 	{
 		id = "WitchsBrewTart",
@@ -102,7 +93,6 @@ Shop.Bakery = {
 		price = 2_000_000_000,
 		restockChance = 0.8,
 		grantsEffect = "Hexed",
-		familiarity = 0.6,
 	},
 	{
 		id = "EclipseEclair",
@@ -111,7 +101,6 @@ Shop.Bakery = {
 		price = 15_000_000_000,
 		restockChance = 0.2,
 		grantsEffect = "Eclipsed",
-		familiarity = 0.75,
 	},
 } :: { Item }
 

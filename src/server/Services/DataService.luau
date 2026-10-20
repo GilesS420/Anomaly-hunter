@@ -8,6 +8,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local ProfileStore = require(script.Parent.Parent.Vendor.ProfileStore)
 
@@ -20,6 +21,7 @@ export type Data = {
 	storage: { Value.CaughtMonster }, -- monsters that didn't fit, paused (Util/Storage)
 	vault: { Value.CaughtMonster }, -- up to 3 monsters that can never be stolen
 	inventory: { [string]: number }, -- shop items by id -> how many
+	cakes: { Cakes.Placed }, -- cakes standing in the mansion (they keep going offline)
 	equipped: { vacuum: string }, -- older saves also have flashlight/lens (cleared on load)
 	codex: { [string]: any }, -- discovered monsters, effects and combo recipes
 	shop: { slot: number, bought: { [string]: number } }, -- Workshop buys since the last restock
@@ -36,6 +38,7 @@ DataService.Template = {
 	storage = {},
 	vault = {},
 	inventory = {},
+	cakes = {},
 	equipped = { -- item ids in use; the starter vacuum is free
 		vacuum = "DustBuster",
 	},

@@ -1,7 +1,7 @@
 --!strict
--- The Haunted Bakery window. Opens when you use the prompt at the Bakery. Lists the treats
--- for sale with what each one does, its price and a Buy button. Bought treats go into your
--- Backpack, where you give them to a monster (InventoryController).
+-- The Haunted Bakery window. Opens when you use the prompt at the Bakery. Lists the cakes
+-- for sale with what each bite can do, its price and a Buy button. Bought cakes go into your
+-- Roblox hotbar, where you hold one in your mansion and click to set it out (CakeService).
 -- Feed all at the bottom feeds every monster for free. The stock changes together with the
 -- Workshop's and a countdown shows when. The server checks everything
 -- (server/Services/BakeryService and CareService).

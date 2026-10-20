@@ -18,6 +18,8 @@ local Shop = require("../src/shared/Config/Shop")
 local Workshop = require("../src/shared/Util/Workshop")
 local Care = require("../src/shared/Util/Care")
 local CareConfig = require("../src/shared/Config/Care")
+local CakeConfig = require("../src/shared/Config/Cakes")
+local Cakes = require("../src/shared/Util/Cakes")
 local Effects = require("../src/shared/Config/Effects")
 local Haunting = require("../src/shared/Util/Haunting")
 local AttackConfig = require("../src/shared/Config/Attacks")
@@ -722,115 +724,189 @@ do
 
 	check("percent rounds down cleanly", Care.percent({ familiarity = 0.29 } :: any) == 29)
 
-	-- Treats: refused rather than wasted, and combos free up a slot.
-	local candy = Care.treat("PumpkinCandy") :: Shop.Item
-	local cake = Care.treat("CursedCake") :: Shop.Item
+	-- Cakes (Util/Cakes): a bite only goes to a monster its effect can land on, if there is one.
+	local candy = Cakes.item("PumpkinCandy") :: Shop.Item
+	local cursed = Cakes.item("CursedCake") :: Shop.Item
 	local function withEffects(effects: { string }): any
 		return { monsterId = "Gravepup", size = "Normal", effects = effects, familiarity = 0.95, fed = false }
 	end
-	check("an unknown treat is refused", Care.canTreat(withEffects({}), Care.treat("VoidVac")) == "Unknown")
-	check("a treat isn't given twice", Care.canTreat(withEffects({ "PumpkinHead" }), candy) == "HasEffect")
+	check("an unknown cake doesn't fit", Cakes.fits(withEffects({}), Cakes.item("VoidVac")) == "Unknown")
 	check(
-		"a treat doesn't fit a monster with 3 effects",
-		Care.canTreat(withEffects({ "Ghost", "Mummy", "Possessed" }), candy) == "NoRoom"
+		"a cake's effect doesn't land twice",
+		Cakes.fits(withEffects({ "PumpkinHead" }), candy) == "HasEffect"
+	)
+	check(
+		"a cake's effect doesn't fit a monster with 3 effects",
+		Cakes.fits(withEffects({ "Ghost", "Mummy", "Possessed" }), candy) == "NoRoom"
 	)
 	check(
 		"a combo counts as one effect",
-		Care.canTreat(withEffects({ "Vampire", "Batty", "Ghost" }), candy) == "Ok"
+		Cakes.fits(withEffects({ "Vampire", "Batty", "Ghost" }), candy) == "Ok"
 	)
 	check(
-		"a treat that completes a combo fits",
-		Care.canTreat(withEffects({ "Ghost", "Vampire", "Possessed" }), cake) == "Ok"
-	)
-	local treated = withEffects({ "Ghost" })
-	Care.giveTreat(treated, candy, t0, fakeRandom(1))
-	check(
-		"a treat feeds, adds its effect and Familiarity (capped)",
-		treated.fed
-			and treated.fedUntil == t0 + fed
-			and treated.familiarity == 1
-			and treated.effects[2] == "PumpkinHead"
+		"an effect that completes a combo fits",
+		Cakes.fits(withEffects({ "Ghost", "Vampire", "Possessed" }), cursed) == "Ok"
 	)
 
-	local treatsOk = true
+	local cakesOk = true
 	for _, item in Shop.Bakery do
-		local chances = Care.effectChances(item)
-		treatsOk = treatsOk
+		local chances = Cakes.effectChances(item)
+		cakesOk = cakesOk
 			and item.kind == "Food"
-			and (item.familiarity or 0) > 0
-			and (item.familiarity or 0) <= 1
 			and #chances > 0
-			and Care.describe(item) ~= ""
-			and Care.treat(item.id) == item
+			and Cakes.describe(item) ~= ""
+			and Cakes.item(item.id) == item
+			and CakeConfig.Looks[item.id] ~= nil
 		for _, option in chances do
-			treatsOk = treatsOk
+			cakesOk = cakesOk
 				and Effects.List[option.effect] ~= nil
 				and option.chance > 0
 				and option.chance <= 100
 		end
 	end
-	check("every treat is food with Familiarity and a real effect", treatsOk)
+	check("every cake has a look and real effects", cakesOk)
 
 	local foodEffectsOk = true
 	for id, effect in Effects.List do
 		if effect.source == "Food" then
-			local from = Care.treat(effect.from or "")
+			local from = Cakes.item(effect.from or "")
 			foodEffectsOk = foodEffectsOk and from ~= nil and from.grantsEffect == id
 		end
 	end
-	check("every Food effect comes from the Bakery treat it names", foodEffectsOk)
+	check("every Food effect comes from the Bakery cake it names", foodEffectsOk)
 
-	-- Chance treats and cakes that are set out.
-	local fudge = Care.treat("FangFudge") :: Shop.Item
-	local mousse = Care.treat("BoneMarrowMousse") :: Shop.Item
+	local fudge = Cakes.item("FangFudge") :: Shop.Item
+	local mousse = Cakes.item("BoneMarrowMousse") :: Shop.Item
+	local lucky = {
+		NextNumber = function()
+			return 0
+		end,
+		NextInteger = function(_, min: number)
+			return min
+		end,
+	} :: any
 	check(
-		"a chance treat is fine while one of its effects fits",
-		Care.canTreat(withEffects({ "Mummy" }), mousse) == "Ok"
+		"a chance cake fits while one of its effects does",
+		Cakes.fits(withEffects({ "Mummy" }), mousse) == "Ok"
 	)
 	check(
-		"a chance treat is refused when none of its effects can land",
-		Care.canTreat(withEffects({ "Vampire" }), fudge) == "HasEffect"
+		"a chance cake doesn't fit when none of its effects can land",
+		Cakes.fits(withEffects({ "Vampire" }), fudge) == "HasEffect"
 	)
 	check(
 		"the mousse gives Batty when Mummy can't land",
-		Care.pickEffect(withEffects({ "Mummy" }), mousse, fakeRandom(1)) == "Batty"
+		Cakes.pickEffect(withEffects({ "Mummy" }), mousse, lucky) == "Batty"
 	)
 	math.randomseed(7)
 	local fake = {
 		NextNumber = function()
 			return math.random()
 		end,
+		NextInteger = function(_, min: number, max: number)
+			return math.random(min, max)
+		end,
 	} :: any
-	local tries, vampires, bites, biteEffects = 4000, 0, 0, 0
+	local tries, candyHits, vampires = 4000, 0, 0
 	for _ = 1, tries do
-		if Care.pickEffect(withEffects({}), fudge, fake) == "Vampire" then
+		if Cakes.pickEffect(withEffects({}), candy, fake) then
+			candyHits += 1
+		end
+		if Cakes.pickEffect(withEffects({}), fudge, fake) == "Vampire" then
 			vampires += 1
 		end
-		if Care.pickEffect(withEffects({}), candy, fake, true) then
-			bites += 1
-		end
-		if Care.pickEffect(withEffects({}), fudge, fake, true) then
-			biteEffects += 1
-		end
 	end
-	check("Fang Fudge gives Vampire about 35% of the time", math.abs(vampires / tries - 0.35) < 0.03)
 	check(
-		"a bite of a sure treat gives its effect about half the time",
-		math.abs(bites / tries - CareConfig.SetOutEffectChance / 100) < 0.03
+		"a bite of a sure cake gives its effect about BiteEffectChance of the time",
+		math.abs(candyHits / tries - CakeConfig.BiteEffectChance / 100) < 0.03
 	)
 	check(
 		"a bite of Fang Fudge lands Vampire about 17.5% of the time",
-		math.abs(biteEffects / tries - 0.175) < 0.03
+		math.abs(vampires / tries - 0.175) < 0.03
+	)
+	check(
+		"the odds shown are the real odds per bite",
+		Cakes.describe(fudge) == "Each bite: 17.5% Vampire (x2.5)"
+	)
+	check(
+		"a chance cake shows each effect's real odds",
+		Cakes.describe(mousse) == "Each bite: 12.5% Mummy (x4), 37.5% Batty (x3)"
 	)
 
-	local nibbler = withEffects({ "PumpkinHead" })
-	nibbler.familiarity = 0
-	local got = Care.giveTreat(nibbler, candy, t0, fake, true)
+	-- A bite never feeds and goes to a monster the effect can land on first.
+	local has = withEffects({ "PumpkinHead" })
+	has.uid = "a"
+	local fresh = withEffects({})
+	fresh.uid = "b"
+	local placed = Cakes.new("PumpkinCandy", 0, 0, 0, t0)
 	check(
-		"a bite feeds and gives half the Familiarity, but never an effect it has",
-		nibbler.fed and math.abs(nibbler.familiarity - (candy.familiarity or 0) / 2) < 1e-9 and got == nil
+		"a bite goes to a monster the effect can land on",
+		Cakes.pickEater(placed, { has, fresh }, fake) == fresh
 	)
-	check("a chance treat lists its odds", string.find(Care.describe(mousse), "25% Mummy", 1, true) ~= nil)
+	local b = Cakes.bite(placed, fresh, lucky)
+	check(
+		"a bite gives the effect and uses up a bite, but doesn't feed",
+		b.effect == "PumpkinHead" and placed.bitesLeft == CakeConfig.Bites - 1 and fresh.fed == false
+	)
+	check("a monster only bites a cake once", Cakes.pickEater(placed, { fresh }, fake) == nil)
+	local vamp = withEffects({ "Vampire" })
+	vamp.uid = "c"
+	local bat = Cakes.bite(Cakes.new("BoneMarrowMousse", 0, 0, 0, t0), vamp, lucky)
+	check("a bite that makes no combo says none", bat.effect == "Mummy" and bat.combo == nil)
+	local batty = withEffects({ "Vampire" })
+	batty.uid = "d"
+	table.insert(batty.effects, "Mummy") -- Mummy can't land again, so the mousse gives Batty
+	local count = Cakes.bite(Cakes.new("BoneMarrowMousse", 0, 0, 0, t0), batty, lucky)
+	check("Vampire + Batty from a bite makes a Count", count.effect == "Batty" and count.combo == "Count")
+	check("cakes allowed: one per wing", Cakes.limit(3) == 3 * CakeConfig.PerWing)
+
+	-- Offline: catchUp plays back the missed checks with the same odds.
+	local herd = {}
+	for i = 1, 10 do
+		local m = withEffects({})
+		m.uid = `m{i}`
+		table.insert(herd, m)
+	end
+	local away = Cakes.new("PumpkinCandy", 0, 0, 0, t0)
+	check(
+		"no checks missed, no bites",
+		#Cakes.catchUp(away, herd, t0 + CakeConfig.CheckSeconds - 1, fake) == 0
+	)
+	local bitesSeen, runs = 0, 400
+	for _ = 1, runs do
+		local c = Cakes.new("PumpkinCandy", 0, 0, 0, t0)
+		local monsters = {}
+		for i = 1, 10 do
+			local m = withEffects({})
+			m.uid = `m{i}`
+			table.insert(monsters, m)
+		end
+		bitesSeen += #Cakes.catchUp(c, monsters, t0 + 6 * 3600, fake)
+	end
+	local checks = CakeConfig.Minutes * 60 / CakeConfig.CheckSeconds
+	local expected = 0
+	-- expected bites: each check hits with BiteChance while bites are left
+	local p = CakeConfig.BiteChance / 100
+	local dist = { [0] = 1 }
+	for _ = 1, checks do
+		local nextDist = {}
+		for k, v in dist do
+			if k >= CakeConfig.Bites then
+				nextDist[k] = (nextDist[k] or 0) + v
+			else
+				nextDist[k + 1] = (nextDist[k + 1] or 0) + v * p
+				nextDist[k] = (nextDist[k] or 0) + v * (1 - p)
+			end
+		end
+		dist = nextDist
+	end
+	for k, v in dist do
+		expected += k * v
+	end
+	check("offline bites match the online odds", math.abs(bitesSeen / runs - expected) < 0.15)
+	local stale = Cakes.new("PumpkinCandy", 0, 0, 0, t0)
+	Cakes.catchUp(stale, herd, t0 + 6 * 3600, fake)
+	check("a cake is done after its time, even offline", Cakes.isDone(stale, t0 + 6 * 3600))
+	check("a cake never checks past going stale", stale.checkedAt <= Cakes.expiresAt(stale))
 
 	local record = { slot = 5, bought = { PumpkinCandy = 2 } }
 	check("buys count within a restock", Workshop.boughtThisSlot(record, 5).PumpkinCandy == 2)

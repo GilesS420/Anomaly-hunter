@@ -16,10 +16,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Care = require(ReplicatedStorage.Shared.Util.Care)
 local CareConfig = require(ReplicatedStorage.Shared.Config.Care)
-local Effects = require(ReplicatedStorage.Shared.Config.Effects)
-local Format = require(ReplicatedStorage.Shared.Util.Format)
-local Shop = require(ReplicatedStorage.Shared.Config.Shop)
-local Value = require(ReplicatedStorage.Shared.Util.Value)
 local DataService = require(script.Parent.DataService)
 local MansionService = require(script.Parent.MansionService)
 local Notify = require(script.Parent.Parent.Notify)
@@ -36,7 +32,6 @@ FeedAll.Name = "FeedAll"
 FeedAll.Parent = remotes
 
 local lastFed: { [Player]: number } = {}
-local random = Random.new()
 
 -- Brings the player's monsters up to date, then updates their labels and the Feed all button.
 function CareService.refresh(player: Player)
@@ -77,78 +72,6 @@ function CareService.feedAll(player: Player): string
 	local count = #data.monsters
 	local what = if count == 1 then "your monster" else `all {count} monsters`
 	return `You fed {what}! They stay fed for {CareConfig.FedHours} hours.`
-end
-
--- Gives one of the player's treats to one of their monsters. Returns whether it worked and
--- the message for them. The treat is only used up when it worked.
-function CareService.giveTreat(player: Player, uid: unknown, itemId: unknown): (boolean, string)
-	local data = DataService.get(player)
-	if not data then
-		return false, "Your save is still loading. Try again in a moment!"
-	end
-	local item = if typeof(itemId) == "string" then Care.treat(itemId) else nil
-	if not item then
-		return false, "That isn't a treat."
-	end
-	if (data.inventory[item.id] or 0) <= 0 then
-		return false, `You don't have a {item.name}. Buy one at the Bakery!`
-	end
-	local caught: Value.CaughtMonster? = nil
-	for _, candidate in data.monsters do
-		if typeof(uid) == "string" and candidate.uid == uid then
-			caught = candidate
-		end
-	end
-	if not caught then
-		return false, "That monster isn't in your mansion any more."
-	end
-
-	local name = Format.name(caught.monsterId)
-	local check = Care.canTreat(caught, item)
-	if check == "HasEffect" then
-		local effects = {}
-		for _, option in Care.effectChances(item) do
-			table.insert(effects, Format.name(option.effect))
-		end
-		return false, `{name} already has {table.concat(effects, " and ")}.`
-	elseif check == "NoRoom" then
-		return false, `{name} has no room for another effect ({Effects.MaxSlots} at most).`
-	elseif check ~= "Ok" then
-		return false, "That isn't a treat."
-	end
-
-	local inventory: { [string]: number? } = data.inventory
-	local left = (inventory[item.id] or 0) - 1
-	inventory[item.id] = if left > 0 then left else nil
-	local result = CareService.eat(player, data, caught, item, false)
-	if result == "" and #Care.effectChances(item) > 0 then
-		result = " but no effect this time" -- a chance treat that missed
-	end
-	return true, `{name} ate the {item.name}{result}! Now {Care.percent(caught)}% familiar.`
-end
-
--- One monster eats a treat (a whole one, or a bite of a set-out cake): feeds it, rolls the
--- effect and refreshes the labels. Returns the end of the message: " and got Slimed",
--- " and turned into a Banshee" when the new effect completes a combo, or "".
-function CareService.eat(
-	player: Player,
-	data: DataService.Data,
-	caught: Value.CaughtMonster,
-	item: Shop.Item,
-	bite: boolean
-): string
-	local before = Value.resolveEffects(caught.effects)
-	local effectId = Care.giveTreat(caught, item, os.time(), random, bite)
-	CareService.refresh(player)
-	local combo = Value.newCombo(before, Value.resolveEffects(caught.effects))
-	if combo then
-		CareService.discoverCombo(data, combo)
-		local article = if string.match(combo, "^[AEIOU]") then "an" else "a"
-		return ` and turned into {article} {combo}`
-	elseif effectId then
-		return ` and got {Format.name(effectId)}`
-	end
-	return ""
 end
 
 -- Remembers a combo the player has made, for the Codex (data.codex.combos[id] = true).
