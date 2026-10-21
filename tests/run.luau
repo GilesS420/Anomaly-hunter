@@ -2004,6 +2004,10 @@ do
 	ok = ok
 		and Sounds.Sheets.EventStingers[Sounds.EndCue] ~= nil
 		and Sounds.Sheets.EventStingers[Sounds.ThunderCue] ~= nil
+	ok = ok and Sounds.Sheets.WorldAmbience.Night ~= nil
+	for _, key in Sounds.BetweenSongs do
+		ok = ok and Sounds.Sheets.WorldAmbience[key] ~= nil
+	end
 	for _, song in Sounds.Sheets.Music do
 		ok = ok and (Sounds.Files :: any)[song.file] ~= nil and song.length > 0
 	end

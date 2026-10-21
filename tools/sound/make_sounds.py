@@ -10,6 +10,7 @@ Writes, into out_dir (default: tools/sound/out):
   MusicFurElise.ogg      after Beethoven, Fur Elise (1810)
   MusicMoonlight.ogg     after Beethoven, Moonlight Sonata, first movement (1801)
   preview/*.mp3       each sound on its own, for the preview page
+  WorldAmbience.ogg   the night under the music, and the little sounds between songs
   regions.json        where each sound sits inside the two event files
 
 It also rewrites src/shared/Config/SoundSheets.luau with those positions, so the game plays
@@ -694,6 +695,112 @@ MUSIC = [
 ]
 
 
+# ================================================================ world ambience
+# A quiet night that always plays under the music, so it never comes out of silence, and
+# the little sounds that fill the pause between two songs.
+
+NIGHT = 48.0
+
+
+def cricket(pitch, chirps=3, rate=28.0):
+    """One cricket chirp: a few very fast pulses of a high tone."""
+    pulse = samples(1 / rate)
+    out = np.zeros(pulse * chirps + samples(0.02))
+    t = times(seconds(pulse))
+    one = np.sin(2 * np.pi * pitch * t) * np.sin(np.pi * np.linspace(0, 1, len(t))) ** 2
+    for i in range(chirps):
+        out[i * pulse : i * pulse + len(one)] += one
+    return out
+
+
+def owl(base=370.0):
+    """A soft 'hoo... hoo-hoo' far away."""
+    out = np.zeros(samples(2.2))
+    for at, length, bend in [(0.0, 0.55, 1.0), (0.85, 0.3, 0.97), (1.25, 0.6, 0.94)]:
+        t = times(length)
+        f = base * bend * (1 + 0.04 * np.sin(np.pi * t / length))
+        tone = np.sin(2 * np.pi * np.cumsum(f) / RATE) + 0.15 * np.sin(4 * np.pi * np.cumsum(f) / RATE)
+        tone *= np.sin(np.pi * np.linspace(0, 1, len(t))) ** 1.5
+        out[samples(at) : samples(at) + len(tone)] += tone
+    return lowpass(out, 1200) * 0.5
+
+
+def creak(duration=1.2):
+    """Old wood creaking: a stick-slip buzz whose speed wanders."""
+    t = times(duration)
+    rate = 40 + 70 * np.abs(np.sin(np.pi * t / duration * rng.uniform(0.8, 1.6))) + rng.uniform(-10, 10)
+    phase = np.cumsum(rate) / RATE
+    clicks = (np.diff(np.floor(phase), prepend=0) > 0).astype(float)
+    body = signal.lfilter([1], [1, -0.97], clicks)
+    tone = bandpass(body, 350, 1600)
+    return tone * np.sin(np.pi * np.linspace(0, 1, len(t))) ** 0.7 * 0.6
+
+
+def night_loop():
+    d = NIGHT
+    buf = silence(d)
+    for center, width, gain, pan in [(380, 70, 0.22, -0.4), (820, 110, 0.12, 0.5)]:
+        band = looped_band(d, center, width) * gain * lfo(d, rng.integers(2, 4), rng.uniform(0, 6), 0.2, 1)
+        place(buf, stereo(band, pan), 0)
+    place(buf, stereo(looped_noise(d, 60, 400, -6) * 0.05), 0)
+    # three crickets, each chirping in its own rhythm, now and then taking a rest
+    for pitch, every, pan in [(4300, 0.62, -0.7), (4750, 0.81, 0.6), (3900, 1.13, 0.1)]:
+        at = rng.uniform(0, every)
+        while at < d:
+            if rng.uniform() > 0.18:
+                place(buf, stereo(cricket(pitch * rng.uniform(0.995, 1.005)) * 0.045, pan), at, wrap=True)
+            at += every * rng.uniform(0.9, 1.1)
+    place(buf, stereo(owl() * 0.18, -0.6), 9.0, wrap=True)
+    place(buf, stereo(owl(345) * 0.14, 0.7), 33.0, wrap=True)
+    for at in (18.0, 41.0):
+        place(buf, stereo(creak(rng.uniform(0.9, 1.5)) * 0.2, rng.uniform(-0.8, 0.8)), at, wrap=True)
+    place(buf, stereo(bell(note("D3"), 6.0, 0.4) * 0.07, 0.2), 26.0, wrap=True)
+    return looped(buf, 3.0, 0.4, -30)
+
+
+def wind_up():
+    """A music box being wound up for the next song: the ratchet clicks, then a few notes."""
+    buf = silence(4.5)
+    at, gap = 0.1, 0.07
+    for _ in range(26):
+        click = highpass(noise(0.006), 2500) * np.exp(-times(0.006) * 600)
+        tick = np.sin(2 * np.pi * 3100 * times(0.01)) * np.exp(-times(0.01) * 500) * 0.4
+        place(buf, stereo(click * 0.5, -0.2), at)
+        place(buf, stereo(tick, -0.2), at)
+        at += gap * rng.uniform(0.9, 1.1)
+        if _ % 9 == 8:
+            at += 0.25  # a turn of the key
+    for i, n in enumerate(["E6", "B5", "G5"]):
+        place(buf, stereo(music_box(note(n), 2.2, 0.006) * 0.25, 0.2), at + 0.1 + i * 0.3)
+    return loudness(trim_tail(reverb(buf, 2.0, 0.35)), -24)
+
+
+def distant_toll():
+    """A far-off church bell, a gust of wind and a whisper."""
+    buf = silence(5.0)
+    place(buf, stereo(whoosh(2.5, 250, 1500) * 0.35, -0.3), 0)
+    place(buf, stereo(bell(note("A2"), 4.5, 0.4) * 0.5, 0.3), 0.6)
+    place(buf, stereo(whisper(1.0) * 0.25, -0.7), 2.4)
+    return loudness(trim_tail(reverb(buf, 3.0, 0.5)), -25)
+
+
+def creaky_house():
+    """Floorboards creaking somewhere and an owl answering."""
+    buf = silence(4.5)
+    place(buf, stereo(creak(1.4) * 0.6, -0.5), 0.1)
+    place(buf, stereo(creak(0.9) * 0.4, 0.3), 1.4)
+    place(buf, stereo(owl() * 0.45, 0.6), 2.0)
+    return loudness(trim_tail(reverb(buf, 2.5, 0.4)), -25)
+
+
+WORLD = [
+    ("Night", night_loop),
+    ("WindUp", wind_up),
+    ("Toll", distant_toll),
+    ("Creaks", creaky_house),
+]
+
+
 # ================================================================ sheets
 
 
@@ -721,6 +828,8 @@ def main():
     stingers = build_sheet(STINGERS, "EventStingers", out)
     print("ambience")
     ambience = build_sheet(AMBIENCE, "EventAmbience", out)
+    print("world")
+    world = build_sheet(WORLD, "WorldAmbience", out)
     print("music")
     music = {}
     for key, make in MUSIC:
@@ -731,12 +840,12 @@ def main():
         encode(sig, os.path.join(out, "preview", key), ogg=False)
         music[key] = round(len(sig) / RATE, 3)
     with open(os.path.join(out, "regions.json"), "w") as f:
-        json.dump({"stingers": stingers, "ambience": ambience, "music": music}, f, indent=2)
-    write_luau(stingers, ambience, music)
+        json.dump({"stingers": stingers, "ambience": ambience, "world": world, "music": music}, f, indent=2)
+    write_luau(stingers, ambience, world, music)
     print("done:", out)
 
 
-def write_luau(stingers, ambience, music):
+def write_luau(stingers, ambience, world, music):
     path = os.path.join(os.path.dirname(__file__), "..", "..", "src", "shared", "Config", "SoundSheets.luau")
     lines = [
         "--!strict",
@@ -749,7 +858,7 @@ def write_luau(stingers, ambience, music):
         "local SoundSheets = {}",
         "",
     ]
-    for name, regions in [("EventStingers", stingers), ("EventAmbience", ambience)]:
+    for name, regions in [("EventStingers", stingers), ("EventAmbience", ambience), ("WorldAmbience", world)]:
         lines.append(f"SoundSheets.{name} = {{")
         for key, r in regions.items():
             lines.append(f"\t{key} = {{ start = {r['start']}, length = {r['length']} }},")

@@ -33,6 +33,13 @@ SoundSheets.EventAmbience = {
 	WatcherAwakens = { start = 125.0, length = 24.0 },
 } :: { [string]: Region }
 
+SoundSheets.WorldAmbience = {
+	Night = { start = 0.0, length = 48.0 },
+	WindUp = { start = 49.0, length = 5.671 },
+	Toll = { start = 55.671, length = 5.904 },
+	Creaks = { start = 62.575, length = 5.886 },
+} :: { [string]: Region }
+
 -- The music playlist in the order it plays, with each song's length in seconds.
 SoundSheets.Music = {
 	{ file = "MusicGymnopedie", length = 84.706 },
