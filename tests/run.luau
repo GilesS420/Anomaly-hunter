@@ -350,7 +350,45 @@ do
 		end
 	end
 	check("Flicker only spawns Flicker monsters", wrong == 0)
-	check("about 70% of Flicker monsters are Flickerwicks", math.abs(wicks / 20_000 - 0.7) < 0.02)
+
+	local used: { [string]: boolean } = {}
+	for _, event in Events.List do
+		if event.launch then
+			for id in event.monsters or {} do
+				used[id] = true
+			end
+		end
+	end
+	local unused = {}
+	for id, m in Monsters do
+		if type(m) == "table" and m.event and not used[id] then
+			table.insert(unused, id)
+		end
+	end
+	check(`every event monster spawns in a launch event ({table.concat(unused, ", ")})`, #unused == 0)
+	local bloodBatch = Watcher.monsterBatch(Events.find("BloodMoon") :: any, 4, eventRng)
+	local kindsSeen: { [string]: boolean } = {}
+	for _, m in bloodBatch do
+		kindsSeen[m.id] = true
+	end
+	check(
+		"Blood Moon shows both its monsters",
+		#bloodBatch == 4 and kindsSeen.CrimsonWisp and kindsSeen.Moonhowler
+	)
+	local flickerBatch = Watcher.monsterBatch(Events.find("Flicker") :: any, 10, eventRng)
+	local lurkers = 0
+	for _, m in flickerBatch do
+		if m.id == "LamppostLurker" then
+			lurkers += 1
+		end
+	end
+	check("a Nightmare appears once per event", #flickerBatch == 10 and lurkers == 1)
+	check(
+		"an event with only rare monsters brings just those",
+		#Watcher.monsterBatch(Events.find("FrostFog") :: any, 6, eventRng) == 1
+			and #Watcher.monsterBatch(Events.find("WatcherAwakens") :: any, 6, eventRng) == 2
+	)
+	check("Flickerwicks are the commonest Flicker monster", math.abs(wicks / 20_000 - 70 / 105) < 0.02)
 
 	local valid = true
 	for _, event in Events.List do
@@ -785,9 +823,9 @@ do
 	)
 	check("the launch tools last 4-20 hours", hours >= 4 and hours <= 20)
 	check(
-		"Nightmare monsters need the Phantom Vac",
-		not Catching.canVacuum("DustBuster", "Normal", "Nightmare")
-			and Catching.canVacuum("PhantomVac", "Normal", "Nightmare")
+		"Nightmare monsters need the Void Vac",
+		not Catching.canVacuum("PhantomVac", "Normal", "Nightmare")
+			and Catching.canVacuum("VoidVac", "Normal", "Nightmare")
 	)
 	check(
 		"Eldritch monsters need the Void Vac",
@@ -2161,7 +2199,7 @@ do
 		"codex leaves out zones that aren't in the game yet",
 		zoneIds.SpookySchool == nil and zoneIds.GhostShip == nil
 	)
-	check("codex lists the launch event monsters only", zoneIds.Events == 4)
+	check("codex lists every event monster", zoneIds.Events == 10)
 	check("codex pages start with the commonest monster", sections[1].monsters[1] == "Gloomlet")
 	check(
 		"codex variant goals are Silver, Gold, Shiny, Rainbow",

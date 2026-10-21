@@ -163,6 +163,47 @@ function Watcher.effectLines(event: Events.WatcherEvent): { string }
 	return lines
 end
 
+-- The event monsters that appear when an event starts: one of each kind first (so every
+-- event shows all its monsters, not just the common one), then picked by weight. A
+-- Nightmare or Eldritch monster appears at most once, so the batch can be shorter than count.
+function Watcher.monsterBatch(
+	event: Events.WatcherEvent,
+	count: number,
+	random: Random?
+): { Monsters.Monster }
+	local weights = event.monsters
+	assert(weights, `event {event.id} has no monsters`)
+	local kinds: { Monsters.Monster } = {}
+	for id in weights do
+		table.insert(kinds, Monsters[id])
+	end
+	table.sort(kinds, function(a, b) -- commonest first, so a short batch keeps the common ones
+		if weights[a.id] ~= weights[b.id] then
+			return weights[a.id] > weights[b.id]
+		end
+		return a.id < b.id
+	end)
+	local batch: { Monsters.Monster } = {}
+	for index = 1, math.min(count, #kinds) do
+		batch[index] = kinds[index]
+	end
+	local common: { Monsters.Monster } = {}
+	for _, monster in kinds do
+		if monster.rarity == "Phantom" then
+			table.insert(common, monster)
+		end
+	end
+	while #batch < count and #common > 0 do
+		table.insert(
+			batch,
+			Rng.pickWeighted(common, function(m)
+				return weights[m.id]
+			end, random)
+		)
+	end
+	return batch
+end
+
 -- "2:05"
 function Watcher.clock(seconds: number): string
 	local whole = math.max(math.ceil(seconds), 0)

@@ -32,6 +32,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Events = require(ReplicatedStorage.Shared.Config.Events)
+local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Roam = require(ReplicatedStorage.Shared.Util.Roam)
 local Spawning = require(ReplicatedStorage.Shared.Util.Spawning)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
@@ -365,8 +366,7 @@ local function eventMonstersFolder(): Folder
 	return folder
 end
 
-local function spawnOne(event: Events.WatcherEvent, rects: { Roam.Rect }): boolean
-	local monster = Watcher.rollMonster(event, random)
+local function spawnOne(event: Events.WatcherEvent, monster: Monsters.Monster, rects: { Roam.Rect }): boolean
 	local size = Spawning.rollSize(random)
 	local radius = MonsterModel.radius(size.id, monster.id)
 	local point = Roam.findFreePoint(rects, radius, RoamService.bodies(Group), random)
@@ -461,8 +461,8 @@ local function startEvent(event: Events.WatcherEvent, ends: number, skySeconds: 
 
 	if event.monsters then
 		local rects = driftRects()
-		for _ = 1, Watcher.monsterCount(#Players:GetPlayers()) do
-			if not spawnOne(event, rects) then
+		for _, monster in Watcher.monsterBatch(event, Watcher.monsterCount(#Players:GetPlayers()), random) do
+			if not spawnOne(event, monster, rects) then
 				break -- too crowded
 			end
 		end

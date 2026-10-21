@@ -73,9 +73,10 @@ Events.EyesToAwaken = 5
 -- for the event's effect this often (Util/Haunting.eventRoll).
 Events.EffectRollSeconds = 30
 
--- How many event monsters (the Flicker and Blood Moon Phantoms, an optional bonus to catch)
--- appear at the start of an event: this many per player in the server, clamped between Min
--- and Max, so everyone gets a chance.
+-- How many event monsters (an optional bonus to catch) appear at the start of an event: this
+-- many per player in the server, clamped between Min and Max, so everyone gets a chance. Each
+-- kind appears at least once; a Nightmare or Eldritch one appears at most once per event, so
+-- an event with only those (Frost Fog, Sugar Rush, Gold Rush) brings just one or two.
 Events.MonstersPerPlayer = 1
 Events.MinMonsters = 4
 Events.MaxMonsters = 10
@@ -104,6 +105,7 @@ Events.List = {
 		effect = "Frostbitten",
 		effectChance = 6,
 		durationSeconds = 180,
+		monsters = { StormGremlin = 1 },
 		sky = {
 			ambient = { 80, 110, 150 },
 			outdoorAmbient = { 110, 150, 200 },
@@ -115,7 +117,7 @@ Events.List = {
 			edge = { 225, 245, 255 },
 		},
 		warning = "The air turns icy cold...",
-		announce = "Frost Fog rolls in! Monsters can freeze over, and the Bakery sells Frost Tarts.",
+		announce = "Frost Fog rolls in! Monsters can freeze over, a Storm Gremlin rides the blizzard and the Bakery sells Frost Tarts.",
 	},
 	{
 		id = "SugarRush",
@@ -126,6 +128,7 @@ Events.List = {
 		effect = "Sugarcoated",
 		effectChance = 6,
 		durationSeconds = 180,
+		monsters = { Doorknocker = 1 },
 		growthMultiplier = 2,
 		cakeEffectMultiplier = 2,
 		bakeryStockMultiplier = 3,
@@ -140,7 +143,7 @@ Events.List = {
 			edge = { 140, 255, 120 },
 		},
 		warning = "Something sweet is in the air...",
-		announce = "Sugar Rush! Cakes get eaten twice as fast, monsters grow and the Bakery is packed.",
+		announce = "Sugar Rush! Cakes get eaten twice as fast, monsters grow, the Doorknocker comes trick-or-treating and the Bakery is packed.",
 	},
 	{
 		id = "GoldRush",
@@ -151,6 +154,7 @@ Events.List = {
 		effect = "Gilded",
 		effectChance = 4,
 		durationSeconds = 180,
+		monsters = { MailboxMimic = 1 },
 		sellMultiplier = 1.25,
 		sky = {
 			ambient = { 130, 95, 50 },
@@ -164,7 +168,7 @@ Events.List = {
 			edge = { 255, 200, 60 },
 		},
 		warning = "Coins jingle somewhere in the dark...",
-		announce = "Gold Rush! The Collector pays 25% more and the Bakery sells Gilded Truffles.",
+		announce = "Gold Rush! The Collector pays 25% more, a Mailbox Mimic guards its gold and the Bakery sells Gilded Truffles.",
 	},
 	{
 		id = "Flicker",
@@ -175,7 +179,7 @@ Events.List = {
 		effect = "Poltergeist",
 		effectChance = 4,
 		durationSeconds = 180,
-		monsters = { Flickerwick = 70, StaticShade = 30 },
+		monsters = { Flickerwick = 70, StaticShade = 30, LamppostLurker = 5 },
 		sky = {
 			ambient = { 30, 30, 40 },
 			outdoorAmbient = { 40, 40, 55 },
@@ -226,6 +230,7 @@ Events.List = {
 		effectChance = 0.3,
 		otherEffectsChance = 1,
 		durationSeconds = 300,
+		monsters = { Watcherling = 70, EyeOfTheWatcher = 30 },
 		growthMultiplier = 3,
 		sky = {
 			ambient = { 55, 25, 75 },
@@ -238,7 +243,7 @@ Events.List = {
 			edge = { 110, 30, 160 },
 		},
 		warning = "All five eyes are open. The Watcher is waking up...",
-		announce = "THE WATCHER AWAKENS! Its eye is on every mansion.",
+		announce = "THE WATCHER AWAKENS! Its eye is on every mansion, and its Watcherlings creep through the hub.",
 	},
 } :: { WatcherEvent }
 
