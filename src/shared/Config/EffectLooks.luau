@@ -441,22 +441,22 @@ EffectLooks.Styles = {
 	-- Catch variants.
 	Silver = {
 		tint = { color = { 200, 205, 215 }, mix = 0.75 },
-		material = { name = "Metal", reflectance = 0.25 },
+		material = { name = "Metal", reflectance = 0.1 },
 		auras = { { kind = "Sparkle", color = { 230, 235, 255 } } },
 	},
 	Gold = {
 		tint = { color = Gold, mix = 0.92 },
-		material = { name = "Foil", reflectance = 0.3 },
+		material = { name = "Foil", reflectance = 0.1 },
 		auras = { { kind = "Sparkle", color = { 255, 230, 120 } } },
 	},
 	Shiny = {
 		hueShift = 0.45,
-		material = { name = "Foil", reflectance = 0.35 },
+		material = { name = "Foil", reflectance = 0.12 },
 		auras = { { kind = "Sparkle", color = { 255, 255, 255 } } },
 	},
 	Rainbow = {
 		rainbow = true,
-		material = { name = "SmoothPlastic", reflectance = 0.15 },
+		material = { name = "SmoothPlastic", reflectance = 0.05 },
 		auras = {
 			{ kind = "Sparkle", color = { 255, 120, 220 } },
 			{ kind = "Sparkle", color = { 120, 220, 255 } },
