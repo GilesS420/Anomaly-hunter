@@ -341,6 +341,8 @@ end
 -- Brings the wing parts and the next-wing sign in line with the wings owned, and updates
 -- where monsters may roam. Rooms already standing are kept; only what changed is rebuilt.
 local function buildWings(state: State, wingsOwned: number)
+	-- The client shuts the zone gates this player can't enter yet (client/GateController).
+	state.player:SetAttribute("WingsOwned", wingsOwned)
 	local owned: { [string]: boolean } = {}
 	for _, wing in Mansion.ownedWings(wingsOwned) do
 		owned[wing.id] = true
