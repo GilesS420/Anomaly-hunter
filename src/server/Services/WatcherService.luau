@@ -5,9 +5,11 @@
 -- servers never finds a rarer one.
 -- Events are passive: the sky changes, and while one is live the mansion rolls read its
 -- boosts from WatcherService.current() (effect, effectOddsMultiplier, growthMultiplier).
---   Flicker     the streetlights fail too, and Flickerwick and Static Shade drift between
---               the mansions (an optional bonus to catch)
---   Blood Moon  Crimson Wisp and Moonhowler drift between the mansions, same as Flicker
+--   Flicker     the streetlights fail too
+--   Blood Moon  Crimson Wisp and Moonhowler drift between the mansions (an optional bonus
+--               to catch)
+--   The Watcher Awakens  brings one of its monster sets: Phantoms, Nightmares or (rarely)
+--               Eldritch monsters, the same set in every server (workspace attr WatcherMonsterSet)
 -- Event monsters are caught in the main area like any other monster (CatchService) and fly
 -- straight home to the mansion. Whatever is left when the event ends fades away.
 --
@@ -32,6 +34,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Events = require(ReplicatedStorage.Shared.Config.Events)
+local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
+local Rng = require(ReplicatedStorage.Shared.Util.Rng)
 local Roam = require(ReplicatedStorage.Shared.Util.Roam)
 local Spawning = require(ReplicatedStorage.Shared.Util.Spawning)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
@@ -166,10 +170,10 @@ end
 
 local SkyNames = { "WatcherSkyTint", "WatcherSkyAtmosphere" }
 
--- Eases the sky into `event`'s look over `seconds` (the warning, so it's fully in when the
--- event starts). Replaces whatever sky was showing.
-local function applySky(event: Events.WatcherEvent, seconds: number)
-	local sky = event.sky
+-- Eases the sky into `event`'s look (its monster set's own, if it has one) over `seconds`
+-- (the warning, so it's fully in when the event starts). Replaces whatever sky was showing.
+local function applySky(event: Events.WatcherEvent, set: Events.MonsterSet?, seconds: number)
+	local sky = Events.skyFor(event, if set then set.id else nil)
 	if not sky then
 		return
 	end
@@ -365,8 +369,7 @@ local function eventMonstersFolder(): Folder
 	return folder
 end
 
-local function spawnOne(event: Events.WatcherEvent, rects: { Roam.Rect }): boolean
-	local monster = Watcher.rollMonster(event, random)
+local function spawnOne(event: Events.WatcherEvent, monster: Monsters.Monster, rects: { Roam.Rect }): boolean
 	local size = Spawning.rollSize(random)
 	local radius = MonsterModel.radius(size.id, monster.id)
 	local point = Roam.findFreePoint(rects, radius, RoamService.bodies(Group), random)
@@ -417,6 +420,120 @@ local ClosedEye = Color3.fromRGB(40, 32, 52)
 local Glow = Color3.fromRGB(190, 110, 255)
 local Lamp = Color3.fromRGB(255, 176, 84) -- the lantern orange of the shop titles
 
+-- The eyes in Watcher Square: the glowing ball over each of the four ways in, then the one on
+-- the meter's pillar, open one by one with the meter (an eye per event). A closed eye is dark
+-- stone; an open one glows purple with a black pupil looking out of the square, and the
+-- pillar's eye follows the nearest player. With all five open they burn red: The Watcher
+-- Awakens is next.
+
+type WorldEye = { ball: BasePart, pupil: Part, light: PointLight, out: Vector3, open: boolean? }
+
+local worldEyes: { WorldEye } = {}
+local EyeAwake = Color3.fromRGB(255, 50, 80)
+local EyeTween = TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+
+local function pupilAt(eye: WorldEye, look: Vector3): CFrame
+	local center = eye.ball.Position
+	local radius = eye.ball.Size.X / 2
+	-- A flat disc on the ball's surface, facing `look` (a cylinder's round faces point along X).
+	return CFrame.lookAt(center + look * (radius - 0.05), center + look * (radius + 1))
+		* CFrame.Angles(0, math.rad(90), 0)
+end
+
+local function addWorldEye(ball: BasePart, out: Vector3)
+	local pupil = Instance.new("Part")
+	pupil.Name = "Pupil"
+	pupil.Shape = Enum.PartType.Cylinder
+	pupil.Anchored = true
+	pupil.CanCollide = false
+	pupil.CanQuery = false
+	pupil.CanTouch = false
+	pupil.CastShadow = false
+	pupil.Material = Enum.Material.SmoothPlastic
+	pupil.Color = Color3.fromRGB(10, 6, 14)
+	pupil.Size = Vector3.new(0.1, 0.05, 0.05)
+	pupil.Parent = ball
+	local light = ball:FindFirstChildOfClass("PointLight") or Instance.new("PointLight")
+	light.Color = Glow
+	light.Range = 14
+	light.Parent = ball
+	local eye: WorldEye = { ball = ball, pupil = pupil, light = light, out = out }
+	pupil.CFrame = pupilAt(eye, out)
+	table.insert(worldEyes, eye)
+end
+
+local function findWorldEyes(hub: Instance)
+	local meter = World.part(World.find(hub, "WatcherMeter"))
+	local center = if meter then meter.Position else Vector3.zero
+	for gate = 1, 4 do
+		local ball = hub:FindFirstChild(`Gate{gate}Eye`, true)
+		if ball and ball:IsA("BasePart") then
+			local flat = Vector3.new(ball.Position.X - center.X, 0, ball.Position.Z - center.Z)
+			addWorldEye(ball, if flat.Magnitude > 0.1 then flat.Unit else Vector3.zAxis)
+		end
+	end
+	if meter then
+		local ball = meter:FindFirstChild("Eye")
+		if not (ball and ball:IsA("BasePart")) then
+			local made = block(
+				"Eye",
+				Vector3.new(3, 3, 3),
+				CFrame.new(meter.Position + Vector3.new(0, meter.Size.Y / 2 + 1.5, 0)),
+				ClosedEye,
+				Enum.Material.Slate
+			)
+			made.Shape = Enum.PartType.Ball
+			made.CanCollide = false
+			made.Parent = meter
+			ball = made
+		end
+		addWorldEye(ball :: BasePart, Vector3.zAxis)
+	end
+	if #worldEyes < Events.EyesToAwaken then
+		warn(`WatcherService: found {#worldEyes} of {Events.EyesToAwaken} eyes in Watcher Square`)
+	end
+end
+
+local function showWorldEyes()
+	local awake = eyes >= Events.EyesToAwaken or (current ~= nil and current.awakening == true)
+	for index, eye in worldEyes do
+		local open = awake or index <= eyes
+		local ball = eye.ball
+		ball.Material = if open then Enum.Material.Neon else Enum.Material.Slate
+		ball.Color = if not open then ClosedEye elseif awake then EyeAwake else Glow
+		eye.light.Enabled = open
+		eye.light.Color = if awake then EyeAwake else Glow
+		if open ~= eye.open then
+			eye.open = open
+			-- The pupil opens (or shuts) like a lid lifting.
+			local d = ball.Size.X * 0.5
+			TweenService:Create(eye.pupil, EyeTween, {
+				Size = if open then Vector3.new(0.1, d, d) else Vector3.new(0.1, 0.05, 0.05),
+			}):Play()
+		end
+	end
+	-- The pillar's eye watches the nearest player.
+	local pillar = worldEyes[Events.EyesToAwaken]
+	if pillar and pillar.open then
+		local nearest: Vector3? = nil
+		local best = 120
+		for _, player in Players:GetPlayers() do
+			local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+			if root and root:IsA("BasePart") then
+				local distance = (root.Position - pillar.ball.Position).Magnitude
+				if distance < best then
+					best = distance
+					nearest = root.Position
+				end
+			end
+		end
+		local look = if nearest then (nearest - pillar.ball.Position).Unit else pillar.out
+		TweenService:Create(pillar.pupil, TweenInfo.new(0.8, Enum.EasingStyle.Sine), {
+			CFrame = pupilAt(pillar, look),
+		}):Play()
+	end
+end
+
 local function publish()
 	local sky = if phase == "Live" then current elseif phase == "Warning" then upcoming else nil
 	workspace:SetAttribute("WatcherEvent", if current then current.id else nil)
@@ -425,6 +542,7 @@ local function publish()
 	workspace:SetAttribute("WatcherSky", if sky then sky.id else nil)
 	workspace:SetAttribute("WatcherEyes", eyes)
 
+	showWorldEyes()
 	for index, eye in meterEyes do
 		local open = index <= eyes
 		eye.white.BackgroundColor3 = if open then EyeWhite else ClosedEye
@@ -441,9 +559,14 @@ local function publish()
 	end
 end
 
-local function startEvent(event: Events.WatcherEvent, ends: number, skySeconds: number?)
+local function startEvent(
+	event: Events.WatcherEvent,
+	ends: number,
+	set: Events.MonsterSet?,
+	skySeconds: number?
+)
 	if skySeconds then
-		applySky(event, skySeconds)
+		applySky(event, set, skySeconds)
 		workspace:SetAttribute("WatcherSkyAt", now() + skySeconds)
 	end
 	phase = "Live"
@@ -451,6 +574,10 @@ local function startEvent(event: Events.WatcherEvent, ends: number, skySeconds: 
 	upcoming = nil
 	endsAt = ends
 	Notify.toastAll(event.announce or `{event.name} has begun!`)
+	if set then
+		Notify.toastAll(set.announce)
+	end
+	workspace:SetAttribute("WatcherMonsterSet", if set then set.id else nil)
 
 	local handler = handlers[event.id]
 	if handler then
@@ -459,10 +586,11 @@ local function startEvent(event: Events.WatcherEvent, ends: number, skySeconds: 
 		end)
 	end
 
-	if event.monsters then
+	local weights, count = Watcher.spawns(event, set, #Players:GetPlayers())
+	if weights then
 		local rects = driftRects()
-		for _ = 1, Watcher.monsterCount(#Players:GetPlayers()) do
-			if not spawnOne(event, rects) then
+		for _, monster in Watcher.monsterBatch(weights, count, random) do
+			if not spawnOne(event, monster, rects) then
 				break -- too crowded
 			end
 		end
@@ -493,12 +621,16 @@ local function endEvent()
 	phase = "Calm"
 	summoned = false
 	publish()
+	-- After WatcherSky clears, so clients fade the set's sky out instead of switching skies.
+	workspace:SetAttribute("WatcherMonsterSet", nil)
 end
 
-local function startWarning(event: Events.WatcherEvent, startsAt: number)
+local function startWarning(event: Events.WatcherEvent, set: Events.MonsterSet?, startsAt: number)
 	phase = "Warning"
 	upcoming = event
-	applySky(event, math.max(startsAt - now(), 1))
+	-- Before WatcherSky (publish), so clients draw the set's sky straight away.
+	workspace:SetAttribute("WatcherMonsterSet", if set then set.id else nil)
+	applySky(event, set, math.max(startsAt - now(), 1))
 	workspace:SetAttribute("WatcherSkyAt", startsAt)
 	Notify.toastAll(event.warning or "The Watcher stirs...")
 end
@@ -521,16 +653,18 @@ local function tick()
 
 	-- A summoned event holds the sky until it ends; then the schedule picks up where it is.
 	if not summoned then
+		-- The set is rolled from the slot too, so every server gets the same monsters and sky.
+		local set = Watcher.pickSet(slot.event, Rng.seeded(`watcher-set:{slot.index}`))
 		if time >= slot.startAt then
 			if phase ~= "Live" then
 				-- Straight from the warning the sky is already in; joining late, it comes in fast.
 				local skySeconds = if phase == "Warning" and upcoming == slot.event
 					then nil
 					else SummonSkySeconds
-				startEvent(slot.event, slot.endAt, skySeconds)
+				startEvent(slot.event, slot.endAt, set, skySeconds)
 			end
 		elseif time >= slot.warnAt and phase ~= "Warning" then
-			startWarning(slot.event, slot.startAt)
+			startWarning(slot.event, set, slot.startAt)
 		end
 	end
 	publish()
@@ -803,7 +937,12 @@ function WatcherService.summon(id: string?): boolean
 		return false
 	end
 	summoned = true
-	startEvent(event, now() + (event.durationSeconds or 180), SummonSkySeconds)
+	startEvent(
+		event,
+		now() + (event.durationSeconds or 180),
+		Watcher.pickSet(event, random),
+		SummonSkySeconds
+	)
 	return true
 end
 
@@ -812,6 +951,7 @@ function WatcherService.start()
 	findLamps(hub)
 	buildMeter(hub)
 	buildSign(hub)
+	findWorldEyes(hub)
 	-- Walks the schedule from its start, once; tick steps it on from here, and joins an
 	-- event or warning that is already under way.
 	schedule = Watcher.slotAt(now())

@@ -106,7 +106,8 @@ function EventIconController.start()
 		if not event then
 			return
 		end
-		local color = rgb(event.sky and event.sky.edge)
+		local sky = Events.skyFor(event, workspace:GetAttribute("WatcherMonsterSet"))
+		local color = rgb(sky and sky.edge)
 		Ui.paint(icon, color)
 		rim.Color = color
 		icon.Text = event.icon or "?"
@@ -117,6 +118,11 @@ function EventIconController.start()
 			end
 		end
 		local lines = Watcher.effectLines(event)
+		local monsters = Watcher.monsterLine(event, workspace:GetAttribute("WatcherMonsterSet"))
+		if monsters then
+			-- Above the Familiarity note, which is last when there are effect lines.
+			table.insert(lines, math.max(#lines, 1), monsters)
+		end
 		for index, line in lines do
 			local last = index == #lines -- the Familiarity note, quieter
 			local label = Ui.text(
@@ -134,6 +140,7 @@ function EventIconController.start()
 	end
 	workspace:GetAttributeChangedSignal("WatcherEvent"):Connect(refresh)
 	workspace:GetAttributeChangedSignal("WatcherNext"):Connect(refresh)
+	workspace:GetAttributeChangedSignal("WatcherMonsterSet"):Connect(refresh)
 	Ui.windowsChanged:Connect(refresh)
 	refresh()
 

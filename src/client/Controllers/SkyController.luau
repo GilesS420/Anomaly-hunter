@@ -1,7 +1,8 @@
 --!strict
 -- How a Watcher event looks on each player's screen (Config/Events, each event's `sky`):
 --   weather   what falls or floats all around you: a snowstorm, rain, gold coins, candy or
---             eyeballs that turn to look at you
+--             eyeballs that turn to look at you; or what circles the hub: ghosts flying high
+--             (Phantom Swarm) or a parade of grinning lantern heads (Nightmare Parade)
 --   sky       a moon, the Watcher's eye, an aurora, sparkles, lightning
 --   edge      a glow round the edges of the screen in the event's colour
 --   banner    the event's name across the screen when it starts
@@ -9,7 +10,8 @@
 -- camera, so it follows you everywhere and players in zones see it too.
 --
 -- The server says which sky to show in Workspace attribute WatcherSky (an event id) and when
--- it should be fully in with WatcherSkyAt (server time; the end of the warning). The banner
+-- it should be fully in with WatcherSkyAt (server time; the end of the warning). The Watcher
+-- Awakens shows its monster set's own sky (WatcherMonsterSet, Events.skyFor). The banner
 -- shows when WatcherEvent is set. Pieces live in Workspace.CurrentCamera.WatcherSky.
 -- Each lightning flash asks SoundController for a thunderclap.
 -- The player's settings (client/Settings) can thin out or hide the weather, and switch off the
@@ -42,10 +44,12 @@ type Piece = {
 	place: (piece: Piece, camera: Vector3, t: number) -> CFrame,
 }
 
--- A falling (or floating) thing: a coin, a sweet, an eyeball.
+-- A falling (or floating, or circling) thing: a coin, a sweet, an eyeball, a ghost.
 type Bit = {
 	parts: { Part },
 	offsets: { number }, -- eyes: how far each part sits towards the camera
+	shape: { CFrame }, -- circling bits: each part's place in the bit (forward is -Z)
+	orbit: Vector3, -- circling bits: radius, height above the hub, turn speed (radians/s)
 	opaque: number,
 	position: Vector3,
 	velocity: Vector3,
@@ -58,6 +62,8 @@ type Weather = {
 	kind: string,
 	bits: { Bit },
 	floating: boolean, -- eyes hover round you instead of falling
+	circling: boolean, -- ghosts and lanterns go round the hub instead
+	centre: Vector3, -- circling: the middle of Watcher Square
 }
 
 type Set = {
@@ -354,13 +360,106 @@ local function spot(camera: Vector3, radius: number, above: number): Vector3
 	return camera + Vector3.new(math.cos(angle) * distance, above, math.sin(angle) * distance)
 end
 
+-- The middle of Watcher Square (the meter's pillar), on the ground; ghosts and lanterns
+-- circle it.
+local function hubCentre(): Vector3
+	local hub = workspace:FindFirstChild("Hub")
+	local meter = hub and hub:FindFirstChild("WatcherMeter", true)
+	if meter and meter:IsA("BasePart") then
+		return meter.Position - Vector3.new(0, meter.Size.Y / 2, 0)
+	end
+	return Vector3.zero
+end
+
 local function addBits(set: Set, kind: string, count: number)
-	local weather: Weather = { kind = kind, bits = {}, floating = kind == "Eyes" }
+	local circling = kind == "Ghosts" or kind == "Lanterns"
+	local weather: Weather = {
+		kind = kind,
+		bits = {},
+		floating = kind == "Eyes",
+		circling = circling,
+		centre = if circling then hubCentre() else Vector3.zero,
+	}
 	for index = 1, count do
 		local parts: { Part } = {}
 		local offsets: { number } = {}
+		local layout: { CFrame } = {}
+		local orbit = Vector3.zero
+		local opaque = 0
 		local fall = 0
-		if kind == "Coins" then
+		if kind == "Ghosts" then
+			-- A glowing head with two black eyes and a tail of shrinking puffs, flying in
+			-- circles high over the hub, some near and some far, at different speeds.
+			local pale = Color3.fromRGB(225, 240, 255)
+			table.insert(
+				parts,
+				piecePart(`Ghost{index}`, Enum.PartType.Ball, Vector3.one * 4, pale, set.holder)
+			)
+			table.insert(layout, CFrame.identity)
+			for side = -1, 1, 2 do
+				local eye = piecePart(
+					`GhostEye{index}`,
+					Enum.PartType.Ball,
+					Vector3.new(0.8, 1.2, 0.8),
+					Color3.fromRGB(10, 10, 20),
+					set.holder
+				)
+				eye.Material = Enum.Material.SmoothPlastic
+				table.insert(parts, eye)
+				table.insert(layout, CFrame.new(side * 0.75, 0.4, -1.75))
+			end
+			for puff, size in { 3.2, 2.4, 1.6 } do
+				table.insert(
+					parts,
+					piecePart(`GhostTail{index}`, Enum.PartType.Ball, Vector3.one * size, pale, set.holder)
+				)
+				table.insert(layout, CFrame.new(0, -0.35 * puff, 1.9 * puff))
+			end
+			opaque = 0.2
+			orbit = Vector3.new(
+				random:NextNumber(35, 120),
+				random:NextNumber(22, 55),
+				random:NextNumber(0.18, 0.4) * (if random:NextNumber() < 0.8 then 1 else -1)
+			)
+		elseif kind == "Lanterns" then
+			-- A grinning orange head with black eyes and mouth, all of them in one long
+			-- procession round the hub, bobbing as they march.
+			table.insert(
+				parts,
+				piecePart(
+					`Lantern{index}`,
+					Enum.PartType.Ball,
+					Vector3.one * 3.6,
+					Color3.fromRGB(255, 130, 30),
+					set.holder
+				)
+			)
+			table.insert(layout, CFrame.identity)
+			local features: { { size: Vector3, at: CFrame } } = {
+				{
+					size = Vector3.new(0.7, 0.9, 0.5),
+					at = CFrame.new(-0.75, 0.5, -1.55) * CFrame.Angles(0, 0, 0.4),
+				},
+				{
+					size = Vector3.new(0.7, 0.9, 0.5),
+					at = CFrame.new(0.75, 0.5, -1.55) * CFrame.Angles(0, 0, -0.4),
+				},
+				{ size = Vector3.new(2, 0.45, 0.5), at = CFrame.new(0, -0.6, -1.5) },
+			}
+			for _, feature in features do
+				local part = piecePart(
+					`LanternFace{index}`,
+					Enum.PartType.Block,
+					feature.size,
+					Color3.fromRGB(20, 5, 0),
+					set.holder
+				)
+				part.Material = Enum.Material.SmoothPlastic
+				table.insert(parts, part)
+				table.insert(layout, feature.at)
+			end
+			orbit = Vector3.new(random:NextNumber(62, 72), random:NextNumber(7, 11), 0.12)
+		elseif kind == "Coins" then
 			local coin = piecePart(
 				`Coin{index}`,
 				Enum.PartType.Cylinder,
@@ -421,12 +520,15 @@ local function addBits(set: Set, kind: string, count: number)
 		table.insert(weather.bits, {
 			parts = parts,
 			offsets = offsets,
-			opaque = 0,
+			shape = layout,
+			orbit = orbit,
+			opaque = opaque,
 			position = Vector3.zero, -- placed on the first frame
 			velocity = Vector3.new(random:NextNumber(-3, 3), -fall, random:NextNumber(-3, 3)),
 			spin = Vector3.new(random:NextNumber(-4, 4), random:NextNumber(-4, 4), random:NextNumber(-4, 4)),
 			angle = Vector3.new(random:NextNumber(0, 6), random:NextNumber(0, 6), random:NextNumber(0, 6)),
-			phase = random:NextNumber(0, 10),
+			-- Circling: where on the circle it starts; the parade is evenly spaced.
+			phase = if kind == "Lanterns" then index / count * math.pi * 2 else random:NextNumber(0, 10),
 		})
 	end
 	set.weather = weather
@@ -449,6 +551,11 @@ local function addWeather(set: Set, weather: Events.Weather, scale: number)
 		bits("Candy", 140)
 	elseif weather.kind == "Eyes" then
 		bits("Eyes", 28)
+	elseif weather.kind == "Ghosts" then
+		bits("Ghosts", 22)
+		addSparkles(set, { 200, 230, 255 })
+	elseif weather.kind == "Lanterns" then
+		bits("Lanterns", 26)
 	end
 	for index = before + 1, #set.emitters do
 		set.emitters[index].rate *= scale
@@ -465,7 +572,23 @@ local function stepWeather(weather: Weather, camera: Vector3, deltaTime: number,
 	local frames: { CFrame } = {}
 	for _, bit in weather.bits do
 		local flat = Vector3.new(bit.position.X - camera.X, 0, bit.position.Z - camera.Z)
-		if weather.floating then
+		if weather.circling then
+			local turn = bit.phase + t * bit.orbit.Z
+			local ahead = Vector3.new(-math.sin(turn), 0, math.cos(turn)) * math.sign(bit.orbit.Z)
+			local bob = if weather.kind == "Lanterns"
+				then math.abs(math.sin(t * 3 + bit.phase * 4)) * 1.2 -- marching steps
+				else math.sin(t * 0.9 + bit.phase) * 3
+			local at = weather.centre
+				+ Vector3.new(math.cos(turn) * bit.orbit.X, bit.orbit.Y + bob, math.sin(turn) * bit.orbit.X)
+			-- Ghosts look where they fly; lanterns grin at you as they pass.
+			local frame = if weather.kind == "Lanterns"
+				then CFrame.lookAt(at, Vector3.new(camera.X, at.Y, camera.Z))
+				else CFrame.lookAt(at, at + ahead)
+			for index, part in bit.parts do
+				table.insert(parts, part)
+				table.insert(frames, frame * bit.shape[index])
+			end
+		elseif weather.floating then
 			if bit.position == Vector3.zero or flat.Magnitude > FloatRadius * 1.3 then
 				bit.position = spot(camera, FloatRadius, random:NextNumber(4, 30))
 			end
@@ -612,21 +735,29 @@ local function stopFlashes()
 end
 
 -- The event's name across the middle of the screen for a few seconds.
-local function showBanner(event: Events.WatcherEvent)
+local function showBanner(event: Events.WatcherEvent, setId: string?)
 	local gui = screenGui()
 	local old = gui:FindFirstChild("Banner")
 	if old then
 		old:Destroy()
 	end
-	local color = if event.sky and event.sky.edge then rgb(event.sky.edge) else Color3.new(1, 1, 1)
+	local sky = Events.skyFor(event, setId)
+	local color = if sky and sky.edge then rgb(sky.edge) else Color3.new(1, 1, 1)
+	local text = string.upper(event.name)
+	local sets: { Events.MonsterSet } = event.monsterSets or {}
+	for _, set in sets do
+		if set.id == setId then
+			text ..= `\n{string.upper(set.name)}` -- The Watcher Awakens: which set came
+		end
+	end
 	local label = Instance.new("TextLabel")
 	label.Name = "Banner"
 	label.AnchorPoint = Vector2.new(0.5, 0.5)
 	label.Position = UDim2.fromScale(0.5, 0.3)
-	label.Size = UDim2.fromScale(0.8, 0.12)
+	label.Size = UDim2.fromScale(0.8, if string.find(text, "\n") then 0.2 else 0.12)
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.Creepster
-	label.Text = string.upper(event.name)
+	label.Text = text
 	label.TextScaled = true
 	label.TextColor3 = color:Lerp(Color3.new(1, 1, 1), 0.35)
 	label.TextTransparency = 1
@@ -656,6 +787,8 @@ end
 
 ------------------------------------------------------------------------------------------
 
+local shown: Events.Sky? = nil -- the sky last drawn
+
 local function show(id: string?)
 	-- Fade out whatever is showing.
 	for _, set in sets do
@@ -665,7 +798,8 @@ local function show(id: string?)
 	stopFlashes()
 
 	local event = Events.find(id)
-	local sky = event and event.sky
+	local sky = if event then Events.skyFor(event, workspace:GetAttribute("WatcherMonsterSet")) else nil
+	shown = sky
 	if not event or not sky then
 		return
 	end
@@ -765,7 +899,14 @@ function SkyController.start()
 	workspace:GetAttributeChangedSignal("WatcherEvent"):Connect(function()
 		local event = Events.find(workspace:GetAttribute("WatcherEvent"))
 		if event then
-			showBanner(event)
+			showBanner(event, workspace:GetAttribute("WatcherMonsterSet"))
+		end
+	end)
+	-- The Watcher's monster set has its own sky; redraw only if it actually changes the sky.
+	workspace:GetAttributeChangedSignal("WatcherMonsterSet"):Connect(function()
+		local event = Events.find(workspace:GetAttribute("WatcherSky"))
+		if event and Events.skyFor(event, workspace:GetAttribute("WatcherMonsterSet")) ~= shown then
+			show(event.id)
 		end
 	end)
 	Settings.changed(function(key)

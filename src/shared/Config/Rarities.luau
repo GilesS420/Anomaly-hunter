@@ -36,7 +36,9 @@ local Rarities: { [string]: Rarity } = {
 	Phantom = { id = "Phantom", order = 8, eventOnly = true },
 	-- Event rarities with big fixed values need a better vacuum, so their jackpots go to
 	-- players who have progressed (set by the balance sheet, docs in /mnt/project-files/balance).
-	Nightmare = { id = "Nightmare", order = 9, eventOnly = true, vacuumTier = 2 },
+	-- Nightmare went from tier 2 to 3 (Void Vac) on 2026-10-21 when they started spawning in
+	-- every event: tier 2 is the $50K Phantom Vac, far too early for a $3M-$12M monster.
+	Nightmare = { id = "Nightmare", order = 9, eventOnly = true, vacuumTier = 3 },
 	Eldritch = { id = "Eldritch", order = 10, eventOnly = true, vacuumTier = 3 },
 }
 
