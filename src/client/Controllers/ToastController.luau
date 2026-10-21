@@ -12,8 +12,10 @@ local ToastController = {}
 local player = Players.LocalPlayer
 
 local MAX_TOASTS = 3
-local SHOW_SECONDS = 3
-local FADE_SECONDS = 0.5
+local SHOW_SECONDS = 5 -- a short message stays this long (Giles 2026-10-21: 3 was too quick)
+local SECONDS_PER_LETTER = 0.06 -- longer messages stay longer, so there's time to read them
+local MAX_SHOW_SECONDS = 9
+local FADE_SECONDS = 0.8
 local ROW_HEIGHT = 40
 
 type Toast = { frame: Frame, label: TextLabel, text: string, token: number, tweens: { Tween } }
@@ -61,12 +63,13 @@ local function remove(toast: Toast)
 	toast.frame:Destroy()
 end
 
--- Waits SHOW_SECONDS, then fades the toast out. A newer token (same text shown again)
+-- Waits SHOW_SECONDS (more for a long message), then fades the toast out. A newer token (same text shown again)
 -- cancels the old countdown.
 local function scheduleFade(toast: Toast)
 	toast.token += 1
 	local token = toast.token
-	task.delay(SHOW_SECONDS, function()
+	local seconds = math.clamp(2 + #toast.text * SECONDS_PER_LETTER, SHOW_SECONDS, MAX_SHOW_SECONDS)
+	task.delay(seconds, function()
 		if token ~= toast.token or not toast.frame.Parent then
 			return
 		end

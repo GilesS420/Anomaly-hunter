@@ -34,7 +34,7 @@ local Distance = 220 -- studs from the camera to a moon or the eye
 local FadeOutSeconds = 3
 local MinFadeInSeconds = 1
 local MaxRatePerEmitter = 400 -- big particle rates are split over several emitters
-local BannerSeconds = 4
+local BannerSeconds = 6
 
 type Piece = {
 	part: Part,
