@@ -16,7 +16,7 @@ export type Setting = {
 	default: any,
 }
 
-Settings.VolumeSteps = { 0, 25, 50, 75, 100 } -- percent; the buttons in the window
+Settings.VolumeMax = 100 -- volumes are whole percents from 0 to this, set with a slider
 
 Settings.List = {
 	{
@@ -49,11 +49,12 @@ Settings.List = {
 		default = true,
 	},
 	{
-		key = "glow",
+		-- Was "glow" (on by default); a new key so every save starts with it off (Giles 2026-10-21).
+		key = "edgeGlow",
 		name = "Screen edge glow",
 		detail = "The coloured glow round the screen during an event.",
 		kind = "Toggle",
-		default = true,
+		default = false,
 	},
 } :: { Setting }
 
@@ -78,7 +79,10 @@ function Settings.valid(key: string, value: any): boolean
 		return false
 	end
 	if setting.kind == "Volume" then
-		return typeof(value) == "number" and table.find(Settings.VolumeSteps, value) ~= nil
+		return typeof(value) == "number"
+			and value == math.floor(value)
+			and value >= 0
+			and value <= Settings.VolumeMax
 	elseif setting.kind == "Choice" then
 		return typeof(value) == "string" and table.find(setting.options :: { string }, value) ~= nil
 	end

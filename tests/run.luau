@@ -2412,8 +2412,13 @@ do
 	end
 	check("settings defaults are all allowed", allValid)
 	check(
-		"settings volume takes only the steps",
-		Settings.valid("music", 50) and not Settings.valid("music", 40)
+		"settings volume takes whole percents 0 to 100",
+		Settings.valid("music", 0)
+			and Settings.valid("music", 37)
+			and Settings.valid("music", 100)
+			and not Settings.valid("music", 101)
+			and not Settings.valid("music", -1)
+			and not Settings.valid("music", 37.5)
 	)
 	check("settings volume needs a number", not Settings.valid("music", "50"))
 	check(
@@ -2422,13 +2427,14 @@ do
 	)
 	check(
 		"settings toggle needs true or false",
-		Settings.valid("glow", false) and not Settings.valid("glow", 1)
+		Settings.valid("edgeGlow", false) and not Settings.valid("edgeGlow", 1)
 	)
 	check("settings unknown key is refused", not Settings.valid("speed", true))
 	check("settings broken save falls back to default", Settings.value("weather", "Max") == "Full")
 	check("settings saved value is kept", Settings.value("music", 25) == 25)
 	check("settings missing value falls back to default", Settings.value("flashes", nil) == true)
 	check("settings attribute name", Settings.attribute("music") == "SettingMusic")
+	check("settings edge glow is off by default", Settings.value("edgeGlow", nil) == false)
 	check(
 		"settings weather scale",
 		Settings.weatherScale("Off") == 0

@@ -914,7 +914,7 @@ local function show(id: string?)
 	if sky.mist then
 		addMist(set, sky.mist)
 	end
-	if sky.frame and sky.edge and Settings.get("glow") == true then
+	if sky.frame and sky.edge and Settings.get("edgeGlow") == true then
 		addEdge(set, sky.edge)
 	end
 	table.insert(sets, set)
@@ -979,7 +979,7 @@ function SkyController.start()
 		end
 	end)
 	Settings.changed(function(key)
-		if key == "weather" or key == "flashes" or key == "glow" then
+		if key == "weather" or key == "flashes" or key == "edgeGlow" then
 			show(workspace:GetAttribute("WatcherSky"))
 		end
 	end)
