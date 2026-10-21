@@ -26,9 +26,11 @@ local Sounds = {}
 Sounds.Files = {
 	EventStingers = "rbxassetid://79245545160543",
 	EventAmbience = "rbxassetid://122808714791910",
-	MusicGymnopedie = "rbxassetid://126501042420062",
+	-- Gymnopedie and Fur Elise were rejected by Roblox moderation (2026-10-21), so they stay
+	-- out of the playlist until they are replaced.
+	MusicGymnopedie = "",
 	MusicMountainKing = "rbxassetid://94551444495402",
-	MusicFurElise = "rbxassetid://128385526223567",
+	MusicFurElise = "",
 	MusicMoonlight = "rbxassetid://124222698146635",
 	WorldAmbience = "rbxassetid://99157796020232",
 }
