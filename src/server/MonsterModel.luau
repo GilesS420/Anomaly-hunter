@@ -255,7 +255,7 @@ local function buildLook(
 			elseif look.wet then Enum.Material.SmoothPlastic
 			else Enum.Material.Plastic
 		if look.wet and not piece.glow then
-			part.Reflectance = 0.2 -- a wet sheen
+			part.Reflectance = 0.08 -- a wet sheen
 		end
 		if piece.reflectance then
 			part.Reflectance = piece.reflectance
@@ -328,14 +328,14 @@ local auraTextures = {
 	Mist = "rbxasset://textures/particles/smoke_main.dds",
 	Drip = "rbxasset://textures/particles/sparkles_main.dds",
 }
-local function addAura(body: BasePart, aura: EffectLooks.Aura, radius: number)
+local function addAura(body: BasePart, aura: EffectLooks.Aura, radius: number, count: number)
 	local emitter = Instance.new("ParticleEmitter")
 	emitter.Name = "Aura"
 	emitter.Texture = auraTextures[aura.kind]
 	emitter.Color = ColorSequence.new(Color3.fromRGB(aura.color[1], aura.color[2], aura.color[3]))
-	emitter.LightEmission = if aura.kind == "Mist" then 0.3 else 1
+	emitter.LightEmission = if aura.kind == "Mist" then 0.2 else 0.4
 	emitter.Lifetime = NumberRange.new(1, 2)
-	emitter.Rate = if aura.kind == "Mist" then 4 else 6
+	emitter.Rate = (if aura.kind == "Mist" then 3 else 2.5) / count -- several auras share one budget
 	emitter.SpreadAngle = Vector2.new(180, 180)
 	emitter.Speed = NumberRange.new(0.3, 1)
 	if aura.kind == "Drip" then
@@ -371,8 +371,9 @@ function dressModel(model: Model, info: Info)
 	local scale = radius / Spawning.BaseRadius
 	local look = EffectLooks.dress(base, info.effects, info.variant)
 	local lift = buildLook(model, body, look, scale, info.roamRadius or radius)
-	for _, aura in look.auras or {} do
-		addAura(body, aura, radius)
+	local auras = look.auras or {}
+	for _, aura in auras do
+		addAura(body, aura, radius, math.max(1, #auras / 2))
 	end
 	local billboard = body:FindFirstChild("Label")
 	if billboard and billboard:IsA("BillboardGui") then
@@ -410,12 +411,16 @@ function MonsterModel.build(info: Info): Model
 		body.Transparency = 1 -- just the press target; the blocks are what players see
 	end
 
-	local light = Instance.new("PointLight")
-	light.Color = color
-	light.Range = 6 + radius * 2
-	light.Brightness = 1.2
-	light.Shadows = false
-	light.Parent = body
+	-- Wild monsters glow softly so hunters can spot them in the dark zones. Mansion monsters
+	-- (they have an owner) don't: a mansion full of lights looked too shiny and cost frames.
+	if not info.owner then
+		local light = Instance.new("PointLight")
+		light.Color = color
+		light.Range = 4 + radius * 1.5
+		light.Brightness = 0.8
+		light.Shadows = false
+		light.Parent = body
+	end
 
 	-- "$1.2M" price tag / "Wisp Jack" / "Big Rare · Ghost, Werewolf" / mansion monsters:
 	-- "45% familiar"
