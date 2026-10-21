@@ -449,9 +449,38 @@ do
 		end
 	end
 	check("event monster lists match Monsters config", valid)
+	-- Event monsters wait for a better vacuum (Giles 2026-10-21: not the first one you buy).
 	check(
-		"Phantoms can be caught with the starter vacuum",
-		Catching.canVacuum("DustBuster", "Normal", "Phantom")
+		"event monsters need a later vacuum",
+		not Catching.canVacuum("PhantomVac", "Normal", "Phantom", "Flickerwick")
+			and Catching.canVacuum("SpiritSiphon", "Normal", "Phantom", "Flickerwick")
+			and not Catching.canVacuum("SpiritSiphon", "Normal", "Phantom", "CrimsonWisp")
+			and Catching.canVacuum("BansheeBlower", "Normal", "Phantom", "CrimsonWisp")
+			and Catching.canVacuum("VoidVac", "Normal", "Phantom", "Moonhowler")
+			and not Catching.canVacuum("MoonVac", "Normal", "Nightmare", "Doorknocker")
+	)
+	local everyNeedsOne = true
+	for _, monster in Monsters do
+		if
+			monster.event
+			and (not monster.vacuum or Catching.rank(monster.vacuum) <= Catching.rank("PhantomVac"))
+		then
+			everyNeedsOne = false
+		end
+	end
+	check("every event monster needs more than the Phantom Vac", everyNeedsOne)
+	check(
+		"the Workshop says which events a vacuum opens up",
+		table.concat(Workshop.unlocksEvents("BansheeBlower"), ",") == "Blood Moon"
+			and table.concat(Workshop.unlocksEvents("VoidVac"), ",") == "Eldritch Gaze,Nightmare Parade"
+			and #Workshop.unlocksEvents("PhantomVac") == 0
+	)
+	check(
+		"the tooltip names the vacuum",
+		Watcher.vacuumLine(blood) == "Catch with the Banshee Blower or better"
+			and Watcher.vacuumLine(awakens, "Phantoms") == "Catch with the Spirit Siphon or better"
+			and Watcher.vacuumLine(awakens, "Eldritch") == "Catch with the Void Vac or better"
+			and Watcher.vacuumLine(Events.find("FrostFog") :: Events.WatcherEvent) == nil
 	)
 end
 

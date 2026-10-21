@@ -118,10 +118,16 @@ function EventIconController.start()
 			end
 		end
 		local lines = Watcher.effectLines(event)
-		local monsters = Watcher.monsterLine(event, workspace:GetAttribute("WatcherMonsterSet"))
+		local setId = workspace:GetAttribute("WatcherMonsterSet")
+		local monsters = Watcher.monsterLine(event, setId)
 		if monsters then
 			-- Above the Familiarity note, which is last when there are effect lines.
-			table.insert(lines, math.max(#lines, 1), monsters)
+			local at = math.max(#lines, 1)
+			table.insert(lines, at, monsters)
+			local vacuum = Watcher.vacuumLine(event, setId)
+			if vacuum then
+				table.insert(lines, at + 1, vacuum)
+			end
 		end
 		for index, line in lines do
 			local last = index == #lines -- the Familiarity note, quieter

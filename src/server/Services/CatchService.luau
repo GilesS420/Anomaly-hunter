@@ -290,7 +290,12 @@ local function onStartCatch(player: Player, model: unknown)
 		return
 	end
 
-	-- 7. Strong enough vacuum.
+	-- 7. Strong enough vacuum. Event monsters name the vacuum they need.
+	if not Catching.strongEnough(vacuumId, spawned.monsterId) then
+		local needed = Catching.neededVacuum(spawned.monsterId) :: string
+		Notify.toast(player, `Too strong! You need the {itemName(needed)} or a better vacuum.`)
+		return
+	end
 	if not Catching.canVacuum(vacuumId, spawned.size, spawned.rarity) then
 		local tier = Catching.requiredTier(spawned.size, spawned.rarity)
 		local vacuumName = vacuumByTier[tier]

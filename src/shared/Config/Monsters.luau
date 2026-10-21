@@ -15,6 +15,9 @@ export type Monster = {
 	zone: number?,
 	spawnWeight: number?,
 	event: string?,
+	-- Event monsters: the weakest vacuum that can catch it (Shop.Workshop order), so event
+	-- jackpots wait until a player has worked their way up the vacuums.
+	vacuum: string?,
 }
 
 local Monsters: { [string]: Monster } = {}
@@ -84,15 +87,75 @@ add({ id = "SeraphOfTheDeep", rarity = "Divine", baseValue = 4_000_000_000, zone
 -- monsters are gated by vacuum tier instead (Rarities.luau). Only the rare events bring
 -- monsters: Blood Moon its own two, and The Watcher Awakens one of its monster sets
 -- (Config/Events monsterSets).
-add({ id = "Flickerwick", rarity = "Phantom", baseValue = 100_000, event = "WatcherAwakens" })
-add({ id = "StaticShade", rarity = "Phantom", baseValue = 150_000, event = "WatcherAwakens" })
-add({ id = "CrimsonWisp", rarity = "Phantom", baseValue = 250_000, event = "BloodMoon" })
-add({ id = "Moonhowler", rarity = "Phantom", baseValue = 400_000, event = "BloodMoon" })
-add({ id = "MailboxMimic", rarity = "Nightmare", baseValue = 3_000_000, event = "WatcherAwakens" })
-add({ id = "LamppostLurker", rarity = "Nightmare", baseValue = 5_000_000, event = "WatcherAwakens" })
-add({ id = "StormGremlin", rarity = "Nightmare", baseValue = 8_000_000, event = "WatcherAwakens" })
-add({ id = "Doorknocker", rarity = "Nightmare", baseValue = 12_000_000, event = "WatcherAwakens" })
-add({ id = "Watcherling", rarity = "Eldritch", baseValue = 80_000_000, event = "WatcherAwakens" })
-add({ id = "EyeOfTheWatcher", rarity = "Eldritch", baseValue = 150_000_000, event = "WatcherAwakens" })
+add({
+	id = "Flickerwick",
+	rarity = "Phantom",
+	baseValue = 100_000,
+	event = "WatcherAwakens",
+	vacuum = "SpiritSiphon",
+})
+add({
+	id = "StaticShade",
+	rarity = "Phantom",
+	baseValue = 150_000,
+	event = "WatcherAwakens",
+	vacuum = "SpiritSiphon",
+})
+add({
+	id = "CrimsonWisp",
+	rarity = "Phantom",
+	baseValue = 250_000,
+	event = "BloodMoon",
+	vacuum = "BansheeBlower",
+})
+add({
+	id = "Moonhowler",
+	rarity = "Phantom",
+	baseValue = 400_000,
+	event = "BloodMoon",
+	vacuum = "BansheeBlower",
+})
+add({
+	id = "MailboxMimic",
+	rarity = "Nightmare",
+	baseValue = 3_000_000,
+	event = "WatcherAwakens",
+	vacuum = "VoidVac",
+})
+add({
+	id = "LamppostLurker",
+	rarity = "Nightmare",
+	baseValue = 5_000_000,
+	event = "WatcherAwakens",
+	vacuum = "VoidVac",
+})
+add({
+	id = "StormGremlin",
+	rarity = "Nightmare",
+	baseValue = 8_000_000,
+	event = "WatcherAwakens",
+	vacuum = "VoidVac",
+})
+add({
+	id = "Doorknocker",
+	rarity = "Nightmare",
+	baseValue = 12_000_000,
+	event = "WatcherAwakens",
+	vacuum = "VoidVac",
+})
+add({
+	id = "Watcherling",
+	rarity = "Eldritch",
+	baseValue = 80_000_000,
+	event = "WatcherAwakens",
+	vacuum = "VoidVac",
+})
+add({
+	id = "EyeOfTheWatcher",
+	rarity = "Eldritch",
+	baseValue = 150_000_000,
+	event = "WatcherAwakens",
+	vacuum = "VoidVac",
+})
 
 return Monsters
