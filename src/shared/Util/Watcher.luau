@@ -162,6 +162,11 @@ function Watcher.spawns(
 	return event.monsters, Watcher.monsterCount(players)
 end
 
+-- Whether a caught event monster is replaced while the event is live.
+function Watcher.respawns(set: Events.MonsterSet?): boolean
+	return not (set and set.noRespawn)
+end
+
 local function percent(value: number): string
 	local rounded = math.floor(value * 10 + 0.5) / 10
 	return if rounded == math.floor(rounded) then `{math.floor(rounded)}%` else `{rounded}%`
