@@ -54,7 +54,7 @@ export type WatcherEvent = {
 	monsters: { [string]: number }?, -- event monster id -> spawn weight (optional bonus to catch)
 	effectOddsMultiplier: number?, -- mansion effect odds while live (Blood Moon doubles them)
 	growthMultiplier: number?, -- extra growth spurt rolls while live (Config/Weight.EventSpurtChance)
-	cakeBiteMultiplier: number?, -- cakes set out in mansions roll for bites this much more often
+	cakeEffectMultiplier: number?, -- a cake bite's effect chance (Config/Cakes.BiteEffectChance) x this
 	bakeryStockMultiplier: number?, -- Bakery restock chances while live (an item in stock stays in)
 	sellMultiplier: number?, -- the Collector pays this much more while live
 	sky: Sky?,
@@ -127,7 +127,7 @@ Events.List = {
 		effectChance = 6,
 		durationSeconds = 180,
 		growthMultiplier = 2,
-		cakeBiteMultiplier = 2,
+		cakeEffectMultiplier = 2,
 		bakeryStockMultiplier = 3,
 		sky = {
 			ambient = { 70, 115, 65 },

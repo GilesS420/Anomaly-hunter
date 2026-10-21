@@ -1,15 +1,13 @@
 --!strict
 -- Cake rules (numbers and looks in Config/Cakes, the cakes themselves in Config/Shop.Bakery).
 -- A placed cake is plain saved data, so it keeps going while its owner is offline:
--- Cakes.catchUp plays back every check that was missed. Pure functions so they can be tested
+-- Cakes.catchUp plays back every bite that was missed. Pure functions so they can be tested
 -- outside Roblox; server/Services/CakeService does the world side.
 
 local CakeConfig = require("../Config/Cakes")
 local Effects = require("../Config/Effects")
-local Layout = require("../Config/Layout")
 local Shop = require("../Config/Shop")
 local Format = require("./Format")
-local Mansion = require("./Mansion")
 local Rng = require("./Rng")
 local Value = require("./Value")
 
@@ -25,9 +23,10 @@ export type Placed = {
 	y: number,
 	z: number,
 	placedAt: number,
-	checkedAt: number, -- the last check that was rolled
+	checkedAt: number, -- the last time it was checked (older saves; bites now follow the clock)
 	bitesLeft: number,
 	eaten: { string }, -- uids that had a bite
+	gaveEffect: boolean?, -- a bite has given an effect
 }
 
 -- One bite: who ate, the effect it got (nil when the mutation roll missed) and the combo that
@@ -73,18 +72,30 @@ function Cakes.fits(caught: Value.CaughtMonster, item: Shop.Item?): Fit
 	return first
 end
 
--- Rolls the effect a bite gives, or nil: first BiteEffectChance, then each effect in turn rolls
--- its chance (skipping ones that don't fit) and the first hit wins.
-function Cakes.pickEffect(caught: Value.CaughtMonster, item: Shop.Item, random: Random?): string?
-	if not Rng.chance(CakeConfig.BiteEffectChance, random) then
+-- Rolls the effect a bite gives, or nil: first BiteEffectChance (x `chanceMultiplier`, for
+-- an event), then each effect in turn rolls its chance (skipping ones that don't fit) and the
+-- first hit wins. `force` skips the first roll and, if every effect misses, gives the first
+-- one that fits: a cake's last bite when it hasn't given an effect yet.
+function Cakes.pickEffect(
+	caught: Value.CaughtMonster,
+	item: Shop.Item,
+	random: Random?,
+	force: boolean?,
+	chanceMultiplier: number?
+): string?
+	if not force and not Rng.chance(CakeConfig.BiteEffectChance * (chanceMultiplier or 1), random) then
 		return nil
 	end
+	local first: string? = nil
 	for _, option in Cakes.effectChances(item) do
-		if Value.fits(caught.effects, option.effect) == "Ok" and Rng.chance(option.chance, random) then
-			return option.effect
+		if Value.fits(caught.effects, option.effect) == "Ok" then
+			if Rng.chance(option.chance, random) then
+				return option.effect
+			end
+			first = first or option.effect
 		end
 	end
-	return nil
+	return if force then first else nil
 end
 
 -- A new cake at (x, y, z) relative to the plot.
@@ -105,6 +116,13 @@ function Cakes.expiresAt(cake: Placed): number
 	return cake.placedAt + Cakes.Seconds
 end
 
+-- When the next bite is due: the bites are spread evenly over the cake's time, each in the
+-- middle of its share (2.5, 7.5 and 12.5 minutes for 3 bites over 15).
+function Cakes.nextBiteAt(cake: Placed): number
+	local share = Cakes.Seconds / CakeConfig.Bites
+	return cake.placedAt + (CakeConfig.Bites - cake.bitesLeft + 0.5) * share
+end
+
 -- True once it's eaten up or has gone stale.
 function Cakes.isDone(cake: Placed, now: number): boolean
 	return cake.bitesLeft <= 0 or now >= Cakes.expiresAt(cake)
@@ -113,29 +131,6 @@ end
 -- How far a cake reaches, in studs (a circle round it on the floor).
 function Cakes.reach(itemId: string): number
 	return CakeConfig.Reach[itemId] or CakeConfig.DefaultReach
-end
-
--- The mansion's floor area in square studs (every owned wing that has a spot in the layout).
-function Cakes.floorArea(wingsOwned: number): number
-	local area = 0
-	for _, wing in Mansion.ownedWings(wingsOwned) do
-		local spot = Layout.Wings[wing.id]
-		if spot then
-			area += spot.width * spot.depth
-		end
-	end
-	return area
-end
-
--- The chance (0 to 1) that a monster roaming the mansion is within this cake's reach at a
--- check: the share of the floor its circle covers. Used while the owner is offline.
-function Cakes.reachShare(itemId: string, wingsOwned: number): number
-	local area = Cakes.floorArea(wingsOwned)
-	if area <= 0 then
-		return 1
-	end
-	local reach = Cakes.reach(itemId)
-	return math.min(1, math.pi * reach * reach / area)
 end
 
 -- How many cakes can stand at once.
@@ -167,15 +162,23 @@ function Cakes.pickEater(
 	return pool[rng:NextInteger(1, #pool)]
 end
 
--- One monster takes a bite: it may get the cake's effect.
-function Cakes.bite(cake: Placed, caught: Value.CaughtMonster, random: Random?): Bite
+-- One monster takes a bite: it may get the cake's effect, and does for sure on the last bite
+-- if the cake hasn't given one yet.
+function Cakes.bite(
+	cake: Placed,
+	caught: Value.CaughtMonster,
+	random: Random?,
+	chanceMultiplier: number?
+): Bite
+	local force = cake.bitesLeft <= 1 and not cake.gaveEffect
 	cake.bitesLeft -= 1
 	local uid = caught.uid or ""
 	table.insert(cake.eaten, uid)
 	local item = items[cake.itemId]
-	local effectId = if item then Cakes.pickEffect(caught, item, random) else nil
+	local effectId = if item then Cakes.pickEffect(caught, item, random, force, chanceMultiplier) else nil
 	local combo = nil
 	if effectId then
+		cake.gaveEffect = true
 		local before = Value.resolveEffects(caught.effects)
 		table.insert(caught.effects, effectId)
 		combo = Value.newCombo(before, Value.resolveEffects(caught.effects))
@@ -183,36 +186,29 @@ function Cakes.bite(cake: Placed, caught: Value.CaughtMonster, random: Random?):
 	return { uid = uid, effect = effectId, combo = combo }
 end
 
--- Plays back every check missed since cake.checkedAt (up to now, or until the cake is done),
--- with the same odds as when the owner is online: at each check every monster is within reach
--- with the chance Cakes.reachShare. Returns the bites, in order.
+-- Plays back every bite that came due since the owner left (up to now, or until the cake is
+-- done), the same way as online. Returns the bites, in order.
 function Cakes.catchUp(
 	cake: Placed,
 	monsters: { Value.CaughtMonster },
 	now: number,
-	wingsOwned: number,
 	random: Random?
 ): { Bite }
 	local bites: { Bite } = {}
 	local untilTime = math.min(now, Cakes.expiresAt(cake))
-	local share = Cakes.reachShare(cake.itemId, wingsOwned) * 100
-	local function inReach(): boolean
-		return Rng.chance(share, random)
-	end
-	while cake.bitesLeft > 0 and cake.checkedAt + CakeConfig.CheckSeconds <= untilTime do
-		cake.checkedAt += CakeConfig.CheckSeconds
-		if Rng.chance(CakeConfig.BiteChance, random) then
-			local eater = Cakes.pickEater(cake, monsters, random, inReach)
-			if eater then
-				table.insert(bites, Cakes.bite(cake, eater, random))
-			end
+	while cake.bitesLeft > 0 and Cakes.nextBiteAt(cake) <= untilTime do
+		local eater = Cakes.pickEater(cake, monsters, random)
+		if not eater then
+			break -- every monster has had a bite
 		end
+		cake.checkedAt = Cakes.nextBiteAt(cake)
+		table.insert(bites, Cakes.bite(cake, eater, random))
 	end
 	return bites
 end
 
--- One short line saying what a cake does, with its reach and the real odds per bite:
--- "Reach 10 studs · Each bite: 50% Slimed (x2)".
+-- One short line saying what a cake does, with the real odds per bite:
+-- "3 bites, at least one effect · Each bite: 50% Slimed (x2)".
 function Cakes.describe(item: Shop.Item): string
 	local odds = {}
 	local left = CakeConfig.BiteEffectChance / 100 -- chance the roll gets this far
@@ -225,7 +221,7 @@ function Cakes.describe(item: Shop.Item): string
 			table.insert(odds, `{percent}% {Format.name(effect.id)} (x{effect.multiplier})`)
 		end
 	end
-	return `Reach {Cakes.reach(item.id)} studs · Each bite: {table.concat(odds, ", ")}`
+	return `{CakeConfig.Bites} bites, at least one effect · Each bite: {table.concat(odds, ", ")}`
 end
 
 return Cakes

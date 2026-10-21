@@ -3,10 +3,12 @@
 -- hotbar and click while standing in one of your wings). Monsters come for a bite, and a bite
 -- may give them a mutation (the treat's effect, Config/Shop.Bakery).
 --
--- Every CheckSeconds each cake rolls BiteChance. On a hit, a monster within the cake's Reach
--- that hasn't had a bite of it yet comes over (monsters the effect can still land on first). A
--- bite rolls BiteEffectChance, then the treat's own odds (Util/Care.pickEffect). A cake is
--- gone after Bites bites or Minutes minutes, whichever comes first.
+-- A cake is out for Minutes minutes and gets Bites bites, evenly spread (with 3 bites over 15
+-- minutes: at 2.5, 7.5 and 12.5 minutes). For each bite a monster that hasn't had one yet
+-- comes over: one within the cake's Reach if there is one, else any (monsters the effect can
+-- still land on first). A bite rolls BiteEffectChance, then the treat's own odds
+-- (Util/Cakes.pickEffect). The last bite always gives an effect if the cake hasn't yet, so
+-- every cake gives at least one (if a monster it fits is there).
 --
 -- Cakes are saved and keep going while you're offline, with the same odds (Util/Cakes.catchUp
 -- plays the missed checks back when you return). Placeholders, tune in playtesting.
@@ -15,15 +17,13 @@ local Cakes = {}
 
 Cakes.Minutes = 15
 Cakes.Bites = 3
-Cakes.BiteChance = 10 -- percent per check
-Cakes.CheckSeconds = 30
+Cakes.CheckSeconds = 30 -- how often a cake looks whether its next bite is due (online)
 Cakes.PerWing = 5 -- cakes out at once per owned wing (the Foyer counts): 5 to start, 30 with every wing
 Cakes.BiteEffectChance = 50 -- percent a bite rolls for the effect at all
 
--- How far each cake reaches (studs, a circle round it on the floor): only monsters inside it
--- come for a bite. Better cakes reach further. A wing is 40 x 40 studs. Hover over (or tap)
--- a placed cake to see its circle. Offline, a monster counts as in reach with the share of
--- the mansion floor the circle covers (Util/Cakes.reachShare), so the odds match.
+-- How far each cake reaches (studs, a circle round it on the floor): monsters inside it come
+-- for a bite first. Better cakes reach further. A wing is 40 x 40 studs. Hover over (or tap)
+-- a placed cake to see its circle.
 Cakes.Reach = {
 	PumpkinCandy = 8,
 	FangFudge = 9,
