@@ -635,8 +635,18 @@ do
 	check("can't buy a charm out of stock", Workshop.canBuy(charm, outSlot, 1e6, {}, 0) == "OutOfStock")
 	check(
 		"charms sell out after the limit",
-		Workshop.canBuy(charm, inSlot, 1e6, {}, Shop.ConsumablesPerRestock) == "SoldOut"
+		Workshop.canBuy(charm, inSlot, 1e6, {}, Workshop.limit(charm, inSlot)) == "SoldOut"
 	)
+	local seen: { [number]: boolean } = {}
+	local inRange = true
+	for slot = 1, 200 do
+		local limit = Workshop.limit(charm, slot)
+		seen[limit] = true
+		inRange = inRange and limit >= Shop.StockMin and limit <= Shop.StockMax
+	end
+	check("shop stock is a random amount in range", inRange and seen[Shop.StockMin] and seen[Shop.StockMax])
+	check("shop stock is the same for the same restock", Workshop.limit(charm, 7) == Workshop.limit(charm, 7))
+	check("a tool is always one", Workshop.limit(siphon, 7) == 1)
 	check("can't buy without the money", Workshop.canBuy(charm, inSlot, charm.price - 1, {}, 0) == "TooPoor")
 	check(
 		"a tool you own can't be bought again",
@@ -2453,6 +2463,53 @@ do
 	check("empty mansion is worth nothing and has no best", emptyTotal == 0 and none == nil)
 	local _, first = Mansion.worth({ 50, 50 })
 	check("mansion worth tie goes to the first", first == 1)
+end
+
+-- Codex rewards (Util/Codex.newRewards, Config/CodexRewards) and the Portals button's gate
+-- (Util/Hunt.newestZone).
+do
+	local Codex = require("../src/shared/Util/Codex")
+	local page = Codex.sections()[1]
+	local codex: { [string]: any } = {}
+	check("codex: nothing done pays nothing", #Codex.newRewards(codex, { page }) == 0)
+	for _, id in page.monsters do
+		Codex.note(codex, { monsterId = id, size = "Normal", effects = {}, familiarity = 0 })
+	end
+	local paid = Codex.newRewards(codex, { page })
+	check(
+		"codex: every monster found pays the Found reward once",
+		#paid == 1 and paid[1].goal == "Found" and paid[1].amount == Codex.rewardAmount(page.id, "Found")
+	)
+	check("codex: a paid reward isn't paid again", #Codex.newRewards(codex, { page }) == 0)
+	check("codex: a paid reward is marked", Codex.claimed(codex, page.id, "Found"))
+	for _, id in page.monsters do
+		Codex.note(
+			codex,
+			{ monsterId = id, size = "Normal", effects = {}, familiarity = 0, variant = "Gold" }
+		)
+	end
+	local gold = Codex.newRewards(codex, { page })
+	check("codex: every monster in Gold pays the Gold reward", #gold == 1 and gold[1].goal == "Gold")
+	check(
+		"codex: rarer variants pay more",
+		Codex.rewardAmount(page.id, "Rainbow") > Codex.rewardAmount(page.id, "Shiny")
+			and Codex.rewardAmount(page.id, "Shiny") > Codex.rewardAmount(page.id, "Gold")
+			and Codex.rewardAmount(page.id, "Gold") > Codex.rewardAmount(page.id, "Silver")
+	)
+	check(
+		"codex: later zones pay more",
+		Codex.rewardAmount("MurkyBayou", "Found") > Codex.rewardAmount("PumpkinGraveyard", "Found")
+	)
+	local launched = 0
+	for _, section in Codex.sections() do
+		launched += if Codex.rewardAmount(section.id, "Found") > 0 then 1 else 0
+	end
+	check("codex: every page has a reward", launched == #Codex.sections())
+
+	check("portals: a new player goes to the first zone", Hunt.newestZone(1).index == 1)
+	check("portals: two wings go to the second zone", Hunt.newestZone(2).index == 2)
+	local last = Hunt.newestZone(99)
+	check("portals: never a zone that isn't in the game yet", last ~= nil and last.launch)
 end
 
 if failures > 0 then

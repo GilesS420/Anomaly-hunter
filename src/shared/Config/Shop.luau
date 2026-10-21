@@ -27,9 +27,12 @@ local Shop = {}
 
 Shop.RestockSeconds = 5 * 60
 
--- How many of one single-use item (Bait Bell, Return Charm, a treat) a player can buy per restock.
+-- How many of one single-use item (Bait Bell, Return Charm, a cake) a player can buy per
+-- restock: a random number from StockMin to StockMax, new every restock and the same in every
+-- server (Util/Workshop.limit; Giles 2026-10-21, it used to be always 3).
 -- Vacuums are bought once and kept forever.
-Shop.ConsumablesPerRestock = 3
+Shop.StockMin = 1
+Shop.StockMax = 6
 
 -- Selling a monster of this rarity or rarer at the Collector asks "are you sure?" first.
 Shop.ConfirmSellFrom = "Legendary"

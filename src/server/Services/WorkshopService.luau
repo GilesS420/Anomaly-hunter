@@ -3,7 +3,7 @@
 -- Charms, and choose which tools to use. Hold the prompt at Workspace.Hub.Landmarks.Workshop
 -- to open the shop window. The stock changes every 5 minutes (Util/Workshop decides what's in
 -- stock, the same in every server). Tools are kept forever and equipped straight away;
--- single-use items stack in the inventory, up to Shop.ConsumablesPerRestock per restock.
+-- single-use items stack in the inventory, up to a random number per restock (Workshop.limit).
 --
 -- Remotes in ReplicatedStorage.WorkshopRemotes:
 --   Open     server -> client (counter: Vector3)   the player used the Workshop prompt
@@ -101,7 +101,7 @@ local function viewFor(data: DataService.Data): View
 			equipped = equipSlot ~= nil and equipped[equipSlot] == item.id,
 			count = data.inventory[item.id] or 0,
 			bought = bought[item.id] or 0,
-			limit = Workshop.limit(item),
+			limit = Workshop.limit(item, slot),
 			look = ToolModel.look(item.id),
 		})
 	end
@@ -170,7 +170,7 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 	elseif check == "Owned" then
 		message = "You already own that."
 	elseif check == "SoldOut" and item then
-		message = `You bought all {Workshop.limit(item)} this restock. More in {countdown(
+		message = `You bought all {Workshop.limit(item, slot)} this restock. More in {countdown(
 			Workshop.restockAt(slot) - os.time()
 		)}.`
 	elseif check == "OutOfStock" then
