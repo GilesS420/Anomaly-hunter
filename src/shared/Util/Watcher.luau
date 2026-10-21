@@ -3,7 +3,9 @@
 -- rolls. Pure functions so they can be tested outside Roblox. See Config/Events for how the
 -- clock runs.
 
+local Effects = require("../Config/Effects")
 local Events = require("../Config/Events")
+local Format = require("./Format")
 local Monsters = require("../Config/Monsters")
 local Rng = require("./Rng")
 
@@ -130,6 +132,35 @@ function Watcher.rollMonster(event: Events.WatcherEvent, random: Random?): Monst
 	return Rng.pickWeighted(list, function(m)
 		return weights[m.id]
 	end, random)
+end
+
+local function percent(value: number): string
+	local rounded = math.floor(value * 10 + 0.5) / 10
+	return if rounded == math.floor(rounded) then `{math.floor(rounded)}%` else `{rounded}%`
+end
+
+-- What an event does to mansion monsters, in a few short lines for the event icon's tooltip:
+-- the effect it gives, its value boost and the chance per roll.
+function Watcher.effectLines(event: Events.WatcherEvent): { string }
+	local lines: { string } = {}
+	local effect = if event.effect then Effects.List[event.effect] else nil
+	if effect then
+		table.insert(lines, `Gives {Format.name(effect.id)} (x{effect.multiplier} value)`)
+		table.insert(
+			lines,
+			`{percent(event.effectChance or 0)} chance per monster every {Events.EffectRollSeconds} s`
+		)
+	end
+	if event.otherEffectsChance then
+		table.insert(lines, `{percent(event.otherEffectsChance)} chance of another event's effect`)
+	end
+	if event.effectOddsMultiplier and event.effectOddsMultiplier ~= 1 then
+		table.insert(lines, `Other haunted effects x{event.effectOddsMultiplier} as likely`)
+	end
+	if #lines > 0 then
+		table.insert(lines, "Higher with Familiarity and more wings")
+	end
+	return lines
 end
 
 -- "2:05"

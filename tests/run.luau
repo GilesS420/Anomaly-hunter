@@ -295,6 +295,20 @@ do
 		again.index == walk.index and again.event.id == walk.event.id
 	)
 
+	local frostLines = Watcher.effectLines(Events.find("FrostFog") :: Events.WatcherEvent)
+	check(
+		"the event icon names the effect and its chance",
+		frostLines[1] == "Gives Frostbitten (x2.5 value)"
+			and frostLines[2] == "6% chance per monster every 30 s"
+	)
+	local watchedLines =
+		table.concat(Watcher.effectLines(Events.find("WatcherAwakens") :: Events.WatcherEvent), "|")
+	check(
+		"The Watcher Awakens shows its rare chance",
+		string.find(watchedLines, "0.3% chance", 1, true) ~= nil
+			and string.find(watchedLines, "another event", 1, true) ~= nil
+	)
+
 	local eyes = 0
 	for _ = 1, Events.EyesToAwaken do
 		eyes = Watcher.eyesAfter(eyes, Watcher.pick(nil, eyes, clockRng))

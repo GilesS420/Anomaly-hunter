@@ -1,7 +1,8 @@
 --!strict
 -- While a Watcher event is live, its icon sits in the bottom-right corner of the screen (on
 -- phones, above the jump button). Hover over it (or tap it) to see the event's name and how
--- long is left. It comes with the weather, at the start of the 30 second warning, and shows
+-- long is left, plus the effect the event gives mansion monsters and its chance
+-- (Watcher.effectLines). It comes with the weather, at the start of the 30 second warning, and shows
 -- how long until the event starts until then.
 -- Reads the workspace attributes WatcherEvent, WatcherEventEnd, WatcherNext and WatcherSkyAt
 -- (WatcherService).
@@ -54,7 +55,7 @@ function EventIconController.start()
 	tip.Name = "Tooltip"
 	tip.AnchorPoint = Vector2.new(1, 1) -- above the icon, kept on screen
 	tip.Position = UDim2.new(1, 0, 0, -8)
-	tip.Size = UDim2.fromOffset(190, 52)
+	tip.Size = UDim2.fromOffset(250, 52)
 	tip.BackgroundColor3 = Ui.Colors.panel
 	tip.Visible = false
 	Ui.corner(tip, 8)
@@ -65,6 +66,16 @@ function EventIconController.start()
 	local left = Ui.text(tip, "", UDim2.new(1, -16, 0, 20), Ui.Colors.text, false, 16)
 	left.Position = UDim2.fromOffset(8, 27)
 	left.TextXAlignment = Enum.TextXAlignment.Center
+	-- The effect lines, under the time; rebuilt for each event.
+	local details = Instance.new("Frame")
+	details.Name = "Details"
+	details.BackgroundTransparency = 1
+	details.Position = UDim2.fromOffset(8, 50)
+	details.Size = UDim2.new(1, -16, 0, 0)
+	local stack = Instance.new("UIListLayout")
+	stack.SortOrder = Enum.SortOrder.LayoutOrder
+	stack.Parent = details
+	details.Parent = tip
 	tip.Parent = icon
 
 	local hovering = false
@@ -97,6 +108,26 @@ function EventIconController.start()
 		rim.Color = color
 		icon.Text = event.icon or "?"
 		title.Text = event.name
+		for _, child in details:GetChildren() do
+			if child:IsA("TextLabel") then
+				child:Destroy()
+			end
+		end
+		local lines = Watcher.effectLines(event)
+		for index, line in lines do
+			local last = index == #lines -- the Familiarity note, quieter
+			local label = Ui.text(
+				details,
+				line,
+				UDim2.new(1, 0, 0, 18),
+				if last then Ui.Colors.muted else Ui.Colors.text,
+				false,
+				if last then 13 else 15
+			)
+			label.LayoutOrder = index
+			label.TextXAlignment = Enum.TextXAlignment.Center
+		end
+		tip.Size = UDim2.fromOffset(250, 52 + #lines * 18 + (if #lines > 0 then 6 else 0))
 	end
 	workspace:GetAttributeChangedSignal("WatcherEvent"):Connect(refresh)
 	workspace:GetAttributeChangedSignal("WatcherNext"):Connect(refresh)
