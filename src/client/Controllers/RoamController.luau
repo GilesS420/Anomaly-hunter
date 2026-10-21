@@ -45,10 +45,13 @@ type State = {
 	pace: number, -- eases between IDLE_PACE and 1 so limbs never jump
 	swings: { Swing }?, -- nil until the model has streamed in
 	lookVersion: any, -- the server rebuilds the blocks when effects change (LookVersion)
+	rescanUntil: number?, -- os.clock(): keep looking for the new joints until then
+	nextScan: number?,
 	rainbow: { BasePart }?, -- parts of a Rainbow monster, recoloured every frame
 }
 
 local RAINBOW_SPEED = 0.25 -- trips round the colour wheel per second
+local RESCAN_SECONDS = 4
 local random = Random.new()
 local phases: { [Model]: State } = {}
 
@@ -59,9 +62,20 @@ local function track(instance: Instance)
 end
 
 -- The swinging joints the server set up for a block monster (MonsterModel.buildLook).
-local function findSwings(model: Model): { Swing }
+-- Joints already in `known` keep their entry: their C0 has been moved since.
+local function findSwings(model: Model, known: { Swing }?): { Swing }
+	local seen: { [Motor6D]: Swing } = {}
+	if known then
+		for _, swing in known do
+			seen[swing.motor] = swing
+		end
+	end
 	local swings: { Swing } = {}
 	for _, motor in model:GetDescendants() do
+		if motor:IsA("Motor6D") and seen[motor] then
+			table.insert(swings, seen[motor])
+			continue
+		end
 		if motor:IsA("Motor6D") then
 			local axis = motor:GetAttribute("SwingAxis")
 			local amp = motor:GetAttribute("SwingAmp")
@@ -178,8 +192,20 @@ function RoamController.start()
 			if gait then
 				local swings = state.swings
 				local lookVersion = model:GetAttribute("LookVersion")
-				if not swings or state.lookVersion ~= lookVersion then
+				local now = os.clock()
+				-- After a rebuild (a new effect) the new blocks can reach us after LookVersion
+				-- does, so keep looking for a few seconds, and whenever a joint we move is gone.
+				local changed = state.lookVersion ~= lookVersion
+				if changed then
+					state.rescanUntil = now + RESCAN_SECONDS
+				end
+				local stale = swings ~= nil and #swings > 0 and swings[1].motor.Parent == nil
+				local settling = state.rescanUntil ~= nil
+					and now < state.rescanUntil
+					and now >= (state.nextScan or 0)
+				if not swings or changed or stale or settling then
 					state.lookVersion = lookVersion
+					state.nextScan = now + 0.5
 					local rainbow: { BasePart } = {}
 					for _, part in model:GetDescendants() do
 						if part:IsA("BasePart") and typeof(part:GetAttribute("Rainbow")) == "number" then
@@ -187,7 +213,7 @@ function RoamController.start()
 						end
 					end
 					state.rainbow = if #rainbow > 0 then rainbow else nil
-					swings = findSwings(model)
+					swings = findSwings(model, swings)
 					state.swings = swings
 				end
 				if state.rainbow then
