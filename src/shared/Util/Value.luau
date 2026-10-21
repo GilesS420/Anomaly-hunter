@@ -2,9 +2,11 @@
 -- Sell value of a caught monster:
 --   baseValue x weight (kg / 20, Util/Weight; wild monsters use their size) x effects
 --   x familiarity x wing boost x catch variant
+-- Effects add less on cheap monsters (Value.monsterEffectMultiplier).
 -- Effect bonuses add up (1 + sum(multiplier - 1)). Combos replace their two
 -- ingredients. Call Util/Care.settle first so familiarity is up to date.
 
+local Care = require("../Config/Care")
 local Effects = require("../Config/Effects")
 local Monsters = require("../Config/Monsters")
 local Variants = require("../Config/Variants")
@@ -14,6 +16,10 @@ local Weight = require("./Weight")
 local Value = {}
 
 Value.FamiliarityMaxMultiplier = 2 -- placeholder, tune in playtesting
+-- Cheap monsters get familiar fast (Util/Care.hours), so effects add less to them: the
+-- cheapest (Config/Care.CheapValue) get this share of the effect bonus, the priciest
+-- (Config/Care.PriceyValue) all of it, in between by price (Value.priceShare).
+Value.CheapEffectShare = 0.25
 
 export type CaughtMonster = {
 	uid: string?, -- unique id, given when caught (older saves get one when loaded)
@@ -84,6 +90,25 @@ function Value.effectMultiplier(effectIds: { string }): number
 	return total
 end
 
+-- Where a monster's base price sits between Config/Care.CheapValue (0) and PriceyValue (1),
+-- by x10 steps. Nil for a monster that isn't in Config/Monsters.
+function Value.priceShare(monsterId: string): number?
+	local monster = Monsters[monsterId]
+	if not monster then
+		return nil
+	end
+	local span = math.log10(Care.PriceyValue / Care.CheapValue)
+	return math.clamp(math.log10(math.max(monster.baseValue, 1) / Care.CheapValue) / span, 0, 1)
+end
+
+-- The effects' value multiplier on this monster: the full bonus on pricey monsters, less on
+-- cheap ones (Value.CheapEffectShare).
+function Value.monsterEffectMultiplier(caught: CaughtMonster): number
+	local share = Value.CheapEffectShare
+		+ (1 - Value.CheapEffectShare) * (Value.priceShare(caught.monsterId) or 1)
+	return 1 + (Value.effectMultiplier(caught.effects) - 1) * share
+end
+
 function Value.sellValue(caught: CaughtMonster, wingsOwned: number): number
 	local monster = Monsters[caught.monsterId]
 	assert(monster, "unknown monster " .. caught.monsterId)
@@ -93,7 +118,7 @@ function Value.sellValue(caught: CaughtMonster, wingsOwned: number): number
 		* Value.variantMultiplier(caught.variant)
 	local familiarity = 1 + math.clamp(caught.familiarity, 0, 1) * (Value.FamiliarityMaxMultiplier - 1)
 	local wingBoost = 1 + math.max(wingsOwned - 1, 0) * Wings.ValueBoostPerWing
-	return math.floor(value * Value.effectMultiplier(caught.effects) * familiarity * wingBoost)
+	return math.floor(value * Value.monsterEffectMultiplier(caught) * familiarity * wingBoost)
 end
 
 return Value

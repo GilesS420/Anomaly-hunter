@@ -5,19 +5,16 @@
 -- be tested outside Roblox.
 
 local CareConfig = require("../Config/Care")
-local Monsters = require("../Config/Monsters")
 local Value = require("./Value")
 
 local Care = {}
 
 -- Hours this monster takes to go from 0% to 100% Familiarity: fewer the cheaper it is.
 function Care.hours(monsterId: string): number
-	local monster = Monsters[monsterId]
-	if not monster then
+	local at = Value.priceShare(monsterId)
+	if not at then
 		return CareConfig.FamiliarityHours
 	end
-	local span = math.log10(CareConfig.PriceyValue / CareConfig.CheapValue)
-	local at = math.clamp(math.log10(math.max(monster.baseValue, 1) / CareConfig.CheapValue) / span, 0, 1)
 	return CareConfig.CheapHours * (CareConfig.PriceyHours / CareConfig.CheapHours) ^ at
 end
 
