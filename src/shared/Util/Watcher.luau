@@ -3,6 +3,7 @@
 -- rolls. Pure functions so they can be tested outside Roblox. See Config/Events for how the
 -- clock runs.
 
+local Catching = require("./Catching")
 local Effects = require("../Config/Effects")
 local Events = require("../Config/Events")
 local Format = require("./Format")
@@ -221,9 +222,9 @@ function Watcher.monsterBatch(
 	return batch
 end
 
--- One line for the event icon's tooltip on the monsters the event brings (nil: none), with
--- the monster set The Watcher Awakens picked this time (setId, the WatcherMonsterSet attr).
-function Watcher.monsterLine(event: Events.WatcherEvent, setId: string?): string?
+-- The monsters an event brings this time and what to call them (nil: none), with the
+-- monster set The Watcher Awakens picked (setId, the WatcherMonsterSet attr).
+local function shownMonsters(event: Events.WatcherEvent, setId: string?): ({ [string]: number }?, string)
 	local weights = event.monsters
 	local prefix = "Monsters"
 	local sets: { Events.MonsterSet } = event.monsterSets or {}
@@ -233,6 +234,12 @@ function Watcher.monsterLine(event: Events.WatcherEvent, setId: string?): string
 			prefix = set.name
 		end
 	end
+	return weights, prefix
+end
+
+-- One line for the event icon's tooltip on the monsters the event brings (nil: none).
+function Watcher.monsterLine(event: Events.WatcherEvent, setId: string?): string?
+	local weights, prefix = shownMonsters(event, setId)
 	if not weights then
 		return nil
 	end
@@ -241,6 +248,20 @@ function Watcher.monsterLine(event: Events.WatcherEvent, setId: string?): string
 		table.insert(names, Format.name(monster.id))
 	end
 	return `{prefix}: {table.concat(names, ", ")}`
+end
+
+-- The tooltip line on which vacuum the event's monsters need (nil: any vacuum will do):
+-- the weakest one that catches at least one of them.
+function Watcher.vacuumLine(event: Events.WatcherEvent, setId: string?): string?
+	local weights = shownMonsters(event, setId)
+	local weakest: string? = nil
+	for _, monster in kindsOf(weights or {}) do
+		local needed = monster.vacuum
+		if needed and (weakest == nil or Catching.rank(needed) < Catching.rank(weakest)) then
+			weakest = needed
+		end
+	end
+	return if weakest then `Catch with the {Format.name(weakest)} or better` else nil
 end
 
 -- "2:05"

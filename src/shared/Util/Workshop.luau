@@ -6,6 +6,8 @@
 -- they can be tested outside Roblox.
 
 local Effects = require("../Config/Effects")
+local Events = require("../Config/Events")
+local Monsters = require("../Config/Monsters")
 local Shop = require("../Config/Shop")
 local Sizes = require("../Config/Sizes")
 local Tools = require("../Config/Tools")
@@ -154,6 +156,35 @@ local function variantLine(chances: { [string]: number }?): string
 	return table.concat(parts, " · ")
 end
 
+-- The event monsters this vacuum is the first to catch, by event or Watcher set name
+-- ("Blood Moon"), sorted.
+function Workshop.unlocksEvents(vacuumId: string): { string }
+	local names: { string } = {}
+	local function add(name: string)
+		if not table.find(names, name) then
+			table.insert(names, name)
+		end
+	end
+	for _, event in Events.List do
+		local monsters: { [string]: number } = event.monsters or {}
+		for id in monsters do
+			if Monsters[id] and Monsters[id].vacuum == vacuumId then
+				add(event.name)
+			end
+		end
+		local sets: { Events.MonsterSet } = event.monsterSets or {}
+		for _, set in sets do
+			for id in set.monsters do
+				if Monsters[id] and Monsters[id].vacuum == vacuumId then
+					add(set.name)
+				end
+			end
+		end
+	end
+	table.sort(names)
+	return names
+end
+
 -- One short line saying what the item does, for the shop window.
 function Workshop.describe(item: Shop.Item): string
 	if item.kind == "Vacuum" then
@@ -167,6 +198,10 @@ function Workshop.describe(item: Shop.Item): string
 			`Carries {vacuum.bag} · up to {biggestSize(tier)}{extra}`,
 			`catches in {vacuum.catchSeconds}s · reach {vacuum.reach}`,
 		}
+		local events = Workshop.unlocksEvents(item.id)
+		if #events > 0 then
+			table.insert(parts, `catches {table.concat(events, " and ")} monsters`)
+		end
 		local catchEffects: { string } = vacuum.catchEffects or {}
 		for _, effectId in catchEffects do
 			table.insert(parts, `{Effects.CatchChance}% {effectId}`)
