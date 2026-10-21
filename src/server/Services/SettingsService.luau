@@ -19,10 +19,18 @@ Set.Name = "Set"
 Set.Parent = remotes
 
 local function publish(player: Player, data: DataService.Data)
+	-- Only what the player picked is kept in the save, so a changed default reaches everyone
+	-- who never touched that setting. Broken values and old keys are dropped.
+	for key, saved in data.settings do
+		if not Settings.valid(key, saved) then
+			data.settings[key] = nil
+		end
+	end
 	for _, setting in Settings.List do
-		local value = Settings.value(setting.key, data.settings[setting.key])
-		data.settings[setting.key] = value -- repairs a broken value
-		player:SetAttribute(Settings.attribute(setting.key), value)
+		player:SetAttribute(
+			Settings.attribute(setting.key),
+			Settings.value(setting.key, data.settings[setting.key])
+		)
 	end
 end
 
