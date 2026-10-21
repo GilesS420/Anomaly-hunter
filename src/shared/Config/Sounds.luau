@@ -30,7 +30,7 @@ Sounds.Files = {
 	MusicMountainKing = "rbxassetid://94551444495402",
 	MusicFurElise = "rbxassetid://128385526223567",
 	MusicMoonlight = "rbxassetid://124222698146635",
-	WorldAmbience = "",
+	WorldAmbience = "rbxassetid://99157796020232",
 }
 
 -- Overall loudness of each kind of sound, 0 to 1.
