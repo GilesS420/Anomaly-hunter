@@ -171,17 +171,52 @@ local function wingFront(plot: PlotService.Plot, wingId: string, inset: number, 
 	return Vector3.new(point.X, y, point.Z)
 end
 
--- Floor areas monsters can roam: every owned wing that has a spot in the layout.
+-- The doorways between wings (Config/Rooms): the Foyer's side archways and back door, and the
+-- back doors of the Library and Ballroom. Each sits in the middle of the wall the two share.
+local Doorways = {
+	{ "Foyer", "Library" },
+	{ "Foyer", "Ballroom" },
+	{ "Foyer", "Garden" },
+	{ "Library", "Attic" },
+	{ "Ballroom", "Crypt" },
+}
+local DoorwayWidth = 6 -- of the 8-wide doorway, so a monster's middle keeps clear of the jambs
+
+-- Floor areas monsters can roam: every owned wing that has a spot in the layout, plus a strip
+-- through each doorway between two owned wings. The wing floors stop short of their walls, so
+-- without the strips a monster could never cross into the next wing (RoamService only lets a
+-- leg run over these rectangles).
 local function roamRects(state: State, wingsOwned: number): { Roam.Rect }
 	local rects = {}
 	local top = floorTop(state.plot)
+	local owned: { [string]: boolean } = {}
 	for _, wing in Mansion.ownedWings(wingsOwned) do
 		local spot = Layout.Wings[wing.id]
 		if spot then
+			owned[wing.id] = true
 			local centre = wingCentre(state.plot, wing.id, top)
 			table.insert(
 				rects,
 				Roam.rect(centre.X, centre.Z, spot.width - 2 * EdgeInset, spot.depth - 2 * EdgeInset, top)
+			)
+		end
+	end
+	for _, pair in Doorways do
+		local a, b = pair[1], pair[2]
+		if owned[a] and owned[b] then
+			local from, to = wingCentre(state.plot, a, top), wingCentre(state.plot, b, top)
+			local middle = (from + to) / 2
+			local dx, dz = math.abs(to.X - from.X), math.abs(to.Z - from.Z)
+			-- Long enough to reach a little way onto both floors across the walls between them.
+			local span = if dx > dz
+				then dx - (Layout.Wings[a].width + Layout.Wings[b].width) / 2
+				else dz - (Layout.Wings[a].depth + Layout.Wings[b].depth) / 2
+			local length = span + 2 * EdgeInset + 2
+			table.insert(
+				rects,
+				if dx > dz
+					then Roam.rect(middle.X, middle.Z, length, DoorwayWidth, top)
+					else Roam.rect(middle.X, middle.Z, DoorwayWidth, length, top)
 			)
 		end
 	end

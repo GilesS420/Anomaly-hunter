@@ -58,7 +58,7 @@ local PauseMin, PauseMax = 0.5, 2.5 -- rest between legs
 local RetrySeconds = 1 -- wait when no clear path was found (crowded)
 local Candidates = 8 -- targets tried per new leg
 local PathStep = 1 -- studs between the sample bodies placed along a path (small, so no gaps)
-local FloorSlack = 1.5 -- studs a leg may stray off the floor rectangles (bridges the 1-stud gap between wings)
+local FloorSlack = 1.5 -- studs a leg may stray off the floor rectangles (wings join through doorway strips, see MansionService)
 local ExactSlack = 0.25 -- the same on exact open ground (only rounding)
 
 local random = Random.new()
