@@ -389,10 +389,10 @@ function SpawnService.lure(player: Player, zoneIndex: number, vacuumId: string):
 		`A {sizeText}{monster.rarity} {Format.name(monster.id)} answers your bell! Only you can catch it.`
 end
 
--- Studio only (DevService /spawn): brings this exact monster to the hunter in the zone they're
--- in, reserved for them like a Bait Bell's monster but staying for 10 minutes. Any monster
--- works in any zone, event monsters too.
-function SpawnService.spawnFor(player: Player, monsterId: string, size: string): (boolean, string)
+-- Brings this exact monster to the hunter in the zone they're in, reserved for them like a
+-- Bait Bell's monster but staying for 10 minutes (DevService /spawn, and the tutorial's
+-- Gloomlet). Any monster works in any zone, event monsters too. Also returns the model.
+function SpawnService.spawnFor(player: Player, monsterId: string, size: string): (boolean, string, Model?)
 	local monster = Monsters[monsterId]
 	local zoneId = player:GetAttribute("Zone")
 	local state: ZoneState? = nil
@@ -410,10 +410,11 @@ function SpawnService.spawnFor(player: Player, monsterId: string, size: string):
 	if not state or not folder or not root or not root:IsA("BasePart") then
 		return false, "Go into a zone first, then try again."
 	end
-	if not bring(player, state, folder, root.Position, monster, size, 600) then
+	local model = bring(player, state, folder, root.Position, monster, size, 600)
+	if not model then
 		return false, "It's too crowded here. Try again in a moment."
 	end
-	return true, `{Format.name(monster.id)} ({size} {monster.rarity}) is here. Only you can catch it.`
+	return true, `{Format.name(monster.id)} ({size} {monster.rarity}) is here. Only you can catch it.`, model
 end
 
 function SpawnService.start()

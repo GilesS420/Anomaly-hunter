@@ -8,8 +8,8 @@
 -- A monster you're catching is stunned by your vacuum's beam and can't attack, but the others
 -- can, and a hit that costs a heart makes the catch get away. They keep attacking while you
 -- carry a catch; at 0 hearts you drop it and go home (HuntService.damage).
--- Players with the attribute Calm (Studio: /calm) are left alone, and Bait Bell monsters
--- never attack. Studio /attack makes the closest monster attack you now (provoke).
+-- Players with the attribute Calm (Studio: /calm) or in the tutorial are left alone, and
+-- Bait Bell monsters never attack. Studio /attack makes the closest monster attack you now (provoke).
 --
 -- Remotes in ReplicatedStorage.AttackRemotes:
 --   Warn  server -> clients in the zone (Warning)   draw the warning shape until hitTime
@@ -124,6 +124,7 @@ local function huntersByZone(): { [string]: { Target } }
 		if
 			typeof(zoneId) ~= "string"
 			or player:GetAttribute("Calm")
+			or player:GetAttribute("Tutorial") -- nothing attacks a first-timer
 			or not root
 			or not root:IsA("BasePart")
 			or not humanoid

@@ -20,6 +20,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Drag = require(script.Parent.Parent:WaitForChild("Drag"))
 local HotbarController = require(script.Parent.HotbarController)
+local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
 local InventoryController = {}
@@ -391,7 +392,7 @@ function InventoryController.start()
 	end)
 
 	UserInputService.InputBegan:Connect(function(input, processed)
-		if not processed and input.KeyCode == Enum.KeyCode.G then
+		if not processed and input.KeyCode == Enum.KeyCode.G and not Locks.isLocked("Backpack") then
 			toggle()
 		end
 	end)
@@ -399,6 +400,7 @@ function InventoryController.start()
 	local hud = player:WaitForChild("PlayerGui"):WaitForChild("HuntUi"):WaitForChild("Hud")
 	local button = hud:WaitForChild("Backpack") :: TextButton
 	button.Activated:Connect(toggle)
+	Locks.guard(button, "Backpack") -- greyed out until the tutorial gets there
 end
 
 return InventoryController

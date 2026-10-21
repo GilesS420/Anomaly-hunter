@@ -22,6 +22,8 @@ local SkyController = require(script.Controllers.SkyController)
 local EventIconController = require(script.Controllers.EventIconController)
 local AdminController = require(script.Controllers.AdminController)
 local SoundController = require(script.Controllers.SoundController)
+local TutorialController = require(script.Controllers.TutorialController)
+local CodexController = require(script.Controllers.CodexController)
 
 local controllers: { { start: () -> () } } = {
 	ToastController,
@@ -43,6 +45,8 @@ local controllers: { { start: () -> () } } = {
 	EventIconController,
 	AdminController,
 	SoundController,
+	TutorialController,
+	CodexController,
 }
 
 for _, controller in controllers do

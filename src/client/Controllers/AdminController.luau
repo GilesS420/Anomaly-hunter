@@ -202,6 +202,18 @@ local function build()
 	button(me, "Attack me", Ui.Colors.confirm, function()
 		send("/attack")
 	end)
+	button(me, "Skip tutorial", Ui.Colors.off, function()
+		send("/tutorial", "skip")
+	end)
+	button(me, "Restart tutorial", Ui.Colors.off, function()
+		send("/tutorial", "restart")
+	end)
+	-- Wipes only your own save and kicks you; rejoin to play as a brand-new player.
+	local reset = Ui.button(me, "Reset my save", Ui.Colors.confirm, CellSize)
+	reset.LayoutOrder = nextOrder()
+	Ui.confirmButton(reset, "Wipe it all?", function()
+		send("/reset", "confirm")
+	end)
 end
 
 local function toggle()

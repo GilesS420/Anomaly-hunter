@@ -2012,6 +2012,179 @@ do
 		"asset ids get their prefix",
 		Sounds.assetId("123") == "rbxassetid://123" and Sounds.assetId("") == ""
 	)
+-- The first-timer tutorial (Util/Tutorial).
+do
+	local Tutorial = require("../src/shared/Util/Tutorial")
+	local Zones = require("../src/shared/Config/Zones")
+	check("tutorial starts at the gate and ends after the tour", Tutorial.Steps[1] == "Gate")
+	check("tutorial step order", Tutorial.nextStep("Gate") == "Catch" and Tutorial.nextStep("Tour") == "Done")
+	check(
+		"tutorial: every step has words and a hint",
+		(function()
+			for _, step in Tutorial.Steps do
+				if not Tutorial.Text[step] or not Tutorial.Hints[step] then
+					return false
+				end
+			end
+			return true
+		end)()
+	)
+	check("tutorial: buttons locked at the start", not Tutorial.isUnlocked("Gate", "Sell"))
+	check("tutorial: Portals works from the first step", Tutorial.isUnlocked("Gate", "Portals"))
+	check(
+		"tutorial: hotbar opens for the catch",
+		Tutorial.isUnlocked("Catch", "Hotbar") and not Tutorial.isUnlocked("Gate", "Hotbar")
+	)
+	check(
+		"tutorial: Sell opens at the sell step and stays open",
+		Tutorial.isUnlocked("Sell", "Sell") and Tutorial.isUnlocked("Tour", "Sell")
+	)
+	check("tutorial: unlisted features wait for the end", not Tutorial.isUnlocked("Tour", "Something"))
+	check(
+		"tutorial: everything works once done",
+		Tutorial.isUnlocked(nil, "Something") and Tutorial.isUnlocked("Done", "Sell")
+	)
+	check(
+		"tutorial: every unlock names a real step",
+		(function()
+			for _, from in Tutorial.Unlocks do
+				if Tutorial.index(from) == 0 then
+					return false
+				end
+			end
+			return true
+		end)()
+	)
+	local travelIds = {}
+	for _, destination in TravelConfig.Destinations do
+		travelIds[destination.id] = true
+	end
+	check(
+		"tutorial: every fast-travel button gets unlocked",
+		travelIds.Portals
+			and Tutorial.Unlocks.Portals ~= nil
+			and Tutorial.Unlocks.Shops ~= nil
+			and Tutorial.Unlocks.Sell ~= nil
+	)
+	check(
+		"tutorial: fresh save only",
+		Tutorial.isFresh(0, 0, 0, 1, 0)
+			and not Tutorial.isFresh(10, 0, 0, 1, 0)
+			and not Tutorial.isFresh(0, 1, 0, 1, 0)
+			and not Tutorial.isFresh(0, 0, 0, 2, 0)
+			and not Tutorial.isFresh(0, 0, 0, 1, 1)
+	)
+	check(
+		"tutorial: a lost hunt starts over at the gate",
+		Tutorial.resumeAt("Catch") == "Gate"
+			and Tutorial.resumeAt("Home") == "Gate"
+			and Tutorial.resumeAt("Sell") == "Sell"
+	)
+	check(
+		"tutorial: welcome gift tops up to the price",
+		Tutorial.gift(1_200, 50_000) == 48_800 and Tutorial.gift(60_000, 50_000) == 0
+	)
+	local zoneOk = false
+	for _, zone in Zones.List do
+		zoneOk = zoneOk or (zone.id == Tutorial.Zone and zone.index == 1)
+	end
+	check("tutorial zone is the first zone", zoneOk)
+	check(
+		"tutorial monster lives in the first zone",
+		Monsters[Tutorial.Monster] ~= nil and Monsters[Tutorial.Monster].zone == 1
+	)
+	check("tutorial effect is a roaming effect", Effects.List[Tutorial.Effect] ~= nil)
+	check(
+		"tutorial vacuum is a Workshop vacuum",
+		Workshop.item(Tutorial.FirstVacuum) ~= nil and Workshop.item(Tutorial.FirstVacuum).kind == "Vacuum"
+	)
+	check(
+		"tutorial vacuum is always in stock with the tutorial boost",
+		Workshop.inStock(Workshop.item(Tutorial.FirstVacuum), 12345, nil, math.huge)
+	)
+end
+
+-- The Codex (Util/Codex).
+do
+	local Codex = require("../src/shared/Util/Codex")
+	local sections = Codex.sections()
+	local zoneIds = {}
+	for _, section in sections do
+		zoneIds[section.id] = #section.monsters
+	end
+	check(
+		"codex has a page per launch zone",
+		zoneIds.PumpkinGraveyard == 9 and zoneIds.MurkyBayou == 9 and zoneIds.AbandonedCarnival == 9
+	)
+	check(
+		"codex leaves out zones that aren't in the game yet",
+		zoneIds.SpookySchool == nil and zoneIds.GhostShip == nil
+	)
+	check("codex lists the launch event monsters only", zoneIds.Events == 4)
+	check("codex pages start with the commonest monster", sections[1].monsters[1] == "Gloomlet")
+	check(
+		"codex variant goals are Silver, Gold, Shiny, Rainbow",
+		table.concat(Codex.VariantOrder, ",") == "Silver,Gold,Shiny,Rainbow"
+	)
+
+	local codex = {}
+	local found = Codex.note(
+		codex,
+		{ monsterId = "Gloomlet", size = "Normal", effects = { "Cobwebbed" }, familiarity = 0 }
+	)
+	check(
+		"codex: first catch is a new monster and a new effect",
+		#found == 2 and found[1].kind == "Monster" and found[2].kind == "Effect"
+	)
+	check(
+		"codex: plain catch is no variant goal",
+		Codex.has(codex, "Gloomlet") and not Codex.has(codex, "Gloomlet", "Gold")
+	)
+	check(
+		"codex: the same catch again is nothing new",
+		#Codex.note(
+				codex,
+				{ monsterId = "Gloomlet", size = "Big", effects = { "Cobwebbed" }, familiarity = 0 }
+			) == 0
+	)
+	local gold = Codex.note(
+		codex,
+		{ monsterId = "Gloomlet", size = "Normal", effects = {}, familiarity = 0, variant = "Gold" }
+	)
+	check(
+		"codex: a Gold one is a new variant goal",
+		#gold == 1
+			and gold[1].kind == "Variant"
+			and gold[1].variant == "Gold"
+			and Codex.has(codex, "Gloomlet", "Gold")
+	)
+	local combo = Codex.note(
+		codex,
+		{ monsterId = "Gravepup", size = "Normal", effects = { "Vampire", "Batty" }, familiarity = 0 }
+	)
+	local kinds = {}
+	for _, f in combo do
+		kinds[f.kind] = (kinds[f.kind] or 0) + 1
+	end
+	check("codex: combos are noted from their recipe", kinds.Combo == 1 and codex.combos.Count == true)
+	check(
+		"codex: unknown monsters are ignored",
+		#Codex.note(codex, { monsterId = "Nobody", size = "Normal", effects = {}, familiarity = 0 }) == 0
+	)
+	local progress = Codex.progress(codex, sections[1].monsters)
+	check(
+		"codex progress counts found and variants",
+		progress.found == 2
+			and progress.total == 9
+			and progress.variants.Gold == 1
+			and progress.variants.Silver == 0
+	)
+	local effectIds = Codex.effectIds()
+	check(
+		"codex leaves out effects from events not in the game",
+		not table.find(effectIds, "Mimic") and table.find(effectIds, "Cobwebbed") ~= nil
+	)
+	check("codex lists every combo", #Codex.comboIds() == 4)
 end
 
 if failures > 0 then

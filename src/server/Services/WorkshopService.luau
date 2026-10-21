@@ -16,6 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
+local Tutorial = require(ReplicatedStorage.Shared.Util.Tutorial)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local Counter = require(script.Parent.Parent.Counter)
 local DataService = require(script.Parent.DataService)
@@ -71,6 +72,12 @@ local function boughtThisSlot(data: DataService.Data, slot: number): { [string]:
 	return Workshop.boughtThisSlot(data.shop, slot)
 end
 
+-- The tutorial's first vacuum is always in stock while its Buy step is on (a huge restock
+-- chance multiplier), so a new player is never told to come back later.
+local function stockBoost(data: DataService.Data, item: Shop.Item?): number?
+	return if item and item.id == Tutorial.FirstVacuum and data.tutorial == "Buy" then math.huge else nil
+end
+
 local function viewFor(data: DataService.Data): View
 	local slot = currentSlot()
 	local bought = boughtThisSlot(data, slot)
@@ -87,7 +94,7 @@ local function viewFor(data: DataService.Data): View
 			rarity = item.rarity,
 			rarityColor = MonsterModel.color(item.rarity),
 			tool = Workshop.isTool(item),
-			inStock = Workshop.inStock(item, slot),
+			inStock = Workshop.inStock(item, slot, nil, stockBoost(data, item)),
 			owned = Workshop.owns(data.inventory, item),
 			equipped = equipSlot ~= nil and equipped[equipSlot] == item.id,
 			count = data.inventory[item.id] or 0,
@@ -129,8 +136,15 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 	local item = if typeof(itemId) == "string" then Workshop.item(itemId) else nil
 	local slot = currentSlot()
 	local bought = boughtThisSlot(data, slot)
-	local check =
-		Workshop.canBuy(item, slot, data.money, data.inventory, if item then bought[item.id] or 0 else 0)
+	local check = Workshop.canBuy(
+		item,
+		slot,
+		data.money,
+		data.inventory,
+		if item then bought[item.id] or 0 else 0,
+		nil,
+		stockBoost(data, item)
+	)
 
 	local message
 	if check == "Ok" and item and DataService.addMoney(player, -item.price) then

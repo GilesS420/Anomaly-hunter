@@ -17,6 +17,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 
 local Travel = require(ReplicatedStorage.Shared.Util.Travel)
 local TravelConfig = require(ReplicatedStorage.Shared.Config.Travel)
+local Tutorial = require(ReplicatedStorage.Shared.Util.Tutorial)
 local Zones = require(ReplicatedStorage.Shared.Config.Zones)
 local HuntService = require(script.Parent.HuntService)
 local Notify = require(script.Parent.Parent.Notify)
@@ -157,6 +158,12 @@ end
 FastTravel.OnServerEvent:Connect(function(player, id)
 	local destination = validDestination(id)
 	if not destination then
+		return
+	end
+	-- Greyed out during the tutorial until its step (the client hides it too).
+	local step = player:GetAttribute("Tutorial")
+	if not Tutorial.isUnlocked(if typeof(step) == "string" then step else nil, destination.id) then
+		Notify.toast(player, "Finish the tutorial first!")
 		return
 	end
 	if player:GetAttribute("Zone") ~= nil or HuntService.isCarrying(player) then

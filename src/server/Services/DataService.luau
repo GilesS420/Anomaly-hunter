@@ -1,12 +1,14 @@
 --!strict
 -- Player save data, loaded and saved through ProfileStore (session-locked, auto-saves
 -- every few minutes and on leave). In Studio without API access ProfileStore falls back
--- to a mock store, so nothing persists between play tests.
+-- to a mock store, so nothing persists between play tests. With API access, Studio play
+-- tests save to their own store (StudioStoreName), so testing never touches real saves.
 -- Money also shows in the player list (leaderstats > Money) and is only ever changed
 -- through DataService.addMoney, so the two always match.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
@@ -26,10 +28,12 @@ export type Data = {
 	codex: { [string]: any }, -- discovered monsters, effects and combo recipes
 	shop: { slot: number, bought: { [string]: number } }, -- Workshop buys since the last restock
 	stealingEnabled: boolean,
+	tutorial: string, -- "New" until TutorialService looks, then the step, then "Done"
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
 DataService.StoreName = "PlayerData_v1"
+DataService.StudioStoreName = "PlayerData_Studio"
 
 DataService.Template = {
 	money = 0,
@@ -45,12 +49,17 @@ DataService.Template = {
 	codex = {},
 	shop = { slot = 0, bought = {} },
 	stealingEnabled = false,
+	tutorial = "New", -- older saves get this too; TutorialService marks those "Done"
 } :: Data
 
-local store = ProfileStore.New(DataService.StoreName, DataService.Template)
+local store = ProfileStore.New(
+	if RunService:IsStudio() then DataService.StudioStoreName else DataService.StoreName,
+	DataService.Template
+)
 local profiles: { [Player]: any } = {}
 local moneyValues: { [Player]: NumberValue } = {}
 local loadedCallbacks: { (Player, Data) -> () } = {}
+local wiped: { [Player]: boolean } = {} -- reset by DataService.reset, on their way out
 
 -- Returns the player's data, or nil while it is still loading (or after they left).
 function DataService.get(player: Player): Data?
@@ -124,7 +133,7 @@ local function loadPlayer(player: Player)
 		profiles[player] = nil
 		moneyValues[player] = nil
 		-- Only kick if they're still here (the session also ends normally when they leave).
-		if player.Parent == Players then
+		if player.Parent == Players and not wiped[player] then
 			player:Kick("Your save was opened on another server. Please rejoin.")
 		end
 	end)
@@ -164,9 +173,30 @@ function DataService.saveSoon(player: Player)
 	end)
 end
 
+-- Wipes this one player's save back to a brand-new one (the template) and kicks them, so
+-- every service loads it fresh when they rejoin. Only this player's profile is touched.
+-- Returns false if their save isn't loaded.
+function DataService.reset(player: Player): boolean
+	local profile = profiles[player]
+	if not profile then
+		return false
+	end
+	-- From here DataService.get returns nil for them, so no service's leave handler can
+	-- write their old mansion, cakes or catch into the fresh save.
+	profiles[player] = nil
+	moneyValues[player] = nil
+	wiped[player] = true
+	profile.Data = {}
+	profile:Reconcile() -- fills the empty table from the template, like a first join
+	player:Kick("Your save was reset. Rejoin to start fresh.")
+	profile:EndSession() -- saves the fresh data
+	return true
+end
+
 function DataService.start()
 	Players.PlayerAdded:Connect(loadPlayer)
 	Players.PlayerRemoving:Connect(function(player)
+		wiped[player] = nil
 		local profile = profiles[player]
 		if profile then
 			profile:EndSession()
