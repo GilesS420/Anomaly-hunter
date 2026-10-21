@@ -78,16 +78,17 @@ function EventIconController.start()
 	details.Parent = tip
 	tip.Parent = icon
 
-	local hovering = false
-	local pinned = false -- a tap keeps the tooltip open until the next tap
+	-- Hovering opens the tooltip and moving off closes it; a click or tap toggles it (on a
+	-- phone, where nothing hovers, a tap opens it and the next tap closes it).
+	local open = false
 	icon.MouseEnter:Connect(function()
-		hovering = true
+		open = true
 	end)
 	icon.MouseLeave:Connect(function()
-		hovering = false
+		open = false
 	end)
 	icon.Activated:Connect(function()
-		pinned = not pinned
+		open = not open
 	end)
 
 	-- The live event, or else the one being warned about.
@@ -99,8 +100,10 @@ function EventIconController.start()
 	local function refresh()
 		local event = showing()
 		icon.Visible = event ~= nil and not Ui.anyWindowOpen("BackpackUi")
+		if not icon.Visible then
+			open = false -- hidden under the mouse, MouseLeave never comes
+		end
 		if not event then
-			pinned = false
 			return
 		end
 		local color = rgb(event.sky and event.sky.edge)
@@ -135,7 +138,7 @@ function EventIconController.start()
 	refresh()
 
 	RunService.Heartbeat:Connect(function()
-		tip.Visible = icon.Visible and (hovering or pinned)
+		tip.Visible = icon.Visible and open
 		if tip.Visible then
 			local now = workspace:GetServerTimeNow()
 			if workspace:GetAttribute("WatcherEvent") then
