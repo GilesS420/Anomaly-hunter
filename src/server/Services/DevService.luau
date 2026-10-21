@@ -6,6 +6,8 @@
 --   /money 1000000    adds money (a negative number takes some away; 5k, 2.5m and 1b work too)
 --   /wings 3          sets how many wings your mansion has (1 to 6) and rebuilds it
 --   /clearmonsters    empties your mansion and Storage
+--   /reset confirm    wipes YOUR save back to a brand-new player's and kicks you; rejoin to
+--                     start fresh (replay the tutorial and early game). Nobody else is touched.
 --   /summon           starts the next Watcher event right away (skipping its warning)
 --   /event BloodMoon  starts that Watcher event right away (/event alone lists them;
 --                     any capitals: /event frostfog works too)
@@ -118,6 +120,17 @@ commands["/clearmonsters"] = function(player)
 	table.clear(data.storage)
 	MansionService.rebuild(player)
 	Notify.toast(player, "Your mansion and Storage are empty now.")
+end
+
+-- Only ever the player who typed it: the command has no target argument.
+commands["/reset"] = function(player, argument)
+	if string.lower(argument or "") ~= "confirm" then
+		Notify.toast(player, "This wipes your whole save. Type /reset confirm to do it.")
+		return
+	end
+	if not DataService.reset(player) then
+		Notify.toast(player, "Your save is still loading. Try again in a moment.")
+	end
 end
 
 commands["/summon"] = function(player)
@@ -377,7 +390,7 @@ function DevService.start()
 		return
 	end
 	print(
-		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /give <item> [count], /summon, /event <name>, /skip <hours>, /haunt, /calm, /attack`
+		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /reset confirm, /give <item> [count], /summon, /event <name>, /skip <hours>, /haunt, /calm, /attack`
 	)
 end
 
