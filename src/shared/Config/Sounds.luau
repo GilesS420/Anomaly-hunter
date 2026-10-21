@@ -28,9 +28,9 @@ local Sounds = {}
 Sounds.Files = {
 	EventStingers = "rbxassetid://79245545160543",
 	EventAmbience = "rbxassetid://122808714791910",
-	MusicWaltz = "",
+	MusicWaltz = "rbxassetid://72259685212361",
 	MusicMountainKing = "rbxassetid://94551444495402",
-	MusicLullaby = "",
+	MusicLullaby = "rbxassetid://129818520848497",
 	MusicMoonlight = "rbxassetid://124222698146635",
 	WorldAmbience = "rbxassetid://99157796020232",
 }
