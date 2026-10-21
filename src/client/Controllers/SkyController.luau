@@ -11,6 +11,7 @@
 -- The server says which sky to show in Workspace attribute WatcherSky (an event id) and when
 -- it should be fully in with WatcherSkyAt (server time; the end of the warning). The banner
 -- shows when WatcherEvent is set. Pieces live in Workspace.CurrentCamera.WatcherSky.
+-- Each lightning flash asks SoundController for a thunderclap.
 
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
@@ -19,6 +20,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Events = require(ReplicatedStorage.Shared.Config.Events)
+local SoundController = require(script.Parent.SoundController)
 
 local SkyController = {}
 
@@ -576,6 +578,9 @@ local function startFlashes(set: Set)
 	task.spawn(function()
 		while flashToken == mine do
 			task.wait(random:NextNumber(2, 6))
+			if flashToken == mine then
+				SoundController.thunder()
+			end
 			for _ = 1, if random:NextNumber() < 0.4 then 2 else 1 do
 				if flashToken ~= mine then
 					break
