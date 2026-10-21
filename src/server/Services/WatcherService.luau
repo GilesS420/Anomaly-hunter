@@ -420,6 +420,120 @@ local ClosedEye = Color3.fromRGB(40, 32, 52)
 local Glow = Color3.fromRGB(190, 110, 255)
 local Lamp = Color3.fromRGB(255, 176, 84) -- the lantern orange of the shop titles
 
+-- The eyes in Watcher Square: the glowing ball over each of the four ways in, then the one on
+-- the meter's pillar, open one by one with the meter (an eye per event). A closed eye is dark
+-- stone; an open one glows purple with a black pupil looking out of the square, and the
+-- pillar's eye follows the nearest player. With all five open they burn red: The Watcher
+-- Awakens is next.
+
+type WorldEye = { ball: BasePart, pupil: Part, light: PointLight, out: Vector3, open: boolean? }
+
+local worldEyes: { WorldEye } = {}
+local EyeAwake = Color3.fromRGB(255, 50, 80)
+local EyeTween = TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+
+local function pupilAt(eye: WorldEye, look: Vector3): CFrame
+	local center = eye.ball.Position
+	local radius = eye.ball.Size.X / 2
+	-- A flat disc on the ball's surface, facing `look` (a cylinder's round faces point along X).
+	return CFrame.lookAt(center + look * (radius - 0.05), center + look * (radius + 1))
+		* CFrame.Angles(0, math.rad(90), 0)
+end
+
+local function addWorldEye(ball: BasePart, out: Vector3)
+	local pupil = Instance.new("Part")
+	pupil.Name = "Pupil"
+	pupil.Shape = Enum.PartType.Cylinder
+	pupil.Anchored = true
+	pupil.CanCollide = false
+	pupil.CanQuery = false
+	pupil.CanTouch = false
+	pupil.CastShadow = false
+	pupil.Material = Enum.Material.SmoothPlastic
+	pupil.Color = Color3.fromRGB(10, 6, 14)
+	pupil.Size = Vector3.new(0.1, 0.05, 0.05)
+	pupil.Parent = ball
+	local light = ball:FindFirstChildOfClass("PointLight") or Instance.new("PointLight")
+	light.Color = Glow
+	light.Range = 14
+	light.Parent = ball
+	local eye: WorldEye = { ball = ball, pupil = pupil, light = light, out = out }
+	pupil.CFrame = pupilAt(eye, out)
+	table.insert(worldEyes, eye)
+end
+
+local function findWorldEyes(hub: Instance)
+	local meter = World.part(World.find(hub, "WatcherMeter"))
+	local center = if meter then meter.Position else Vector3.zero
+	for gate = 1, 4 do
+		local ball = hub:FindFirstChild(`Gate{gate}Eye`, true)
+		if ball and ball:IsA("BasePart") then
+			local flat = Vector3.new(ball.Position.X - center.X, 0, ball.Position.Z - center.Z)
+			addWorldEye(ball, if flat.Magnitude > 0.1 then flat.Unit else Vector3.zAxis)
+		end
+	end
+	if meter then
+		local ball = meter:FindFirstChild("Eye")
+		if not (ball and ball:IsA("BasePart")) then
+			local made = block(
+				"Eye",
+				Vector3.new(3, 3, 3),
+				CFrame.new(meter.Position + Vector3.new(0, meter.Size.Y / 2 + 1.5, 0)),
+				ClosedEye,
+				Enum.Material.Slate
+			)
+			made.Shape = Enum.PartType.Ball
+			made.CanCollide = false
+			made.Parent = meter
+			ball = made
+		end
+		addWorldEye(ball :: BasePart, Vector3.zAxis)
+	end
+	if #worldEyes < Events.EyesToAwaken then
+		warn(`WatcherService: found {#worldEyes} of {Events.EyesToAwaken} eyes in Watcher Square`)
+	end
+end
+
+local function showWorldEyes()
+	local awake = eyes >= Events.EyesToAwaken or (current ~= nil and current.awakening == true)
+	for index, eye in worldEyes do
+		local open = awake or index <= eyes
+		local ball = eye.ball
+		ball.Material = if open then Enum.Material.Neon else Enum.Material.Slate
+		ball.Color = if not open then ClosedEye elseif awake then EyeAwake else Glow
+		eye.light.Enabled = open
+		eye.light.Color = if awake then EyeAwake else Glow
+		if open ~= eye.open then
+			eye.open = open
+			-- The pupil opens (or shuts) like a lid lifting.
+			local d = ball.Size.X * 0.5
+			TweenService:Create(eye.pupil, EyeTween, {
+				Size = if open then Vector3.new(0.1, d, d) else Vector3.new(0.1, 0.05, 0.05),
+			}):Play()
+		end
+	end
+	-- The pillar's eye watches the nearest player.
+	local pillar = worldEyes[Events.EyesToAwaken]
+	if pillar and pillar.open then
+		local nearest: Vector3? = nil
+		local best = 120
+		for _, player in Players:GetPlayers() do
+			local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+			if root and root:IsA("BasePart") then
+				local distance = (root.Position - pillar.ball.Position).Magnitude
+				if distance < best then
+					best = distance
+					nearest = root.Position
+				end
+			end
+		end
+		local look = if nearest then (nearest - pillar.ball.Position).Unit else pillar.out
+		TweenService:Create(pillar.pupil, TweenInfo.new(0.8, Enum.EasingStyle.Sine), {
+			CFrame = pupilAt(pillar, look),
+		}):Play()
+	end
+end
+
 local function publish()
 	local sky = if phase == "Live" then current elseif phase == "Warning" then upcoming else nil
 	workspace:SetAttribute("WatcherEvent", if current then current.id else nil)
@@ -428,6 +542,7 @@ local function publish()
 	workspace:SetAttribute("WatcherSky", if sky then sky.id else nil)
 	workspace:SetAttribute("WatcherEyes", eyes)
 
+	showWorldEyes()
 	for index, eye in meterEyes do
 		local open = index <= eyes
 		eye.white.BackgroundColor3 = if open then EyeWhite else ClosedEye
@@ -833,6 +948,7 @@ function WatcherService.start()
 	findLamps(hub)
 	buildMeter(hub)
 	buildSign(hub)
+	findWorldEyes(hub)
 	-- Walks the schedule from its start, once; tick steps it on from here, and joins an
 	-- event or warning that is already under way.
 	schedule = Watcher.slotAt(now())
