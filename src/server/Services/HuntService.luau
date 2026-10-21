@@ -17,7 +17,8 @@
 -- Return Charms are also Tools in the hotbar (Section "Tool"): catching only works with a
 -- vacuum in your hand (heldVacuum), holding one makes it the vacuum you use, and clicking
 -- with the bell or charm in hand uses one. Carrying / CarryingSize name the latest
--- catch in the bag, CarryingCount and BagSize say how full it is.
+-- catch in the bag, CarryingCount and BagSize say how full it is, BagList names every catch
+-- in it (one per line).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -105,6 +106,13 @@ local function setCarrying(player: Player, bag: { Value.CaughtMonster }?)
 	player:SetAttribute("Carrying", if latest then latest.monsterId else nil)
 	player:SetAttribute("CarryingSize", if latest then latest.size else nil)
 	player:SetAttribute("CarryingCount", if latest then #list else nil)
+	-- Every catch in the bag, one per line ("Big Gloomlet", "Gold Normal Wisp Jack"), for the HUD.
+	local lines: { string } = {}
+	for _, caught in list do
+		local variant = if caught.variant then `{caught.variant} ` else ""
+		table.insert(lines, `{variant}{caught.size} {Format.name(caught.monsterId)}`)
+	end
+	player:SetAttribute("BagList", if #lines > 0 then table.concat(lines, "\n") else nil)
 	player:SetAttribute("BagSize", bagSize(player))
 end
 

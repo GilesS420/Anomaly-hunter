@@ -173,9 +173,17 @@ function HuntController.start()
 				then ` ({inBag}/{bagSize})`
 				else ""
 			carrying.Text = `Carrying: {sizeText}{Format.name(monsterId)}{bagText}`
+			-- With room for more than one, list everything in the vacuum.
+			local bagList = player:GetAttribute("BagList")
+			if typeof(bagList) == "string" and typeof(bagSize) == "number" and bagSize > 1 then
+				local lines = string.split(bagList, "\n")
+				carrying.Text = `In your vacuum ({#lines}/{bagSize}):\n• {table.concat(lines, "\n• ")}`
+			end
 		else
 			carrying.Text = ""
 		end
+		local _, lineCount = string.gsub(carrying.Text, "\n", "")
+		carrying.Size = UDim2.new(1, 0, 0, ROW_HEIGHT * (lineCount + 1))
 		carrying.Visible = carrying.Text ~= ""
 
 		-- The charm only makes sense away from home, and only if you own one.
@@ -199,6 +207,7 @@ function HuntController.start()
 			"CarryingSize",
 			"CarryingCount",
 			"BagSize",
+			"BagList",
 			"ReturnCharms",
 			"BaitBells",
 		}
