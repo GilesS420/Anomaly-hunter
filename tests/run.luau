@@ -22,6 +22,7 @@ local CakeConfig = require("../src/shared/Config/Cakes")
 local Cakes = require("../src/shared/Util/Cakes")
 local Effects = require("../src/shared/Config/Effects")
 local Haunting = require("../src/shared/Util/Haunting")
+local Away = require("../src/shared/Util/Away")
 local AttackConfig = require("../src/shared/Config/Attacks")
 local Attacks = require("../src/shared/Util/Attacks")
 local Landmarks = require("../src/shared/Config/Landmarks")
@@ -1068,6 +1069,63 @@ do
 	local record = { slot = 5, bought = { PumpkinCandy = 2 } }
 	check("buys count within a restock", Workshop.boughtThisSlot(record, 5).PumpkinCandy == 2)
 	check("buys reset on the next restock", Workshop.boughtThisSlot(record, 6).PumpkinCandy == nil)
+end
+
+-- Offline: roaming rolls are played back, and the away book lists what changed.
+do
+	local hit = {
+		NextNumber = function()
+			return 0
+		end,
+		NextInteger = function(_, min: number)
+			return min
+		end,
+	} :: any
+	local miss = {
+		NextNumber = function()
+			return 0.999
+		end,
+		NextInteger = function(_, min: number)
+			return min
+		end,
+	} :: any
+	local function fresh(): any
+		return {
+			uid = "u1",
+			monsterId = "Gravepup",
+			size = "Normal",
+			kg = 20,
+			effects = {},
+			familiarity = 1,
+			grownAt = 0,
+		}
+	end
+	local lucky = fresh()
+	local gained = Haunting.catchUp(lucky, 1, 0, 3600, hit)
+	check("offline rolls give roaming effects", #gained > 0 and #lucky.effects == #gained)
+	local onlyRoam = true
+	for _, id in gained do
+		onlyRoam = onlyRoam and Effects.List[id] ~= nil and Effects.List[id].source == "Roam"
+	end
+	check("offline rolls only give roaming effects", onlyRoam)
+	check("no time away, no rolls", #Haunting.catchUp(fresh(), 1, 0, Effects.RoamRollSeconds - 1, hit) == 0)
+	check("unlucky offline rolls give nothing", #Haunting.catchUp(fresh(), 1, 0, 3600, miss) == 0)
+
+	local m = fresh()
+	local snap = Away.snapshot({ m })
+	check("nothing changed, nothing in the book", #Away.changes(snap, { m }) == 0)
+	m.kg = 30
+	m.size = "Big"
+	table.insert(m.effects, "Cobwebbed")
+	local changes = Away.changes(snap, { m })
+	check(
+		"the book lists weight, size and new effects",
+		#changes == 1
+			and changes[1].kgBefore == 20
+			and changes[1].kgAfter == 30
+			and changes[1].sizeAfter == "Big"
+			and changes[1].effects[1] == "Cobwebbed"
+	)
 end
 
 -- Roaming effects (Util/Haunting).

@@ -18,10 +18,12 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Away = require(ReplicatedStorage.Shared.Util.Away)
 local Care = require(ReplicatedStorage.Shared.Util.Care)
 local CareConfig = require(ReplicatedStorage.Shared.Config.Care)
 local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
+local Haunting = require(ReplicatedStorage.Shared.Util.Haunting)
 local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
 local Layout = require(ReplicatedStorage.Shared.Config.Layout)
 local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
@@ -82,6 +84,12 @@ local wingColors: { [string]: Color3 } = {
 }
 
 local mansions: { [Player]: State } = {}
+local AwayBookDelay = 4 -- seconds after joining before the "while you were away" book opens
+
+-- ReplicatedStorage.Remotes.AwayBook   server -> client: (changes: { Away.Change }, seconds away)
+local awayBook = Instance.new("RemoteEvent")
+awayBook.Name = "AwayBook"
+awayBook.Parent = ReplicatedStorage:WaitForChild("Remotes")
 local buying: { [Player]: boolean } = {} -- one purchase at a time per player
 local random = Random.new()
 
@@ -529,7 +537,9 @@ end
 -- Fixes up a save before the mansion uses it: wings in range, every monster has a uid
 -- (saves from before uids existed) and a list of effects. Brings every monster's Familiarity up to date; when the player
 -- just joined and Config/Care.GrowsOffline is off, the time they were away doesn't count.
-local function repair(data: DataService.Data, joining: boolean)
+-- Joining, it also plays back the roaming effect rolls they missed (Haunting.catchUp) and
+-- returns what changed for the "while you were away" book, with the seconds they were away.
+local function repair(data: DataService.Data, joining: boolean): ({ Away.Change }, number)
 	if typeof(data.wingsOwned) ~= "number" or data.wingsOwned ~= data.wingsOwned then
 		data.wingsOwned = 1
 	end
@@ -545,13 +555,37 @@ local function repair(data: DataService.Data, joining: boolean)
 		end
 	end
 	local now = os.time()
+	local seenAt = if joining and typeof(data.seenAt) == "number" then data.seenAt else 0
+	local away = if seenAt > 0 then now - seenAt else 0
+	local snapshot = if joining then Away.snapshot(data.monsters) else nil
+	local from = math.max(seenAt, now - WeightConfig.MaxOfflineDays * 86400)
 	for _, caught in data.monsters do
 		if joining and not CareConfig.GrowsOffline and caught.grownAt then
 			caught.grownAt = math.max(caught.grownAt, now)
 		end
+		if seenAt > 0 then
+			local before = Value.resolveEffects(caught.effects)
+			Haunting.catchUp(caught, data.wingsOwned, from, now, random)
+			local combo = Value.newCombo(before, Value.resolveEffects(caught.effects))
+			if combo then
+				local combos = data.codex.combos
+				if typeof(combos) ~= "table" then
+					combos = {}
+					data.codex.combos = combos
+				end
+				combos[combo] = true -- found (as CareService.discoverCombo)
+			end
+		end
 		Care.settle(caught, now)
 		Weight.settle(caught, now, random) -- weight always grows offline (Storage pauses it)
 	end
+	if joining then
+		data.seenAt = now
+	end
+	if not snapshot or away < Away.MinSeconds then
+		return {}, away
+	end
+	return Away.changes(snapshot, data.monsters), away
 end
 
 local function folderIn(parent: Instance, name: string): Folder
@@ -726,7 +760,15 @@ local function tryBuild(player: Player)
 	if not data or not plot then
 		return -- the other one calls this again when it's ready
 	end
-	repair(data, true)
+	local changes, away = repair(data, true)
+	DataService.markPresent(player)
+	if #changes > 0 then
+		task.delay(AwayBookDelay, function()
+			if player.Parent == Players then
+				awayBook:FireClient(player, changes, away)
+			end
+		end)
+	end
 
 	local model = Instance.new("Model")
 	model.Name = plot.name

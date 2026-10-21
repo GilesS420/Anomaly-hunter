@@ -30,6 +30,7 @@ export type Data = {
 	stealingEnabled: boolean,
 	tutorial: string, -- "New" until TutorialService looks, then the step, then "Done"
 	settings: { [string]: any }, -- music, sounds, weather... (Util/Settings, SettingsService)
+	seenAt: number, -- os.time() the player was last online (0: never); the "while you were away" book
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -52,6 +53,7 @@ DataService.Template = {
 	stealingEnabled = false,
 	tutorial = "New", -- older saves get this too; TutorialService marks those "Done"
 	settings = {}, -- empty means the defaults (Util/Settings)
+	seenAt = 0,
 } :: Data
 
 local store = ProfileStore.New(
@@ -195,13 +197,37 @@ function DataService.reset(player: Player): boolean
 	return true
 end
 
+local SeenSeconds = 30 -- how often data.seenAt is brought up to date (in case the server dies)
+local present: { [Player]: boolean } = {}
+
+-- From now on data.seenAt follows this player (MansionService calls it once it has played
+-- back their time away, so a tick before that can't swallow it).
+function DataService.markPresent(player: Player)
+	present[player] = true
+end
+
 function DataService.start()
 	Players.PlayerAdded:Connect(loadPlayer)
 	Players.PlayerRemoving:Connect(function(player)
 		wiped[player] = nil
 		local profile = profiles[player]
+		if profile and present[player] then
+			profile.Data.seenAt = os.time()
+		end
+		present[player] = nil
 		if profile then
 			profile:EndSession()
+		end
+	end)
+	task.spawn(function()
+		while true do
+			task.wait(SeenSeconds)
+			for player in present do
+				local profile = profiles[player]
+				if profile then
+					profile.Data.seenAt = os.time()
+				end
+			end
 		end
 	end)
 	for _, player in Players:GetPlayers() do

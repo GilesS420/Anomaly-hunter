@@ -23,14 +23,15 @@ local Effects = {}
 -- Percent each of a vacuum's catch effects (Config/Tools) lands on a catch (balance sheet input).
 Effects.CatchChance = 25
 
--- Roaming effects (Util/Haunting). Every RoamRollSeconds each monster in an online
--- player's mansion rolls: RoamChance percent, raised by Familiarity (x(1 + bonus) at 100%),
+-- Roaming effects (Util/Haunting). Every RoamRollSeconds each monster in a player's mansion
+-- rolls (while they're offline too, played back when they return: Haunting.catchUp; event
+-- effects only while online): RoamChance percent, raised by Familiarity (x(1 + bonus) at 100%),
 -- by every wing past the Foyer, and by a Watcher event's effectOddsMultiplier (Blood Moon x2).
 -- A hit picks a Roam effect by weight; while an event with an effect is live, that effect
 -- joins the pick with EventEffectWeight. Placeholders, tune in playtesting.
 Effects.RoamRollSeconds = 5 * 60
-Effects.RoamChance = 4
-Effects.RoamFamiliarityBonus = 1.5
+Effects.RoamChance = 0.75 -- 1.5% a roll at 100% Familiarity: about 4 effects a day (Giles 2026-10-21: slower)
+Effects.RoamFamiliarityBonus = 1
 Effects.RoamOddsPerWing = 0.1
 Effects.EventEffectWeight = 25
 
