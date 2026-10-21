@@ -2,18 +2,25 @@
 -- Catching: press and hold on a wild monster. It freezes in your vacuum's beam and a catch
 -- meter fills by itself (1-3 seconds, longer for rarer monsters). Let go early, walk out of
 -- reach or get knocked out and it escapes (dazed for a moment, so you can grab it again).
--- The client only says "start catching this" and "stop"; every rule is checked here.
+-- On the way the monster struggles (Config/Struggles): the meter stops and you must tap while
+-- a sweeping needle is in a zone. Miss, or wait too long, and it breaks free. Letting go
+-- doesn't count during a struggle, so the tap can be a fresh click.
+-- The client only says "start catching this", "stop" and "tapped at"; every rule is checked
+-- here.
 --
 -- Remotes in ReplicatedStorage.CatchRemotes:
 --   StartCatch  client -> server (model)
 --   StopCatch   client -> server ()
---   State       server -> client ("Holding", {model, seconds}) or ("Ended", {result, model})
+--   Strike      client -> server (serverTime the player tapped)
+--   State       server -> client ("Holding", {model, seconds}), ("Struggle", {model, startedAt,
+--               speed, centre, width, timeout}), ("Struggled", {model}) or ("Ended", {result, model})
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Catching = require(ReplicatedStorage.Shared.Util.Catching)
+local Struggles = require(ReplicatedStorage.Shared.Config.Struggles)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
@@ -34,7 +41,12 @@ type Hold = {
 	zoneId: string, -- the zone the monster lives in; the hunter must stay in it ("" = main area)
 	reach: number,
 	stunSeconds: number,
-	endTime: number, -- server time the meter is full
+	total: number, -- seconds of filling to catch it
+	filled: number, -- seconds filled before fillStart
+	fillStart: number, -- server time the meter last started filling
+	plan: Catching.StrugglePlan,
+	nextMark: number, -- index into plan.marks of the next struggle
+	struggle: { startedAt: number, centre: number }?, -- the struggle going on now
 	glow: Highlight,
 	beam: Beam,
 	from: Attachment, -- on the hunter
@@ -43,6 +55,7 @@ type Hold = {
 }
 
 local StartCooldown = 0.25 -- seconds between StartCatch requests (stops spam)
+local random = Random.new()
 
 local holds: { [Player]: Hold } = {}
 local heldBy: { [Model]: Player } = {}
@@ -59,7 +72,8 @@ local function remote(name: string): RemoteEvent
 end
 local StartCatch = remote("StartCatch") -- client -> server: (model)
 local StopCatch = remote("StopCatch") -- client -> server: ()
-local State = remote("State") -- server -> client: ("Holding" | "Ended", info)
+local Strike = remote("Strike") -- client -> server: (serverTime of the tap)
+local State = remote("State") -- server -> client: ("Holding" | "Struggle" | "Struggled" | "Ended", info)
 
 -- Shop names by item id ("PhantomVac" -> "Phantom Vac"), and vacuum names by tier.
 local itemNames: { [string]: string } = {}
@@ -125,6 +139,7 @@ local function clear(player: Player): Hold?
 	hold.model:SetAttribute("HeldBy", nil)
 	hold.model:SetAttribute("CatchStart", nil)
 	hold.model:SetAttribute("CatchEnd", nil)
+	hold.model:SetAttribute("CatchPaused", nil)
 	return hold
 end
 
@@ -314,6 +329,7 @@ local function onStartCatch(player: Player, model: unknown)
 	RoamService.hold(model)
 	local seconds = Catching.catchSeconds(vacuumId, spawned.rarity)
 	local serverNow = workspace:GetServerTimeNow()
+	local plan = Catching.strugglePlan(spawned.rarity, spawned.size)
 	model:SetAttribute("HeldBy", player.UserId)
 	model:SetAttribute("CatchStart", serverNow)
 	model:SetAttribute("CatchEnd", serverNow + seconds)
@@ -351,7 +367,12 @@ local function onStartCatch(player: Player, model: unknown)
 		zoneId = zoneId,
 		reach = reach,
 		stunSeconds = Catching.stunSeconds(vacuumId),
-		endTime = serverNow + seconds,
+		total = seconds,
+		filled = 0,
+		fillStart = serverNow,
+		plan = plan,
+		nextMark = 1,
+		struggle = nil,
 		glow = glow,
 		beam = beam,
 		from = from,
@@ -371,10 +392,59 @@ local function onStartCatch(player: Player, model: unknown)
 	State:FireClient(player, "Holding", { model = model, seconds = seconds })
 end
 
+-- The meter stops and the monster struggles: the client shows the needle and the zone.
+local function beginStruggle(player: Player, hold: Hold, serverNow: number)
+	hold.filled = hold.plan.marks[hold.nextMark] * hold.total
+	hold.nextMark += 1
+	local centre = Catching.zoneCentre(hold.plan.zone, random)
+	hold.struggle = { startedAt = serverNow, centre = centre }
+	hold.model:SetAttribute("CatchPaused", hold.filled / hold.total)
+	State:FireClient(player, "Struggle", {
+		model = hold.model,
+		startedAt = serverNow,
+		speed = hold.plan.speed,
+		centre = centre,
+		width = hold.plan.zone,
+		timeout = Struggles.TimeoutSeconds,
+	})
+end
+
+-- The tap landed: the meter fills on from where it stopped.
+local function endStruggle(player: Player, hold: Hold, serverNow: number)
+	hold.struggle = nil
+	hold.fillStart = serverNow
+	hold.model:SetAttribute("CatchPaused", nil)
+	hold.model:SetAttribute("CatchStart", serverNow - hold.filled)
+	hold.model:SetAttribute("CatchEnd", serverNow - hold.filled + hold.total)
+	State:FireClient(player, "Struggled", { model = hold.model })
+end
+
+local function onStrike(player: Player, tappedAt: unknown)
+	local hold = holds[player]
+	local struggle = hold and hold.struggle
+	if not hold or not struggle then
+		return
+	end
+	local serverNow = workspace:GetServerTimeNow()
+	-- The client's own clock reading of the tap, so lag doesn't move the needle; trusted only
+	-- within LagAllowance of when it arrived.
+	local at = if typeof(tappedAt) == "number"
+			and tappedAt <= serverNow
+			and tappedAt >= serverNow - Struggles.LagAllowance
+		then tappedAt
+		else serverNow
+	if Catching.struggleHit(at - struggle.startedAt, hold.plan.speed, struggle.centre, hold.plan.zone) then
+		endStruggle(player, hold, serverNow)
+	else
+		release(player, `{hold.name} broke free! Tap when the needle is in the zone.`)
+	end
+end
+
 -- Checks every catch in progress each frame.
 local function update()
 	local serverNow = workspace:GetServerTimeNow()
 	for player, hold in holds do
+		local struggle = hold.struggle
 		if wildMonster(hold.model) == nil then
 			-- Gone (cleared by an event, or the zone was removed).
 			clear(player)
@@ -384,8 +454,18 @@ local function update()
 			release(player, nil)
 		elseif distanceTo(player, hold.model) > hold.reach then
 			release(player, `{hold.name} got away!`)
-		elseif serverNow >= hold.endTime then
-			finish(player)
+		elseif struggle then
+			if serverNow - struggle.startedAt > Struggles.TimeoutSeconds + Struggles.LagAllowance then
+				release(player, `{hold.name} broke free! Tap when the needle is in the zone.`)
+			end
+		else
+			local filled = hold.filled + (serverNow - hold.fillStart)
+			local mark = hold.plan.marks[hold.nextMark]
+			if mark and filled >= mark * hold.total then
+				beginStruggle(player, hold, serverNow)
+			elseif filled >= hold.total then
+				finish(player)
+			end
 		end
 	end
 end
@@ -401,10 +481,11 @@ function CatchService.start()
 	remotes.Parent = ReplicatedStorage
 
 	StartCatch.OnServerEvent:Connect(onStartCatch)
+	Strike.OnServerEvent:Connect(onStrike)
 	StopCatch.OnServerEvent:Connect(function(player)
 		pendingStart[player] = nil
 		local hold = holds[player]
-		if hold then
+		if hold and not hold.struggle then -- letting go mid-struggle is how a fresh tap starts
 			release(player, `{hold.name} got away! Hold until the meter is full.`)
 		end
 	end)
