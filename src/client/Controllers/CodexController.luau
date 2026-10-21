@@ -8,7 +8,8 @@
 --                  found and how many of each variant, the extra goals for every page.
 --   Effects        every effect (unfound ones say where they come from) and the secret combos
 --                  (the recipe shows once you've made one).
--- Tap a card to see it along the bottom. Everything comes from the server
+-- The look is a plain field journal: square numbered cards, flat tabs, and the goals as a
+-- line of colour swatches rather than glowing pills. Tap a card to see it along the bottom. Everything comes from the server
 -- (CodexRemotes.GetView, server/Services/CodexService); the pictures are preview models in
 -- PlayerGui.InventoryPreviews.
 
@@ -45,6 +46,10 @@ local VariantColor = {
 	Rainbow = Color3.fromRGB(255, 120, 210),
 } :: { [string]: Color3 }
 local Unfound = Color3.fromRGB(58, 48, 78)
+local CardColor = Color3.fromRGB(26, 21, 36)
+local Line = Color3.fromRGB(52, 44, 68) -- thin card and tab edges
+local Gap = 8 -- between cards, and the margin round the content
+local CardTarget = 112 -- cards are about this wide, then stretched to fill the row
 
 -- A rainbow across a dot or chip.
 local function rainbow(parent: Instance)
@@ -68,59 +73,98 @@ function CodexController.start()
 	local panel = window.gui:FindFirstChild("Panel") :: Frame
 	local limit = panel:FindFirstChildOfClass("UISizeConstraint")
 	if limit then
-		limit.MaxSize = Vector2.new(780, 620)
+		limit.MaxSize = Vector2.new(780, 540)
 	end
+	-- A little lower and shorter than other windows, so the messages along the top of the
+	-- screen don't sit over the title.
+	panel.Position = UDim2.fromScale(0.5, 0.54)
+	panel.Size = UDim2.fromScale(0.92, 0.8)
 	local small = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	local sideWidth = if small then 104 else 132
-	local cell = if small then Vector2.new(84, 104) else Vector2.new(100, 120)
-	local stripHeight = 30
-	local top = 68 + stripHeight + 6
+	local sideWidth = if small then 110 else 140
+	local stripHeight = 20
+	local top = 68 -- under the title and the status line
+	local left = sideWidth + Gap * 2
+	local footerHeight = 52
 
 	-- Tabs down the left.
 	local side = Instance.new("ScrollingFrame")
 	side.Name = "Tabs"
 	side.BackgroundTransparency = 1
 	side.BorderSizePixel = 0
-	side.ScrollBarThickness = 4
+	side.ScrollBarThickness = 0
 	side.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	side.CanvasSize = UDim2.new()
-	side.Position = UDim2.fromOffset(0, 68)
-	side.Size = UDim2.new(0, sideWidth, 1, -68 - 62)
+	side.Position = UDim2.fromOffset(0, top)
+	side.Size = UDim2.new(0, sideWidth, 1, -top - footerHeight - Gap)
 	side.Parent = panel
 	local sideLayout = Instance.new("UIListLayout")
-	sideLayout.Padding = UDim.new(0, 8)
+	sideLayout.Padding = UDim.new(0, 2)
 	sideLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	sideLayout.Parent = side
 
-	-- The goal strip: found, then one chip per variant.
+	-- A thin line between the tabs and the cards.
+	local divider = Instance.new("Frame")
+	divider.BorderSizePixel = 0
+	divider.BackgroundColor3 = Line
+	divider.Position = UDim2.fromOffset(sideWidth + Gap, top)
+	divider.Size = UDim2.new(0, 1, 1, -top - footerHeight - Gap)
+	divider.Parent = panel
+
+	-- The goals: found, then one swatch per variant, on one line.
 	local strip = Instance.new("Frame")
 	strip.Name = "Goals"
 	strip.BackgroundTransparency = 1
-	strip.Position = UDim2.fromOffset(sideWidth + 10, 68)
-	strip.Size = UDim2.new(1, -(sideWidth + 10), 0, stripHeight)
+	strip.Position = UDim2.fromOffset(left, top)
+	strip.Size = UDim2.new(1, -left, 0, stripHeight)
 	strip.Parent = panel
 	local stripLayout = Instance.new("UIListLayout")
 	stripLayout.FillDirection = Enum.FillDirection.Horizontal
-	stripLayout.Padding = UDim.new(0, 6)
+	stripLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	stripLayout.Padding = UDim.new(0, if small then 10 else 16)
 	stripLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	stripLayout.Parent = strip
 
 	local list = window.list
-	list.Position = UDim2.fromOffset(sideWidth + 10, top)
-	list.Size = UDim2.new(1, -(sideWidth + 10), 1, -top - 62)
+	local listTop = top + stripHeight + Gap
+	list.Position = UDim2.fromOffset(left, listTop)
+	list.Size = UDim2.new(1, -left, 1, -listTop - footerHeight - Gap)
+	list.ScrollBarThickness = 4
 	local oldLayout = list:FindFirstChildOfClass("UIListLayout")
 	if oldLayout then
 		oldLayout:Destroy()
 	end
 	local grid = Instance.new("UIGridLayout")
-	grid.CellSize = UDim2.fromOffset(cell.X, cell.Y)
-	grid.CellPadding = UDim2.fromOffset(8, 8)
+	grid.CellPadding = UDim2.fromOffset(Gap, Gap)
 	grid.SortOrder = Enum.SortOrder.LayoutOrder
 	grid.Parent = list
+	-- Room for the card edges, which are drawn just outside each card.
 	local gridPadding = Instance.new("UIPadding")
-	gridPadding.PaddingTop = UDim.new(0, 4)
-	gridPadding.PaddingLeft = UDim.new(0, 4)
+	gridPadding.PaddingTop = UDim.new(0, 1)
+	gridPadding.PaddingLeft = UDim.new(0, 1)
+	gridPadding.PaddingBottom = UDim.new(0, 1)
 	gridPadding.Parent = list
+
+	-- Square cards that fill the row exactly, however wide the window is.
+	local function fitCards()
+		local width = list.AbsoluteSize.X - list.ScrollBarThickness - 2
+		if width <= 0 then
+			return
+		end
+		local columns = math.max(math.floor((width + Gap) / (CardTarget + Gap)), 3)
+		local size = math.floor((width - Gap * (columns - 1)) / columns)
+		grid.CellSize = UDim2.fromOffset(size, size)
+	end
+	list:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitCards)
+	fitCards()
+
+	-- The bottom bar has a line above it too.
+	local footerLine = Instance.new("Frame")
+	footerLine.BorderSizePixel = 0
+	footerLine.BackgroundColor3 = Line
+	footerLine.AnchorPoint = Vector2.new(0, 1)
+	footerLine.Position = UDim2.new(0, 0, 1, -footerHeight - Gap / 2)
+	footerLine.Size = UDim2.new(1, 0, 0, 1)
+	footerLine.Parent = panel
 
 	-- The bottom bar: the selected card.
 	local footer = window.footer
@@ -134,27 +178,39 @@ function CodexController.start()
 	local render: () -> ()
 	local tabButtons: { [string]: TextButton } = {}
 
+	-- One goal: a small colour swatch and a count.
 	local function chip(order: number, text: string, color: Color3, isRainbow: boolean)
 		local frame = Instance.new("Frame")
 		frame.LayoutOrder = order
 		frame.Size = UDim2.new(0, 0, 1, 0)
 		frame.AutomaticSize = Enum.AutomaticSize.X
-		frame.BackgroundColor3 = Ui.Colors.row
+		frame.BackgroundTransparency = 1
 		frame.Parent = strip
-		Ui.corner(frame, 8)
-		local rim = Ui.rim(frame, color, 2)
+		local layout = Instance.new("UIListLayout")
+		layout.FillDirection = Enum.FillDirection.Horizontal
+		layout.VerticalAlignment = Enum.VerticalAlignment.Center
+		layout.Padding = UDim.new(0, 6)
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Parent = frame
+		local swatch = Instance.new("Frame")
+		swatch.BorderSizePixel = 0
+		swatch.Size = UDim2.fromOffset(10, 10)
+		swatch.BackgroundColor3 = if isRainbow then Color3.new(1, 1, 1) else color
+		swatch.Parent = frame
+		Ui.corner(swatch, 2)
 		if isRainbow then
-			rim.Color = Color3.new(1, 1, 1)
-			rainbow(rim)
+			rainbow(swatch)
 		end
-		local padding = Instance.new("UIPadding")
-		padding.PaddingLeft = UDim.new(0, 8)
-		padding.PaddingRight = UDim.new(0, 8)
-		padding.Parent = frame
-		local label = Ui.text(frame, text, UDim2.new(0, 0, 1, 0), color, true, 16)
+		local label = Instance.new("TextLabel")
+		label.LayoutOrder = 2
+		label.BackgroundTransparency = 1
 		label.AutomaticSize = Enum.AutomaticSize.X
-		label.TextScaled = false
+		label.Size = UDim2.new(0, 0, 1, 0)
+		label.Font = Enum.Font.GothamMedium
 		label.TextSize = if small then 13 else 15
+		label.TextColor3 = Ui.Colors.muted
+		label.Text = text
+		label.Parent = frame
 	end
 
 	local function clearStrip()
@@ -165,26 +221,62 @@ function CodexController.start()
 		end
 	end
 
-	-- A card: picture (or icon), caption along the bottom, coloured rim.
+	-- A square card: its number in the corner, the picture (or a big "?"), the name under it
+	-- and a thin bar along the top in its rarity colour once found.
 	local function card(
 		order: number,
 		key: string,
-		rim: Color3,
+		accent: Color3?,
 		look: string?,
-		icon: string?,
+		mark: string?,
 		caption: string
 	): TextButton
+		local chosen = selected == key
 		local button = Instance.new("TextButton")
 		button.Name = key
 		button.LayoutOrder = order
 		button.Text = ""
 		button.AutoButtonColor = true
-		button.BackgroundColor3 = Ui.Colors.row
+		button.BackgroundColor3 = if chosen then Color3.fromRGB(40, 32, 54) else CardColor
+		button.ClipsDescendants = true
 		button.Parent = list
-		Ui.corner(button, 10)
-		Ui.rim(button, if selected == key then Ui.Colors.lamp else rim, if selected == key then 3 else 2)
-		Ui.picture(button, UDim2.new(1, 0, 1, -36), look, icon)
-		local label = Ui.text(button, caption, UDim2.new(1, -8, 0, 16), Ui.Colors.text, true, 14)
+		Ui.corner(button, 6)
+		Ui.rim(button, if chosen then Ui.Colors.lamp else Line, if chosen then 2 else 1)
+		if accent then
+			local bar = Instance.new("Frame")
+			bar.BorderSizePixel = 0
+			bar.BackgroundColor3 = accent
+			bar.Size = UDim2.new(1, 0, 0, 3)
+			bar.Parent = button
+		end
+		local number = Ui.text(
+			button,
+			string.format("%02d", order),
+			UDim2.fromOffset(28, 14),
+			Ui.Colors.muted,
+			false,
+			12
+		)
+		number.Position = UDim2.fromOffset(7, 7)
+		number.TextTransparency = 0.35
+		if look then
+			local picture = Ui.picture(button, UDim2.new(1, -16, 1, -48), look, nil)
+			picture.Position = UDim2.fromOffset(8, 12)
+		else
+			local glyph = Ui.text(button, mark or "?", UDim2.new(1, 0, 1, -48), Unfound, false, 56)
+			glyph.Font = Ui.TitleFont
+			glyph.Position = UDim2.fromOffset(0, 12)
+			glyph.TextXAlignment = Enum.TextXAlignment.Center
+			glyph.TextColor3 = if accent then accent else Color3.fromRGB(84, 72, 108)
+		end
+		local label = Ui.text(
+			button,
+			caption,
+			UDim2.new(1, -12, 0, 15),
+			if look or accent then Ui.Colors.text else Ui.Colors.muted,
+			true,
+			14
+		)
 		label.AnchorPoint = Vector2.new(0.5, 1)
 		label.Position = UDim2.new(0.5, 0, 1, -18)
 		label.TextXAlignment = Enum.TextXAlignment.Center
@@ -200,26 +292,26 @@ function CodexController.start()
 		local row = Instance.new("Frame")
 		row.BackgroundTransparency = 1
 		row.AnchorPoint = Vector2.new(0.5, 1)
-		row.Position = UDim2.new(0.5, 0, 1, -4)
-		row.Size = UDim2.new(1, -8, 0, 12)
+		row.Position = UDim2.new(0.5, 0, 1, -7)
+		row.Size = UDim2.new(1, -8, 0, 8)
 		row.Parent = button
 		local layout = Instance.new("UIListLayout")
 		layout.FillDirection = Enum.FillDirection.Horizontal
 		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-		layout.Padding = UDim.new(0, 5)
+		layout.Padding = UDim.new(0, 4)
 		layout.SortOrder = Enum.SortOrder.LayoutOrder
 		layout.Parent = row
 		for i, variant in variants do
 			local dot = Instance.new("Frame")
 			dot.LayoutOrder = i
-			dot.Size = UDim2.fromOffset(12, 12)
+			dot.Size = UDim2.fromOffset(8, 8)
 			local color = VariantColor[variant] or Ui.Colors.muted
 			local has = caught[variant] == true
 			dot.BackgroundColor3 = if has
 				then (if variant == "Rainbow" then Color3.new(1, 1, 1) else color)
 				else Unfound
 			dot.Parent = row
-			Ui.corner(dot, 6)
+			Ui.corner(dot, 4)
 			if has and variant == "Rainbow" then
 				rainbow(dot)
 			end
@@ -245,14 +337,8 @@ function CodexController.start()
 			else `{page.title}: all found! Now catch each one in every colour`
 		for i, monster in page.monsters do
 			local key = `m:{monster.id}`
-			local button = card(
-				i,
-				key,
-				if monster.found then monster.color else Unfound,
-				monster.look,
-				if monster.found then nil else "❓",
-				monster.name
-			)
+			local button =
+				card(i, key, if monster.found then monster.color else nil, monster.look, nil, monster.name)
 			dots(button, variants, monster.variants)
 			if selected == key then
 				pickName.Text = if monster.found
@@ -294,9 +380,9 @@ function CodexController.start()
 			card(
 				i,
 				key,
-				if effect.found then (if effect.combo then Ui.Colors.equip else Ui.Colors.lamp) else Unfound,
+				if effect.found then (if effect.combo then Ui.Colors.equip else Ui.Colors.lamp) else nil,
 				nil,
-				if effect.found then (if effect.combo then "🔮" else "✨") else "❓",
+				if effect.found then string.sub(effect.name, 1, 1) else "?",
 				caption
 			)
 			if selected == key then
@@ -331,8 +417,31 @@ function CodexController.start()
 			end
 			table.insert(names, { id = EffectsTab, title = EffectsTab })
 			for i, entry in names do
-				local button = Ui.button(side, entry.title, Ui.Colors.off, UDim2.new(1, -6, 0, 44))
+				local button = Instance.new("TextButton")
 				button.LayoutOrder = i
+				button.Size = UDim2.new(1, 0, 0, if small then 34 else 38)
+				button.BackgroundColor3 = Color3.fromRGB(40, 32, 54)
+				button.BorderSizePixel = 0
+				button.AutoButtonColor = true
+				button.Font = Enum.Font.GothamMedium
+				button.TextSize = if small then 13 else 15
+				button.TextWrapped = true
+				button.TextXAlignment = Enum.TextXAlignment.Left
+				button.Text = entry.title
+				button.Parent = side
+				Ui.corner(button, 4)
+				local padding = Instance.new("UIPadding")
+				padding.PaddingLeft = UDim.new(0, 12)
+				padding.PaddingRight = UDim.new(0, 6)
+				padding.Parent = button
+				-- The open tab gets a lantern-coloured mark down its left edge.
+				local mark = Instance.new("Frame")
+				mark.Name = "Mark"
+				mark.BorderSizePixel = 0
+				mark.BackgroundColor3 = Ui.Colors.lamp
+				mark.Position = UDim2.new(0, -12, 0, 6)
+				mark.Size = UDim2.new(0, 3, 1, -12)
+				mark.Parent = button
 				local id = entry.id
 				button.Activated:Connect(function()
 					tab = id
@@ -344,7 +453,13 @@ function CodexController.start()
 		end
 		local shown = tab or (current.pages[1] and current.pages[1].id) or EffectsTab
 		for id, button in tabButtons do
-			Ui.paint(button, if id == shown then Ui.Colors.equip else Ui.Colors.off)
+			local open = id == shown
+			button.BackgroundTransparency = if open then 0 else 1
+			button.TextColor3 = if open then Ui.Colors.text else Ui.Colors.muted
+			local mark = button:FindFirstChild("Mark") :: Frame?
+			if mark then
+				mark.Visible = open
+			end
 		end
 		if shown == EffectsTab then
 			effectsPage(current.effects)
