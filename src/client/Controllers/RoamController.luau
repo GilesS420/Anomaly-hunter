@@ -7,6 +7,10 @@
 -- while walking and slow while they stand still. A monster that is being caught (HeldBy is
 -- set) trembles instead.
 -- Only the model's PrimaryPart ("Body") is moved; the other parts are joined to it and follow.
+--
+-- Eight full mansions hold hundreds of block monsters with ~16 swinging joints each, far too
+-- many to move every frame. So only monsters near the camera (and in front of it) swing their
+-- limbs; the rest just glide, and the further away they are the fewer frames they're moved on.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -26,6 +30,13 @@ local TURN_SPEED = 8 -- how quickly a monster turns to face where it walks
 local IDLE_PACE = 0.35 -- limbs swing this much slower and smaller while standing still
 local HOP_HEIGHT = 0.15 -- studs walkers bounce with each step
 local TAU = math.pi * 2
+
+-- Level of detail by distance from the camera (studs).
+local ANIMATE_DISTANCE = 140 -- closer than this (and in view): every frame, limbs swinging
+local MID_DISTANCE = 320 -- closer than this: moved every MID_EVERY frames, limbs still
+local MID_EVERY = 3
+local FAR_EVERY = 8 -- further away: moved every FAR_EVERY frames
+local BEHIND_SLACK = 30 -- monsters this close still animate when just behind the camera
 
 type Swing = {
 	motor: Motor6D,
@@ -48,6 +59,8 @@ type State = {
 	rescanUntil: number?, -- os.clock(): keep looking for the new joints until then
 	nextScan: number?,
 	rainbow: { BasePart }?, -- parts of a Rainbow monster, recoloured every frame
+	slot: number, -- spreads far monsters' updates over different frames
+	lastUpdate: number, -- os.clock() of the last frame it was moved
 }
 
 local RAINBOW_SPEED = 0.25 -- trips round the colour wheel per second
@@ -57,7 +70,14 @@ local phases: { [Model]: State } = {}
 
 local function track(instance: Instance)
 	if instance:IsA("Model") then
-		phases[instance] = { phase = random:NextNumber(0, TAU), yaw = 0, clock = 0, pace = IDLE_PACE }
+		phases[instance] = {
+			phase = random:NextNumber(0, TAU),
+			yaw = 0,
+			clock = 0,
+			pace = IDLE_PACE,
+			slot = random:NextInteger(0, FAR_EVERY * MID_EVERY - 1),
+			lastUpdate = os.clock(),
+		}
 	end
 end
 
@@ -111,11 +131,7 @@ local function untrack(instance: Instance)
 end
 
 -- Where the orb's centre should be this frame, or nil if the leg hasn't arrived yet.
-local function legPosition(model: Model, serverNow: number): Vector3?
-	local from = model:GetAttribute("RoamFrom")
-	local to = model:GetAttribute("RoamTo")
-	local startTime = model:GetAttribute("RoamStart")
-	local endTime = model:GetAttribute("RoamEnd")
+local function legPosition(from: any, to: any, startTime: any, endTime: any, serverNow: number): Vector3?
 	if
 		typeof(from) ~= "Vector3"
 		or typeof(to) ~= "Vector3"
@@ -138,9 +154,13 @@ function RoamController.start()
 	local parts: { BasePart } = {}
 	local cframes: { CFrame } = {}
 
-	RunService.RenderStepped:Connect(function(dt: number)
+	local frame = 0
+	RunService.RenderStepped:Connect(function()
 		local serverNow = workspace:GetServerTimeNow()
 		local clock = os.clock()
+		local view = workspace.CurrentCamera.CFrame
+		local eye, ahead = view.Position, view.LookVector
+		frame += 1
 		table.clear(parts)
 		table.clear(cframes)
 
@@ -149,18 +169,33 @@ function RoamController.start()
 			if not body or not model.Parent then
 				continue
 			end
-			local position = legPosition(model, serverNow)
+			local held = model:GetAttribute("HeldBy") ~= nil
+
+			-- How much detail this monster gets this frame.
+			local offset = body.Position - eye
+			local distance = offset.Magnitude
+			local animate = held
+				or (distance < ANIMATE_DISTANCE and (distance < BEHIND_SLACK or offset:Dot(ahead) > 0))
+			if not animate then
+				local every = if distance < MID_DISTANCE then MID_EVERY else FAR_EVERY
+				if (frame + state.slot) % every ~= 0 then
+					continue
+				end
+			end
+			local dt = math.min(clock - state.lastUpdate, 0.5)
+			state.lastUpdate = clock
+
+			local from = model:GetAttribute("RoamFrom")
+			local to = model:GetAttribute("RoamTo")
+			local endTime = model:GetAttribute("RoamEnd")
+			local position = legPosition(from, to, model:GetAttribute("RoamStart"), endTime, serverNow)
 			if not position then
 				continue
 			end
 			local gait = model:GetAttribute("Gait") -- nil for orbs
-			local held = model:GetAttribute("HeldBy") ~= nil
 
 			-- Walking = on a leg that hasn't arrived yet; face the way it's going.
 			local walking = false
-			local from = model:GetAttribute("RoamFrom")
-			local to = model:GetAttribute("RoamTo")
-			local endTime = model:GetAttribute("RoamEnd")
 			if typeof(from) == "Vector3" and typeof(to) == "Vector3" and typeof(endTime) == "number" then
 				local step = to - from
 				if serverNow < endTime and step.X * step.X + step.Z * step.Z > 0.01 then
@@ -189,7 +224,7 @@ function RoamController.start()
 				position += Vector3.new(0, math.sin(clock * BOB_SPEED + state.phase) * BOB_HEIGHT, 0)
 			end
 
-			if gait then
+			if gait and animate then
 				local swings = state.swings
 				local lookVersion = model:GetAttribute("LookVersion")
 				local now = os.clock()
