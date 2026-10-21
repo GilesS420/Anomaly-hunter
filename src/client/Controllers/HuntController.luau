@@ -35,7 +35,7 @@ local function label(name: string, order: number, color: Color3, parent: Instanc
 	text.TextStrokeTransparency = 0
 	text.TextScaled = true
 	text.TextXAlignment = Enum.TextXAlignment.Left
-	text.Font = Enum.Font.GothamBold
+	text.Font = Enum.Font.FredokaOne
 	text.Text = ""
 	text.Visible = false
 	local size = Instance.new("UITextSizeConstraint")
@@ -76,7 +76,7 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, TextButt
 		button.Size = UDim2.fromOffset(200, 48)
 		button.BackgroundColor3 = color
 		button.TextColor3 = Color3.new(1, 1, 1)
-		button.Font = Enum.Font.GothamBold
+		button.Font = Enum.Font.FredokaOne
 		button.TextScaled = true
 		button.AutoButtonColor = true
 		button.Text = text

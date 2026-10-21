@@ -126,7 +126,7 @@ local function buildUi(): (Frame, TextLabel, Frame)
 	title.Name = "Title"
 	title.Size = UDim2.new(1, 0, 0, 30)
 	title.BackgroundTransparency = 1
-	title.Font = Enum.Font.GothamBlack
+	title.Font = Enum.Font.FredokaOne
 	title.TextColor3 = Color3.new(1, 1, 1)
 	title.TextStrokeTransparency = 0
 	title.TextScaled = true

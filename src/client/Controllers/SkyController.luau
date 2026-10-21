@@ -822,7 +822,7 @@ local function showBanner(event: Events.WatcherEvent, setId: string?)
 	label.Position = UDim2.fromScale(0.5, 0.3)
 	label.Size = UDim2.fromScale(0.8, if string.find(text, "\n") then 0.2 else 0.12)
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.Creepster
+	label.Font = Enum.Font.LuckiestGuy
 	label.Text = text
 	label.TextScaled = true
 	label.TextColor3 = color:Lerp(Color3.new(1, 1, 1), 0.35)

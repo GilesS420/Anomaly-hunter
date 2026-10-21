@@ -41,7 +41,7 @@ function EventIconController.start()
 	icon.AnchorPoint = Vector2.new(1, 1)
 	icon.Position = UDim2.new(1, -16, 1, -lift)
 	icon.TextScaled = true
-	icon.Font = Enum.Font.GothamBold
+	icon.Font = Enum.Font.FredokaOne
 	icon.Visible = false
 	Ui.corner(icon, 12)
 	local pad = Instance.new("UIPadding")

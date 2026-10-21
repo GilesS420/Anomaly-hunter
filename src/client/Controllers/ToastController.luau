@@ -127,7 +127,7 @@ local function show(holder: Frame, text: string)
 	label.Position = UDim2.fromScale(0.5, 0.5)
 	label.Size = UDim2.new(1, -20, 1, -8)
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBold
+	label.Font = Enum.Font.FredokaOne
 	label.Text = text
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.TextStrokeTransparency = 0.6

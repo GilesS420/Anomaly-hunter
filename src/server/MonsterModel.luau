@@ -116,7 +116,7 @@ local function line(
 	label.BackgroundTransparency = 1
 	label.Position = UDim2.fromScale(0, y)
 	label.Size = UDim2.fromScale(1, height)
-	label.Font = if bold then Enum.Font.GothamBold else Enum.Font.GothamMedium
+	label.Font = if bold then Enum.Font.FredokaOne else Enum.Font.FredokaOne
 	label.Text = text
 	label.TextColor3 = color
 	label.TextScaled = true
@@ -209,7 +209,7 @@ local function priceTag(parent: Instance)
 	price.BackgroundTransparency = 1
 	price.Size = UDim2.fromScale(0, 1)
 	price.AutomaticSize = Enum.AutomaticSize.X
-	price.Font = Enum.Font.GothamBlack
+	price.Font = Enum.Font.FredokaOne
 	price.TextSize = 16
 	price.Text = ""
 	price.TextColor3 = TagLamp

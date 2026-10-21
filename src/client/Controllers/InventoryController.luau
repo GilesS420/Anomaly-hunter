@@ -244,7 +244,7 @@ function InventoryController.start()
 			heart.AnchorPoint = Vector2.new(1, 0)
 			heart.Position = UDim2.new(1, -2, 0, 0)
 			heart.Size = UDim2.fromOffset(28, 28)
-			heart.Font = Enum.Font.GothamBold
+			heart.Font = Enum.Font.FredokaOne
 			heart.Text = if monster.locked then "♥" else "♡"
 			heart.TextColor3 = if monster.locked then Heart else Ui.Colors.muted
 			heart.TextSize = 24
