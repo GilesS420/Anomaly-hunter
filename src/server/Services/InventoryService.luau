@@ -110,6 +110,11 @@ function InventoryService.cakeLook(itemId: string): string
 end
 local cakeLook = InventoryService.cakeLook
 
+-- The Codex shows each monster you've found plainly (no effects, no variant).
+function InventoryService.codexLook(monsterId: string): string
+	return `Codex|{monsterId}`
+end
+
 -- The monster built at Normal size with its effects and variant, without its name label.
 local function monsterLook(caught: Value.CaughtMonster, rarity: string): Model
 	local model = MonsterModel.build({
@@ -484,8 +489,8 @@ function InventoryService.place(player: Player, uid: string)
 	end
 end
 
--- Keeps the player's hidden preview models in step with what they own: one per monster look
--- and one per Bakery cake. Built once each, removed when nothing uses them any more.
+-- Keeps the player's hidden preview models in step with what they own: one per monster look,
+-- one per Bakery cake and one per monster in their Codex. Built once each, removed when nothing uses them any more.
 function InventoryService.syncPreviews(player: Player)
 	local data = DataService.get(player)
 	local playerGui = player:FindFirstChildOfClass("PlayerGui")
@@ -510,6 +515,19 @@ function InventoryService.syncPreviews(player: Player)
 			if monster and not wanted[key] then
 				wanted[key] = function()
 					return monsterLook(caught, monster.rarity)
+				end
+			end
+		end
+	end
+	local found = data.codex.monsters
+	if typeof(found) == "table" then
+		for monsterId in found do
+			local monster = Monsters[monsterId]
+			if monster then
+				local plain: Value.CaughtMonster =
+					{ monsterId = monsterId, size = "Normal", effects = {}, familiarity = 0 }
+				wanted[InventoryService.codexLook(monsterId)] = function()
+					return monsterLook(plain, monster.rarity)
 				end
 			end
 		end

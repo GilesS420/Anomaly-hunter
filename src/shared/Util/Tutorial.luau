@@ -31,6 +31,7 @@ Tutorial.Unlocks = {
 	Backpack = "Pickup",
 	Sell = "Sell",
 	Shops = "Buy",
+	Codex = "Tour",
 } :: { [string]: Step }
 
 -- What the guide card says for each step.
@@ -72,6 +73,10 @@ Tutorial.Tour = {
 	{
 		feature = "Backpack",
 		text = "Your Backpack (G) holds your monsters, cakes and tools. Tap the heart on a monster to keep it safe.",
+	},
+	{
+		feature = "Codex",
+		text = "Your Codex (C) lists every monster you've caught. Then catch each one in Silver, Gold, Shiny and Rainbow too!",
 	},
 	{
 		feature = "Events",

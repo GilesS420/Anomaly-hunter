@@ -2074,6 +2074,89 @@ do
 	)
 end
 
+-- The Codex (Util/Codex).
+do
+	local Codex = require("../src/shared/Util/Codex")
+	local sections = Codex.sections()
+	local zoneIds = {}
+	for _, section in sections do
+		zoneIds[section.id] = #section.monsters
+	end
+	check(
+		"codex has a page per launch zone",
+		zoneIds.PumpkinGraveyard == 9 and zoneIds.MurkyBayou == 9 and zoneIds.AbandonedCarnival == 9
+	)
+	check(
+		"codex leaves out zones that aren't in the game yet",
+		zoneIds.SpookySchool == nil and zoneIds.GhostShip == nil
+	)
+	check("codex lists the launch event monsters only", zoneIds.Events == 4)
+	check("codex pages start with the commonest monster", sections[1].monsters[1] == "Gloomlet")
+	check(
+		"codex variant goals are Silver, Gold, Shiny, Rainbow",
+		table.concat(Codex.VariantOrder, ",") == "Silver,Gold,Shiny,Rainbow"
+	)
+
+	local codex = {}
+	local found = Codex.note(
+		codex,
+		{ monsterId = "Gloomlet", size = "Normal", effects = { "Cobwebbed" }, familiarity = 0 }
+	)
+	check(
+		"codex: first catch is a new monster and a new effect",
+		#found == 2 and found[1].kind == "Monster" and found[2].kind == "Effect"
+	)
+	check(
+		"codex: plain catch is no variant goal",
+		Codex.has(codex, "Gloomlet") and not Codex.has(codex, "Gloomlet", "Gold")
+	)
+	check(
+		"codex: the same catch again is nothing new",
+		#Codex.note(
+				codex,
+				{ monsterId = "Gloomlet", size = "Big", effects = { "Cobwebbed" }, familiarity = 0 }
+			) == 0
+	)
+	local gold = Codex.note(
+		codex,
+		{ monsterId = "Gloomlet", size = "Normal", effects = {}, familiarity = 0, variant = "Gold" }
+	)
+	check(
+		"codex: a Gold one is a new variant goal",
+		#gold == 1
+			and gold[1].kind == "Variant"
+			and gold[1].variant == "Gold"
+			and Codex.has(codex, "Gloomlet", "Gold")
+	)
+	local combo = Codex.note(
+		codex,
+		{ monsterId = "Gravepup", size = "Normal", effects = { "Vampire", "Batty" }, familiarity = 0 }
+	)
+	local kinds = {}
+	for _, f in combo do
+		kinds[f.kind] = (kinds[f.kind] or 0) + 1
+	end
+	check("codex: combos are noted from their recipe", kinds.Combo == 1 and codex.combos.Count == true)
+	check(
+		"codex: unknown monsters are ignored",
+		#Codex.note(codex, { monsterId = "Nobody", size = "Normal", effects = {}, familiarity = 0 }) == 0
+	)
+	local progress = Codex.progress(codex, sections[1].monsters)
+	check(
+		"codex progress counts found and variants",
+		progress.found == 2
+			and progress.total == 9
+			and progress.variants.Gold == 1
+			and progress.variants.Silver == 0
+	)
+	local effectIds = Codex.effectIds()
+	check(
+		"codex leaves out effects from events not in the game",
+		not table.find(effectIds, "Mimic") and table.find(effectIds, "Cobwebbed") ~= nil
+	)
+	check("codex lists every combo", #Codex.comboIds() == 4)
+end
+
 if failures > 0 then
 	error(`{failures} check(s) failed`)
 end
