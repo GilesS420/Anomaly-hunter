@@ -30,8 +30,9 @@ export type Sky = {
 	atmosphere: { color: Rgb, decay: Rgb, density: number, haze: number }?,
 	moon: { color: Rgb, size: number, coin: boolean? }?, -- a big disc in the sky; coin: flat and gold
 	eye: boolean?, -- the Watcher's giant eye, looking around
-	aurora: Rgb?, -- slow waving bands of light
+	aurora: Rgb?, -- a curtain of light rippling across the northern sky
 	sparkles: Rgb?, -- specks drifting down everywhere
+	mist: Rgb?, -- low fog rolling over the ground round your feet
 	flashes: boolean?, -- lightning: the screen flashes and bolts strike in the distance
 	-- What falls (or floats) all around the player while the event is on:
 	--   Snow   a thick, sideways-blowing snowstorm
@@ -42,7 +43,8 @@ export type Sky = {
 	--   Ghosts    pale ghosts flying in circles high over the hub (Phantom Swarm)
 	--   Lanterns  a parade of grinning lantern heads marching round the hub (Nightmare Parade)
 	weather: Weather?,
-	edge: Rgb?, -- a glow round the edges of the screen in this colour
+	edge: Rgb?, -- the event's colour: its icon, its banner and the screen frame
+	frame: boolean?, -- a glow round the edges of the screen in the edge colour (only the scariest)
 }
 
 export type MonsterSet = {
@@ -130,6 +132,7 @@ Events.List = {
 			saturation = -0.15,
 			atmosphere = { color = { 220, 235, 250 }, decay = { 160, 190, 225 }, density = 0.6, haze = 3 },
 			aurora = { 120, 230, 255 },
+			mist = { 220, 240, 255 },
 			weather = { kind = "Snow" },
 			edge = { 225, 245, 255 },
 		},
@@ -202,6 +205,7 @@ Events.List = {
 			saturation = -0.45,
 			atmosphere = { color = { 45, 45, 60 }, decay = { 12, 12, 18 }, density = 0.5, haze = 2 },
 			flashes = true,
+			mist = { 70, 75, 95 },
 			weather = { kind = "Rain", color = { 170, 180, 210 } },
 			edge = { 10, 10, 20 },
 		},
@@ -228,6 +232,7 @@ Events.List = {
 			moon = { color = { 255, 70, 55 }, size = 90 },
 			weather = { kind = "Rain", color = { 200, 25, 30 } },
 			edge = { 170, 0, 10 },
+			frame = true,
 		},
 		warning = "The moon is turning red...",
 		announce = "A Blood Moon rises! Haunted effects are twice as likely, monsters grow, Phantoms roam and the Bakery sells Blood Moon Pies.",
@@ -264,6 +269,7 @@ Events.List = {
 						haze = 2,
 					},
 					aurora = { 180, 230, 255 },
+					mist = { 200, 225, 255 },
 					weather = { kind = "Ghosts" },
 					edge = { 190, 225, 255 },
 				},
@@ -283,6 +289,7 @@ Events.List = {
 					atmosphere = { color = { 45, 0, 10 }, decay = { 95, 0, 20 }, density = 0.5, haze = 2 },
 					moon = { color = { 255, 120, 40 }, size = 60 },
 					flashes = true,
+					mist = { 120, 10, 25 },
 					weather = { kind = "Lanterns" },
 					edge = { 160, 0, 25 },
 				},
@@ -305,6 +312,7 @@ Events.List = {
 			eye = true,
 			weather = { kind = "Eyes" },
 			edge = { 110, 30, 160 },
+			frame = true,
 		},
 		warning = "All five eyes are open. The Watcher is waking up...",
 		announce = "THE WATCHER AWAKENS! Its eye is on every mansion.",
