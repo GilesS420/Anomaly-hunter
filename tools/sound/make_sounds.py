@@ -5,9 +5,9 @@
 Writes, into out_dir (default: tools/sound/out):
   EventStingers.ogg   every event's warning and start sound, one after another
   EventAmbience.ogg   every event's background loop, one after another
-  MusicGymnopedie.ogg    after Satie, Gymnopedie No. 1 (1888)
+  MusicWaltz.ogg         The Haunted Waltz (our own tune)
   MusicMountainKing.ogg  after Grieg, In the Hall of the Mountain King (1875)
-  MusicFurElise.ogg      after Beethoven, Fur Elise (1810)
+  MusicLullaby.ogg       Lullaby for the Lost (our own tune)
   MusicMoonlight.ogg     after Beethoven, Moonlight Sonata, first movement (1801)
   preview/*.mp3       each sound on its own, for the preview page
   WorldAmbience.ogg   the night under the music, and the little sounds between songs
@@ -53,7 +53,6 @@ APPROVED = {  # name: (PCG64 state, has_uint32, uinteger)
     "SugarRush": (315939851298089173177605725354231658393, 1, 1771602223),
     "GoldRush": (254997078598393388880328317970523957418, 1, 2672971746),
     "WatcherAwakens": (189870864784255521201730970769586460453, 1, 2672971746),
-    "MusicGymnopedie": (334769270541249766193863008936780335254, 1, 2672971746),
     "MusicMountainKing": (283070765951860029914347476084439014823, 1, 2672971746),
 }
 APPROVED_INC = 300095300155318575761469457844978717175
@@ -480,100 +479,114 @@ AMBIENCE = [
 # "performance" is this code, so there is no recording anyone else owns.
 
 
-def music_gymnopedie():
-    """After Erik Satie, Gymnopedie No. 1 (1888): slow 3/4, music box over a soft pad."""
-    beat = 60 / 68
-    bar = beat * 3
-    bars = 32
-    d = bars * bar
-    buf = silence(d)
-    g, dm = (["G2"], ["B3", "D4", "F#4"]), (["D2"], ["A3", "C#4", "F#4"])
-    for b in range(bars):
-        bass, chord = g if b % 2 == 0 else dm
-        at = b * bar
-        place(buf, stereo(soft_piano(note(bass[0]), bar + 1.0) * 0.55, -0.15), at, wrap=True)
+def oompah(buf, at, bass, chord, beat, gain=1.0):
+    """A waltz bar's left hand: the bass on 1, the chord on 2 and 3."""
+    place(buf, stereo(soft_piano(note(bass), beat * 3 + 0.8) * 0.4 * gain, -0.25), at)
+    for b in (1, 2):
         for i, n in enumerate(chord):
-            place(buf, stereo(soft_piano(note(n), bar * 0.66 + 0.8) * 0.2, 0.2 + 0.1 * i), at + beat, wrap=True)
-        place(buf, stereo(pad(note(chord[1]), bar + 0.4, 0.6, 0.8, 900) * 0.18, 0.0), at, wrap=True)
-    # melody: (bar, beat, note, beats)
-    phrase = [
-        (0, 1, "F#5", 1), (0, 2, "A5", 1),
-        (1, 0, "G5", 1), (1, 1, "F#5", 1), (1, 2, "C#5", 1),
-        (2, 0, "B4", 1), (2, 1, "C#5", 1), (2, 2, "D5", 1),
-        (3, 0, "A4", 3),
-        (4, 0, "F#4", 6),
-    ]
-    melody = [(4 + b, bt, n, l) for b, bt, n, l in phrase]
-    melody += [(12 + b, bt, n, l) for b, bt, n, l in phrase[:-2]]
-    melody += [(15, 0, "A4", 3), (16, 0, "C#5", 3), (17, 0, "F#5", 3), (18, 0, "E5", 6)]
-    melody += [
-        (20, 1, "B4", 1), (20, 2, "C#5", 1),
-        (21, 0, "D5", 1), (21, 1, "E5", 1), (21, 2, "F#5", 1),
-        (22, 0, "A5", 3),
-        (23, 0, "G5", 1), (23, 1, "F#5", 1), (23, 2, "E5", 1),
-        (24, 0, "F#5", 3), (25, 0, "D5", 3), (26, 0, "E5", 3), (27, 0, "C#5", 3), (28, 0, "D5", 6),
-    ]
-    for b, bt, n, length in melody:
-        at = b * bar + bt * beat
-        place(buf, stereo(music_box(note(n), max(2.5, length * beat + 1.2), wobble=0.004) * 0.5, -0.1), at, wrap=True)
-        place(buf, stereo(celesta(note(n) * 2, 1.5) * 0.06, 0.3), at + 0.01, wrap=True)
-    return loudness(reverb(buf, 3.2, 0.4, 5000, wrap=True), -19)
+            place(buf, stereo(celesta(note(n), 0.9) * 0.07 * gain, 0.1 + 0.1 * i), at + b * beat)
 
 
-# Fur Elise, bar by bar in sixteenths: (left hand bass or None, the six sixteenths). A bar's
-# first sixteenth sounds together with the bass note.
-ELISE_A = [
-    (None, ["E5", "D#5", "E5", "B4", "D5", "C5"]),
-    ("A2", ["A4", "E3", "A3", "C4", "E4", "A4"]),
-    ("E2", ["B4", "E3", "G#3", "E4", "G#4", "B4"]),
-    ("A2", ["C5", "E3", "A3", "E4", "E5", "D#5"]),
-    (None, ["E5", "D#5", "E5", "B4", "D5", "C5"]),
-    ("A2", ["A4", "E3", "A3", "C4", "E4", "A4"]),
-    ("E2", ["B4", "E3", "G#3", "E4", "C5", "B4"]),
-]
-ELISE_END_1 = ("A2", ["A4", "E3", "A3", None, "E5", "D#5"])
-ELISE_END_2 = ("A2", ["A4", "E3", "A3", "B4", "C5", "D5"])
-ELISE_B = [
-    ("C3", ["E5", "G3", "C4", "G4", "F5", "E5"]),
-    ("G2", ["D5", "G3", "B3", "F4", "E5", "D5"]),
-    ("A2", ["C5", "E3", "A3", "E4", "D5", "C5"]),
-    ("E2", ["B4", "E3", "E4", None, "E5", "D#5"]),
-    (None, ["E5", "D#5", "E5", "D#5", "E5", "D#5"]),
+WALTZ_CHORDS = {
+    "Am": ("A2", ["C4", "E4", "A4"]),
+    "E7": ("E2", ["D4", "E4", "G#4"]),
+    "Dm": ("D2", ["D4", "F4", "A4"]),
+    "F": ("F2", ["C4", "F4", "A4"]),
+    "C": ("C3", ["C4", "E4", "G4"]),
+}
+# An original waltz (ours, not anyone else's): four 8-bar phrases. Each bar: chord and the
+# tune as (beat, note, beats).
+WALTZ = [
+    ("Am", [(0, "E5", 2), (2, "C5", 1)]), ("Am", [(0, "A4", 3)]),
+    ("E7", [(0, "G#4", 1), (1, "B4", 1), (2, "D5", 1)]), ("E7", [(0, "F5", 2), (2, "E5", 1)]),
+    ("E7", [(0, "D5", 1), (1, "C5", 1), (2, "B4", 1)]), ("E7", [(0, "G#4", 2), (2, "B4", 1)]),
+    ("Am", [(0, "A4", 1), (1, "C5", 1), (2, "E5", 1)]), ("Am", [(0, "A5", 3)]),
+    ("Am", [(0, "A5", 2), (2, "G5", 1)]), ("Am", [(0, "E5", 3)]),
+    ("Dm", [(0, "F5", 1), (1, "E5", 1), (2, "D5", 1)]), ("Dm", [(0, "A4", 3)]),
+    ("Am", [(0, "C5", 1), (1, "E5", 1), (2, "A5", 1)]), ("E7", [(0, "G#5", 2), (2, "B4", 1)]),
+    ("Am", [(0, "C5", 1), (1, "B4", 1), (2, "G#4", 1)]), ("Am", [(0, "A4", 3)]),
+    ("F", [(0, "C5", 1), (1, "F5", 1), (2, "A5", 1)]), ("F", [(0, "A5", 2), (2, "G5", 1)]),
+    ("C", [(0, "E5", 1), (1, "G5", 1), (2, "C6", 1)]), ("C", [(0, "C6", 2), (2, "B5", 1)]),
+    ("Dm", [(0, "A5", 1), (1, "F5", 1), (2, "D5", 1)]), ("Dm", [(0, "F5", 2), (2, "E5", 1)]),
+    ("E7", [(0, "E5", 1), (1, "D5", 1), (2, "B4", 1)]), ("E7", [(0, "G#4", 2), (2, "E5", 1)]),
+    ("Am", [(0, "A5", 2), (2, "G5", 1)]), ("Am", [(0, "E5", 3)]),
+    ("Dm", [(0, "F5", 1), (1, "E5", 1), (2, "D5", 1)]), ("Dm", [(0, "A4", 3)]),
+    ("Am", [(0, "C5", 1), (1, "E5", 1), (2, "A5", 1)]), ("E7", [(0, "G#5", 2), (2, "B4", 1)]),
+    ("Am", [(0, "C5", 1), (1, "B4", 1), (2, "G#4", 1)]), ("Am", [(0, "A4", 3)]),
 ]
 
 
-def music_elise():
-    """After Beethoven, Fur Elise (1810): a haunted music box that slowly goes out of tune.
-    Played twice; the second time lower, softer and more warped, over a cold pad."""
-    step = 0.17
-    bar = step * 6
-    form = [None, None] + ELISE_A + [ELISE_END_1] + ELISE_A + [ELISE_END_2] + ELISE_B + ELISE_A + [ELISE_END_1]
-    form = [b for b in form if b is not None]
-    rounds = [(1.0, 0.004, 0.0), (0.5, 0.011, 1.0)]  # (pitch, wobble, pad)
-    pickup = 2 * step
-    length = pickup + len(form) * bar
-    d = len(rounds) * (length + 1.5) + 5
+def music_waltz():
+    """The Haunted Waltz, our own tune: a music box waltzing in A minor, played twice. The
+    second time it's lower, slower to die away and more out of tune, over a cold pad."""
+    beat = 0.6
+    bar = beat * 3
+    rounds = [(1.0, 0.004, 0.0), (0.5, 0.010, 1.0)]  # (pitch, wobble, pad)
+    length = len(WALTZ) * bar
+    d = len(rounds) * length + bar * 2 + 5
     buf = silence(d)
     for r, (shift, wobble, pad_gain) in enumerate(rounds):
-        base = r * (length + 1.5)
-        for i, n in enumerate(["E5", "D#5"]):  # the pickup
-            place(buf, stereo(music_box(note(n) * shift * 2, 2.0, wobble) * 0.45, 0.1), base + i * step)
-        for b, (bass, notes) in enumerate(form):
-            at = base + pickup + b * bar
-            if bass:
-                place(buf, stereo(soft_piano(note(bass) * max(shift, 1.0), bar * 2) * 0.35, -0.3), at)
-                if pad_gain:
-                    place(buf, stereo(pad(note(bass) * 2, bar + 0.6, 0.3, 0.6, 700) * 0.12 * pad_gain), at)
-            for k, n in enumerate(notes):
-                if n is None:
-                    continue
+        base = r * length
+        for b, (name, tune) in enumerate(WALTZ):
+            at = base + b * bar
+            bass, chord = WALTZ_CHORDS[name]
+            oompah(buf, at, bass, chord, beat)
+            if pad_gain:
+                place(buf, stereo(pad(note(chord[1]), bar + 0.6, 0.3, 0.6, 700) * 0.1 * pad_gain), at)
+            for beat_at, n, beats in tune:
                 f = note(n) * shift * 2
-                low = note(n) < note("A4") and k in (1, 2)  # the left-hand arpeggio notes
-                if low:
-                    place(buf, stereo(soft_piano(note(n) * max(shift, 1.0), 1.2) * 0.22, -0.2), at + k * step)
-                else:
-                    place(buf, stereo(music_box(f, 2.2, wobble) * 0.45, 0.1), at + k * step)
+                place(buf, stereo(music_box(f, max(2.0, beats * beat + 1.0), wobble) * 0.45, 0.1), at + beat_at * beat)
+    end = len(rounds) * length  # a last low A to finish
+    place(buf, stereo(soft_piano(note("A1"), 4.0) * 0.45), end)
+    place(buf, stereo(music_box(note("A4"), 4.0, 0.012) * 0.4, 0.1), end)
     return loudness(trim_tail(reverb(buf, 3.0, 0.4, 5000)), -19)
+
+
+LULLABY_CHORDS = {
+    "Dm": ["D2", "A2", "D3", "F3", "D3", "A2"],
+    "Gm": ["G2", "D3", "G3", "Bb3", "G3", "D3"],
+    "A7": ["A2", "E3", "G3", "C#4", "G3", "E3"],
+    "Bb": ["Bb1", "F2", "Bb2", "D3", "Bb2", "F2"],
+    "F": ["F2", "C3", "F3", "A3", "F3", "C3"],
+}
+# An original lullaby (ours) in 6/8: each bar is six eighths, the tune as (eighth, note, eighths).
+LULLABY_A = [
+    ("Dm", [(0, "A4", 3), (3, "F4", 2), (5, "E4", 1)]), ("Dm", [(0, "D4", 6)]),
+    ("Gm", [(0, "D4", 2), (2, "G4", 1), (3, "Bb4", 3)]), ("Gm", [(0, "A4", 3), (3, "G4", 3)]),
+    ("A7", [(0, "E4", 2), (2, "F4", 1), (3, "G4", 2), (5, "E4", 1)]), ("A7", [(0, "C#5", 3), (3, "A4", 3)]),
+    ("Dm", [(0, "D5", 2), (2, "C5", 1), (3, "A4", 2), (5, "F4", 1)]), ("Dm", [(0, "D4", 6)]),
+]
+LULLABY_B = [
+    ("Bb", [(0, "F4", 2), (2, "G4", 1), (3, "Bb4", 3)]), ("Bb", [(0, "D5", 3), (3, "C5", 3)]),
+    ("F", [(0, "A4", 2), (2, "C5", 1), (3, "F5", 3)]), ("F", [(0, "E5", 3), (3, "C5", 3)]),
+    ("Gm", [(0, "D5", 2), (2, "Bb4", 1), (3, "G4", 3)]), ("A7", [(0, "E5", 2), (2, "C#5", 1), (3, "A4", 3)]),
+    ("Dm", [(0, "F5", 3), (3, "E5", 2), (5, "C#5", 1)]), ("Dm", [(0, "D5", 6)]),
+]
+
+
+def music_lullaby():
+    """Lullaby for the Lost, our own tune: a slow rocking lullaby in D minor on a celesta,
+    with the tune passing to a wonky music box the second time."""
+    eighth = 0.3
+    bar = eighth * 6
+    form = [(LULLABY_A, 1.0, False), (LULLABY_B, 1.0, False), (LULLABY_A, 2.0, True), (LULLABY_B, 1.0, True)]
+    d = sum(len(section) for section, _, _ in form) * bar + 6
+    buf = silence(d)
+    at = 0.0
+    for section, octave, box in form:
+        for name, tune in section:
+            for k, n in enumerate(LULLABY_CHORDS[name]):
+                place(buf, stereo(soft_piano(note(n), 1.4) * 0.16, -0.3 + 0.1 * (k % 3)), at + k * eighth)
+            for start, n, length in tune:
+                f = note(n) * octave
+                if box:
+                    place(buf, stereo(music_box(f, max(2.0, length * eighth + 1.0), 0.008) * 0.4, 0.15), at + start * eighth)
+                else:
+                    place(buf, stereo(celesta(f, max(1.8, length * eighth + 0.8)) * 0.5, 0.15), at + start * eighth)
+            at += bar
+    place(buf, stereo(pad(note("D3"), d - 4, 4.0, 3.0, 500) * 0.06), 0)
+    place(buf, stereo(soft_piano(note("D2"), 4.0) * 0.4), at)
+    return loudness(trim_tail(reverb(buf, 3.2, 0.42, 4500)), -20)
 
 
 def music_moonlight():
@@ -688,9 +701,9 @@ def music_mountain_king():
 
 # The playlist, in order: the whole server hears the same song at the same moment.
 MUSIC = [
-    ("MusicGymnopedie", music_gymnopedie),
+    ("MusicWaltz", music_waltz),
     ("MusicMountainKing", music_mountain_king),
-    ("MusicFurElise", music_elise),
+    ("MusicLullaby", music_lullaby),
     ("MusicMoonlight", music_moonlight),
 ]
 

@@ -1,7 +1,9 @@
 --!strict
 -- Music and sound effects. Every sound is made by tools/sound/make_sounds.py (synthesized
 -- from scratch, so nobody else owns it); the music is our own rendition of public-domain
--- classical pieces. client/Controllers/SoundController plays it all.
+-- classical pieces plus two songs of our own. Very famous melodies get rejected by Roblox's
+-- audio moderation (Gymnopedie and Fur Elise were, 2026-10-21), so don't add those.
+-- client/Controllers/SoundController plays it all.
 --
 -- Roblox can't read sound files from this repo: each of the seven files in Files has to be
 -- uploaded to Roblox once (Creator Hub > Development Items > Audio), and its asset id goes
@@ -26,9 +28,9 @@ local Sounds = {}
 Sounds.Files = {
 	EventStingers = "rbxassetid://79245545160543",
 	EventAmbience = "rbxassetid://122808714791910",
-	MusicGymnopedie = "rbxassetid://126501042420062",
+	MusicWaltz = "rbxassetid://72259685212361",
 	MusicMountainKing = "rbxassetid://94551444495402",
-	MusicFurElise = "rbxassetid://128385526223567",
+	MusicLullaby = "rbxassetid://129818520848497",
 	MusicMoonlight = "rbxassetid://124222698146635",
 	WorldAmbience = "rbxassetid://99157796020232",
 }
@@ -45,9 +47,9 @@ Sounds.AmbienceFadeSeconds = 3
 
 -- The music is one playlist for the whole server: every player hears the same song at the
 -- same moment, wherever they are. The order and lengths are in Config/SoundSheets (Music):
---   after Erik Satie, Gymnopedie No. 1 (1888)
+--   The Haunted Waltz (our own)
 --   after Edvard Grieg, In the Hall of the Mountain King (1875)
---   after Ludwig van Beethoven, Fur Elise (1810)
+--   The Nursery Lullaby (our own)
 --   after Ludwig van Beethoven, Moonlight Sonata, first movement (1801)
 -- A song that isn't uploaded yet is skipped.
 Sounds.PlaylistGapSeconds = 4 -- quiet between two songs
