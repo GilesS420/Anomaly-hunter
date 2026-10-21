@@ -5,7 +5,7 @@
 -- a keyboard) that takes you home, and in a zone a "Bait Bell" button (B) that brings a rarer
 -- monster to you. Each button shows only if you own one. A "Backpack" button (G) is always
 -- there and opens your items and monsters (InventoryController), and so is a "Codex" button
--- (C, CodexController).
+-- (C, CodexController) and a "Settings" button (SettingsController).
 -- Everything shown comes from the server: player attributes Zone / Hearts / Carrying /
 -- CarryingSize / CarryingCount / BagSize / ReturnCharms / BaitBells and
 -- leaderstats.Money.
@@ -109,6 +109,8 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, TextButt
 	-- Always there too; CodexController opens the Codex with it.
 	local codex = itemButton("Codex", 8, Color3.fromRGB(110, 70, 40), if keys then "Codex (C)" else "Codex")
 	codex.Visible = true
+	local settings = itemButton("Settings", 9, Color3.fromRGB(60, 60, 75), "Settings")
+	settings.Visible = true
 
 	gui.Parent = player:WaitForChild("PlayerGui")
 	return money, hearts, carrying, charm, bell

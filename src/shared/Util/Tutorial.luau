@@ -32,6 +32,7 @@ Tutorial.Unlocks = {
 	Sell = "Sell",
 	Shops = "Buy",
 	Codex = "Tour",
+	Settings = "Gate", -- sound and weather settings always work
 } :: { [string]: Step }
 
 -- What the guide card says for each step.
