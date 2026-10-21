@@ -72,7 +72,7 @@ local function input(grid: Frame, placeholder: string, start: string?): () -> st
 	box.PlaceholderText = placeholder
 	box.PlaceholderColor3 = Ui.Colors.muted
 	box.Text = start or ""
-	box.Font = Enum.Font.Gotham
+	box.Font = Enum.Font.FredokaOne
 	box.TextScaled = true
 	box.ClearTextOnFocus = false
 	local limit = Instance.new("UITextSizeConstraint")

@@ -127,11 +127,11 @@ function MonsterLabelController.start()
 		label.Parent = card
 		return label
 	end
-	local price = line(1, Enum.Font.GothamBlack, 18)
+	local price = line(1, Enum.Font.FredokaOne, 18)
 	price.TextColor3 = Ui.Colors.lamp
-	local name = line(2, Enum.Font.GothamBold, 18)
-	local details = line(3, Enum.Font.GothamMedium, 14)
-	local status = line(4, Enum.Font.GothamMedium, 14)
+	local name = line(2, Enum.Font.FredokaOne, 18)
+	local details = line(3, Enum.Font.FredokaOne, 14)
+	local status = line(4, Enum.Font.FredokaOne, 14)
 
 	local function textOf(label: BillboardGui, path: { string }): TextLabel?
 		local at: Instance? = label

@@ -206,7 +206,7 @@ function CodexController.start()
 		label.BackgroundTransparency = 1
 		label.AutomaticSize = Enum.AutomaticSize.X
 		label.Size = UDim2.new(0, 0, 1, 0)
-		label.Font = Enum.Font.GothamMedium
+		label.Font = Enum.Font.FredokaOne
 		label.TextSize = if small then 13 else 15
 		label.TextColor3 = Ui.Colors.muted
 		label.Text = text
@@ -423,7 +423,7 @@ function CodexController.start()
 				button.BackgroundColor3 = Color3.fromRGB(40, 32, 54)
 				button.BorderSizePixel = 0
 				button.AutoButtonColor = true
-				button.Font = Enum.Font.GothamMedium
+				button.Font = Enum.Font.FredokaOne
 				button.TextSize = if small then 13 else 15
 				button.TextWrapped = true
 				button.TextXAlignment = Enum.TextXAlignment.Left

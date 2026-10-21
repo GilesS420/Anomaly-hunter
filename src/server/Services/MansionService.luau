@@ -122,7 +122,7 @@ local function textLine(parent: Instance, text: string, color: Color3, y: number
 	label.BackgroundTransparency = 1
 	label.Position = UDim2.fromScale(0, y)
 	label.Size = UDim2.fromScale(1, height)
-	label.Font = Enum.Font.GothamBold
+	label.Font = Enum.Font.FredokaOne
 	label.Text = text
 	label.TextColor3 = color
 	label.TextScaled = true

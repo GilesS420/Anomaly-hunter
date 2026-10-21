@@ -130,7 +130,7 @@ local function label(part: BasePart, title: string, subtitle: string?, height: n
 		textLabel.BackgroundTransparency = 1
 		textLabel.Position = UDim2.fromScale(0, (i - 1) / #lines)
 		textLabel.Size = UDim2.fromScale(1, 1 / #lines)
-		textLabel.Font = if i == 1 then Enum.Font.GothamBold else Enum.Font.GothamMedium
+		textLabel.Font = if i == 1 then Enum.Font.FredokaOne else Enum.Font.FredokaOne
 		textLabel.Text = text
 		textLabel.TextColor3 = LabelColor
 		textLabel.TextScaled = true
