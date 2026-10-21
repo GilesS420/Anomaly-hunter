@@ -5,9 +5,11 @@
 -- servers never finds a rarer one.
 -- Events are passive: the sky changes, and while one is live the mansion rolls read its
 -- boosts from WatcherService.current() (effect, effectOddsMultiplier, growthMultiplier).
---   Flicker     the streetlights fail too, and Flickerwick and Static Shade drift between
---               the mansions (an optional bonus to catch)
---   Blood Moon  Crimson Wisp and Moonhowler drift between the mansions, same as Flicker
+--   Flicker     the streetlights fail too
+--   Blood Moon  Crimson Wisp and Moonhowler drift between the mansions (an optional bonus
+--               to catch)
+--   The Watcher Awakens  brings one of its monster sets: Phantoms, Nightmares or (rarely)
+--               Eldritch monsters, the same set in every server (workspace attr WatcherMonsterSet)
 -- Event monsters are caught in the main area like any other monster (CatchService) and fly
 -- straight home to the mansion. Whatever is left when the event ends fades away.
 --
@@ -33,6 +35,7 @@ local TweenService = game:GetService("TweenService")
 
 local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
+local Rng = require(ReplicatedStorage.Shared.Util.Rng)
 local Roam = require(ReplicatedStorage.Shared.Util.Roam)
 local Spawning = require(ReplicatedStorage.Shared.Util.Spawning)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
@@ -441,7 +444,12 @@ local function publish()
 	end
 end
 
-local function startEvent(event: Events.WatcherEvent, ends: number, skySeconds: number?)
+local function startEvent(
+	event: Events.WatcherEvent,
+	ends: number,
+	set: Events.MonsterSet?,
+	skySeconds: number?
+)
 	if skySeconds then
 		applySky(event, skySeconds)
 		workspace:SetAttribute("WatcherSkyAt", now() + skySeconds)
@@ -451,6 +459,10 @@ local function startEvent(event: Events.WatcherEvent, ends: number, skySeconds: 
 	upcoming = nil
 	endsAt = ends
 	Notify.toastAll(event.announce or `{event.name} has begun!`)
+	if set then
+		Notify.toastAll(set.announce)
+	end
+	workspace:SetAttribute("WatcherMonsterSet", if set then set.id else nil)
 
 	local handler = handlers[event.id]
 	if handler then
@@ -459,9 +471,10 @@ local function startEvent(event: Events.WatcherEvent, ends: number, skySeconds: 
 		end)
 	end
 
-	if event.monsters then
+	local weights, count = Watcher.spawns(event, set, #Players:GetPlayers())
+	if weights then
 		local rects = driftRects()
-		for _, monster in Watcher.monsterBatch(event, Watcher.monsterCount(#Players:GetPlayers()), random) do
+		for _, monster in Watcher.monsterBatch(weights, count, random) do
 			if not spawnOne(event, monster, rects) then
 				break -- too crowded
 			end
@@ -492,6 +505,7 @@ local function endEvent()
 
 	phase = "Calm"
 	summoned = false
+	workspace:SetAttribute("WatcherMonsterSet", nil)
 	publish()
 end
 
@@ -527,7 +541,9 @@ local function tick()
 				local skySeconds = if phase == "Warning" and upcoming == slot.event
 					then nil
 					else SummonSkySeconds
-				startEvent(slot.event, slot.endAt, skySeconds)
+				-- The set is rolled from the slot too, so every server gets the same monsters.
+				local set = Watcher.pickSet(slot.event, Rng.seeded(`watcher-set:{slot.index}`))
+				startEvent(slot.event, slot.endAt, set, skySeconds)
 			end
 		elseif time >= slot.warnAt and phase ~= "Warning" then
 			startWarning(slot.event, slot.startAt)
@@ -803,7 +819,12 @@ function WatcherService.summon(id: string?): boolean
 		return false
 	end
 	summoned = true
-	startEvent(event, now() + (event.durationSeconds or 180), SummonSkySeconds)
+	startEvent(
+		event,
+		now() + (event.durationSeconds or 180),
+		Watcher.pickSet(event, random),
+		SummonSkySeconds
+	)
 	return true
 end
 

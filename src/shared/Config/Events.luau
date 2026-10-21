@@ -40,6 +40,15 @@ export type Sky = {
 	edge: Rgb?, -- a glow round the edges of the screen in this colour
 }
 
+export type MonsterSet = {
+	id: string,
+	name: string, -- shown to players
+	weight: number,
+	monsters: { [string]: number }, -- monster id -> spawn weight
+	count: number?, -- how many appear (nil: Events.MonstersPerPlayer etc.)
+	announce: string, -- toast everyone sees when the event starts with this set
+}
+
 export type WatcherEvent = {
 	id: string,
 	name: string, -- shown to players
@@ -52,6 +61,9 @@ export type WatcherEvent = {
 	otherEffectsChance: number?, -- percent per roll for one of the other events' effects
 	durationSeconds: number?,
 	monsters: { [string]: number }?, -- event monster id -> spawn weight (optional bonus to catch)
+	-- The Watcher Awakens instead picks one of these sets each time, by weight: usually the
+	-- small Phantoms, sometimes Nightmares, rarely the Eldritch ones.
+	monsterSets: { MonsterSet }?,
 	effectOddsMultiplier: number?, -- mansion effect odds while live (Blood Moon doubles them)
 	growthMultiplier: number?, -- extra growth spurt rolls while live (Config/Weight.EventSpurtChance)
 	cakeEffectMultiplier: number?, -- a cake bite's effect chance (Config/Cakes.BiteEffectChance) x this
@@ -73,10 +85,10 @@ Events.EyesToAwaken = 5
 -- for the event's effect this often (Util/Haunting.eventRoll).
 Events.EffectRollSeconds = 30
 
--- How many event monsters (an optional bonus to catch) appear at the start of an event: this
--- many per player in the server, clamped between Min and Max, so everyone gets a chance. Each
--- kind appears at least once; a Nightmare or Eldritch one appears at most once per event, so
--- an event with only those (Frost Fog, Sugar Rush, Gold Rush) brings just one or two.
+-- How many event monsters (an optional bonus to catch, only in the rare events: Blood Moon
+-- and The Watcher Awakens) appear at the start of an event: this many per player in the
+-- server, clamped between Min and Max, so everyone gets a chance. Each kind appears at least
+-- once. A monster set with a count brings just that many.
 Events.MonstersPerPlayer = 1
 Events.MinMonsters = 4
 Events.MaxMonsters = 10
@@ -105,7 +117,6 @@ Events.List = {
 		effect = "Frostbitten",
 		effectChance = 6,
 		durationSeconds = 180,
-		monsters = { StormGremlin = 1 },
 		sky = {
 			ambient = { 80, 110, 150 },
 			outdoorAmbient = { 110, 150, 200 },
@@ -117,7 +128,7 @@ Events.List = {
 			edge = { 225, 245, 255 },
 		},
 		warning = "The air turns icy cold...",
-		announce = "Frost Fog rolls in! Monsters can freeze over, a Storm Gremlin rides the blizzard and the Bakery sells Frost Tarts.",
+		announce = "Frost Fog rolls in! Monsters can freeze over, and the Bakery sells Frost Tarts.",
 	},
 	{
 		id = "SugarRush",
@@ -128,7 +139,6 @@ Events.List = {
 		effect = "Sugarcoated",
 		effectChance = 6,
 		durationSeconds = 180,
-		monsters = { Doorknocker = 1 },
 		growthMultiplier = 2,
 		cakeEffectMultiplier = 2,
 		bakeryStockMultiplier = 3,
@@ -143,7 +153,7 @@ Events.List = {
 			edge = { 140, 255, 120 },
 		},
 		warning = "Something sweet is in the air...",
-		announce = "Sugar Rush! Cakes get eaten twice as fast, monsters grow, the Doorknocker comes trick-or-treating and the Bakery is packed.",
+		announce = "Sugar Rush! Cakes get eaten twice as fast, monsters grow and the Bakery is packed.",
 	},
 	{
 		id = "GoldRush",
@@ -154,7 +164,6 @@ Events.List = {
 		effect = "Gilded",
 		effectChance = 4,
 		durationSeconds = 180,
-		monsters = { MailboxMimic = 1 },
 		sellMultiplier = 1.25,
 		sky = {
 			ambient = { 130, 95, 50 },
@@ -168,7 +177,7 @@ Events.List = {
 			edge = { 255, 200, 60 },
 		},
 		warning = "Coins jingle somewhere in the dark...",
-		announce = "Gold Rush! The Collector pays 25% more, a Mailbox Mimic guards its gold and the Bakery sells Gilded Truffles.",
+		announce = "Gold Rush! The Collector pays 25% more and the Bakery sells Gilded Truffles.",
 	},
 	{
 		id = "Flicker",
@@ -179,7 +188,6 @@ Events.List = {
 		effect = "Poltergeist",
 		effectChance = 4,
 		durationSeconds = 180,
-		monsters = { Flickerwick = 70, StaticShade = 30, LamppostLurker = 5 },
 		sky = {
 			ambient = { 30, 30, 40 },
 			outdoorAmbient = { 40, 40, 55 },
@@ -192,7 +200,7 @@ Events.List = {
 			edge = { 10, 10, 20 },
 		},
 		warning = "The streetlights buzz and dim...",
-		announce = "Flicker! The lights are failing, Phantoms drift between the mansions and the Bakery sells Static Cupcakes.",
+		announce = "Flicker! The lights are failing and the Bakery sells Static Cupcakes.",
 	},
 	{
 		id = "BloodMoon",
@@ -230,8 +238,32 @@ Events.List = {
 		effectChance = 0.3,
 		otherEffectsChance = 1,
 		durationSeconds = 300,
-		monsters = { Watcherling = 70, EyeOfTheWatcher = 30 },
 		growthMultiplier = 3,
+		monsterSets = {
+			{
+				id = "Phantoms",
+				name = "Phantom Swarm",
+				weight = 65,
+				monsters = { Flickerwick = 60, StaticShade = 40 },
+				announce = "Phantoms pour out of the Watcher's eye!",
+			},
+			{
+				id = "Nightmares",
+				name = "Nightmare Parade",
+				weight = 28,
+				monsters = { MailboxMimic = 35, LamppostLurker = 30, StormGremlin = 20, Doorknocker = 15 },
+				count = 2,
+				announce = "Nightmares crawl out of the shadows! Only a Void Vac can hold them.",
+			},
+			{
+				id = "Eldritch",
+				name = "Eldritch Gaze",
+				weight = 7,
+				monsters = { Watcherling = 70, EyeOfTheWatcher = 30 },
+				count = 1,
+				announce = "Something ELDRITCH has slipped through. Only a Void Vac can hold it!",
+			},
+		} :: { MonsterSet },
 		sky = {
 			ambient = { 55, 25, 75 },
 			outdoorAmbient = { 80, 35, 110 },
@@ -243,7 +275,7 @@ Events.List = {
 			edge = { 110, 30, 160 },
 		},
 		warning = "All five eyes are open. The Watcher is waking up...",
-		announce = "THE WATCHER AWAKENS! Its eye is on every mansion, and its Watcherlings creep through the hub.",
+		announce = "THE WATCHER AWAKENS! Its eye is on every mansion.",
 	},
 } :: { WatcherEvent }
 

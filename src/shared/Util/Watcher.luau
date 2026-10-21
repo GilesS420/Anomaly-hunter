@@ -116,22 +116,49 @@ function Watcher.monsterCount(players: number): number
 	return math.clamp(math.ceil(players * Events.MonstersPerPlayer), Events.MinMonsters, Events.MaxMonsters)
 end
 
--- Picks which event monster appears next, by the event's weights.
-function Watcher.rollMonster(event: Events.WatcherEvent, random: Random?): Monsters.Monster
-	local weights = event.monsters
-	assert(weights, `event {event.id} has no monsters`)
+-- The monsters in a weights table (monster id -> weight), in a fixed order so a seeded
+-- Random gives the same picks.
+local function kindsOf(weights: { [string]: number }): { Monsters.Monster }
 	local list: { Monsters.Monster } = {}
 	for id in weights do
 		local monster = Monsters[id]
 		assert(monster, `unknown event monster {id}`)
 		table.insert(list, monster)
 	end
-	table.sort(list, function(a, b) -- sorted, so a seeded Random gives the same picks
+	table.sort(list, function(a, b)
 		return a.id < b.id
 	end)
-	return Rng.pickWeighted(list, function(m)
+	return list
+end
+
+-- Picks one event monster by weight (monster id -> weight).
+function Watcher.rollMonster(weights: { [string]: number }, random: Random?): Monsters.Monster
+	return Rng.pickWeighted(kindsOf(weights), function(m)
 		return weights[m.id]
 	end, random)
+end
+
+-- Which monster set The Watcher Awakens brings this time (nil for events without sets).
+function Watcher.pickSet(event: Events.WatcherEvent, random: Random?): Events.MonsterSet?
+	local sets = event.monsterSets
+	if not sets or #sets == 0 then
+		return nil
+	end
+	return Rng.pickWeighted(sets, function(set)
+		return set.weight
+	end, random)
+end
+
+-- The monsters an event brings this time, as weights and a count (nil: none).
+function Watcher.spawns(
+	event: Events.WatcherEvent,
+	set: Events.MonsterSet?,
+	players: number
+): ({ [string]: number }?, number)
+	if set then
+		return set.monsters, set.count or Watcher.monsterCount(players)
+	end
+	return event.monsters, Watcher.monsterCount(players)
 end
 
 local function percent(value: number): string
@@ -163,45 +190,57 @@ function Watcher.effectLines(event: Events.WatcherEvent): { string }
 	return lines
 end
 
--- The event monsters that appear when an event starts: one of each kind first (so every
--- event shows all its monsters, not just the common one), then picked by weight. A
--- Nightmare or Eldritch monster appears at most once, so the batch can be shorter than count.
+-- The event monsters that appear when an event starts. With room for every kind, each
+-- appears once (so Blood Moon always shows a Moonhowler next to its Wisps) and the rest are
+-- picked by weight; with less room (a set that brings 1 or 2), different kinds by weight.
 function Watcher.monsterBatch(
-	event: Events.WatcherEvent,
+	weights: { [string]: number },
 	count: number,
 	random: Random?
 ): { Monsters.Monster }
-	local weights = event.monsters
-	assert(weights, `event {event.id} has no monsters`)
-	local kinds: { Monsters.Monster } = {}
-	for id in weights do
-		table.insert(kinds, Monsters[id])
+	local kinds = kindsOf(weights)
+	local function weight(m: Monsters.Monster): number
+		return weights[m.id]
 	end
-	table.sort(kinds, function(a, b) -- commonest first, so a short batch keeps the common ones
-		if weights[a.id] ~= weights[b.id] then
-			return weights[a.id] > weights[b.id]
-		end
-		return a.id < b.id
-	end)
 	local batch: { Monsters.Monster } = {}
-	for index = 1, math.min(count, #kinds) do
-		batch[index] = kinds[index]
-	end
-	local common: { Monsters.Monster } = {}
-	for _, monster in kinds do
-		if monster.rarity == "Phantom" then
-			table.insert(common, monster)
+	if count < #kinds then
+		local left = table.clone(kinds)
+		for _ = 1, count do
+			local pick = Rng.pickWeighted(left, weight, random)
+			table.insert(batch, pick)
+			table.remove(left, table.find(left, pick) :: number)
 		end
+		return batch
 	end
-	while #batch < count and #common > 0 do
-		table.insert(
-			batch,
-			Rng.pickWeighted(common, function(m)
-				return weights[m.id]
-			end, random)
-		)
+	for _, monster in kinds do
+		table.insert(batch, monster)
+	end
+	while #batch < count do
+		table.insert(batch, Rng.pickWeighted(kinds, weight, random))
 	end
 	return batch
+end
+
+-- One line for the event icon's tooltip on the monsters the event brings (nil: none), with
+-- the monster set The Watcher Awakens picked this time (setId, the WatcherMonsterSet attr).
+function Watcher.monsterLine(event: Events.WatcherEvent, setId: string?): string?
+	local weights = event.monsters
+	local prefix = "Monsters"
+	local sets: { Events.MonsterSet } = event.monsterSets or {}
+	for _, set in sets do
+		if set.id == setId then
+			weights = set.monsters
+			prefix = set.name
+		end
+	end
+	if not weights then
+		return nil
+	end
+	local names: { string } = {}
+	for _, monster in kindsOf(weights) do
+		table.insert(names, Format.name(monster.id))
+	end
+	return `{prefix}: {table.concat(names, ", ")}`
 end
 
 -- "2:05"

@@ -81,16 +81,17 @@ add({ id = "SeraphOfTheDeep", rarity = "Divine", baseValue = 4_000_000_000, zone
 
 -- Watcher event monsters (main area only). Phantoms are sized so events are about 20% of a
 -- player's income (one Flicker phantom is about 4 zone-1 trips). Nightmare and Eldritch
--- monsters are gated by vacuum tier instead (Rarities.luau), and only one of each appears per
--- event. Every launch event has its own (Config/Events monsters).
-add({ id = "Flickerwick", rarity = "Phantom", baseValue = 100_000, event = "Flicker" })
-add({ id = "StaticShade", rarity = "Phantom", baseValue = 150_000, event = "Flicker" })
+-- monsters are gated by vacuum tier instead (Rarities.luau). Only the rare events bring
+-- monsters: Blood Moon its own two, and The Watcher Awakens one of its monster sets
+-- (Config/Events monsterSets).
+add({ id = "Flickerwick", rarity = "Phantom", baseValue = 100_000, event = "WatcherAwakens" })
+add({ id = "StaticShade", rarity = "Phantom", baseValue = 150_000, event = "WatcherAwakens" })
 add({ id = "CrimsonWisp", rarity = "Phantom", baseValue = 250_000, event = "BloodMoon" })
 add({ id = "Moonhowler", rarity = "Phantom", baseValue = 400_000, event = "BloodMoon" })
-add({ id = "MailboxMimic", rarity = "Nightmare", baseValue = 3_000_000, event = "GoldRush" })
-add({ id = "LamppostLurker", rarity = "Nightmare", baseValue = 5_000_000, event = "Flicker" })
-add({ id = "StormGremlin", rarity = "Nightmare", baseValue = 8_000_000, event = "FrostFog" })
-add({ id = "Doorknocker", rarity = "Nightmare", baseValue = 12_000_000, event = "SugarRush" })
+add({ id = "MailboxMimic", rarity = "Nightmare", baseValue = 3_000_000, event = "WatcherAwakens" })
+add({ id = "LamppostLurker", rarity = "Nightmare", baseValue = 5_000_000, event = "WatcherAwakens" })
+add({ id = "StormGremlin", rarity = "Nightmare", baseValue = 8_000_000, event = "WatcherAwakens" })
+add({ id = "Doorknocker", rarity = "Nightmare", baseValue = 12_000_000, event = "WatcherAwakens" })
 add({ id = "Watcherling", rarity = "Eldritch", baseValue = 80_000_000, event = "WatcherAwakens" })
 add({ id = "EyeOfTheWatcher", rarity = "Eldritch", baseValue = 150_000_000, event = "WatcherAwakens" })
 

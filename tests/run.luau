@@ -340,62 +340,97 @@ do
 	check("countdown clock", Watcher.clock(125) == "2:05" and Watcher.clock(-3) == "0:00")
 
 	local eventRng = fakeRandom(3)
-	local wrong, wicks = 0, 0
+	local blood = Events.find("BloodMoon") :: Events.WatcherEvent
+	local awakens = Events.find("WatcherAwakens") :: Events.WatcherEvent
+	local wrong, wisps = 0, 0
 	for _ = 1, 20_000 do
-		local m = Watcher.rollMonster(Events.find("Flicker") :: any, eventRng)
-		if m.event ~= "Flicker" then
+		local m = Watcher.rollMonster(blood.monsters :: any, eventRng)
+		if m.event ~= "BloodMoon" then
 			wrong += 1
-		elseif m.id == "Flickerwick" then
-			wicks += 1
+		elseif m.id == "CrimsonWisp" then
+			wisps += 1
 		end
 	end
-	check("Flicker only spawns Flicker monsters", wrong == 0)
+	check("Blood Moon only spawns Blood Moon monsters", wrong == 0)
+	check("about 70% of Blood Moon monsters are Crimson Wisps", math.abs(wisps / 20_000 - 0.7) < 0.02)
 
+	local withMonsters: { string } = {}
 	local used: { [string]: boolean } = {}
 	for _, event in Events.List do
 		if event.launch then
-			for id in event.monsters or {} do
-				used[id] = true
+			local lists = { event.monsters }
+			for _, set in event.monsterSets or {} do
+				table.insert(lists, set.monsters)
+			end
+			if #lists > 0 then
+				table.insert(withMonsters, event.id)
+			end
+			for _, list in lists do
+				for id in list do
+					used[id] = true
+				end
 			end
 		end
 	end
+	table.sort(withMonsters)
+	check(
+		"only the rare events bring monsters",
+		table.concat(withMonsters, ",") == "BloodMoon,WatcherAwakens"
+	)
 	local unused = {}
 	for id, m in Monsters do
 		if type(m) == "table" and m.event and not used[id] then
 			table.insert(unused, id)
 		end
 	end
-	check(`every event monster spawns in a launch event ({table.concat(unused, ", ")})`, #unused == 0)
-	local bloodBatch = Watcher.monsterBatch(Events.find("BloodMoon") :: any, 4, eventRng)
+	check(`every event monster can spawn ({table.concat(unused, ", ")})`, #unused == 0)
+
+	local bloodBatch = Watcher.monsterBatch(blood.monsters :: any, 4, eventRng)
 	local kindsSeen: { [string]: boolean } = {}
 	for _, m in bloodBatch do
 		kindsSeen[m.id] = true
 	end
 	check(
 		"Blood Moon shows both its monsters",
-		#bloodBatch == 4 and kindsSeen.CrimsonWisp and kindsSeen.Moonhowler
+		#bloodBatch == 4 and kindsSeen.CrimsonWisp == true and kindsSeen.Moonhowler == true
 	)
-	local flickerBatch = Watcher.monsterBatch(Events.find("Flicker") :: any, 10, eventRng)
-	local lurkers = 0
-	for _, m in flickerBatch do
-		if m.id == "LamppostLurker" then
-			lurkers += 1
-		end
+
+	local setCounts: { [string]: number } = {}
+	for _ = 1, 10_000 do
+		local set = Watcher.pickSet(awakens, eventRng) :: Events.MonsterSet
+		setCounts[set.id] = (setCounts[set.id] or 0) + 1
 	end
-	check("a Nightmare appears once per event", #flickerBatch == 10 and lurkers == 1)
 	check(
-		"an event with only rare monsters brings just those",
-		#Watcher.monsterBatch(Events.find("FrostFog") :: any, 6, eventRng) == 1
-			and #Watcher.monsterBatch(Events.find("WatcherAwakens") :: any, 6, eventRng) == 2
+		"the Watcher usually brings Phantoms, sometimes Nightmares, rarely Eldritch",
+		(setCounts.Phantoms or 0) > (setCounts.Nightmares or 0)
+			and (setCounts.Nightmares or 0) > (setCounts.Eldritch or 0)
+			and (setCounts.Eldritch or 0) > 0
 	)
-	check("Flickerwicks are the commonest Flicker monster", math.abs(wicks / 20_000 - 70 / 105) < 0.02)
+	check("other events have no monster sets", Watcher.pickSet(blood, eventRng) == nil)
+	local nightmares = (awakens.monsterSets :: { Events.MonsterSet })[2]
+	local pair = Watcher.monsterBatch(nightmares.monsters, 2, eventRng)
+	check("a Nightmare Parade brings two different Nightmares", #pair == 2 and pair[1].id ~= pair[2].id)
+	local weights, count = Watcher.spawns(awakens, nightmares, 8)
+	check("a set's own count wins", weights == nightmares.monsters and count == 2)
+	check(
+		"the tooltip names the monsters",
+		Watcher.monsterLine(blood) == "Monsters: Crimson Wisp, Moonhowler"
+			and Watcher.monsterLine(awakens, "Eldritch") == "Eldritch Gaze: Eye Of The Watcher, Watcherling"
+			and Watcher.monsterLine(Events.find("FrostFog") :: Events.WatcherEvent) == nil
+	)
 
 	local valid = true
 	for _, event in Events.List do
-		for id in event.monsters or {} do
-			local m = Monsters[id]
-			if not m or m.event ~= event.id then
-				valid = false
+		local lists = { event.monsters or {} }
+		for _, set in event.monsterSets or {} do
+			table.insert(lists, set.monsters)
+		end
+		for _, list in lists do
+			for id in list do
+				local m = Monsters[id]
+				if not m or m.event ~= event.id then
+					valid = false
+				end
 			end
 		end
 	end

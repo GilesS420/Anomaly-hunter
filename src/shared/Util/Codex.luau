@@ -62,11 +62,20 @@ function Codex.sections(): { Section }
 	end
 	local eventIds = {}
 	for _, event in Events.List do
-		local spawns = event.monsters
-		if event.launch and spawns then
-			for id in spawns do
-				if Monsters[id] and not table.find(eventIds, id) then
-					table.insert(eventIds, id)
+		if event.launch then
+			local lists: { { [string]: number } } = {}
+			if event.monsters then
+				table.insert(lists, event.monsters)
+			end
+			local sets: { Events.MonsterSet } = event.monsterSets or {}
+			for _, set in sets do
+				table.insert(lists, set.monsters)
+			end
+			for _, spawns in lists do
+				for id in spawns do
+					if Monsters[id] and not table.find(eventIds, id) then
+						table.insert(eventIds, id)
+					end
 				end
 			end
 		end
