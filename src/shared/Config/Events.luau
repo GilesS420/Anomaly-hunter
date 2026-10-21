@@ -54,6 +54,7 @@ export type MonsterSet = {
 	monsters: { [string]: number }, -- monster id -> spawn weight
 	count: number?, -- how many appear (nil: Events.MonstersPerPlayer etc.)
 	announce: string, -- toast everyone sees when the event starts with this set
+	noRespawn: boolean?, -- a caught one isn't replaced (the Eldritch jackpot stays one per event)
 	sky: Sky?, -- this set's own sky (nil: the event's sky)
 }
 
@@ -94,12 +95,16 @@ Events.EyesToAwaken = 5
 Events.EffectRollSeconds = 30
 
 -- How many event monsters (an optional bonus to catch, only in the rare events: Blood Moon
--- and The Watcher Awakens) appear at the start of an event: this many per player in the
+-- and The Watcher Awakens) are out during an event (caught ones come back, RespawnSeconds): this many per player in the
 -- server, clamped between Min and Max, so everyone gets a chance. Each kind appears at least
 -- once. A monster set with a count brings just that many.
 Events.MonstersPerPlayer = 1
 Events.MinMonsters = 4
 Events.MaxMonsters = 10
+
+-- A caught event monster is replaced this many seconds later, so there is something to
+-- catch all event long, not just in the first minute (a set with noRespawn excepted).
+Events.RespawnSeconds = 20
 
 -- Event monsters drift between the mansions, this many studs above the ground.
 Events.HoverHeight = 3
@@ -300,6 +305,7 @@ Events.List = {
 				weight = 7,
 				monsters = { Watcherling = 70, EyeOfTheWatcher = 30 },
 				count = 1,
+				noRespawn = true,
 				announce = "Something ELDRITCH has slipped through. Only a Void Vac can hold it!",
 			},
 		} :: { MonsterSet },

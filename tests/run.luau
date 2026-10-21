@@ -470,6 +470,21 @@ do
 		end
 	end
 	check("every event monster needs more than the Phantom Vac", everyNeedsOne)
+	local function setOf(id: string): Events.MonsterSet?
+		for _, set in awakens.monsterSets or {} do
+			if set.id == id then
+				return set
+			end
+		end
+		return nil
+	end
+	check(
+		"caught event monsters come back, except the Eldritch jackpot",
+		Watcher.respawns(nil)
+			and Watcher.respawns(setOf("Phantoms"))
+			and Watcher.respawns(setOf("Nightmares"))
+			and not Watcher.respawns(setOf("Eldritch"))
+	)
 	check(
 		"the Workshop says which events a vacuum opens up",
 		table.concat(Workshop.unlocksEvents("BansheeBlower"), ",") == "Blood Moon"

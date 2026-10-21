@@ -79,6 +79,8 @@ local eyes = 0
 -- the same times. Set in start.
 local schedule: Watcher.Slot? = nil
 local summoned = false -- the live event was summoned in this server only (Studio /event)
+-- Topping up the live event's monsters as they're caught (Events.RespawnSeconds).
+local respawn: { weights: { [string]: number }, target: number, at: number? }? = nil
 
 -- The meter's eyes and count line, set in buildMeter. The live event and its time left are
 -- shown on each player's screen instead (client/Controllers/EventIconController).
@@ -587,6 +589,7 @@ local function startEvent(
 	end
 
 	local weights, count = Watcher.spawns(event, set, #Players:GetPlayers())
+	respawn = nil
 	if weights then
 		local rects = driftRects()
 		for _, monster in Watcher.monsterBatch(weights, count, random) do
@@ -594,8 +597,35 @@ local function startEvent(
 				break -- too crowded
 			end
 		end
+		if Watcher.respawns(set) then
+			respawn = { weights = weights, target = count }
+		end
 	end
 	publish()
+end
+
+-- While the event is live, a caught monster is replaced RespawnSeconds later (one at a
+-- time), so latecomers and slow hunters still find some.
+local function topUp()
+	local event = current
+	local plan = respawn
+	if phase ~= "Live" or not event or not plan then
+		return
+	end
+	local alive = 0
+	for _, spawned in live do
+		if spawned.event == event.id then
+			alive += 1
+		end
+	end
+	if alive >= plan.target then
+		plan.at = nil
+	elseif not plan.at then
+		plan.at = now() + Events.RespawnSeconds
+	elseif now() >= plan.at then
+		plan.at = nil
+		spawnOne(event, Watcher.rollMonster(plan.weights, random), driftRects())
+	end
 end
 
 local function endEvent()
@@ -604,6 +634,7 @@ local function endEvent()
 		return
 	end
 	current = nil
+	respawn = nil
 	local handler = handlers[event.id]
 	if handler then
 		xpcall(handler.stop, function(err)
@@ -667,6 +698,7 @@ local function tick()
 			startWarning(slot.event, set, slot.startAt)
 		end
 	end
+	topUp()
 	publish()
 end
 
