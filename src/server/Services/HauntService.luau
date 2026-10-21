@@ -123,6 +123,24 @@ function HauntService.eventRollFor(player: Player, event: Events.WatcherEvent, f
 	return announce(player, gains)
 end
 
+-- Gives one monster in the player's mansion this effect right away (the tutorial shows
+-- off an effect on the first catch). Returns whether a monster could take it.
+function HauntService.give(player: Player, effectId: string): boolean
+	local data = DataService.get(player)
+	if not data then
+		return false
+	end
+	for _, caught in data.monsters do
+		local after = Haunting.withEffect(caught.effects, effectId)
+		if after then
+			local gains: Gains = { messages = {}, combos = {} }
+			gain(data, caught, effectId, after, gains)
+			return announce(player, gains) > 0
+		end
+	end
+	return false
+end
+
 local function forEachPlayer(label: string, roll: (Player) -> ())
 	for _, player in Players:GetPlayers() do
 		local ok, err = pcall(function()

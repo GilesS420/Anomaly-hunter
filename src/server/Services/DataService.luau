@@ -28,6 +28,7 @@ export type Data = {
 	codex: { [string]: any }, -- discovered monsters, effects and combo recipes
 	shop: { slot: number, bought: { [string]: number } }, -- Workshop buys since the last restock
 	stealingEnabled: boolean,
+	tutorial: string, -- "New" until TutorialService looks, then the step, then "Done"
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -48,6 +49,7 @@ DataService.Template = {
 	codex = {},
 	shop = { slot = 0, bought = {} },
 	stealingEnabled = false,
+	tutorial = "New", -- older saves get this too; TutorialService marks those "Done"
 } :: Data
 
 local store = ProfileStore.New(

@@ -16,6 +16,7 @@ local UserInputService = game:GetService("UserInputService")
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
 local Drag = require(script.Parent.Parent:WaitForChild("Drag"))
+local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
 
 local HotbarController = {}
 
@@ -209,6 +210,7 @@ function HotbarController.start()
 			number.Position = UDim2.fromOffset(-6, -5)
 		end
 		button:SetAttribute("Paint", "")
+		Locks.guard(button, "Hotbar") -- greyed out until the tutorial gets there
 		Drag.attach(button, function()
 			local tool = slots[i]
 			return if tool then tool.Name else ""
@@ -366,7 +368,7 @@ function HotbarController.start()
 	player.CharacterAdded:Connect(watch)
 
 	UserInputService.InputBegan:Connect(function(input, processed)
-		if processed then
+		if processed or Locks.isLocked("Hotbar") then
 			return
 		end
 		local slot = table.find(Keys, input.KeyCode)
