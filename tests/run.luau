@@ -72,9 +72,22 @@ check("size weights add up to 100", near(sizeTotal, 100))
 check("effect bonuses add up", near(Value.effectMultiplier({ "Slimed", "Mummy" }), 5))
 -- Vampire + Batty merge into Count (x10).
 check("combo replaces its recipe", near(Value.effectMultiplier({ "Vampire", "Batty" }), 10))
+do
+	local function slimed(id: string): any
+		return { monsterId = id, size = "Normal", effects = { "Slimed", "Mummy" }, familiarity = 0 }
+	end
+	check(
+		"effects add less on cheap monsters",
+		near(Value.monsterEffectMultiplier(slimed("Gloomlet")), 1 + 4 * Value.CheapEffectShare)
+			and Value.monsterEffectMultiplier(slimed("Gravepup")) < Value.monsterEffectMultiplier(
+				slimed("LadyOfLanterns")
+			)
+			and near(Value.monsterEffectMultiplier({ monsterId = "Gloomlet", effects = {} } :: any), 1)
+	)
+end
 
 local caught = { monsterId = "Gravepup", size = "Big", effects = { "Ghost" }, familiarity = 0 }
-check("value uses effects", Value.sellValue(caught, 1) == 45_000) -- 10,000 x 1.5 x 3
+check("value uses effects", Value.sellValue(caught, 1) == 27_000) -- 10,000 x 1.5 x (1 + 2 x 0.4: a cheap monster)
 
 -- Spawn rolls. The CLI has no Roblox Random, so use a small seeded stand-in.
 local function fakeRandom(seed: number): any
@@ -771,7 +784,7 @@ end
 
 -- Familiarity (Util/Care): it just grows with time, no hunger.
 do
-	local grow = CareConfig.FamiliarityHours * 3600
+	local grow = Care.hours("Gravepup") * 3600
 	local t0 = 1_000_000
 	local m: any = {
 		monsterId = "Gravepup",
@@ -793,6 +806,21 @@ do
 	check("a monster without a timestamp grows from now", fresh.grownAt == t0 and fresh.familiarity == 0)
 	Care.settle(fresh, t0 - 50)
 	check("a clock that went back never shrinks or regrows", fresh.familiarity == 0 and fresh.grownAt == t0)
+
+	check(
+		"cheaper monsters get familiar faster",
+		Care.hours("Gloomlet") < Care.hours("Gravepup")
+			and Care.hours("Gravepup") < Care.hours("LadyOfLanterns")
+	)
+	check(
+		"Familiarity hours run from cheap to pricey",
+		near(Care.hours("Gloomlet"), CareConfig.CheapHours)
+			and Care.hours("LadyOfLanterns") <= CareConfig.PriceyHours
+	)
+	check(
+		"an unknown monster takes the default time",
+		Care.hours("NoSuchMonster") == CareConfig.FamiliarityHours
+	)
 
 	check("percent rounds down cleanly", Care.percent({ familiarity = 0.29 } :: any) == 29)
 

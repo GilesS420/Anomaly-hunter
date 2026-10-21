@@ -9,15 +9,23 @@ local Value = require("./Value")
 
 local Care = {}
 
-local GrowSeconds = CareConfig.FamiliarityHours * 3600
+-- Hours this monster takes to go from 0% to 100% Familiarity: fewer the cheaper it is.
+function Care.hours(monsterId: string): number
+	local at = Value.priceShare(monsterId)
+	if not at then
+		return CareConfig.FamiliarityHours
+	end
+	return CareConfig.CheapHours * (CareConfig.PriceyHours / CareConfig.CheapHours) ^ at
+end
 
 -- Brings a monster up to date at `now`: its Familiarity grows for the time since the last
--- update. Safe to call as often as you like. A monster without a timestamp (just caught)
+-- update (cheaper monsters grow faster, Care.hours). Safe to call as often as you like. A monster without a timestamp (just caught)
 -- grows from now on. Clears the hunger fields older saves still carry.
 function Care.settle(caught: Value.CaughtMonster, now: number)
 	local from = caught.grownAt or now
 	local grown = math.max(0, now - from)
-	caught.familiarity = math.clamp((caught.familiarity or 0) + grown / GrowSeconds, 0, 1)
+	local growSeconds = Care.hours(caught.monsterId) * 3600
+	caught.familiarity = math.clamp((caught.familiarity or 0) + grown / growSeconds, 0, 1)
 	caught.grownAt = math.max(from, now)
 	local old = caught :: any
 	old.fed = nil
