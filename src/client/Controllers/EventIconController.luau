@@ -106,7 +106,8 @@ function EventIconController.start()
 		if not event then
 			return
 		end
-		local color = rgb(event.sky and event.sky.edge)
+		local sky = Events.skyFor(event, workspace:GetAttribute("WatcherMonsterSet"))
+		local color = rgb(sky and sky.edge)
 		Ui.paint(icon, color)
 		rim.Color = color
 		icon.Text = event.icon or "?"

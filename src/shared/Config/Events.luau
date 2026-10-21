@@ -16,7 +16,10 @@ export type Rgb = { number } -- { red, green, blue }, 0 to 255 (Color3.fromRGB)
 -- How an event changes the sky. Lighting values are set on the server and reach everyone;
 -- the sky pieces (moon, eye, aurora, sparkles, flashes) are drawn by each client around its
 -- own camera (client/Controllers/SkyController), so players in zones see them too.
-export type Weather = { kind: "Snow" | "Rain" | "Coins" | "Candy" | "Eyes", color: Rgb? }
+export type Weather = {
+	kind: "Snow" | "Rain" | "Coins" | "Candy" | "Eyes" | "Ghosts" | "Lanterns",
+	color: Rgb?,
+}
 
 export type Sky = {
 	ambient: Rgb?, -- Lighting.Ambient
@@ -36,6 +39,8 @@ export type Sky = {
 	--   Coins  spinning gold coins tumbling out of the sky
 	--   Candy  sweets and sprinkles in every colour
 	--   Eyes   eyeballs floating in the air, all turning to look at you
+	--   Ghosts    pale ghosts flying in circles high over the hub (Phantom Swarm)
+	--   Lanterns  a parade of grinning lantern heads marching round the hub (Nightmare Parade)
 	weather: Weather?,
 	edge: Rgb?, -- a glow round the edges of the screen in this colour
 }
@@ -47,6 +52,7 @@ export type MonsterSet = {
 	monsters: { [string]: number }, -- monster id -> spawn weight
 	count: number?, -- how many appear (nil: Events.MonstersPerPlayer etc.)
 	announce: string, -- toast everyone sees when the event starts with this set
+	sky: Sky?, -- this set's own sky (nil: the event's sky)
 }
 
 export type WatcherEvent = {
@@ -246,6 +252,21 @@ Events.List = {
 				weight = 65,
 				monsters = { Flickerwick = 60, StaticShade = 40 },
 				announce = "Phantoms pour out of the Watcher's eye!",
+				sky = {
+					ambient = { 70, 85, 110 },
+					outdoorAmbient = { 110, 130, 165 },
+					tint = { 205, 225, 255 },
+					saturation = -0.35,
+					atmosphere = {
+						color = { 170, 190, 220 },
+						decay = { 90, 110, 150 },
+						density = 0.4,
+						haze = 2,
+					},
+					aurora = { 180, 230, 255 },
+					weather = { kind = "Ghosts" },
+					edge = { 190, 225, 255 },
+				},
 			},
 			{
 				id = "Nightmares",
@@ -254,6 +275,17 @@ Events.List = {
 				monsters = { MailboxMimic = 35, LamppostLurker = 30, StormGremlin = 20, Doorknocker = 15 },
 				count = 2,
 				announce = "Nightmares crawl out of the shadows! Only a Void Vac can hold them.",
+				sky = {
+					ambient = { 60, 10, 20 },
+					outdoorAmbient = { 85, 15, 30 },
+					tint = { 255, 175, 175 },
+					saturation = 0.1,
+					atmosphere = { color = { 45, 0, 10 }, decay = { 95, 0, 20 }, density = 0.5, haze = 2 },
+					moon = { color = { 255, 120, 40 }, size = 60 },
+					flashes = true,
+					weather = { kind = "Lanterns" },
+					edge = { 160, 0, 25 },
+				},
 			},
 			{
 				id = "Eldritch",
@@ -278,6 +310,17 @@ Events.List = {
 		announce = "THE WATCHER AWAKENS! Its eye is on every mansion.",
 	},
 } :: { WatcherEvent }
+
+-- The sky an event shows: the monster set's own sky (The Watcher Awakens), else the event's.
+function Events.skyFor(event: WatcherEvent, setId: string?): Sky?
+	local sets: { MonsterSet } = event.monsterSets or {}
+	for _, set in sets do
+		if set.id == setId and set.sky then
+			return set.sky
+		end
+	end
+	return event.sky
+end
 
 -- Finds an event by id.
 function Events.find(id: string?): WatcherEvent?

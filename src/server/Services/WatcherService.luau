@@ -170,10 +170,10 @@ end
 
 local SkyNames = { "WatcherSkyTint", "WatcherSkyAtmosphere" }
 
--- Eases the sky into `event`'s look over `seconds` (the warning, so it's fully in when the
--- event starts). Replaces whatever sky was showing.
-local function applySky(event: Events.WatcherEvent, seconds: number)
-	local sky = event.sky
+-- Eases the sky into `event`'s look (its monster set's own, if it has one) over `seconds`
+-- (the warning, so it's fully in when the event starts). Replaces whatever sky was showing.
+local function applySky(event: Events.WatcherEvent, set: Events.MonsterSet?, seconds: number)
+	local sky = Events.skyFor(event, if set then set.id else nil)
 	if not sky then
 		return
 	end
@@ -566,7 +566,7 @@ local function startEvent(
 	skySeconds: number?
 )
 	if skySeconds then
-		applySky(event, skySeconds)
+		applySky(event, set, skySeconds)
 		workspace:SetAttribute("WatcherSkyAt", now() + skySeconds)
 	end
 	phase = "Live"
@@ -620,14 +620,17 @@ local function endEvent()
 
 	phase = "Calm"
 	summoned = false
-	workspace:SetAttribute("WatcherMonsterSet", nil)
 	publish()
+	-- After WatcherSky clears, so clients fade the set's sky out instead of switching skies.
+	workspace:SetAttribute("WatcherMonsterSet", nil)
 end
 
-local function startWarning(event: Events.WatcherEvent, startsAt: number)
+local function startWarning(event: Events.WatcherEvent, set: Events.MonsterSet?, startsAt: number)
 	phase = "Warning"
 	upcoming = event
-	applySky(event, math.max(startsAt - now(), 1))
+	-- Before WatcherSky (publish), so clients draw the set's sky straight away.
+	workspace:SetAttribute("WatcherMonsterSet", if set then set.id else nil)
+	applySky(event, set, math.max(startsAt - now(), 1))
 	workspace:SetAttribute("WatcherSkyAt", startsAt)
 	Notify.toastAll(event.warning or "The Watcher stirs...")
 end
@@ -650,18 +653,18 @@ local function tick()
 
 	-- A summoned event holds the sky until it ends; then the schedule picks up where it is.
 	if not summoned then
+		-- The set is rolled from the slot too, so every server gets the same monsters and sky.
+		local set = Watcher.pickSet(slot.event, Rng.seeded(`watcher-set:{slot.index}`))
 		if time >= slot.startAt then
 			if phase ~= "Live" then
 				-- Straight from the warning the sky is already in; joining late, it comes in fast.
 				local skySeconds = if phase == "Warning" and upcoming == slot.event
 					then nil
 					else SummonSkySeconds
-				-- The set is rolled from the slot too, so every server gets the same monsters.
-				local set = Watcher.pickSet(slot.event, Rng.seeded(`watcher-set:{slot.index}`))
 				startEvent(slot.event, slot.endAt, set, skySeconds)
 			end
 		elseif time >= slot.warnAt and phase ~= "Warning" then
-			startWarning(slot.event, slot.startAt)
+			startWarning(slot.event, set, slot.startAt)
 		end
 	end
 	publish()

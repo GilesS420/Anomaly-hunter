@@ -419,6 +419,20 @@ do
 			and Watcher.monsterLine(Events.find("FrostFog") :: Events.WatcherEvent) == nil
 	)
 
+	-- Each Watcher set has its own look: ghosts, a lantern parade, or the event's eye sky.
+	local function weatherOf(setId: string?): string?
+		local sky = Events.skyFor(awakens, setId)
+		return if sky and sky.weather then sky.weather.kind else nil
+	end
+	check(
+		"each Watcher set has its own sky",
+		weatherOf("Phantoms") == "Ghosts"
+			and weatherOf("Nightmares") == "Lanterns"
+			and Events.skyFor(awakens, "Eldritch") == awakens.sky
+			and Events.skyFor(awakens, nil) == awakens.sky
+			and Events.skyFor(blood, "Phantoms") == blood.sky
+	)
+
 	local valid = true
 	for _, event in Events.List do
 		local lists = { event.monsters or {} }
