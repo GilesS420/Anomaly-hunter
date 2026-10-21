@@ -8,6 +8,10 @@
 --              its ambience loops quietly and the music is turned down until it ends.
 --   thunder    SkyController calls SoundController.thunder() for each lightning flash.
 --
+--   night      a quiet night (wind, crickets, an owl) loops under everything, and a little
+--              sound fills the pause between two songs (Sounds.BetweenSongs). It follows
+--              the Music volume setting.
+--
 -- Also switches off the default walking sound on every character (Sounds.MutedCharacterSounds).
 -- The player's Music and Sound effects settings (client/Settings) scale the groups.
 
@@ -32,6 +36,7 @@ local musicTween: { [Sound]: Tween } = {}
 local ambience: Sound? = nil
 local liveEvent: string? = nil
 local musicDuck = 1 -- how far the music is turned down for the live event
+local worldDuck = 1 -- how far the night is turned down for the live event
 
 local function group(name: string, volume: number): SoundGroup
 	local made = Instance.new("SoundGroup")
@@ -68,9 +73,11 @@ local function sliceSound(file: string, key: string, groupName: string, looped: 
 	return sound
 end
 
-local function playOnce(key: string, delaySeconds: number?)
-	local region = Sounds.Sheets.EventStingers[key]
-	local sound = sliceSound("EventStingers", key, "Events", false)
+-- One slice of a sheet, played once. Event sounds come from EventStingers by default.
+local function playOnce(key: string, delaySeconds: number?, file: string?, groupName: string?)
+	local sheet = file or "EventStingers"
+	local region = (Sounds.Sheets :: any)[sheet][key]
+	local sound = sliceSound(sheet, key, groupName or "Events", false)
 	if not sound or not region then
 		return
 	end
@@ -121,7 +128,8 @@ end
 
 -- Which song plays right now and how far into it, from the shared server clock: the
 -- playlist repeats forever from time 0, with a short pause after each song, so everyone in
--- every server hears the same moment of the same song.
+-- every server hears the same moment of the same song. In a pause: nil and the number of
+-- the song that just ended.
 local function nowPlaying(list: { { file: string, length: number } }): (string?, number)
 	local cycle = 0
 	for _, song in list do
@@ -131,13 +139,13 @@ local function nowPlaying(list: { { file: string, length: number } }): (string?,
 		return nil, 0
 	end
 	local at = workspace:GetServerTimeNow() % cycle
-	for _, song in list do
+	for index, song in list do
 		if at < song.length then
 			return song.file, at
 		end
 		at -= song.length + Sounds.PlaylistGapSeconds
 		if at < 0 then
-			return nil, 0 -- the pause between two songs
+			return nil, index
 		end
 	end
 	return nil, 0
@@ -170,6 +178,15 @@ local function updateMusic(list: { { file: string, length: number } })
 	if nextTrack ~= playingMusic then
 		if playingMusic then
 			fadeOut(playingMusic)
+			if not nextTrack and #Sounds.BetweenSongs > 0 then
+				-- a little sound fills the pause, the same one for everyone (at is the song number)
+				playOnce(
+					Sounds.BetweenSongs[(at - 1) % #Sounds.BetweenSongs + 1],
+					nil,
+					"WorldAmbience",
+					"World"
+				)
+			end
 		end
 		playingMusic = nextTrack
 		if nextTrack then
@@ -187,15 +204,26 @@ local function updateMusic(list: { { file: string, length: number } })
 	end
 end
 
--- The music group is turned down while an event is live (Sounds.Events[id].musicVolume).
+-- The quiet night under everything, so the music never starts out of silence.
+local function startNight()
+	local sound = sliceSound("WorldAmbience", "Night", "World", true)
+	if sound then
+		sound:Play()
+	end
+end
+
+-- The music group is turned down while an event is live (Sounds.Events[id].musicVolume),
+-- and the night with it: the event's own ambience takes over.
 local function setMusicDuck(level: number)
 	musicDuck = level
-	local tween = TweenService:Create(
-		groups.Music,
-		TweenInfo.new(Sounds.AmbienceFadeSeconds, Enum.EasingStyle.Sine),
-		{ Volume = Sounds.MusicVolume * level * Settings.volume("music") }
-	)
-	tween:Play()
+	worldDuck = if level < 1 then Sounds.WorldDuringEvents else 1
+	local info = TweenInfo.new(Sounds.AmbienceFadeSeconds, Enum.EasingStyle.Sine)
+	TweenService
+		:Create(groups.Music, info, { Volume = Sounds.MusicVolume * level * Settings.volume("music") })
+		:Play()
+	TweenService
+		:Create(groups.World, info, { Volume = Sounds.WorldVolume * worldDuck * Settings.volume("music") })
+		:Play()
 end
 
 -- The player's volume settings, applied straight away.
@@ -203,6 +231,7 @@ local function applySettings()
 	groups.Music.Volume = Sounds.MusicVolume * musicDuck * Settings.volume("music")
 	groups.Events.Volume = Sounds.StingerVolume * Settings.volume("sounds")
 	groups.Ambience.Volume = Sounds.AmbienceVolume * Settings.volume("sounds")
+	groups.World.Volume = Sounds.WorldVolume * worldDuck * Settings.volume("music") -- part of the music
 end
 
 -- ------------------------------------------------------------------ events
@@ -325,6 +354,7 @@ function SoundController.start()
 	group("Music", Sounds.MusicVolume)
 	group("Events", Sounds.StingerVolume)
 	group("Ambience", Sounds.AmbienceVolume)
+	group("World", Sounds.WorldVolume)
 	applySettings()
 	Settings.changed(function(key)
 		if key == "music" or key == "sounds" then
@@ -362,6 +392,7 @@ function SoundController.start()
 	end)
 	onEvent(workspace:GetAttribute("WatcherEvent"), true)
 
+	startNight()
 	local list = playlist()
 	while true do
 		updateMusic(list)

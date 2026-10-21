@@ -3,11 +3,11 @@
 -- from scratch, so nobody else owns it); the music is our own rendition of public-domain
 -- classical pieces. client/Controllers/SoundController plays it all.
 --
--- Roblox can't read sound files from this repo: each of the six files in Files has to be
+-- Roblox can't read sound files from this repo: each of the seven files in Files has to be
 -- uploaded to Roblox once (Creator Hub > Development Items > Audio), and its asset id goes
 -- here. A file without an id is simply silent, and Studio's Output says which ones are missing.
 --
--- The two event files are "sound sheets": one upload holds many sounds one after another,
+-- The two event files and WorldAmbience are "sound sheets": one upload holds many sounds one after another,
 -- and the game plays just the slice it needs (Config/SoundSheets says where each one sits).
 
 local SoundSheets = require("./SoundSheets")
@@ -30,12 +30,15 @@ Sounds.Files = {
 	MusicMountainKing = "rbxassetid://94551444495402",
 	MusicFurElise = "rbxassetid://128385526223567",
 	MusicMoonlight = "rbxassetid://124222698146635",
+	WorldAmbience = "",
 }
 
 -- Overall loudness of each kind of sound, 0 to 1.
 Sounds.MusicVolume = 0.35
 Sounds.StingerVolume = 0.8
 Sounds.AmbienceVolume = 0.55
+Sounds.WorldVolume = 0.6 -- the night under the music (WorldAmbience)
+Sounds.WorldDuringEvents = 0.35 -- the night is turned down to this while an event is live
 
 Sounds.MusicFadeSeconds = 2.5 -- fade out at the end of a song, or in when you join halfway
 Sounds.AmbienceFadeSeconds = 3
@@ -49,6 +52,10 @@ Sounds.AmbienceFadeSeconds = 3
 -- A song that isn't uploaded yet is skipped.
 Sounds.PlaylistGapSeconds = 4 -- quiet between two songs
 Sounds.MusicDriftSeconds = 1.5 -- a song this far off the server clock jumps back in time
+
+-- WorldAmbience slices played in the pause after each song, taking turns: a music box being
+-- wound up, a far-off bell, creaking floorboards and an owl.
+Sounds.BetweenSongs = { "WindUp", "Toll", "Creaks" }
 
 -- The sounds of each Watcher event (Config/Events ids).
 Sounds.Events = {
