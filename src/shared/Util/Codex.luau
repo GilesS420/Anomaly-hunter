@@ -5,10 +5,12 @@
 --   monsters  [monsterId] = { Plain = true, Gold = true, ... }  (Plain: caught without a variant)
 --   effects   [effectId] = true
 --   combos    [comboId] = true
+--   rewards   ["PumpkinGraveyard:Gold"] = true  (Codex rewards already paid, see Config/CodexRewards)
 -- Only launch content is listed (zones and events that are in the game). Pure functions so
 -- they can be tested outside Roblox; the server fills it (CodexService), the client draws it
 -- (CodexController).
 
+local CodexRewards = require("../Config/CodexRewards")
 local Effects = require("../Config/Effects")
 local Events = require("../Config/Events")
 local Monsters = require("../Config/Monsters")
@@ -22,6 +24,7 @@ local Codex = {}
 
 export type Section = { id: string, title: string, monsters: { string } }
 export type Progress = { found: number, total: number, variants: { [string]: number } }
+export type Reward = { key: string, page: string, goal: string, amount: number }
 export type Found = { kind: "Monster" | "Variant" | "Effect" | "Combo", id: string, variant: string? }
 
 Codex.Plain = "Plain"
@@ -231,6 +234,89 @@ function Codex.progress(codex: { [string]: any }, monsterIds: { string }): Progr
 		end
 	end
 	return progress
+end
+
+Codex.EffectsPage = "Effects"
+
+-- What finishing a goal on a page pays (0 if that goal pays nothing).
+function Codex.rewardAmount(page: string, goal: string): number
+	if page == Codex.EffectsPage then
+		return if goal == "Effects"
+			then CodexRewards.Effects
+			elseif goal == "Combos" then CodexRewards.Combos
+			else 0
+	end
+	return math.floor((CodexRewards.Pages[page] or 0) * (CodexRewards.Goals[goal] or 0))
+end
+
+-- The goals of a monster page that are done: "Found" once every monster is caught, then each
+-- variant once every monster on the page has it.
+function Codex.goalsDone(progress: Progress): { string }
+	local done = {}
+	if progress.total == 0 or progress.found < progress.total then
+		return done
+	end
+	table.insert(done, "Found")
+	for _, variant in Codex.VariantOrder do
+		if (progress.variants[variant] or 0) >= progress.total then
+			table.insert(done, variant)
+		end
+	end
+	return done
+end
+
+-- How many of the listed effects and combos are in the Codex.
+function Codex.effectProgress(codex: { [string]: any }): (number, number, number, number)
+	local effects = if typeof(codex.effects) == "table" then codex.effects else {}
+	local combos = if typeof(codex.combos) == "table" then codex.combos else {}
+	local effectIds, comboIds = Codex.effectIds(), Codex.comboIds()
+	local found, made = 0, 0
+	for _, id in effectIds do
+		found += if effects[id] then 1 else 0
+	end
+	for _, id in comboIds do
+		made += if combos[id] then 1 else 0
+	end
+	return found, #effectIds, made, #comboIds
+end
+
+function Codex.rewardKey(page: string, goal: string): string
+	return `{page}:{goal}`
+end
+
+-- Whether this goal's reward has been paid.
+function Codex.claimed(codex: { [string]: any }, page: string, goal: string): boolean
+	local rewards = codex.rewards
+	return typeof(rewards) == "table" and rewards[Codex.rewardKey(page, goal)] == true
+end
+
+-- Every goal finished but not paid yet, marked as paid now. The caller pays them out.
+function Codex.newRewards(codex: { [string]: any }, sections: { Section }): { Reward }
+	local reached: { { page: string, goal: string } } = {}
+	for _, section in sections do
+		for _, goal in Codex.goalsDone(Codex.progress(codex, section.monsters)) do
+			table.insert(reached, { page = section.id, goal = goal })
+		end
+	end
+	local found, effectTotal, made, comboTotal = Codex.effectProgress(codex)
+	if effectTotal > 0 and found >= effectTotal then
+		table.insert(reached, { page = Codex.EffectsPage, goal = "Effects" })
+	end
+	if comboTotal > 0 and made >= comboTotal then
+		table.insert(reached, { page = Codex.EffectsPage, goal = "Combos" })
+	end
+
+	local rewards = tableIn(codex, "rewards")
+	local paid: { Reward } = {}
+	for _, entry in reached do
+		local key = Codex.rewardKey(entry.page, entry.goal)
+		local amount = Codex.rewardAmount(entry.page, entry.goal)
+		if not rewards[key] and amount > 0 then
+			rewards[key] = true
+			table.insert(paid, { key = key, page = entry.page, goal = entry.goal, amount = amount })
+		end
+	end
+	return paid
 end
 
 return Codex

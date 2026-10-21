@@ -31,7 +31,7 @@ local function paint(part: BasePart, text: string)
 	label.BackgroundTransparency = 1
 	label.Position = UDim2.fromScale(0, 0.1)
 	label.Size = UDim2.fromScale(1, 0.8)
-	label.Font = Enum.Font.Fantasy
+	label.Font = Enum.Font.LuckiestGuy
 	label.Text = text
 	label.TextColor3 = Color3.fromRGB(45, 30, 15)
 	label.TextScaled = true

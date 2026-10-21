@@ -2,8 +2,10 @@
 -- The admin panel: buttons for every admin command (server/Services/DevService.luau), so
 -- nobody has to remember the chat commands. Only admins see it: the server sets an "Admin"
 -- attribute on them (see server/Admins.luau). Press F2 to open and close it (there's
--- no button on screen, Giles 2026-10-20). Each button sends
---   ReplicatedStorage.Remotes.AdminCommand   client -> server: (command, argument?)
+-- no button on screen, Giles 2026-10-20). The row at the top picks who the buttons work on:
+-- you, or any other player in the server (events and "Reset my save" always stay as they
+-- are). Each button sends
+--   ReplicatedStorage.Remotes.AdminCommand   client -> server: (command, argument?, targetUserId?)
 -- and the server checks again that you're an admin before doing anything. Results come
 -- back as the usual toasts.
 
@@ -27,9 +29,10 @@ local CellSize = UDim2.fromOffset(122, 34)
 local remote: RemoteEvent
 local window: Ui.Window
 local order = 0
+local target: Player = player -- who the buttons work on
 
 local function send(command: string, argument: string?)
-	remote:FireServer(command, argument)
+	remote:FireServer(command, argument, if target ~= player then target.UserId else nil)
 end
 
 local function nextOrder(): number
@@ -72,7 +75,7 @@ local function input(grid: Frame, placeholder: string, start: string?): () -> st
 	box.PlaceholderText = placeholder
 	box.PlaceholderColor3 = Ui.Colors.muted
 	box.Text = start or ""
-	box.Font = Enum.Font.Gotham
+	box.Font = Enum.Font.FredokaOne
 	box.TextScaled = true
 	box.ClearTextOnFocus = false
 	local limit = Instance.new("UITextSizeConstraint")
@@ -87,9 +90,57 @@ local function input(grid: Frame, placeholder: string, start: string?): () -> st
 	end
 end
 
+-- The row of players at the top: tap one to point every button at them.
+local function playerPicker()
+	local grid = section("Works on")
+	local buttons: { [Player]: TextButton } = {}
+
+	local function paint()
+		if target.Parent ~= Players then
+			target = player -- they left: back to yourself
+		end
+		for other, made in buttons do
+			Ui.paint(made, if other == target then Ui.Colors.lamp else Ui.Colors.off)
+		end
+		window.status.Text = if target == player
+			then "Changes your own game. Results pop up at the top."
+			else `Changes {target.DisplayName}'s game (not events or Reset). Results pop up at the top.`
+	end
+
+	local function add(other: Player)
+		if buttons[other] then
+			return
+		end
+		local label = if other == player then "Me" else other.DisplayName
+		buttons[other] = button(grid, label, Ui.Colors.off, function()
+			target = other
+			paint()
+		end)
+		buttons[other].LayoutOrder = if other == player then 0 else nextOrder()
+		paint()
+	end
+
+	add(player)
+	for _, other in Players:GetPlayers() do
+		add(other)
+	end
+	Players.PlayerAdded:Connect(add)
+	Players.PlayerRemoving:Connect(function(other)
+		local made = buttons[other]
+		if made then
+			made:Destroy()
+			buttons[other] = nil
+		end
+		if other == target then
+			target = player
+		end
+		paint()
+	end)
+end
+
 local function build()
 	window = Ui.window("AdminPanel", "Admin panel")
-	window.status.Text = "Changes your own game. Results pop up at the top."
+	playerPicker()
 
 	-- Money
 	local money = section("Money")
@@ -112,7 +163,7 @@ local function build()
 	end
 
 	-- Monsters in the mansion
-	local mansion = section("Your mansion monsters")
+	local mansion = section("Mansion monsters")
 	local number = input(mansion, "number", "5")
 	button(mansion, "Grow (spurts)", Ui.Colors.equip, function()
 		send("/grow", number())
@@ -195,7 +246,7 @@ local function build()
 	end
 
 	-- Yourself
-	local me = section("You")
+	local me = section("Player")
 	button(me, "Calm on/off", Ui.Colors.off, function()
 		send("/calm")
 	end)
@@ -212,7 +263,7 @@ local function build()
 	local reset = Ui.button(me, "Reset my save", Ui.Colors.confirm, CellSize)
 	reset.LayoutOrder = nextOrder()
 	Ui.confirmButton(reset, "Wipe it all?", function()
-		send("/reset", "confirm")
+		remote:FireServer("/reset", "confirm") -- always your own save, whoever is picked
 	end)
 end
 

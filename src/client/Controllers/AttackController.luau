@@ -109,7 +109,7 @@ local function exclamation(model: Model): BillboardGui?
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
 	label.Text = "!"
-	label.Font = Enum.Font.GothamBlack
+	label.Font = Enum.Font.FredokaOne
 	label.TextScaled = true
 	label.TextColor3 = Color3.fromRGB(255, 70, 70)
 	label.TextStrokeTransparency = 0
@@ -212,7 +212,7 @@ local function dodged()
 		created.Position = UDim2.fromScale(0.5, 0.35)
 		created.Size = UDim2.fromScale(0.4, 0.08)
 		created.BackgroundTransparency = 1
-		created.Font = Enum.Font.GothamBlack
+		created.Font = Enum.Font.FredokaOne
 		created.Text = "Dodged!"
 		created.TextScaled = true
 		created.TextColor3 = Color3.fromRGB(150, 255, 170)

@@ -72,7 +72,7 @@ function Drag.attach(
 				made.BackgroundColor3 = Color3.fromRGB(32, 26, 44)
 				made.BackgroundTransparency = 0.1
 				made.TextColor3 = Color3.new(1, 1, 1)
-				made.Font = Enum.Font.GothamBold
+				made.Font = Enum.Font.FredokaOne
 				made.TextScaled = true
 				made.Text = label()
 				local corner = Instance.new("UICorner")

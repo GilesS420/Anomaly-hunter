@@ -28,6 +28,7 @@ local CodexController = require(script.Controllers.CodexController)
 local SettingsController = require(script.Controllers.SettingsController)
 local AwayBookController = require(script.Controllers.AwayBookController)
 local MansionListController = require(script.Controllers.MansionListController)
+local DetailController = require(script.Controllers.DetailController)
 
 local controllers: { { start: () -> () } } = {
 	ToastController,
@@ -55,6 +56,7 @@ local controllers: { { start: () -> () } } = {
 	SettingsController,
 	AwayBookController,
 	MansionListController,
+	DetailController,
 }
 
 for _, controller in controllers do

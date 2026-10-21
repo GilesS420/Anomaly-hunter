@@ -160,8 +160,8 @@ local function buildCard(): (ScreenGui, TextLabel, TextLabel, TextLabel, TextBut
 		return label
 	end
 	local title = line(1, Ui.Colors.lamp, 26, Ui.TitleFont)
-	local body = line(2, Ui.Colors.text, 17, Enum.Font.GothamBold)
-	local hint = line(3, Ui.Colors.muted, 14, Enum.Font.Gotham)
+	local body = line(2, Ui.Colors.text, 17, Enum.Font.FredokaOne)
+	local hint = line(3, Ui.Colors.muted, 14, Enum.Font.FredokaOne)
 	local nextButton = Ui.button(card, "Next", Ui.Colors.buy, UDim2.new(0, 110, 0, 40))
 	nextButton.LayoutOrder = 4
 

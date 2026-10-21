@@ -785,7 +785,7 @@ local function buildMeter(hub: Instance)
 	rim.Parent = panel
 	panel.Parent = billboard
 
-	local title = text(panel, "The Watcher", 0.04, 0.32, Enum.Font.Creepster)
+	local title = text(panel, "The Watcher", 0.04, 0.32, Enum.Font.LuckiestGuy)
 	title.TextColor3 = Lamp
 
 	local row = Instance.new("Frame")
@@ -839,7 +839,7 @@ local function buildMeter(hub: Instance)
 	end
 	row.Parent = panel
 
-	meterCount = text(panel, "", 0.75, 0.2, Enum.Font.GothamBold)
+	meterCount = text(panel, "", 0.75, 0.2, Enum.Font.FredokaOne)
 	billboard.Parent = part
 end
 
@@ -865,7 +865,7 @@ local function paintSign(board: BasePart, face: Enum.NormalId)
 	title.BackgroundTransparency = 1
 	title.Position = UDim2.fromScale(0.05, 0.03)
 	title.Size = UDim2.fromScale(0.9, 0.17)
-	title.Font = Enum.Font.Creepster
+	title.Font = Enum.Font.LuckiestGuy
 	title.Text = "The Watcher"
 	title.TextColor3 = Lamp
 	title.TextScaled = true
@@ -874,7 +874,7 @@ local function paintSign(board: BasePart, face: Enum.NormalId)
 	body.BackgroundTransparency = 1
 	body.Position = UDim2.fromScale(0.07, 0.22)
 	body.Size = UDim2.fromScale(0.86, 0.74)
-	body.Font = Enum.Font.GothamMedium
+	body.Font = Enum.Font.FredokaOne
 	body.Text = "• " .. table.concat(SignText, "\n• ")
 	body.TextColor3 = Color3.fromRGB(235, 225, 240)
 	body.TextScaled = true

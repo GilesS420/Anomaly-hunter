@@ -5,6 +5,7 @@
 local Monsters = require("../Config/Monsters")
 local Rarities = require("../Config/Rarities")
 local Shop = require("../Config/Shop")
+local Struggles = require("../Config/Struggles")
 local Sizes = require("../Config/Sizes")
 local Tools = require("../Config/Tools")
 
@@ -59,6 +60,45 @@ function Catching.strongEnough(vacuumId: string, monsterId: string?): boolean
 end
 
 function Catching.canVacuum(vacuumId: string, sizeId: string, rarityId: string, monsterId: string?): boolean
+	-- The quick time struggles of one catch (Config/Struggles): where on the meter each one
+	-- happens (0 to 1), how fast the needle sweeps and how wide the zone is, for this rarity
+	-- and size.
+	export type StrugglePlan = { marks: { number }, speed: number, zone: number }
+
+	function Catching.strugglePlan(rarityId: string, sizeId: string): StrugglePlan
+		local base = Struggles.ByRarity[rarityId] or Struggles.ByRarity.Common
+		local marks: { number } = {}
+		for index = 1, base.count do
+			table.insert(marks, index / (base.count + 1))
+		end
+		return {
+			marks = marks,
+			speed = base.speed,
+			zone = math.clamp(base.zone * (Struggles.ZoneBySize[sizeId] or 1), 0.05, 0.6),
+		}
+	end
+
+	-- Where the needle is (0 to 1) `seconds` after a struggle starts: it sweeps from the left
+	-- edge to the right and back, `speed` sweeps per second.
+	function Catching.needle(seconds: number, speed: number): number
+		local sweeps = math.max(seconds, 0) * speed
+		local along = sweeps % 2
+		return if along <= 1 then along else 2 - along
+	end
+
+	-- Where the zone sits: its centre, somewhere it fits with a margin, never at the very start.
+	function Catching.zoneCentre(width: number, random: Random?): number
+		local rng = random or Random.new()
+		local low = math.max(0.25, width / 2 + 0.05)
+		local high = 1 - width / 2 - 0.05
+		return if high > low then low + (high - low) * rng:NextNumber() else 0.5
+	end
+
+	-- Whether a tap `seconds` into a struggle lands the needle in the zone.
+	function Catching.struggleHit(seconds: number, speed: number, centre: number, width: number): boolean
+		return math.abs(Catching.needle(seconds, speed) - centre) <= width / 2
+	end
+
 	return Catching.vacuumTier(vacuumId) >= Catching.requiredTier(sizeId, rarityId)
 		and Catching.strongEnough(vacuumId, monsterId)
 end
@@ -90,6 +130,45 @@ end
 function Catching.bagSize(vacuumId: string): number
 	local vacuum = Tools.Vacuums[vacuumId]
 	return if vacuum then math.max(1, vacuum.bag) else 1
+end
+
+-- The quick time struggles of one catch (Config/Struggles): where on the meter each one
+-- happens (0 to 1), how fast the needle sweeps and how wide the zone is, for this rarity
+-- and size.
+export type StrugglePlan = { marks: { number }, speed: number, zone: number }
+
+function Catching.strugglePlan(rarityId: string, sizeId: string): StrugglePlan
+	local base = Struggles.ByRarity[rarityId] or Struggles.ByRarity.Common
+	local marks: { number } = {}
+	for index = 1, base.count do
+		table.insert(marks, index / (base.count + 1))
+	end
+	return {
+		marks = marks,
+		speed = base.speed,
+		zone = math.clamp(base.zone * (Struggles.ZoneBySize[sizeId] or 1), 0.05, 0.6),
+	}
+end
+
+-- Where the needle is (0 to 1) `seconds` after a struggle starts: it sweeps from the left
+-- edge to the right and back, `speed` sweeps per second.
+function Catching.needle(seconds: number, speed: number): number
+	local sweeps = math.max(seconds, 0) * speed
+	local along = sweeps % 2
+	return if along <= 1 then along else 2 - along
+end
+
+-- Where the zone sits: its centre, somewhere it fits with a margin, never at the very start.
+function Catching.zoneCentre(width: number, random: Random?): number
+	local rng = random or Random.new()
+	local low = math.max(0.25, width / 2 + 0.05)
+	local high = 1 - width / 2 - 0.05
+	return if high > low then low + (high - low) * rng:NextNumber() else 0.5
+end
+
+-- Whether a tap `seconds` into a struggle lands the needle in the zone.
+function Catching.struggleHit(seconds: number, speed: number, centre: number, width: number): boolean
+	return math.abs(Catching.needle(seconds, speed) - centre) <= width / 2
 end
 
 return Catching

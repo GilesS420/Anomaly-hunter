@@ -7,7 +7,10 @@
 --
 -- A monster is found by its press orb (Body) first. Big monsters (Titans) are drawn much
 -- bigger than their orb, so pointing at their blocks also counts: the pointer ray is checked
--- against each monster's bounding box, unless a wall is closer.
+-- against each monster's bounding box, unless a wall is closer. Working out a bounding box
+-- walks every block of the monster, so each box is remembered relative to the orb and only
+-- worked out again when the monster's look changes (or every few seconds), and monsters
+-- nowhere near the ray are skipped before their box is even looked at.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -20,6 +23,9 @@ local MonsterLabelController = {}
 
 local TapSeconds = 4
 local Reach = 400 -- studs
+local BoxSeconds = 3 -- a remembered bounding box is worked out again after this long
+
+type Box = { offset: CFrame, size: Vector3, reach: number, version: any, until_: number }
 
 local function monsterOf(instance: Instance?): Model?
 	local at = instance
@@ -121,11 +127,11 @@ function MonsterLabelController.start()
 		label.Parent = card
 		return label
 	end
-	local price = line(1, Enum.Font.GothamBlack, 18)
+	local price = line(1, Enum.Font.FredokaOne, 18)
 	price.TextColor3 = Ui.Colors.lamp
-	local name = line(2, Enum.Font.GothamBold, 18)
-	local details = line(3, Enum.Font.GothamMedium, 14)
-	local status = line(4, Enum.Font.GothamMedium, 14)
+	local name = line(2, Enum.Font.FredokaOne, 18)
+	local details = line(3, Enum.Font.FredokaOne, 14)
+	local status = line(4, Enum.Font.FredokaOne, 14)
 
 	local function textOf(label: BillboardGui, path: { string }): TextLabel?
 		local at: Instance? = label
@@ -153,6 +159,26 @@ function MonsterLabelController.start()
 	end
 
 	-- The monster under a screen point (GetMouseLocation space).
+	local boxes: { [Model]: Box } = {}
+	local function boxOf(model: Model, body: BasePart, now: number): Box
+		local version = model:GetAttribute("LookVersion")
+		local box = boxes[model]
+		if box and box.version == version and now <= box.until_ then
+			return box
+		end
+		local frame, size = model:GetBoundingBox()
+		local offset = body.CFrame:ToObjectSpace(frame)
+		local fresh: Box = {
+			offset = offset,
+			size = size,
+			reach = offset.Position.Magnitude + size.Magnitude / 2,
+			version = version,
+			until_ = now + BoxSeconds,
+		}
+		boxes[model] = fresh
+		return fresh
+	end
+
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	local function monsterAt(at: Vector2): Model?
@@ -167,15 +193,24 @@ function MonsterLabelController.start()
 		local wall = if hit then hit.Distance else Reach
 		local best: Model? = nil
 		local bestDistance = wall
+		local origin, unit = ray.Origin, ray.Direction.Unit
+		local now = os.clock()
 		for model in monsters do
-			if model.Parent and model:IsDescendantOf(workspace) then
-				local frame, size = model:GetBoundingBox()
-				local distance = hitBox(ray.Origin, ray.Direction, frame, size)
-				if distance and distance < bestDistance then
-					best, bestDistance = model, distance
-				end
-			else
+			local body = model.PrimaryPart
+			if not model.Parent or not model:IsDescendantOf(workspace) then
 				monsters[model] = nil
+				boxes[model] = nil
+			elseif body then
+				-- Skip it cheaply when it's behind the wall or far from the ray.
+				local toBody = body.Position - origin
+				local along = toBody:Dot(unit)
+				local box = boxOf(model, body, now)
+				if along - box.reach < bestDistance and (toBody - unit * along).Magnitude <= box.reach then
+					local distance = hitBox(origin, ray.Direction, body.CFrame * box.offset, box.size)
+					if distance and distance < bestDistance then
+						best, bestDistance = model, distance
+					end
+				end
 			end
 		end
 		return best
