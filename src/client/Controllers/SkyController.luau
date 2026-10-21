@@ -4,7 +4,8 @@
 --             eyeballs that turn to look at you; or what circles the hub: ghosts flying high
 --             (Phantom Swarm) or a parade of grinning lantern heads (Nightmare Parade)
 --   sky       a moon, the Watcher's eye, an aurora, sparkles, lightning
---   edge      a glow round the edges of the screen in the event's colour
+--   mist      low fog rolling round your feet
+--   frame     a glow round the edges of the screen in the event's colour (only the scariest)
 --   banner    the event's name across the screen when it starts
 -- The server changes Lighting; everything here is drawn on this client only, around its
 -- camera, so it follows you everywhere and players in zones see it too.
@@ -226,25 +227,51 @@ local function addEye(set: Set)
 	end
 end
 
--- Five wide bands of light, waving slowly overhead.
+-- A curtain of light low in the northern sky: two rows of thin upright strips side by side,
+-- each a bright foot with a fainter top, rippling as waves run along it.
+local AuroraStrips = 40
+local AuroraSpread = 130 -- degrees of sky the curtain covers
 local function addAurora(set: Set, color: Events.Rgb)
-	for index = 1, 5 do
-		local band =
-			piecePart(`Aurora{index}`, Enum.PartType.Block, Vector3.new(800, 40, 1), rgb(color), set.holder)
-		table.insert(set.pieces, {
-			part = band,
-			opaque = 0.35 + index * 0.06,
-			place = function(_piece, camera, t)
-				local phase = t * 0.25 + index * 1.3
-				local offset = Vector3.new(math.sin(phase) * 50, 130 + index * 14, -200 + index * 70)
-				return CFrame.new(camera + offset)
-					* CFrame.Angles(
-						math.rad(-50),
-						math.rad(math.sin(phase * 0.6) * 15),
-						math.sin(phase) * 0.08
-					)
-			end,
-		})
+	local base = rgb(color)
+	local top = base:Lerp(Color3.fromRGB(200, 120, 255), 0.45)
+	for row = 1, 2 do
+		local far = Distance + (row - 1) * 40
+		local width = math.rad(AuroraSpread / AuroraStrips) * far * 1.02 -- edge to edge, no gaps
+		local lift = (row - 1) * 6
+		for index = 1, AuroraStrips do
+			local turn = -AuroraSpread / 2 + (index - 0.5) * AuroraSpread / AuroraStrips + (row - 1) * 8
+			-- The foot of the strip, waving up and down as ripples run along the curtain.
+			local function foot(camera: Vector3, t: number): Vector3
+				local wave = math.sin(index * 0.33 + t * 0.35 + row) * 4
+					+ math.sin(index * 0.11 - t * 0.2) * 3
+				return camera + direction(turn, 16 + lift + wave) * far
+			end
+			local function stretch(t: number): number
+				return 45 + math.sin(index * 0.5 + t * 0.6 + row * 2) * 20
+			end
+			for layer = 1, 2 do
+				local part = piecePart(
+					`Aurora{row}_{index}_{layer}`,
+					Enum.PartType.Block,
+					Vector3.new(width, 1, 0.5),
+					if layer == 1 then base else top,
+					set.holder
+				)
+				table.insert(set.pieces, {
+					part = part,
+					opaque = if layer == 1 then 0.55 + row * 0.08 else 0.78 + row * 0.06,
+					place = function(_piece, camera, t)
+						local height = stretch(t)
+						local low = if layer == 1 then 0 else height * 0.35
+						local tall = if layer == 1 then height * 0.35 else height * 0.65
+						part.Size = Vector3.new(width, tall, 0.5)
+						local at = foot(camera, t)
+						local facing = Vector3.new(camera.X, at.Y, camera.Z)
+						return CFrame.lookAt(at, facing) * CFrame.new(0, low + tall / 2, 0)
+					end,
+				})
+			end
+		end
 	end
 end
 
@@ -291,6 +318,45 @@ local function addSparkles(set: Set, color: Events.Rgb)
 			NumberSequenceKeypoint.new(0, 1),
 			NumberSequenceKeypoint.new(0.15, 0.2),
 			NumberSequenceKeypoint.new(0.85, 0.2),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+	end)
+end
+
+-- Low fog rolling over the ground round the player's feet.
+local MistTexture = "rbxasset://textures/particles/smoke_main.dds"
+local function addMist(set: Set, color: Events.Rgb)
+	local part =
+		piecePart("Mist", Enum.PartType.Block, Vector3.new(140, 2, 140), Color3.new(1, 1, 1), set.holder)
+	table.insert(set.pieces, {
+		part = part,
+		opaque = 1,
+		place = function(_piece, camera)
+			local character = player.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart")
+			local ground = if root and root:IsA("BasePart") then root.Position.Y - 3 else camera.Y - 8
+			return CFrame.new(camera.X, ground, camera.Z)
+		end,
+	})
+	emit(set, part, 45, function(emitter)
+		emitter.Texture = MistTexture
+		emitter.Color = ColorSequence.new(rgb(color))
+		emitter.LightEmission = 0.15
+		emitter.EmissionDirection = Enum.NormalId.Top
+		emitter.Lifetime = NumberRange.new(8, 12)
+		emitter.Speed = NumberRange.new(0.5, 1.5)
+		emitter.SpreadAngle = Vector2.new(60, 60)
+		emitter.Acceleration = Vector3.new(1.5, 0, 0.5)
+		emitter.Rotation = NumberRange.new(0, 360)
+		emitter.RotSpeed = NumberRange.new(-8, 8)
+		emitter.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 10),
+			NumberSequenceKeypoint.new(1, 18),
+		})
+		emitter.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.3, 0.75),
+			NumberSequenceKeypoint.new(0.7, 0.8),
 			NumberSequenceKeypoint.new(1, 1),
 		})
 	end)
@@ -845,7 +911,10 @@ local function show(id: string?)
 	if sky.weather and scale > 0 then
 		addWeather(set, sky.weather, scale)
 	end
-	if sky.edge and Settings.get("glow") == true then
+	if sky.mist then
+		addMist(set, sky.mist)
+	end
+	if sky.frame and sky.edge and Settings.get("glow") == true then
 		addEdge(set, sky.edge)
 	end
 	table.insert(sets, set)
