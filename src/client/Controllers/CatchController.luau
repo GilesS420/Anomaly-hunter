@@ -4,11 +4,14 @@
 --                                  the catch meter fills by itself (about 1-3 seconds)
 --   keep holding until it's full   caught! Bring it to the zone's Exit
 --   let go early                   it gets away (but stays dazed for a moment, so try again)
+--   it struggles                   the meter stops and a needle sweeps over a bar: tap (or
+--                                  press Space or E) while it's in the glowing zone, then
+--                                  keep holding. Miss and it breaks free (Config/Struggles)
 -- Only with a vacuum in your hand (or nothing, so the server can say to pick one): a press
 -- while holding a cake, a monster or the Bait Bell is that item's click, not a catch.
 -- No dragging and the camera never locks. The server decides everything (reach, vacuum
--- strength, timing, see server/Services/CatchService.luau); this only sends "start"/"stop"
--- and draws the meter.
+-- strength, timing, see server/Services/CatchService.luau); this only sends "start"/"stop"/
+-- "tapped at" and draws the meter.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -17,6 +20,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Catching = require(Shared:WaitForChild("Util"):WaitForChild("Catching"))
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
 
 local CatchController = {}
@@ -32,6 +36,9 @@ local target: Model? = nil -- the monster this press asked the server to catch (
 local held: Model? = nil -- the monster the server says we're catching right now
 local heldSeconds = 0 -- fallback timing if the model's attributes haven't arrived yet
 local heldSince = 0
+-- The struggle going on now (server times), or nil.
+local struggle: { startedAt: number, speed: number, centre: number, width: number, timeout: number }? = nil
+local struck = false -- tapped during this struggle, waiting for the server
 
 -- True unless the hand holds a Tool that isn't a vacuum.
 local function handFree(): boolean
@@ -105,7 +112,7 @@ end
 
 -- The meter near the bottom: "Hold! Catching Wisp Jack" over a bar that fills up.
 -- 320 pixels wide, or half the screen on small phones.
-local function buildUi(): (Frame, TextLabel, Frame)
+local function buildUi(): (Frame, TextLabel, Frame, Frame, Frame, Frame)
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "CatchUi"
 	gui.ResetOnSpawn = false
@@ -163,12 +170,57 @@ local function buildUi(): (Frame, TextLabel, Frame)
 	fillCorner.CornerRadius = UDim.new(0, 8)
 	fillCorner.Parent = fill
 
+	-- The struggle bar, above the meter: a dark track, the glowing zone and the needle.
+	local track = Instance.new("Frame")
+	track.Name = "Struggle"
+	track.AnchorPoint = Vector2.new(0, 1)
+	track.Position = UDim2.new(0, 0, 0, -8)
+	track.Size = UDim2.new(1, 0, 0, 30)
+	track.BackgroundColor3 = Color3.fromRGB(20, 16, 28)
+	track.BorderSizePixel = 0
+	track.Visible = false
+	track.Parent = meter
+	local trackCorner = Instance.new("UICorner")
+	trackCorner.CornerRadius = UDim.new(0, 8)
+	trackCorner.Parent = track
+	local trackOutline = Instance.new("UIStroke")
+	trackOutline.Color = Color3.fromRGB(255, 120, 120)
+	trackOutline.Thickness = 2
+	trackOutline.Parent = track
+
+	local zone = Instance.new("Frame")
+	zone.Name = "Zone"
+	zone.AnchorPoint = Vector2.new(0.5, 0)
+	zone.Size = UDim2.fromScale(0.3, 1)
+	zone.BackgroundColor3 = Color3.fromRGB(120, 255, 140)
+	zone.BackgroundTransparency = 0.15
+	zone.BorderSizePixel = 0
+	zone.Parent = track
+
+	local needle = Instance.new("Frame")
+	needle.Name = "Needle"
+	needle.AnchorPoint = Vector2.new(0.5, 0.5)
+	needle.Position = UDim2.fromScale(0, 0.5)
+	needle.Size = UDim2.new(0, 6, 1, 10)
+	needle.BackgroundColor3 = Color3.new(1, 1, 1)
+	needle.BorderSizePixel = 0
+	needle.ZIndex = 2
+	needle.Parent = track
+	local needleStroke = Instance.new("UIStroke")
+	needleStroke.Thickness = 1.5
+	needleStroke.Parent = needle
+
 	gui.Parent = player:WaitForChild("PlayerGui")
-	return meter, title, fill
+	return meter, title, fill, track, zone, needle
 end
 
--- 0 to 1: how full the meter is. Uses the server's CatchStart/CatchEnd on the model.
+-- 0 to 1: how full the meter is. Uses the server's CatchStart/CatchEnd on the model, or
+-- where it stopped (CatchPaused) while the monster struggles.
 local function progress(model: Model): number
+	local paused = model:GetAttribute("CatchPaused")
+	if typeof(paused) == "number" then
+		return paused
+	end
 	local startTime = model:GetAttribute("CatchStart")
 	local endTime = model:GetAttribute("CatchEnd")
 	if typeof(startTime) == "number" and typeof(endTime) == "number" and endTime > startTime then
@@ -189,7 +241,16 @@ function CatchController.start()
 	local StopCatch = remotes:WaitForChild("StopCatch") :: RemoteEvent
 	local State = remotes:WaitForChild("State") :: RemoteEvent
 
-	local meter, title, fill = buildUi()
+	local Strike = remotes:WaitForChild("Strike") :: RemoteEvent
+	local meter, title, fill, track, zone, needle = buildUi()
+	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	local holdText = ""
+
+	local function endStruggle()
+		struggle = nil
+		struck = false
+		track.Visible = false
+	end
 
 	-- The finger or button came up (or the window lost focus): stop if we started anything.
 	local function letGo()
@@ -198,6 +259,7 @@ function CatchController.start()
 		target = nil
 		held = nil
 		meter.Visible = false
+		endStruggle()
 		if wasCatching then
 			StopCatch:FireServer()
 		end
@@ -215,6 +277,21 @@ function CatchController.start()
 			)
 		then
 			letGo()
+		end
+		-- Mid-struggle, any click or tap (or Space or E) is the tap; a new click or finger also
+		-- becomes the one to keep holding.
+		if struggle and held then
+			local key = input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.E
+			if (key and not processed) or (isPointer(input) and not processed) then
+				if not struck then
+					struck = true
+					Strike:FireServer(workspace:GetServerTimeNow())
+				end
+				if isPointer(input) and not pressing then
+					pressing = input
+				end
+			end
+			return
 		end
 		if processed or not isPointer(input) or pressing or not handFree() then
 			return
@@ -237,7 +314,11 @@ function CatchController.start()
 		local isMouseRelease = current.UserInputType == Enum.UserInputType.MouseButton1
 			and input.UserInputType == Enum.UserInputType.MouseButton1
 		if isSameTouch or isMouseRelease then
-			letGo()
+			if struggle and held then
+				pressing = nil -- letting go mid-struggle is fine; the tap counts
+			else
+				letGo()
+			end
 		end
 	end)
 
@@ -266,10 +347,42 @@ function CatchController.start()
 			heldSince = os.clock()
 			local monsterId = model:GetAttribute("MonsterId")
 			local name = if typeof(monsterId) == "string" then Format.name(monsterId) else model.Name
-			title.Text = `Hold! Catching {name}`
+			holdText = `Hold! Catching {name}`
+			title.Text = holdText
 			fill.Size = UDim2.fromScale(0, 1)
 			fill.BackgroundColor3 = EMPTY_COLOR
 			meter.Visible = true
+		elseif kind == "Struggle" then
+			local data = if typeof(info) == "table" then info :: any else nil
+			if not data or data.model ~= held then
+				return
+			end
+			local active = {
+				startedAt = tonumber(data.startedAt) or workspace:GetServerTimeNow(),
+				speed = tonumber(data.speed) or 1,
+				centre = tonumber(data.centre) or 0.5,
+				width = tonumber(data.width) or 0.3,
+				timeout = tonumber(data.timeout) or 4,
+			}
+			struggle = active
+			struck = false
+			zone.Position = UDim2.fromScale(active.centre, 0)
+			zone.Size = UDim2.fromScale(active.width, 1)
+			track.Visible = true
+			title.Text = if touch
+				then "It's struggling! TAP in the green!"
+				else "It's struggling! Click or SPACE in the green!"
+		elseif kind == "Struggled" then
+			local data = if typeof(info) == "table" then info :: any else nil
+			if not data or data.model ~= held then
+				return
+			end
+			endStruggle()
+			title.Text = holdText
+			if not pressing then
+				-- Tapped with a key after letting go: nothing is holding it any more.
+				letGo()
+			end
 		elseif kind == "Ended" then
 			-- Caught, escaped or gone; the server sends a message saying which.
 			-- An end for an older press (a quick re-tap on another monster) must not cancel
@@ -282,6 +395,7 @@ function CatchController.start()
 			-- (the server ignores it when nothing is being caught).
 			held = nil
 			meter.Visible = false
+			endStruggle()
 		end
 	end)
 
@@ -294,6 +408,11 @@ function CatchController.start()
 			-- Caught (or vanished); wait for the server's "Ended" but hide the meter now.
 			meter.Visible = false
 			return
+		end
+		local current = struggle
+		if current then
+			local seconds = workspace:GetServerTimeNow() - current.startedAt
+			needle.Position = UDim2.fromScale(Catching.needle(seconds, current.speed), 0.5)
 		end
 		local amount = progress(model)
 		fill.Size = UDim2.fromScale(amount, 1)

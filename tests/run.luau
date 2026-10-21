@@ -174,6 +174,51 @@ check("Dust Buster can't hold a Big monster", not Catching.canVacuum("DustBuster
 check("Phantom Vac holds a Huge Epic", Catching.canVacuum("PhantomVac", "Huge", "Epic"))
 check("Mythic needs the Void Vac", not Catching.canVacuum("PhantomVac", "Tiny", "Mythic"))
 check("Void Vac holds a Colossal Divine", Catching.canVacuum("VoidVac", "Colossal", "Divine"))
+
+-- Every catch has quick time struggles; rarer and bigger monsters are harder (Giles 2026-10-21).
+do
+	local common = Catching.strugglePlan("Common", "Normal")
+	local divine = Catching.strugglePlan("Divine", "Normal")
+	check(
+		"every rarity struggles at least once",
+		(function()
+			for id in Rarities do
+				if #Catching.strugglePlan(id, "Normal").marks < 1 then
+					return false
+				end
+			end
+			return true
+		end)()
+	)
+	check(
+		"rarer monsters struggle more, faster, with a smaller zone",
+		#divine.marks > #common.marks and divine.speed > common.speed and divine.zone < common.zone
+	)
+	check(
+		"bigger monsters have a smaller zone",
+		Catching.strugglePlan("Rare", "Colossal").zone < Catching.strugglePlan("Rare", "Tiny").zone
+	)
+	check(
+		"the needle sweeps there and back",
+		Catching.needle(0, 1) == 0
+			and Catching.needle(0.5, 1) == 0.5
+			and Catching.needle(1, 1) == 1
+			and math.abs(Catching.needle(1.25, 1) - 0.75) < 1e-9
+	)
+	check(
+		"a tap in the zone hits, outside misses",
+		Catching.struggleHit(0.5, 1, 0.5, 0.2) and not Catching.struggleHit(0.1, 1, 0.5, 0.2)
+	)
+	local fits = true
+	local rng = fakeRandom(3)
+	for _ = 1, 200 do
+		local centre = Catching.zoneCentre(0.34, rng)
+		if centre - 0.17 < 0 or centre + 0.17 > 1 or centre < 0.25 then
+			fits = false
+		end
+	end
+	check("the zone always fits on the bar, away from the start", fits)
+end
 check(
 	"rarer monsters take longer to catch",
 	Catching.catchSeconds("VoidVac", "Divine") > Catching.catchSeconds("VoidVac", "Common")
