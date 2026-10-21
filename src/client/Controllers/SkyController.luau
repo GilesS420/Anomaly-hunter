@@ -12,6 +12,8 @@
 -- it should be fully in with WatcherSkyAt (server time; the end of the warning). The banner
 -- shows when WatcherEvent is set. Pieces live in Workspace.CurrentCamera.WatcherSky.
 -- Each lightning flash asks SoundController for a thunderclap.
+-- The player's settings (client/Settings) can thin out or hide the weather, and switch off the
+-- lightning flashes and the screen edge glow; changing one redraws the sky.
 
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
@@ -20,6 +22,8 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Events = require(ReplicatedStorage.Shared.Config.Events)
+local Settings = require(script.Parent.Parent:WaitForChild("Settings"))
+local SettingsUtil = require(ReplicatedStorage.Shared.Util.Settings)
 local SoundController = require(script.Parent.SoundController)
 
 local SkyController = {}
@@ -428,18 +432,26 @@ local function addBits(set: Set, kind: string, count: number)
 	set.weather = weather
 end
 
-local function addWeather(set: Set, weather: Events.Weather)
+-- `scale` is the Event weather setting (1 full, less than 1 thinned out).
+local function addWeather(set: Set, weather: Events.Weather, scale: number)
+	local function bits(kind: string, count: number)
+		addBits(set, kind, math.max(math.floor(count * scale), 1))
+	end
+	local before = #set.emitters
 	if weather.kind == "Snow" then
 		addSnow(set)
 	elseif weather.kind == "Rain" then
 		addRain(set, weather.color or { 170, 180, 210 })
 	elseif weather.kind == "Coins" then
-		addBits(set, "Coins", 150)
+		bits("Coins", 150)
 		addSparkles(set, { 255, 215, 110 })
 	elseif weather.kind == "Candy" then
-		addBits(set, "Candy", 140)
+		bits("Candy", 140)
 	elseif weather.kind == "Eyes" then
-		addBits(set, "Eyes", 28)
+		bits("Eyes", 28)
+	end
+	for index = before + 1, #set.emitters do
+		set.emitters[index].rate *= scale
 	end
 end
 
@@ -681,7 +693,7 @@ local function show(id: string?)
 		alpha = 0,
 		target = 1,
 		speed = 1 / math.max(seconds, MinFadeInSeconds),
-		flashes = sky.flashes == true,
+		flashes = sky.flashes == true and Settings.get("flashes") == true,
 	}
 	if sky.moon then
 		addMoon(set, sky.moon)
@@ -695,10 +707,11 @@ local function show(id: string?)
 	if sky.sparkles then
 		addSparkles(set, sky.sparkles)
 	end
-	if sky.weather then
-		addWeather(set, sky.weather)
+	local scale = SettingsUtil.weatherScale(Settings.get("weather"))
+	if sky.weather and scale > 0 then
+		addWeather(set, sky.weather, scale)
 	end
-	if sky.edge then
+	if sky.edge and Settings.get("glow") == true then
 		addEdge(set, sky.edge)
 	end
 	table.insert(sets, set)
@@ -753,6 +766,11 @@ function SkyController.start()
 		local event = Events.find(workspace:GetAttribute("WatcherEvent"))
 		if event then
 			showBanner(event)
+		end
+	end)
+	Settings.changed(function(key)
+		if key == "weather" or key == "flashes" or key == "glow" then
+			show(workspace:GetAttribute("WatcherSky"))
 		end
 	end)
 	show(workspace:GetAttribute("WatcherSky"))

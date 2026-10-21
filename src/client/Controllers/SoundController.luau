@@ -9,6 +9,7 @@
 --   thunder    SkyController calls SoundController.thunder() for each lightning flash.
 --
 -- Also switches off the default walking sound on every character (Sounds.MutedCharacterSounds).
+-- The player's Music and Sound effects settings (client/Settings) scale the groups.
 
 local ContentProvider = game:GetService("ContentProvider")
 local Players = game:GetService("Players")
@@ -17,6 +18,7 @@ local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
+local Settings = require(script.Parent.Parent:WaitForChild("Settings"))
 local Sounds = require(ReplicatedStorage.Shared.Config.Sounds)
 
 local SoundController = {}
@@ -29,6 +31,7 @@ local playingMusic: Sound? = nil
 local musicTween: { [Sound]: Tween } = {}
 local ambience: Sound? = nil
 local liveEvent: string? = nil
+local musicDuck = 1 -- how far the music is turned down for the live event
 
 local function group(name: string, volume: number): SoundGroup
 	local made = Instance.new("SoundGroup")
@@ -186,12 +189,20 @@ end
 
 -- The music group is turned down while an event is live (Sounds.Events[id].musicVolume).
 local function setMusicDuck(level: number)
+	musicDuck = level
 	local tween = TweenService:Create(
 		groups.Music,
 		TweenInfo.new(Sounds.AmbienceFadeSeconds, Enum.EasingStyle.Sine),
-		{ Volume = Sounds.MusicVolume * level }
+		{ Volume = Sounds.MusicVolume * level * Settings.volume("music") }
 	)
 	tween:Play()
+end
+
+-- The player's volume settings, applied straight away.
+local function applySettings()
+	groups.Music.Volume = Sounds.MusicVolume * musicDuck * Settings.volume("music")
+	groups.Events.Volume = Sounds.StingerVolume * Settings.volume("sounds")
+	groups.Ambience.Volume = Sounds.AmbienceVolume * Settings.volume("sounds")
 end
 
 -- ------------------------------------------------------------------ events
@@ -314,6 +325,12 @@ function SoundController.start()
 	group("Music", Sounds.MusicVolume)
 	group("Events", Sounds.StingerVolume)
 	group("Ambience", Sounds.AmbienceVolume)
+	applySettings()
+	Settings.changed(function(key)
+		if key == "music" or key == "sounds" then
+			applySettings()
+		end
+	end)
 	reportMissing()
 
 	for _, other in Players:GetPlayers() do

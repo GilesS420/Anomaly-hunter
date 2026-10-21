@@ -2012,6 +2012,8 @@ do
 		"asset ids get their prefix",
 		Sounds.assetId("123") == "rbxassetid://123" and Sounds.assetId("") == ""
 	)
+end
+
 -- The first-timer tutorial (Util/Tutorial).
 do
 	local Tutorial = require("../src/shared/Util/Tutorial")
@@ -2185,6 +2187,42 @@ do
 		not table.find(effectIds, "Mimic") and table.find(effectIds, "Cobwebbed") ~= nil
 	)
 	check("codex lists every combo", #Codex.comboIds() == 4)
+end
+
+-- Settings
+do
+	local Settings = require("../src/shared/Util/Settings")
+	local TutorialUtil = require("../src/shared/Util/Tutorial")
+	local allValid = true
+	for _, setting in Settings.List do
+		allValid = allValid and Settings.valid(setting.key, setting.default)
+	end
+	check("settings defaults are all allowed", allValid)
+	check(
+		"settings volume takes only the steps",
+		Settings.valid("music", 50) and not Settings.valid("music", 40)
+	)
+	check("settings volume needs a number", not Settings.valid("music", "50"))
+	check(
+		"settings choice takes only its options",
+		Settings.valid("weather", "Less") and not Settings.valid("weather", "Max")
+	)
+	check(
+		"settings toggle needs true or false",
+		Settings.valid("glow", false) and not Settings.valid("glow", 1)
+	)
+	check("settings unknown key is refused", not Settings.valid("speed", true))
+	check("settings broken save falls back to default", Settings.value("weather", "Max") == "Full")
+	check("settings saved value is kept", Settings.value("music", 25) == 25)
+	check("settings missing value falls back to default", Settings.value("flashes", nil) == true)
+	check("settings attribute name", Settings.attribute("music") == "SettingMusic")
+	check(
+		"settings weather scale",
+		Settings.weatherScale("Off") == 0
+			and Settings.weatherScale("Less") < 1
+			and Settings.weatherScale("Full") == 1
+	)
+	check("settings work during the tutorial", TutorialUtil.isUnlocked("Gate", "Settings"))
 end
 
 if failures > 0 then
