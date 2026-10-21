@@ -402,13 +402,23 @@ function CakeService.start()
 			end
 		end
 	end)
-	-- The countdown on every label.
+	-- The countdown on every label, and a cake goes the moment its timer runs out (unless a
+	-- monster is on its way for the last bite).
 	task.spawn(function()
 		while true do
 			task.wait(1)
-			for _, list in live do
-				for _, cake in list do
-					cake.label.Text = labelText(cake)
+			local now = os.time()
+			for player, list in live do
+				for _, cake in table.clone(list) do
+					if not cake.coming and now >= Cakes.expiresAt(cake.saved) then
+						Notify.toast(
+							player,
+							`Your {cake.item.name} went stale and the monsters lost interest.`
+						)
+						remove(player, cake)
+					else
+						cake.label.Text = labelText(cake)
+					end
 				end
 			end
 		end
