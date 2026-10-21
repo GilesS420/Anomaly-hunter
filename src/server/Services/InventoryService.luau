@@ -42,6 +42,7 @@ local MansionService = require(script.Parent.MansionService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
 local RoamService = require(script.Parent.RoamService)
+local ToolModel = require(script.Parent.Parent.ToolModel)
 local WorkshopService = require(script.Parent.WorkshopService)
 
 local InventoryService = {}
@@ -65,7 +66,7 @@ export type ItemRow = {
 	cake: boolean, -- a Bakery cake (the Cakes section), else the Tools section
 	kind: string, -- Shop.Item kind: "Food", "Vacuum", "Lure" or "Charm"
 	count: number,
-	look: string?, -- cakes: the preview model's name in InventoryPreviews
+	look: string?, -- cakes and Workshop items: the preview model's name in InventoryPreviews
 }
 export type View = {
 	monsters: { MonsterRow },
@@ -214,7 +215,7 @@ local function itemRows(data: DataService.Data): { ItemRow }
 			cake = item.kind == "Food",
 			kind = item.kind :: string,
 			count = count,
-			look = if item.kind == "Food" then cakeLook(item.id) else nil,
+			look = if item.kind == "Food" then cakeLook(item.id) else ToolModel.look(item.id),
 		})
 		order[item.id] = (kindOrder[item.kind] or 9) * 1e15 + item.price
 	end
@@ -490,7 +491,7 @@ function InventoryService.place(player: Player, uid: string)
 end
 
 -- Keeps the player's hidden preview models in step with what they own: one per monster look,
--- one per Bakery cake and one per monster in their Codex. Built once each, removed when nothing uses them any more.
+-- one per Bakery cake, one per Workshop item and one per monster in their Codex. Built once each, removed when nothing uses them any more.
 function InventoryService.syncPreviews(player: Player)
 	local data = DataService.get(player)
 	local playerGui = player:FindFirstChildOfClass("PlayerGui")
@@ -535,6 +536,14 @@ function InventoryService.syncPreviews(player: Player)
 	for _, item in Shop.Bakery do
 		wanted[cakeLook(item.id)] = function()
 			return CakeModel.build(item.id, 1)
+		end
+	end
+	for _, item in Shop.Workshop do
+		local look = ToolModel.look(item.id)
+		if look then
+			wanted[look] = function()
+				return ToolModel.preview(item.id) :: Model
+			end
 		end
 	end
 	for _, child in folder:GetChildren() do

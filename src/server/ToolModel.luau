@@ -45,4 +45,27 @@ function ToolModel.tool(itemId: string, name: string): Tool?
 	return tool
 end
 
+-- The name of item `itemId`'s preview model in the player's InventoryPreviews, so shop and
+-- Backpack cards can draw the real thing (see InventoryService.syncPreviews).
+function ToolModel.look(itemId: string): string?
+	return if ToolLooks.ById[itemId] then `Tool|{itemId}` else nil
+end
+
+-- A still model of item `itemId` for those cards, turned so its side shows with the front
+-- pointing right (the card camera looks along +Z from in front).
+function ToolModel.preview(itemId: string): Model?
+	local recipe = ToolLooks.ById[itemId]
+	if not recipe then
+		return nil
+	end
+	local model = Instance.new("Model")
+	Recipe.build(recipe(), CFrame.Angles(0, math.rad(65), 0), model)
+	for _, light in model:GetDescendants() do
+		if light:IsA("PointLight") then
+			light:Destroy() -- a viewport draws no lights
+		end
+	end
+	return model
+end
+
 return ToolModel

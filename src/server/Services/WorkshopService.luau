@@ -23,6 +23,7 @@ local DataService = require(script.Parent.DataService)
 local HuntService = require(script.Parent.HuntService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
+local ToolModel = require(script.Parent.Parent.ToolModel)
 
 local WorkshopService = {}
 
@@ -41,6 +42,7 @@ export type Row = {
 	count: number, -- single-use items: how many you have
 	bought: number, -- bought since the last restock
 	limit: number, -- most you can buy per restock
+	look: string?, -- preview model in InventoryPreviews (ToolModel.look)
 }
 export type View = { items: { Row }, secondsLeft: number, money: number }
 export type Result = { ok: boolean, message: string, view: View? }
@@ -100,6 +102,7 @@ local function viewFor(data: DataService.Data): View
 			count = data.inventory[item.id] or 0,
 			bought = bought[item.id] or 0,
 			limit = Workshop.limit(item),
+			look = ToolModel.look(item.id),
 		})
 	end
 	table.sort(items, function(a, b)

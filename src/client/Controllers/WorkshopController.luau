@@ -29,6 +29,7 @@ type Row = {
 	count: number,
 	bought: number,
 	limit: number,
+	look: string?, -- preview model in InventoryPreviews
 }
 type View = { items: { Row }, secondsLeft: number, money: number }
 
@@ -117,6 +118,7 @@ function WorkshopController.start()
 			table.insert(cards, {
 				key = item.id,
 				name = item.name,
+				look = item.look,
 				icon = Ui.Icons[item.kind],
 				rarity = item.rarity,
 				rarityColor = item.rarityColor,
