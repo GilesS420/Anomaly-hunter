@@ -17,11 +17,11 @@ SoundSheets.EventStingers = {
 	FlickerWarning = { start = 41.956, length = 6.627 },
 	FlickerStart = { start = 49.583, length = 5.65 },
 	BloodMoonWarning = { start = 56.232, length = 8.839 },
-	BloodMoonStart = { start = 66.071, length = 7.924 },
-	WatcherAwakensWarning = { start = 74.996, length = 9.391 },
-	WatcherAwakensStart = { start = 85.387, length = 19.853 },
-	EventEnd = { start = 106.24, length = 4.621 },
-	Thunder = { start = 111.861, length = 5.401 },
+	BloodMoonStart = { start = 66.071, length = 11.795 },
+	WatcherAwakensWarning = { start = 78.866, length = 9.391 },
+	WatcherAwakensStart = { start = 89.257, length = 19.853 },
+	EventEnd = { start = 110.11, length = 4.621 },
+	Thunder = { start = 115.732, length = 5.401 },
 } :: { [string]: Region }
 
 SoundSheets.EventAmbience = {
@@ -32,5 +32,13 @@ SoundSheets.EventAmbience = {
 	BloodMoon = { start = 100.0, length = 24.0 },
 	WatcherAwakens = { start = 125.0, length = 24.0 },
 } :: { [string]: Region }
+
+-- The music playlist in the order it plays, with each song's length in seconds.
+SoundSheets.Music = {
+	{ file = "MusicGymnopedie", length = 84.706 },
+	{ file = "MusicMountainKing", length = 58.182 },
+	{ file = "MusicFurElise", length = 64.899 },
+	{ file = "MusicMoonlight", length = 64.101 },
+} :: { { file: string, length: number } }
 
 return SoundSheets

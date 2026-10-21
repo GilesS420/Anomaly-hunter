@@ -378,13 +378,13 @@ def choir(freqs, duration, vowel="ah", voices=3):
     return out / (len(freqs) * voices) * 2.5
 
 
-def timpani(freq, duration=2.0):
+def timpani(freq, duration=2.0, hit=0.5):
     t = times(duration)
     f = freq * (1 + 0.04 * np.exp(-t * 20))
     phase = 2 * np.pi * np.cumsum(f) / RATE
     body = (np.sin(phase) + 0.5 * np.sin(phase * 1.5) * np.exp(-t * 4) + 0.3 * np.sin(phase * 1.99)) * np.exp(-t * 2.2)
-    hit = lowpass(noise(duration), 500) * np.exp(-t * 30) * 0.5
-    return (body + hit) * 0.6
+    thump = lowpass(noise(duration), 500) * np.exp(-t * 30) * hit
+    return (body + thump) * 0.6
 
 
 def boom(duration=3.0, freq=45):

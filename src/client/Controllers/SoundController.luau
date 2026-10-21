@@ -1,9 +1,8 @@
 --!strict
 -- Music and event sounds, all played on this client only (Config/Sounds).
 --
---   music      one track per area: the hub, a mansion plot, or a zone (player attribute
---              Zone). Walking from one area to another crossfades; a track that's left is
---              paused, so it picks up where it was when you come back.
+--   music      one playlist for the whole server, the same song for everyone wherever they
+--              are, timed by the server clock (Sounds.Sheets.Music, in order, then again).
 --   events     the event's warning sound when the 30 second warning starts (workspace
 --              attribute WatcherNext), its start sound with the banner (WatcherEvent), then
 --              its ambience loops quietly and the music is turned down until it ends.
@@ -18,12 +17,10 @@ local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
-local Layout = require(ReplicatedStorage.Shared.Config.Layout)
 local Sounds = require(ReplicatedStorage.Shared.Config.Sounds)
 
 local SoundController = {}
 
-local player = Players.LocalPlayer
 local random = Random.new()
 
 local groups: { [string]: SoundGroup } = {}
@@ -107,40 +104,50 @@ end
 
 -- ------------------------------------------------------------------ music
 
-local function inPlot(position: Vector3): boolean
-	local halfX, halfZ = Layout.PlotSize.x / 2, Layout.PlotSize.z / 2
-	for _, plot in Layout.Plots do
-		if math.abs(position.X - plot.x) <= halfX and math.abs(position.Z - plot.z) <= halfZ then
-			return true
+-- The uploaded songs in playlist order. Every client has the same config, so every client
+-- works out the same playlist.
+local function playlist(): { { file: string, length: number } }
+	local list = {}
+	for _, song in Sounds.Sheets.Music do
+		if fileId(song.file) ~= "" then
+			table.insert(list, song)
 		end
 	end
-	return false
+	return list
 end
 
-local function currentArea(): Sounds.Area
-	if player:GetAttribute("Zone") ~= nil then
-		return "Zone"
+-- Which song plays right now and how far into it, from the shared server clock: the
+-- playlist repeats forever from time 0, with a short pause after each song, so everyone in
+-- every server hears the same moment of the same song.
+local function nowPlaying(list: { { file: string, length: number } }): (string?, number)
+	local cycle = 0
+	for _, song in list do
+		cycle += song.length + Sounds.PlaylistGapSeconds
 	end
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if root and inPlot(root.Position) then
-		return "Mansion"
+	if cycle <= 0 then
+		return nil, 0
 	end
-	return "Hub"
+	local at = workspace:GetServerTimeNow() % cycle
+	for _, song in list do
+		if at < song.length then
+			return song.file, at
+		end
+		at -= song.length + Sounds.PlaylistGapSeconds
+		if at < 0 then
+			return nil, 0 -- the pause between two songs
+		end
+	end
+	return nil, 0
 end
 
-local function track(file: string): Sound?
-	if musicTracks[file] then
-		return musicTracks[file]
-	end
-	local id = fileId(file)
-	if id == "" then
-		return nil
+local function track(file: string): Sound
+	local existing = musicTracks[file]
+	if existing then
+		return existing
 	end
 	local sound = Instance.new("Sound")
 	sound.Name = file
-	sound.SoundId = id
-	sound.Looped = true
+	sound.SoundId = fileId(file)
 	sound.Volume = 0
 	sound.SoundGroup = groups.Music
 	sound.Parent = SoundService
@@ -148,25 +155,32 @@ local function track(file: string): Sound?
 	return sound
 end
 
-local function switchMusic(area: Sounds.Area)
-	local nextTrack = track(Sounds.Music[area])
-	if nextTrack == playingMusic then
-		return
-	end
-	local old = playingMusic
-	if old then
-		tweenVolume(old, 0, Sounds.MusicFadeSeconds, function()
-			old:Pause()
-		end)
-	end
-	playingMusic = nextTrack
-	if nextTrack then
-		if nextTrack.IsPaused then
-			nextTrack:Resume()
-		elseif not nextTrack.IsPlaying then
-			nextTrack:Play()
+local function fadeOut(sound: Sound)
+	tweenVolume(sound, 0, Sounds.MusicFadeSeconds, function()
+		sound:Stop()
+	end)
+end
+
+local function updateMusic(list: { { file: string, length: number } })
+	local file, at = nowPlaying(list)
+	local nextTrack = if file then track(file) else nil
+	if nextTrack ~= playingMusic then
+		if playingMusic then
+			fadeOut(playingMusic)
 		end
-		tweenVolume(nextTrack, 1, Sounds.MusicFadeSeconds)
+		playingMusic = nextTrack
+		if nextTrack then
+			nextTrack.TimePosition = at
+			nextTrack:Play()
+			-- a song that starts on time comes in at full volume; joining halfway fades it in
+			tweenVolume(nextTrack, 1, if at < 0.5 then 0.05 else Sounds.MusicFadeSeconds)
+		end
+	elseif
+		nextTrack
+		and nextTrack.IsLoaded
+		and math.abs(nextTrack.TimePosition - at) > Sounds.MusicDriftSeconds
+	then
+		nextTrack.TimePosition = at -- it fell behind (loading, a lag spike): catch up
 	end
 end
 
@@ -331,8 +345,9 @@ function SoundController.start()
 	end)
 	onEvent(workspace:GetAttribute("WatcherEvent"), true)
 
+	local list = playlist()
 	while true do
-		switchMusic(currentArea())
+		updateMusic(list)
 		task.wait(0.5)
 	end
 end

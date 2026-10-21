@@ -5,9 +5,10 @@
 Writes, into out_dir (default: tools/sound/out):
   EventStingers.ogg   every event's warning and start sound, one after another
   EventAmbience.ogg   every event's background loop, one after another
-  MusicHub.ogg        hub music       (after Satie, Gymnopedie No. 1, 1888)
-  MusicMansion.ogg    mansion music   (after Bach, Prelude in C major BWV 846, 1722)
-  MusicZone.ogg       zone music      (after Grieg, In the Hall of the Mountain King, 1875)
+  MusicGymnopedie.ogg    after Satie, Gymnopedie No. 1 (1888)
+  MusicMountainKing.ogg  after Grieg, In the Hall of the Mountain King (1875)
+  MusicFurElise.ogg      after Beethoven, Fur Elise (1810)
+  MusicMoonlight.ogg     after Beethoven, Moonlight Sonata, first movement (1801)
   preview/*.mp3       each sound on its own, for the preview page
   regions.json        where each sound sits inside the two event files
 
@@ -29,6 +30,44 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(__file__))
 from synth import *  # noqa: E402,F403
+
+# Each sound gets its own random seed, so changing one sound never changes another. Sounds
+# Giles reviewed keep the exact random state they were first made with, so a re-render gives
+# the very same sound (new sounds are seeded from their name).
+APPROVED = {  # name: (PCG64 state, has_uint32, uinteger)
+    "FrostFogWarning": (78419187311282569393360609524915227602, 0, 0),
+    "FrostFogStart": (7008574173270448166590076889761042112, 0, 0),
+    "SugarRushWarning": (102585170012589833832176388980571577185, 0, 0),
+    "SugarRushStart": (97618360152295137461415372663552371521, 0, 0),
+    "GoldRushWarning": (273532744158899558150941731045273226810, 0, 0),
+    "GoldRushStart": (174055715559403950645919247399189814292, 0, 0),
+    "FlickerWarning": (293893327554777917356853587435393219884, 0, 0),
+    "FlickerStart": (324204688190000373448532529058630776475, 0, 0),
+    "BloodMoonWarning": (18591976466092328302252927176881050027, 0, 0),
+    "WatcherAwakensWarning": (138495672242948090845689909109801829887, 0, 0),
+    "WatcherAwakensStart": (294825167145047299783056444707968220047, 0, 0),
+    "EventEnd": (261310662143875347988620667263380529450, 0, 0),
+    "Thunder": (175492745243780518409073843892030032823, 0, 0),
+    "FrostFog": (54625636869832943630459843356585606087, 0, 0),
+    "SugarRush": (315939851298089173177605725354231658393, 1, 1771602223),
+    "GoldRush": (254997078598393388880328317970523957418, 1, 2672971746),
+    "WatcherAwakens": (189870864784255521201730970769586460453, 1, 2672971746),
+    "MusicGymnopedie": (334769270541249766193863008936780335254, 1, 2672971746),
+    "MusicMountainKing": (283070765951860029914347476084439014823, 1, 2672971746),
+}
+APPROVED_INC = 300095300155318575761469457844978717175
+
+
+def reseed(key):
+    import zlib
+
+    if key in APPROVED:
+        value, has_uint32, uinteger = APPROVED[key]
+        state = {"state": value, "inc": APPROVED_INC}
+    else:
+        state, has_uint32, uinteger = np.random.PCG64(zlib.crc32(key.encode())).state["state"], 0, 0
+    rng.bit_generator.state = {"bit_generator": "PCG64", "state": state, "has_uint32": has_uint32, "uinteger": uinteger}
+
 
 GAP = 1.0  # seconds of silence between sounds on a sheet, so a slice never catches its neighbour
 
@@ -189,14 +228,31 @@ def blood_moon_warning():
 
 
 def blood_moon_start():
-    d = 6.0
-    buf = silence(d + 1)
-    place(buf, boom(4.0, 40) * 0.9, 0)
-    # the opening of Chopin's funeral march (Sonata No. 2, 1839): Bb, Bb.Bb, Bb
-    for at, n in [(0.0, "Bb2"), (0.9, "Bb2"), (1.575, "Bb2"), (1.8, "Bb2")]:
-        place(buf, stereo(bell(note(n), 4.0, 0.7) * 0.9), at)
-    place(buf, stereo(choir([note("Bb3"), note("Db4"), note("F4"), note("Bb4")], 4.5, "ah") * 0.7), 0.1)
-    return finish(buf, 3.5, 0.45, -15)
+    """The opening of Chopin's Funeral March (Piano Sonata No. 2, 1839): the slow rocking
+    chords in the bass and the famous tune on top, played heavy and low."""
+    beat = 0.92
+    buf = silence(beat * 8 + 5)
+    place(buf, boom(4.0, 38) * 0.45, 0)
+    # the left hand rocks between B-flat minor and G-flat over B-flat, on every beat
+    for i in range(8):
+        chord = ["Bb1", "F2", "Db3"] if i % 2 == 0 else ["Bb1", "Gb2", "Db3"]
+        for n in chord:
+            place(buf, stereo(soft_piano(note(n), beat * 1.6) * 0.32, -0.2), i * beat)
+        place(buf, stereo(organ(note(chord[0]), beat * 1.05, (0.8, 0.5, 0.2, 0.1, 0.0, 0.0), 0.7, 0.08) * 0.35), i * beat)
+    # the tune: Bb, Bb.Bb, Bb | Db.C, C.Bb, Bb.A, Bb
+    tune = [
+        ("Bb3", 0, 1), ("Bb3", 1, 0.75), ("Bb3", 1.75, 0.25), ("Bb3", 2, 2),
+        ("Db4", 4, 0.75), ("C4", 4.75, 0.25), ("C4", 5, 0.75), ("Bb3", 5.75, 0.25),
+        ("Bb3", 6, 0.75), ("A3", 6.75, 0.25), ("Bb3", 7, 1.5),
+    ]
+    for name, at, length in tune:
+        f = note(name)
+        for octave, gain in [(1, 0.55), (2, 0.4)]:  # in octaves, like the piano's right hand
+            place(buf, stereo(soft_piano(f * octave, length * beat + 1.2) * gain, 0.15), at * beat)
+        place(buf, stereo(bell(f * 2, 2.5, 0.4) * 0.08, 0.3), at * beat)
+    choir_part = choir([note("Bb2"), note("F3"), note("Db4")], beat * 8 + 1.5, "oh")
+    place(buf, stereo(choir_part * 0.35), 0.2)
+    return finish(buf, 3.0, 0.4, -16)
 
 
 def watcher_warning():
@@ -338,14 +394,29 @@ def gold_rush_loop():
     return looped(buf, 2.5, 0.35, -25)
 
 
-def rain(d, darkness=0.0, drops=300):
+def rain(d, darkness=0.0, density=1.0):
+    """Rain built from thousands of single drops: tiny splashes, the odd bubbly plink, and a
+    soft wash underneath. darkness lowers it all (heavy, thick Blood Moon rain)."""
     buf = silence(d)
-    place(buf, stereo(looped_noise(d, 400 - darkness * 250, 9000 - darkness * 5000, -2) * 0.25, -0.3), 0)
-    place(buf, stereo(looped_noise(d, 400 - darkness * 250, 9000 - darkness * 5000, -2) * 0.25, 0.3), 0)
-    for _ in range(drops):
-        f = rng.uniform(1500, 4500) * (1 - darkness * 0.5)
-        drip = np.sin(2 * np.pi * f * times(0.02)) * np.exp(-times(0.02) * 250)
-        place(buf, stereo(drip * rng.uniform(0.05, 0.2), rng.uniform(-1, 1)), rng.uniform(0, d), wrap=True)
+    low = 1 - darkness * 0.45
+    wash = looped_noise(d, 120, 2600 * low, -6) * 0.07 * lfo(d, 3, 0.5, 0.7, 1)
+    place(buf, stereo(wash, -0.4), 0)
+    place(buf, stereo(looped_noise(d, 120, 2600 * low, -6) * 0.07 * lfo(d, 2, 2.0, 0.7, 1), 0.4), 0)
+    splats = []
+    for _ in range(48):  # a bank of splashes to pick from
+        length = rng.uniform(0.004, 0.012)
+        center = rng.uniform(900, 4200) * low
+        s = bandpass(noise(length + 0.01), center * 0.6, center * 1.5) * np.exp(-times(length + 0.01) / (length / 3))
+        splats.append(s / (np.max(np.abs(s)) + 1e-9))
+    for _ in range(int(2400 * density)):
+        gain = rng.uniform(0.01, 0.07) * (rng.uniform() ** 2 * 3 + 0.3)
+        place(buf, stereo(splats[rng.integers(len(splats))] * gain, rng.uniform(-1, 1)), rng.uniform(0, d), wrap=True)
+    for _ in range(int(160 * density)):  # drops landing in puddles: a quick rising "plink"
+        length = rng.uniform(0.015, 0.04)
+        t = times(length)
+        f0 = rng.uniform(900, 2600) * low
+        plink = np.sin(2 * np.pi * np.cumsum(f0 * (1 + 1.2 * t / length)) / RATE) * np.exp(-t * 6 / length)
+        place(buf, stereo(plink * rng.uniform(0.015, 0.06), rng.uniform(-1, 1)), rng.uniform(0, d), wrap=True)
     return buf
 
 
@@ -367,8 +438,8 @@ def flicker_loop():
 
 def blood_moon_loop():
     d = LOOP
-    buf = rain(d, darkness=0.6, drops=150)
-    buf *= 0.6
+    buf = rain(d, darkness=0.6, density=1.3)
+    buf *= 0.8
     for n, g in [("Bb1", 0.10), ("F2", 0.07), ("Db3", 0.03)]:
         tone = additive(loop_freq(note(n), d), d, [(1, 1, 0), (2, 0.5, 0), (3, 0.25, 0), (4, 0.1, 0)]) * lfo(d, 3, rng.uniform(0, 6), 0.5, 1)
         place(buf, stereo(tone * g), 0)
@@ -408,7 +479,7 @@ AMBIENCE = [
 # "performance" is this code, so there is no recording anyone else owns.
 
 
-def music_hub():
+def music_gymnopedie():
     """After Erik Satie, Gymnopedie No. 1 (1888): slow 3/4, music box over a soft pad."""
     beat = 60 / 68
     bar = beat * 3
@@ -448,43 +519,108 @@ def music_hub():
     return loudness(reverb(buf, 3.2, 0.4, 5000, wrap=True), -19)
 
 
-PRELUDE = [
-    "C4 E4 G4 C5 E5", "C4 D4 A4 D5 F5", "B3 D4 G4 D5 F5", "C4 E4 G4 C5 E5",
-    "C4 E4 A4 E5 A5", "C4 D4 F#4 A4 D5", "B3 D4 G4 D5 G5", "B3 C4 E4 G4 C5",
-    "A3 C4 E4 G4 C5", "D3 A3 D4 F#4 C5", "G3 B3 D4 G4 B4", "G3 Bb3 E4 G4 C#5",
-    "F3 A3 D4 A4 D5", "F3 Ab3 D4 F4 B4", "E3 G3 C4 G4 C5", "E3 F3 A3 C4 F4",
-    "D3 F3 A3 C4 F4", "G2 D3 G3 B3 F4", "C3 E3 G3 C4 E4", "C3 G3 Bb3 C4 E4",
-    "F2 F3 A3 C4 E4", "F#2 C3 A3 C4 Eb4", "Ab2 F3 B3 C4 D4", "G2 F3 G3 B3 D4",
-    "G2 E3 G3 C4 E4", "G2 D3 G3 C4 F4", "G2 D3 G3 B3 F4", "G2 Eb3 A3 C4 F#4",
-    "G2 E3 G3 C4 G4", "G2 D3 G3 C4 F4", "G2 D3 G3 B3 F4", "C2 C3 G3 Bb3 E4",
+# Fur Elise, bar by bar in sixteenths: (left hand bass or None, the six sixteenths). A bar's
+# first sixteenth sounds together with the bass note.
+ELISE_A = [
+    (None, ["E5", "D#5", "E5", "B4", "D5", "C5"]),
+    ("A2", ["A4", "E3", "A3", "C4", "E4", "A4"]),
+    ("E2", ["B4", "E3", "G#3", "E4", "G#4", "B4"]),
+    ("A2", ["C5", "E3", "A3", "E4", "E5", "D#5"]),
+    (None, ["E5", "D#5", "E5", "B4", "D5", "C5"]),
+    ("A2", ["A4", "E3", "A3", "C4", "E4", "A4"]),
+    ("E2", ["B4", "E3", "G#3", "E4", "C5", "B4"]),
+]
+ELISE_END_1 = ("A2", ["A4", "E3", "A3", None, "E5", "D#5"])
+ELISE_END_2 = ("A2", ["A4", "E3", "A3", "B4", "C5", "D5"])
+ELISE_B = [
+    ("C3", ["E5", "G3", "C4", "G4", "F5", "E5"]),
+    ("G2", ["D5", "G3", "B3", "F4", "E5", "D5"]),
+    ("A2", ["C5", "E3", "A3", "E4", "D5", "C5"]),
+    ("E2", ["B4", "E3", "E4", None, "E5", "D#5"]),
+    (None, ["E5", "D#5", "E5", "D#5", "E5", "D#5"]),
 ]
 
 
-def music_mansion():
-    """After J. S. Bach, Prelude in C major BWV 846 (1722): harp with a music box on top."""
-    step = 0.2  # one sixteenth
-    bar = step * 16
-    bars = len(PRELUDE) + 2  # then the final chord, then a breath before it starts again
-    d = bars * bar
+def music_elise():
+    """After Beethoven, Fur Elise (1810): a haunted music box that slowly goes out of tune.
+    Played twice; the second time lower, softer and more warped, over a cold pad."""
+    step = 0.17
+    bar = step * 6
+    form = [None, None] + ELISE_A + [ELISE_END_1] + ELISE_A + [ELISE_END_2] + ELISE_B + ELISE_A + [ELISE_END_1]
+    form = [b for b in form if b is not None]
+    rounds = [(1.0, 0.004, 0.0), (0.5, 0.011, 1.0)]  # (pitch, wobble, pad)
+    pickup = 2 * step
+    length = pickup + len(form) * bar
+    d = len(rounds) * (length + 1.5) + 5
     buf = silence(d)
-    for b, chord in enumerate(PRELUDE):
-        n = chord.split()
-        pattern = [n[0], n[1], n[2], n[3], n[4], n[2], n[3], n[4]] * 2
-        for i, name in enumerate(pattern):
-            at = b * bar + i * step
-            f = note(name)
-            place(buf, stereo(pluck(f, 2.2, 0.35, 0.997) * 0.45, -0.3 + 0.12 * (i % 8) / 2), at, wrap=True)
-            if i % 8 == 4:  # the top note, an octave up on the music box
-                place(buf, stereo(music_box(f * 2, 2.0, 0.005) * 0.16, 0.35), at, wrap=True)
-        place(buf, stereo(pad(note(n[0]), bar + 0.5, 0.8, 1.0, 600) * 0.12), b * bar, wrap=True)
-    end = len(PRELUDE) * bar
-    for i, name in enumerate(["C2", "C3", "E4", "G4", "C5"]):
-        place(buf, stereo(pluck(note(name), 4.0, 0.35, 0.998) * 0.45), end + i * 0.08, wrap=True)
-    place(buf, stereo(music_box(note("C6"), 4.0) * 0.25, 0.3), end + 0.4, wrap=True)
-    return loudness(reverb(buf, 3.0, 0.38, 5500, wrap=True), -19)
+    for r, (shift, wobble, pad_gain) in enumerate(rounds):
+        base = r * (length + 1.5)
+        for i, n in enumerate(["E5", "D#5"]):  # the pickup
+            place(buf, stereo(music_box(note(n) * shift * 2, 2.0, wobble) * 0.45, 0.1), base + i * step)
+        for b, (bass, notes) in enumerate(form):
+            at = base + pickup + b * bar
+            if bass:
+                place(buf, stereo(soft_piano(note(bass) * max(shift, 1.0), bar * 2) * 0.35, -0.3), at)
+                if pad_gain:
+                    place(buf, stereo(pad(note(bass) * 2, bar + 0.6, 0.3, 0.6, 700) * 0.12 * pad_gain), at)
+            for k, n in enumerate(notes):
+                if n is None:
+                    continue
+                f = note(n) * shift * 2
+                low = note(n) < note("A4") and k in (1, 2)  # the left-hand arpeggio notes
+                if low:
+                    place(buf, stereo(soft_piano(note(n) * max(shift, 1.0), 1.2) * 0.22, -0.2), at + k * step)
+                else:
+                    place(buf, stereo(music_box(f, 2.2, wobble) * 0.45, 0.1), at + k * step)
+    return loudness(trim_tail(reverb(buf, 3.0, 0.4, 5000)), -19)
 
 
-def music_zone():
+def music_moonlight():
+    """After Beethoven, Moonlight Sonata, first movement (1801): the slow rolling triplets in
+    C-sharp minor, deep octaves in the bass and the lonely tune on top."""
+    triplet = 0.36
+    bar = triplet * 12
+    # (bass, [(triplet chord, how many)], tune: [(beat in triplets, note, length in triplets)])
+    bars = [
+        ("C#2", [("G#3 C#4 E4", 4)], []),
+        ("B1", [("G#3 C#4 E4", 4)], []),
+        (("A1", "F#1"), [("A3 C#4 E4", 2), ("A3 D4 F#4", 2)], []),
+        ("G#1", [("G#3 C4 F#4", 1), ("G#3 C#4 E4", 1), ("G#3 C#4 D#4", 1), ("F#3 C4 D#4", 1)], []),
+        ("C#2", [("E3 G#3 C#4", 4)], [(9, "G#4", 2.25), (11.25, "G#4", 0.75)]),
+        ("C2", [("D#3 F#3 C4", 4)], [(0, "G#4", 9), (9, "G#4", 2.25), (11.25, "G#4", 0.75)]),
+        ("C#2", [("E3 G#3 C#4", 2), ("E3 A3 C#4", 2)], [(0, "G#4", 6), (6, "A4", 6)]),
+        ("C#2", [("F#3 A3 C#4", 2), ("F#3 A3 D#4", 2)], [(0, "G#4", 6), (6, "F#4", 6)]),
+        ("B1", [("E3 G#3 B3", 2), ("D#3 F#3 B3", 2)], [(0, "E4", 6), (6, "F#4", 3), (9, "D#4", 3)]),
+        ("E2", [("E3 G#3 B3", 4)], [(0, "E4", 12)]),
+        ("A1", [("E3 A3 C#4", 2), ("F#3 A3 D4", 2)], [(0, "C#4", 6), (6, "D4", 6)]),
+        ("G#1", [("G#3 C4 F#4", 1), ("G#3 C#4 E4", 1), ("G#3 C#4 D#4", 1), ("F#3 C4 D#4", 1)], [(0, "C#4", 6), (6, "C4", 6)]),
+        ("C#2", [("G#3 C#4 E4", 4)], [(0, "C#4", 12)]),
+        ("C#2", [("G#3 C#4 E4", 4)], []),
+    ]
+    d = len(bars) * bar + 6
+    buf = silence(d)
+    for b, (bass, chords, tune) in enumerate(bars):
+        at = b * bar
+        basses = bass if isinstance(bass, tuple) else (bass,)
+        for i, bn in enumerate(basses):
+            length = bar / len(basses)
+            for octave in (1, 2):
+                place(buf, stereo(soft_piano(note(bn) * octave, length + 1.0) * 0.3, -0.25), at + i * length)
+        k = 0
+        for chord, count in chords:
+            names = chord.split()
+            for _ in range(count * 3):
+                n = names[k % 3]
+                place(buf, stereo(soft_piano(note(n), 1.6) * 0.17, -0.05 + 0.1 * (k % 3)), at + k * triplet)
+                k += 1
+        for beat, n, length in tune:
+            place(buf, stereo(soft_piano(note(n), length * triplet + 1.5) * 0.42, 0.15), at + beat * triplet)
+            place(buf, stereo(celesta(note(n) * 2, 1.5) * 0.04, 0.3), at + beat * triplet)
+    place(buf, stereo(pad(note("C#3"), d - 4, 4.0, 3.0, 500) * 0.06), 0)
+    return loudness(trim_tail(reverb(buf, 3.5, 0.42, 4500)), -20)
+
+
+def music_mountain_king():
     """After Edvard Grieg, In the Hall of the Mountain King (1875): sneaking pizzicato and
     bassoon that grows into the full band, then drops back to a whisper to loop."""
     eighth = 60 / 132 / 2
@@ -526,7 +662,7 @@ def music_zone():
                     f = pitch(name, octave)
                     dur = length * eighth
                     if "pizz" in layers:
-                        place(buf, stereo(pluck(f, 0.6, 0.6, 0.985) * 0.6 * gain, -0.3), t, wrap=True)
+                        place(buf, stereo(pluck(f, 0.6, 0.3, 0.985) * 0.45 * gain, -0.3), t, wrap=True)
                     if "reed" in layers:
                         place(buf, stereo(reed(f / 2, dur * 0.85) * 0.7 * gain, 0.2), t, wrap=True)
                     if "organ" in layers:
@@ -534,9 +670,9 @@ def music_zone():
                     t += dur
                 for beat in range(4):  # the bass walks on every beat
                     bn = bass[i][beat % 2]
-                    place(buf, stereo(pluck(note(bn), 0.9, 0.3, 0.99) * 0.8 * gain, 0.0), start + beat * 2 * eighth, wrap=True)
-                    if "drums" in layers:
-                        place(buf, stereo(timpani(note(bass[i][0]), 1.2) * 0.5 * gain), start + beat * 2 * eighth, wrap=True)
+                    place(buf, stereo(pluck(note(bn), 0.9, 0.15, 0.99) * 0.6 * gain, 0.0), start + beat * 2 * eighth, wrap=True)
+                    if "drums" in layers and beat % 2 == 0:  # soft, on beats 1 and 3 only
+                        place(buf, stereo(timpani(note(bass[i][0]), 1.2, hit=0.1) * 0.18 * gain), start + beat * 2 * eighth, wrap=True)
                 if "strings" in layers:
                     chord = [note(bass[i][0]) * 2, note(bass[i][1]) * 2, note(bass[i][0]) * 4]
                     for f in chord:
@@ -545,14 +681,16 @@ def music_zone():
         at_bar += 8
     # the last bar slams down and stops, then the loop starts quietly again
     end = d - bar
-    place(buf, stereo(timpani(note("B1"), 2.5) * 0.9), end + 4 * eighth, wrap=True)
+    place(buf, stereo(timpani(note("B1"), 2.5, hit=0.2) * 0.5), end + 4 * eighth, wrap=True)
     return loudness(reverb(buf, 2.2, 0.3, 6000, wrap=True), -18)
 
 
+# The playlist, in order: the whole server hears the same song at the same moment.
 MUSIC = [
-    ("MusicHub", music_hub),
-    ("MusicMansion", music_mansion),
-    ("MusicZone", music_zone),
+    ("MusicGymnopedie", music_gymnopedie),
+    ("MusicMountainKing", music_mountain_king),
+    ("MusicFurElise", music_elise),
+    ("MusicMoonlight", music_moonlight),
 ]
 
 
@@ -563,6 +701,7 @@ def build_sheet(entries, name, out):
     pieces, regions, at = [], {}, 0.0
     for key, make in entries:
         print("  ", key, flush=True)
+        reseed(key)
         sig = make()
         encode(sig, os.path.join(out, "preview", key), ogg=False)
         length = len(sig) / RATE
@@ -586,17 +725,18 @@ def main():
     music = {}
     for key, make in MUSIC:
         print("  ", key, flush=True)
+        reseed(key)
         sig = make()
         encode(sig, os.path.join(out, key), mp3=False)
         encode(sig, os.path.join(out, "preview", key), ogg=False)
         music[key] = round(len(sig) / RATE, 3)
     with open(os.path.join(out, "regions.json"), "w") as f:
         json.dump({"stingers": stingers, "ambience": ambience, "music": music}, f, indent=2)
-    write_luau(stingers, ambience)
+    write_luau(stingers, ambience, music)
     print("done:", out)
 
 
-def write_luau(stingers, ambience):
+def write_luau(stingers, ambience, music):
     path = os.path.join(os.path.dirname(__file__), "..", "..", "src", "shared", "Config", "SoundSheets.luau")
     lines = [
         "--!strict",
@@ -615,6 +755,12 @@ def write_luau(stingers, ambience):
             lines.append(f"\t{key} = {{ start = {r['start']}, length = {r['length']} }},")
         lines.append("} :: { [string]: Region }")
         lines.append("")
+    lines.append("-- The music playlist in the order it plays, with each song's length in seconds.")
+    lines.append("SoundSheets.Music = {")
+    for key, length in music.items():
+        lines.append(f'\t{{ file = "{key}", length = {length} }},')
+    lines.append("} :: { { file: string, length: number } }")
+    lines.append("")
     lines.append("return SoundSheets")
     with open(path, "w") as f:
         f.write("\n".join(lines) + "\n")

@@ -2004,8 +2004,8 @@ do
 	ok = ok
 		and Sounds.Sheets.EventStingers[Sounds.EndCue] ~= nil
 		and Sounds.Sheets.EventStingers[Sounds.ThunderCue] ~= nil
-	for _, file in Sounds.Music do
-		ok = ok and (Sounds.Files :: any)[file] ~= nil
+	for _, song in Sounds.Sheets.Music do
+		ok = ok and (Sounds.Files :: any)[song.file] ~= nil and song.length > 0
 	end
 	check("every launch event has sounds that exist on the sound sheets", ok)
 	check(
