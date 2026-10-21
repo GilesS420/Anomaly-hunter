@@ -37,6 +37,6 @@ Player data saves through [ProfileStore](https://github.com/MadStudioRoblox/Prof
 
 ## Sound and music
 
-All sounds are made by `tools/sound/make_sounds.py` (needs Python 3 with numpy and scipy, plus ffmpeg): they are synthesized from scratch, so nobody else owns them, and the music is our own rendition of public-domain classical pieces (Satie, Grieg, Beethoven). Run it to write the six files to upload into `tools/sound/out` (it also rewrites `src/shared/Config/SoundSheets.luau`).
+All sounds are made by `tools/sound/make_sounds.py` (needs Python 3 with numpy and scipy, plus ffmpeg): they are synthesized from scratch, so nobody else owns them, and the music is our own rendition of public-domain classical pieces (Grieg, Beethoven) plus two songs of our own. Very famous melodies get rejected by Roblox audio moderation, so avoid those. Run it to write the seven files to upload into `tools/sound/out` (it also rewrites `src/shared/Config/SoundSheets.luau`).
 
 Roblox can't read sound files from the repo. Upload each `.ogg` once (Creator Hub > Development Items > Audio, with the same owner as the game) and put its asset id in `src/shared/Config/Sounds.luau`. Until then that sound is silent and Studio's Output lists what is missing. `client/Controllers/SoundController` plays the music as one server-wide playlist and the event sounds, and switches off the default walking sound.

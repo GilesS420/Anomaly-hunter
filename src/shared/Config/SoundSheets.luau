@@ -42,9 +42,9 @@ SoundSheets.WorldAmbience = {
 
 -- The music playlist in the order it plays, with each song's length in seconds.
 SoundSheets.Music = {
-	{ file = "MusicGymnopedie", length = 84.706 },
+	{ file = "MusicWaltz", length = 120.964 },
 	{ file = "MusicMountainKing", length = 58.182 },
-	{ file = "MusicFurElise", length = 64.899 },
+	{ file = "MusicLullaby", length = 63.529 },
 	{ file = "MusicMoonlight", length = 64.101 },
 } :: { { file: string, length: number } }
 
