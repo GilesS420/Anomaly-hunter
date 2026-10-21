@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local TravelConfig = require(Shared:WaitForChild("Config"):WaitForChild("Travel"))
+local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
 local TravelController = {}
@@ -68,6 +69,7 @@ local function buildUi(): (Frame, { TextButton })
 		limit.MaxTextSize = 26
 		limit.Parent = button
 		button.Parent = bar
+		Locks.guard(button, destination.id) -- greyed out until the tutorial gets there
 		table.insert(buttons, button)
 	end
 

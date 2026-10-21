@@ -1982,6 +1982,98 @@ do
 	check("every Workshop item has a hand-held look with a Handle at the grip", ok)
 end
 
+-- The first-timer tutorial (Util/Tutorial).
+do
+	local Tutorial = require("../src/shared/Util/Tutorial")
+	local Zones = require("../src/shared/Config/Zones")
+	check("tutorial starts at the gate and ends after the tour", Tutorial.Steps[1] == "Gate")
+	check("tutorial step order", Tutorial.nextStep("Gate") == "Catch" and Tutorial.nextStep("Tour") == "Done")
+	check(
+		"tutorial: every step has words and a hint",
+		(function()
+			for _, step in Tutorial.Steps do
+				if not Tutorial.Text[step] or not Tutorial.Hints[step] then
+					return false
+				end
+			end
+			return true
+		end)()
+	)
+	check("tutorial: buttons locked at the start", not Tutorial.isUnlocked("Gate", "Sell"))
+	check("tutorial: Portals works from the first step", Tutorial.isUnlocked("Gate", "Portals"))
+	check(
+		"tutorial: hotbar opens for the catch",
+		Tutorial.isUnlocked("Catch", "Hotbar") and not Tutorial.isUnlocked("Gate", "Hotbar")
+	)
+	check(
+		"tutorial: Sell opens at the sell step and stays open",
+		Tutorial.isUnlocked("Sell", "Sell") and Tutorial.isUnlocked("Tour", "Sell")
+	)
+	check("tutorial: unlisted features wait for the end", not Tutorial.isUnlocked("Tour", "Something"))
+	check(
+		"tutorial: everything works once done",
+		Tutorial.isUnlocked(nil, "Something") and Tutorial.isUnlocked("Done", "Sell")
+	)
+	check(
+		"tutorial: every unlock names a real step",
+		(function()
+			for _, from in Tutorial.Unlocks do
+				if Tutorial.index(from) == 0 then
+					return false
+				end
+			end
+			return true
+		end)()
+	)
+	local travelIds = {}
+	for _, destination in TravelConfig.Destinations do
+		travelIds[destination.id] = true
+	end
+	check(
+		"tutorial: every fast-travel button gets unlocked",
+		travelIds.Portals
+			and Tutorial.Unlocks.Portals ~= nil
+			and Tutorial.Unlocks.Shops ~= nil
+			and Tutorial.Unlocks.Sell ~= nil
+	)
+	check(
+		"tutorial: fresh save only",
+		Tutorial.isFresh(0, 0, 0, 1, 0)
+			and not Tutorial.isFresh(10, 0, 0, 1, 0)
+			and not Tutorial.isFresh(0, 1, 0, 1, 0)
+			and not Tutorial.isFresh(0, 0, 0, 2, 0)
+			and not Tutorial.isFresh(0, 0, 0, 1, 1)
+	)
+	check(
+		"tutorial: a lost hunt starts over at the gate",
+		Tutorial.resumeAt("Catch") == "Gate"
+			and Tutorial.resumeAt("Home") == "Gate"
+			and Tutorial.resumeAt("Sell") == "Sell"
+	)
+	check(
+		"tutorial: welcome gift tops up to the price",
+		Tutorial.gift(1_200, 50_000) == 48_800 and Tutorial.gift(60_000, 50_000) == 0
+	)
+	local zoneOk = false
+	for _, zone in Zones.List do
+		zoneOk = zoneOk or (zone.id == Tutorial.Zone and zone.index == 1)
+	end
+	check("tutorial zone is the first zone", zoneOk)
+	check(
+		"tutorial monster lives in the first zone",
+		Monsters[Tutorial.Monster] ~= nil and Monsters[Tutorial.Monster].zone == 1
+	)
+	check("tutorial effect is a roaming effect", Effects.List[Tutorial.Effect] ~= nil)
+	check(
+		"tutorial vacuum is a Workshop vacuum",
+		Workshop.item(Tutorial.FirstVacuum) ~= nil and Workshop.item(Tutorial.FirstVacuum).kind == "Vacuum"
+	)
+	check(
+		"tutorial vacuum is always in stock with the tutorial boost",
+		Workshop.inStock(Workshop.item(Tutorial.FirstVacuum), 12345, nil, math.huge)
+	)
+end
+
 if failures > 0 then
 	error(`{failures} check(s) failed`)
 end
