@@ -1982,6 +1982,36 @@ do
 	check("every Workshop item has a hand-held look with a Handle at the grip", ok)
 end
 
+-- Sounds: every launch event has its sounds, and every slice it names is on its sheet.
+do
+	local Sounds = require("../src/shared/Config/Sounds")
+	local ok = true
+	for _, event in Events.List do
+		if not event.launch then
+			continue
+		end
+		local sounds = Sounds.Events[event.id]
+		if not sounds then
+			ok = false
+			print(`  {event.id} has no sounds`)
+			continue
+		end
+		for _, key in { sounds.warning, sounds.start } do
+			ok = ok and Sounds.Sheets.EventStingers[key] ~= nil
+		end
+		ok = ok and Sounds.Sheets.EventAmbience[sounds.ambience] ~= nil
+	end
+	ok = ok
+		and Sounds.Sheets.EventStingers[Sounds.EndCue] ~= nil
+		and Sounds.Sheets.EventStingers[Sounds.ThunderCue] ~= nil
+	for _, song in Sounds.Sheets.Music do
+		ok = ok and (Sounds.Files :: any)[song.file] ~= nil and song.length > 0
+	end
+	check("every launch event has sounds that exist on the sound sheets", ok)
+	check(
+		"asset ids get their prefix",
+		Sounds.assetId("123") == "rbxassetid://123" and Sounds.assetId("") == ""
+	)
 -- The first-timer tutorial (Util/Tutorial).
 do
 	local Tutorial = require("../src/shared/Util/Tutorial")
