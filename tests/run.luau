@@ -771,7 +771,7 @@ end
 
 -- Familiarity (Util/Care): it just grows with time, no hunger.
 do
-	local grow = CareConfig.FamiliarityHours * 3600
+	local grow = Care.hours("Gravepup") * 3600
 	local t0 = 1_000_000
 	local m: any = {
 		monsterId = "Gravepup",
@@ -793,6 +793,21 @@ do
 	check("a monster without a timestamp grows from now", fresh.grownAt == t0 and fresh.familiarity == 0)
 	Care.settle(fresh, t0 - 50)
 	check("a clock that went back never shrinks or regrows", fresh.familiarity == 0 and fresh.grownAt == t0)
+
+	check(
+		"cheaper monsters get familiar faster",
+		Care.hours("Gloomlet") < Care.hours("Gravepup")
+			and Care.hours("Gravepup") < Care.hours("LadyOfLanterns")
+	)
+	check(
+		"Familiarity hours run from cheap to pricey",
+		near(Care.hours("Gloomlet"), CareConfig.CheapHours)
+			and Care.hours("LadyOfLanterns") <= CareConfig.PriceyHours
+	)
+	check(
+		"an unknown monster takes the default time",
+		Care.hours("NoSuchMonster") == CareConfig.FamiliarityHours
+	)
 
 	check("percent rounds down cleanly", Care.percent({ familiarity = 0.29 } :: any) == 29)
 
@@ -2012,6 +2027,8 @@ do
 		"asset ids get their prefix",
 		Sounds.assetId("123") == "rbxassetid://123" and Sounds.assetId("") == ""
 	)
+end
+
 -- The first-timer tutorial (Util/Tutorial).
 do
 	local Tutorial = require("../src/shared/Util/Tutorial")
