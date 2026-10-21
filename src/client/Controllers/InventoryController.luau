@@ -281,7 +281,8 @@ function InventoryController.start()
 				item.look,
 				Ui.Icons[item.kind],
 				caption,
-				if item.cake then { "CakeId", item.id } else nil
+				-- every Bakery cake and Workshop item has a hotbar Tool (CakeService, HuntService)
+				if item.cake then { "CakeId", item.id } else { "ToolId", item.id }
 			)
 			if selected == key then
 				pickName.Text = item.name
