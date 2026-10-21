@@ -5,6 +5,7 @@
 -- effect (eventRoll, numbers in Config/Events). Combos merge by themselves
 -- (Value.resolveEffects). Pure functions so they can be tested outside Roblox.
 
+local Care = require("./Care")
 local Effects = require("../Config/Effects")
 local Events = require("../Config/Events")
 local Rng = require("./Rng")
@@ -64,6 +65,42 @@ function Haunting.roll(
 	return Rng.pickWeighted(options, function(option: Option)
 		return option.weight
 	end, random).id
+end
+
+-- Plays back the roaming rolls a monster had while its owner was away, from `from` to `to`
+-- (os.time()), one every Effects.RoamRollSeconds, with its Familiarity as it was at each one.
+-- Only roaming effects (no event's). Puts the new effects on the monster and returns them.
+-- Call it before Care.settle (it reads Familiarity as of caught.grownAt).
+function Haunting.catchUp(
+	caught: Value.CaughtMonster,
+	wingsOwned: number,
+	from: number,
+	to: number,
+	random: Random?
+): { string }
+	local gained: { string } = {}
+	local growSeconds = Care.hours(caught.monsterId) * 3600
+	local grownAt = caught.grownAt or from
+	local at = from + Effects.RoamRollSeconds
+	while at <= to do
+		local familiarity = math.clamp((caught.familiarity or 0) + (at - grownAt) / growSeconds, 0, 1)
+		local probe = table.clone(caught)
+		probe.familiarity = familiarity
+		local effectId = Haunting.roll(probe, wingsOwned, nil, random)
+		if effectId then
+			table.insert(caught.effects, effectId)
+			table.insert(gained, effectId)
+		end
+		local left = false
+		for _, option in Haunting.pool(nil) do
+			left = left or Value.fits(caught.effects, option.id) == "Ok"
+		end
+		if not left then
+			break -- it has every roaming effect
+		end
+		at += Effects.RoamRollSeconds
+	end
+	return gained
 end
 
 -- Percent chance one event roll hits, from the event's base chance, raised by Familiarity and

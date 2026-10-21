@@ -26,6 +26,7 @@ local SoundController = require(script.Controllers.SoundController)
 local TutorialController = require(script.Controllers.TutorialController)
 local CodexController = require(script.Controllers.CodexController)
 local SettingsController = require(script.Controllers.SettingsController)
+local AwayBookController = require(script.Controllers.AwayBookController)
 
 local controllers: { { start: () -> () } } = {
 	ToastController,
@@ -51,6 +52,7 @@ local controllers: { { start: () -> () } } = {
 	TutorialController,
 	CodexController,
 	SettingsController,
+	AwayBookController,
 }
 
 for _, controller in controllers do
