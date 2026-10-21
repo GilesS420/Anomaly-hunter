@@ -24,12 +24,12 @@ local Sounds = {}
 
 -- Asset ids, like "rbxassetid://1234567890" (or just the number). "" means not uploaded yet.
 Sounds.Files = {
-	EventStingers = "",
-	EventAmbience = "",
-	MusicGymnopedie = "",
-	MusicMountainKing = "",
-	MusicFurElise = "",
-	MusicMoonlight = "",
+	EventStingers = "rbxassetid://79245545160543",
+	EventAmbience = "rbxassetid://122808714791910",
+	MusicGymnopedie = "rbxassetid://126501042420062",
+	MusicMountainKing = "rbxassetid://94551444495402",
+	MusicFurElise = "rbxassetid://128385526223567",
+	MusicMoonlight = "rbxassetid://124222698146635",
 }
 
 -- Overall loudness of each kind of sound, 0 to 1.
