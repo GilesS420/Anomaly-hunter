@@ -7,6 +7,8 @@
 --     NextWing    a see-through floor plus a sign on that wing's boarded door: hold its
 --                 prompt to buy the wing
 --     OwnerSign   "<name>'s Mansion" and "3/8 monsters", floating above the Foyer
+--     WorthSign   a wooden sign left of the front gate: what all the monsters inside are worth
+--     Trophy      a stone stand right of the front gate with the owner's best monster on top
 --     Monsters    the owner's caught monsters, roaming around the owned wings (each label
 --                 says how familiar it is, see CareService)
 -- Wings are bought in order (the Foyer is free). Each one makes room for more monsters and
@@ -49,6 +51,9 @@ type State = {
 	built: { [string]: { [string]: Built } }, -- recipe parts per wing, by part name
 	monsters: Folder,
 	countLabel: TextLabel, -- "3/8 monsters" on the owner sign
+	worthLabels: { TextLabel }, -- the amount on both faces of the worth sign
+	trophy: BasePart, -- the stand's top; the best monster stands on it
+	trophyKey: string?, -- what the monster on the stand was built from (uid and look)
 	group: string, -- RoamService group shared by this mansion's monsters
 	rects: { Roam.Rect }, -- floor areas the monsters may roam (one per owned wing)
 	generation: number, -- goes up whenever the monsters are cleared, cancelling waiting spawns
@@ -62,6 +67,10 @@ local PillarHeight = 12
 local EdgeInset = 1.5 -- keeps roaming orbs off the floor edges and away from the pillars
 local MaxWings = #Wings.List
 local SpawnRetrySeconds = 1 -- no free spot right now: try again after the others moved on
+-- Where the worth sign and the trophy stand go: either side of the path to the Foyer gate,
+-- plot-local (see Layout.Wings.Foyer and Layout.PlotSpawn).
+local WorthSignSpot = { x = -13, z = -37 }
+local TrophySpot = { x = 13, z = -37 }
 
 local wingColors: { [string]: Color3 } = {
 	Foyer = Color3.fromRGB(150, 110, 80),
@@ -361,11 +370,14 @@ local function buildWings(state: State, wingsOwned: number)
 	RoamService.setRectsForGroup(state.group, state.rects)
 end
 
+local updateShowcase: (state: State) -> ()
+
 local function updateSign(state: State)
 	local data = DataService.get(state.player)
 	if data then
 		state.countLabel.Text = `{#data.monsters}/{Mansion.capacity(data.wingsOwned)} monsters`
 	end
+	updateShowcase(state)
 end
 
 -- How wide a mansion monster walks (a Titan is drawn bigger, see MonsterModel.roamRadius).
@@ -445,6 +457,53 @@ local function spawnMonster(state: State, caught: Value.CaughtMonster)
 		at = Vector3.new(at.x, at.y + radius + 0.5, at.z),
 	})
 	model.Parent = state.monsters
+end
+
+-- The worth sign and the trophy stand out front: the total value of the mansion's monsters,
+-- and the most valuable one standing on the stand. Called whenever monsters come, go, grow
+-- or get more familiar.
+function updateShowcase(state: State)
+	local data = DataService.get(state.player)
+	if not data or mansions[state.player] ~= state then
+		return
+	end
+	local values = {}
+	for index, caught in data.monsters do
+		local ok, value = pcall(Value.sellValue, caught, data.wingsOwned)
+		values[index] = if ok then value else 0
+	end
+	local total, best = Mansion.worth(values)
+	for _, label in state.worthLabels do
+		label.Text = Format.money(total)
+	end
+
+	local caught = if best then data.monsters[best] else nil
+	local monster = if caught then Monsters[caught.monsterId] else nil
+	local key = if caught and monster
+		then `{caught.uid}|{caught.size}|{caught.kg}|{caught.variant}|{table.concat(caught.effects, ",")}`
+		else nil
+	local old = state.trophy.Parent and state.trophy.Parent:FindFirstChild("BestMonster")
+	if key == state.trophyKey and old then
+		if old:IsA("Model") and caught and monster then
+			MonsterModel.refresh(old, infoFor(state.player, caught, monster.rarity))
+		end
+		return
+	end
+	state.trophyKey = key
+	if old then
+		old:Destroy()
+	end
+	if not caught or not monster then
+		return -- an empty mansion: the stand waits
+	end
+	local model = MonsterModel.build(infoFor(state.player, caught, monster.rarity))
+	model.Name = "BestMonster"
+	local body = model.PrimaryPart :: BasePart
+	body.CanQuery = false -- just for show: no catching or picking up from the stand
+	local radius = MonsterModel.radius(caught.size, caught.monsterId, caught.kg)
+	local top = state.trophy.Position + Vector3.new(0, state.trophy.Size.Y / 2 + radius + 0.2, 0)
+	model:PivotTo(CFrame.new(top) * state.trophy.CFrame.Rotation)
+	model.Parent = state.trophy.Parent
 end
 
 -- Removes every monster orb (stopping their roaming right away, not when Destroying fires).
@@ -529,6 +588,127 @@ local function buildOwnerSign(player: Player, plot: PlotService.Plot, model: Mod
 	return textLine(gui, "", Color3.fromRGB(255, 220, 120), 0.6, 0.4)
 end
 
+-- A part standing on the plot at a plot-local spot, its front facing out to the hub.
+local function yardPart(
+	plot: PlotService.Plot,
+	name: string,
+	size: Vector3,
+	spot: { x: number, z: number },
+	offset: Vector3,
+	color: Color3,
+	material: Enum.Material,
+	parent: Instance
+): Part
+	local base = plot.frame * CFrame.new(spot.x, 0, spot.z) -- on the plot's top surface
+	local part = block(name, size, base * CFrame.new(offset + Vector3.new(0, size.Y / 2, 0)), color, parent)
+	part.Material = material
+	return part
+end
+
+-- Big text on one face of a board: a small heading and the line under it.
+local function boardText(board: BasePart, face: Enum.NormalId, heading: string, line: string): TextLabel
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = face
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 40
+	gui.LightInfluence = 0
+	textLine(gui, heading, Color3.fromRGB(230, 215, 190), 0.1, 0.28)
+	local label = textLine(gui, line, Color3.fromRGB(140, 255, 140), 0.4, 0.5)
+	gui.Parent = board
+	return label
+end
+
+-- The wooden sign left of the gate: "MANSION WORTH" and the total, readable from both sides.
+local function buildWorthSign(plot: PlotService.Plot, model: Model): { TextLabel }
+	local folder = folderIn(model, "WorthSign")
+	local wood = Color3.fromRGB(62, 36, 30)
+	for i, side in { -1, 1 } do
+		yardPart(
+			plot,
+			`Post{i}`,
+			Vector3.new(0.6, 8, 0.6),
+			WorthSignSpot,
+			Vector3.new(side * 4.2, 0, 0),
+			wood,
+			Enum.Material.Wood,
+			folder
+		)
+	end
+	local board = yardPart(
+		plot,
+		"Board",
+		Vector3.new(10, 4.5, 0.4),
+		WorthSignSpot,
+		Vector3.new(0, 3.6, 0),
+		Color3.fromRGB(48, 30, 26),
+		Enum.Material.Wood,
+		folder
+	)
+	yardPart(
+		plot,
+		"Cap",
+		Vector3.new(10.8, 0.4, 0.8),
+		WorthSignSpot,
+		Vector3.new(0, 8.1, 0),
+		wood,
+		Enum.Material.Wood,
+		folder
+	)
+	return {
+		boardText(board, Enum.NormalId.Front, "MANSION WORTH", "$0"),
+		boardText(board, Enum.NormalId.Back, "MANSION WORTH", "$0"),
+	}
+end
+
+-- The stone stand right of the gate, with a brass plate. Returns its top.
+local function buildTrophy(plot: PlotService.Plot, model: Model): BasePart
+	local folder = folderIn(model, "Trophy")
+	local stone = Color3.fromRGB(70, 68, 76)
+	local dark = Color3.fromRGB(52, 50, 58)
+	yardPart(plot, "Base", Vector3.new(5, 1, 5), TrophySpot, Vector3.zero, dark, Enum.Material.Slate, folder)
+	local column = yardPart(
+		plot,
+		"Column",
+		Vector3.new(3.4, 3, 3.4),
+		TrophySpot,
+		Vector3.new(0, 1, 0),
+		stone,
+		Enum.Material.Slate,
+		folder
+	)
+	local top = yardPart(
+		plot,
+		"Top",
+		Vector3.new(4.4, 0.6, 4.4),
+		TrophySpot,
+		Vector3.new(0, 4, 0),
+		dark,
+		Enum.Material.Slate,
+		folder
+	)
+	-- The brass plate on the front of the column.
+	local plate = block(
+		"Plate",
+		Vector3.new(2.8, 1, 0.1),
+		column.CFrame * CFrame.new(0, 0.3, -column.Size.Z / 2 - 0.05),
+		Color3.fromRGB(170, 130, 60),
+		folder
+	)
+	plate.Material = Enum.Material.Metal
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Front
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 60
+	gui.LightInfluence = 0
+	local label = textLine(gui, "BEST MONSTER", Color3.fromRGB(50, 30, 10), 0.15, 0.7)
+	local stroke = label:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke:Destroy() -- engraved, not outlined
+	end
+	gui.Parent = plate
+	return top
+end
+
 -- Builds the mansion once the player has both a loaded save and a plot.
 local function tryBuild(player: Player)
 	if mansions[player] or player.Parent ~= Players then
@@ -554,6 +734,9 @@ local function tryBuild(player: Player)
 		built = {},
 		monsters = folderIn(model, "Monsters"),
 		countLabel = buildOwnerSign(player, plot, model),
+		worthLabels = buildWorthSign(plot, model),
+		trophy = buildTrophy(plot, model),
+		trophyKey = nil,
 		group = `Mansion:{player.UserId}`,
 		rects = {},
 		generation = 0,
@@ -811,6 +994,7 @@ function MansionService.refreshMonsters(player: Player)
 			MonsterModel.refresh(child, infoFor(player, caught, monster.rarity))
 		end
 	end
+	updateShowcase(state)
 end
 
 -- The growthMultiplier of the Watcher event that's live right now, or nil.
