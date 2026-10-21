@@ -972,11 +972,12 @@ do
 	)
 	check(
 		"the odds shown are the real odds per bite",
-		Cakes.describe(fudge) == "Reach 9 studs · Each bite: 17.5% Vampire (x2.5)"
+		Cakes.describe(fudge) == "3 bites, at least one effect · Each bite: 17.5% Vampire (x2.5)"
 	)
 	check(
 		"a chance cake shows each effect's real odds",
-		Cakes.describe(mousse) == "Reach 15 studs · Each bite: 12.5% Mummy (x4), 37.5% Batty (x3)"
+		Cakes.describe(mousse)
+			== "3 bites, at least one effect · Each bite: 12.5% Mummy (x4), 37.5% Batty (x3)"
 	)
 
 	-- A bite never feeds and goes to a monster the effect can land on first.
@@ -1015,13 +1016,12 @@ do
 		reachOk = reachOk and Cakes.reach(Shop.Bakery[i].id) >= Cakes.reach(Shop.Bakery[i - 1].id)
 	end
 	check("reach never shrinks as cakes get pricier", reachOk)
+	-- Bites come on a schedule, and every cake gives at least one effect.
+	local timed = Cakes.new("PumpkinCandy", 0, 0, 0, t0)
 	check(
-		"the reach share is the circle over the floor",
-		near(Cakes.reachShare("PumpkinCandy", 1), math.pi * 64 / 1600)
-			and Cakes.reachShare("PumpkinCandy", 2) < Cakes.reachShare("PumpkinCandy", 1)
+		"bites are spread over the cake's time",
+		Cakes.nextBiteAt(timed) == t0 + Cakes.Seconds / CakeConfig.Bites / 2
 	)
-
-	-- Offline: catchUp plays back the missed checks with the same odds.
 	local herd = {}
 	for i = 1, 10 do
 		local m = withEffects({})
@@ -1029,48 +1029,41 @@ do
 		table.insert(herd, m)
 	end
 	local away = Cakes.new("PumpkinCandy", 0, 0, 0, t0)
-	check(
-		"no checks missed, no bites",
-		#Cakes.catchUp(away, herd, t0 + CakeConfig.CheckSeconds - 1, 1, fake) == 0
-	)
-	local bitesSeen, runs = 0, 400
-	for _ = 1, runs do
-		local c = Cakes.new("PumpkinCandy", 0, 0, 0, t0)
+	check("no bite due yet, no bites", #Cakes.catchUp(away, herd, Cakes.nextBiteAt(away) - 1, fake) == 0)
+	check("a due bite happens while away", #Cakes.catchUp(away, herd, Cakes.nextBiteAt(away), fake) == 1)
+	local never = {
+		NextNumber = function()
+			return 0.999
+		end,
+		NextInteger = function(_, min: number)
+			return min
+		end,
+	} :: any
+	local sure = true
+	for _, id in { "PumpkinCandy", "FangFudge", "BoneMarrowMousse" } do
+		local c = Cakes.new(id, 0, 0, 0, t0)
 		local monsters = {}
 		for i = 1, 10 do
 			local m = withEffects({})
 			m.uid = `m{i}`
 			table.insert(monsters, m)
 		end
-		bitesSeen += #Cakes.catchUp(c, monsters, t0 + 6 * 3600, 1, fake)
-	end
-	local checks = CakeConfig.Minutes * 60 / CakeConfig.CheckSeconds
-	local expected = 0
-	-- expected bites: a check bites with BiteChance, if one of the monsters that hasn't
-	-- eaten yet is within reach (each is, with the reach share of the Foyer's floor)
-	local share = Cakes.reachShare("PumpkinCandy", 1)
-	local dist = { [0] = 1 }
-	for _ = 1, checks do
-		local nextDist = {}
-		for k, v in dist do
-			if k >= CakeConfig.Bites then
-				nextDist[k] = (nextDist[k] or 0) + v
-			else
-				local p = CakeConfig.BiteChance / 100 * (1 - (1 - share) ^ (10 - k))
-				nextDist[k + 1] = (nextDist[k + 1] or 0) + v * p
-				nextDist[k] = (nextDist[k] or 0) + v * (1 - p)
-			end
+		local bites = Cakes.catchUp(c, monsters, t0 + 6 * 3600, never)
+		local effects = 0
+		for _, b in bites do
+			effects += if b.effect then 1 else 0
 		end
-		dist = nextDist
+		sure = sure and #bites == CakeConfig.Bites and effects == 1 and bites[#bites].effect ~= nil
 	end
-	for k, v in dist do
-		expected += k * v
-	end
-	check("offline bites match the online odds", math.abs(bitesSeen / runs - expected) < 0.15)
+	check("every cake gives an effect on its last bite at the latest, even unlucky", sure)
 	local stale = Cakes.new("PumpkinCandy", 0, 0, 0, t0)
-	Cakes.catchUp(stale, herd, t0 + 6 * 3600, 1, fake)
+	Cakes.catchUp(stale, herd, t0 + 6 * 3600, fake)
 	check("a cake is done after its time, even offline", Cakes.isDone(stale, t0 + 6 * 3600))
-	check("a cake never checks past going stale", stale.checkedAt <= Cakes.expiresAt(stale))
+	local lone = Cakes.new("PumpkinCandy", 0, 0, 0, t0)
+	check(
+		"a monster only eats once, even offline",
+		#Cakes.catchUp(lone, { herd[1] }, t0 + 6 * 3600, fake) <= 1
+	)
 
 	local record = { slot = 5, bought = { PumpkinCandy = 2 } }
 	check("buys count within a restock", Workshop.boughtThisSlot(record, 5).PumpkinCandy == 2)

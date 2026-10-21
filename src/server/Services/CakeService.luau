@@ -2,11 +2,13 @@
 -- Cakes (rules in Util/Cakes, numbers and looks in Config/Cakes). Every cake you own sits in
 -- the Roblox hotbar as a Tool, one slot per kind ("Fang Fudge x3"). Hold one and click while
 -- standing in one of your wings to set it out on the floor in front of you. Every
--- Config/Cakes.CheckSeconds each cake rolls for a bite; on a hit a monster within the cake's
--- reach walks over, eats, and may get a mutation. A cake is gone after its bites or when it goes stale.
+-- Config/Cakes.CheckSeconds each cake looks whether its next bite is due (they're spread over
+-- its time); then a monster, one within its reach first, walks over, eats, and may get a
+-- mutation (the last bite always gives one if the cake hasn't yet). A cake is gone after its
+-- bites or when its time runs out.
 --
 -- Cakes are saved (DataService.Data.cakes) and keep going while you're offline: when you come
--- back, Util/Cakes.catchUp plays back the missed checks with the same odds and you get a
+-- back, Util/Cakes.catchUp plays back the bites that came due and you get a
 -- summary of what happened.
 
 local Players = game:GetService("Players")
@@ -16,7 +18,6 @@ local CakeConfig = require(ReplicatedStorage.Shared.Config.Cakes)
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
-local Rng = require(ReplicatedStorage.Shared.Util.Rng)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local CakeModel = require(script.Parent.Parent.CakeModel)
@@ -268,7 +269,8 @@ local function bite(player: Player, cake: Live, uid: string)
 	if not caught then
 		return -- stored or sold on the way
 	end
-	local b = Cakes.bite(cake.saved, caught, random)
+	local event = Events.find(workspace:GetAttribute("WatcherEvent"))
+	local b = Cakes.bite(cake.saved, caught, random, if event then event.cakeEffectMultiplier else nil)
 	MansionService.refreshMonsters(player)
 	local name = Format.name(caught.monsterId)
 	if cake.saved.bitesLeft <= 0 then
@@ -298,18 +300,20 @@ local function check(player: Player)
 			remove(player, cake)
 			continue
 		end
-		cake.saved.checkedAt = now
-		local event = Events.find(workspace:GetAttribute("WatcherEvent"))
-		local biteChance = CakeConfig.BiteChance * (if event then event.cakeBiteMultiplier or 1 else 1)
-		if not Rng.chance(biteChance, random) then
+		if now < Cakes.nextBiteAt(cake.saved) then
 			continue
 		end
-		-- Only monsters within the cake's reach come over.
+		-- A monster within the cake's reach comes over, else any that can walk right now.
 		local reach = Cakes.reach(cake.item.id)
-		local eater = Cakes.pickEater(cake.saved, data.monsters, random, function(caught)
+		local function free(caught: Value.CaughtMonster): Vector3?
 			local model = if caught.uid then models[caught.uid] else nil
-			local at = if model and not RoamService.isHeld(model) then RoamService.position(model) else nil
+			return if model and not RoamService.isHeld(model) then RoamService.position(model) else nil
+		end
+		local eater = Cakes.pickEater(cake.saved, data.monsters, random, function(caught)
+			local at = free(caught)
 			return at ~= nil and Vector2.new(at.X - cake.at.X, at.Z - cake.at.Z).Magnitude <= reach
+		end) or Cakes.pickEater(cake.saved, data.monsters, random, function(caught)
+			return free(caught) ~= nil
 		end)
 		local uid = if eater then eater.uid else nil
 		local model = if uid then models[uid] else nil
@@ -342,7 +346,7 @@ local function restore(player: Player)
 	local lines: { string } = {}
 	for _, saved in table.clone(data.cakes) do
 		local item = Cakes.item(saved.itemId)
-		for _, b in Cakes.catchUp(saved, data.monsters, now, data.wingsOwned, random) do
+		for _, b in Cakes.catchUp(saved, data.monsters, now, random) do
 			local caught = find(data, b.uid)
 			if b.combo then
 				CareService.discoverCombo(data, b.combo)
