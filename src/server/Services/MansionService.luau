@@ -614,8 +614,13 @@ local function boardText(board: BasePart, face: Enum.NormalId, heading: string, 
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 	gui.PixelsPerStud = 40
 	gui.LightInfluence = 0
-	textLine(gui, heading, Color3.fromRGB(230, 215, 190), 0.1, 0.28)
+	local title = textLine(gui, heading, Color3.fromRGB(230, 215, 190), 0.1, 0.28)
 	local label = textLine(gui, line, Color3.fromRGB(140, 255, 140), 0.4, 0.5)
+	-- A margin either side so the outlined letters never touch the board's edges.
+	for _, text in { title, label } do
+		text.Position = UDim2.fromScale(0.07, text.Position.Y.Scale)
+		text.Size = UDim2.fromScale(0.86, text.Size.Y.Scale)
+	end
 	gui.Parent = board
 	return label
 end
@@ -630,7 +635,7 @@ local function buildWorthSign(plot: PlotService.Plot, model: Model): { TextLabel
 			`Post{i}`,
 			Vector3.new(0.6, 8, 0.6),
 			WorthSignSpot,
-			Vector3.new(side * 4.2, 0, 0),
+			Vector3.new(side * 5.3, 0, 0), -- just outside the board, so they never cover the text
 			wood,
 			Enum.Material.Wood,
 			folder
@@ -649,7 +654,7 @@ local function buildWorthSign(plot: PlotService.Plot, model: Model): { TextLabel
 	yardPart(
 		plot,
 		"Cap",
-		Vector3.new(10.8, 0.4, 0.8),
+		Vector3.new(11.8, 0.4, 0.8),
 		WorthSignSpot,
 		Vector3.new(0, 8.1, 0),
 		wood,
