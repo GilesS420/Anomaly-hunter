@@ -42,6 +42,17 @@ function Hunt.isZoneUnlocked(zoneIndex: number, wingsOwned: number): boolean
 	return false
 end
 
+-- The furthest zone the player has opened (the Portals button lands at its gate), or nil.
+function Hunt.newestZone(wingsOwned: number): Zones.Zone?
+	local newest: Zones.Zone? = nil
+	for _, zone in Zones.List do
+		if Hunt.isZoneUnlocked(zone.index, wingsOwned) and (newest == nil or zone.index > newest.index) then
+			newest = zone
+		end
+	end
+	return newest
+end
+
 -- Why a zone's gate won't open, as a message for the player, or nil if it's open.
 function Hunt.lockedReason(zoneIndex: number, wingsOwned: number): string?
 	local zone = Hunt.zoneByIndex(zoneIndex)

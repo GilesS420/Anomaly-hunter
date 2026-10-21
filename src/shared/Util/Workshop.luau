@@ -100,9 +100,14 @@ function Workshop.owns(inventory: { [string]: number }, item: Shop.Item): boolea
 	return item.price <= 0 or (inventory[item.id] or 0) > 0
 end
 
--- How many a player can buy in one restock.
-function Workshop.limit(item: Shop.Item): number
-	return if Workshop.isTool(item) then 1 else Shop.ConsumablesPerRestock
+-- How many a player can buy in one restock: one tool, or a random number of a single-use item
+-- (Shop.StockMin to StockMax), worked out from the slot like the stock itself.
+function Workshop.limit(item: Shop.Item, slot: number): number
+	if Workshop.isTool(item) then
+		return 1
+	end
+	local spread = Shop.StockMax - Shop.StockMin + 1
+	return Shop.StockMin + hash(`{slot}:{item.id}:count`) % spread
 end
 
 -- Whether a player can buy one now. boughtThisSlot is how many they bought since the restock.
@@ -124,7 +129,7 @@ function Workshop.canBuy(
 	if not Workshop.inStock(item, slot, liveEvent, chanceMultiplier) then
 		return "OutOfStock"
 	end
-	if boughtThisSlot >= Workshop.limit(item) then
+	if boughtThisSlot >= Workshop.limit(item, slot) then
 		return "SoldOut"
 	end
 	if money < item.price then

@@ -25,8 +25,12 @@
 --                     add a size: /spawn TheBogKing Huge). Only you can catch it and it never
 --                     attacks. /spawn all brings every monster of the zone you're in.
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
+-- Any command but /summon, /event and /reset can be run on another player in the server:
+-- pick them at the top of the panel, or end a chat command with @name (/money 5m @Biggie).
+-- The results come back to the admin, starting with that player's name.
 -- The panel uses one RemoteEvent, made only on the server:
---   ReplicatedStorage.Remotes.AdminCommand   client -> server: (command: string, argument: string?)
+--   ReplicatedStorage.Remotes.AdminCommand   client -> server: (command: string, argument: string?,
+--                                            targetUserId: number?)
 -- The server checks the player is an admin and the command exists before running it, so a
 -- player who fires it by hand gets nothing.
 
@@ -83,37 +87,39 @@ local function wingNames(wingsOwned: number): string
 	return table.concat(names, ", ")
 end
 
-type Command = (player: Player, argument: string?) -> ...any
+-- `player` is who the command is for (the admin, or the player they picked); `tell` sends a
+-- result back to the admin who ran it.
+type Command = (player: Player, argument: string?, tell: (text: string) -> ()) -> ...any
 
 local commands: { [string]: Command } = {}
 
-commands["/money"] = function(player, argument)
+commands["/money"] = function(player, argument, tell)
 	local amount = parseAmount(argument)
 	local data = DataService.get(player)
 	if not amount or not data then
-		Notify.toast(player, "Try: /money 1000000 (or /money 5m)")
+		tell("Try: /money 1000000 (or /money 5m)")
 		return
 	end
 	if DataService.addMoney(player, math.floor(amount)) then
-		Notify.toast(player, `You now have {Format.money(data.money)}.`)
+		tell(`You now have {Format.money(data.money)}.`)
 	else
-		Notify.toast(player, `You can't go below $0 (you have {Format.money(data.money)}).`)
+		tell(`You can't go below $0 (you have {Format.money(data.money)}).`)
 	end
 end
 
-commands["/wings"] = function(player, argument)
+commands["/wings"] = function(player, argument, tell)
 	local count = tonumber(argument)
 	local data = DataService.get(player)
 	if not count or not data then
-		Notify.toast(player, `Try: /wings 3 (any number from 1 to {MaxWings})`)
+		tell(`Try: /wings 3 (any number from 1 to {MaxWings})`)
 		return
 	end
 	data.wingsOwned = math.clamp(math.floor(count), 1, MaxWings)
 	MansionService.rebuild(player)
-	Notify.toast(player, `Your mansion now has: {wingNames(data.wingsOwned)}.`)
+	tell(`Your mansion now has: {wingNames(data.wingsOwned)}.`)
 end
 
-commands["/clearmonsters"] = function(player)
+commands["/clearmonsters"] = function(player, _, tell)
 	local data = DataService.get(player)
 	if not data then
 		return
@@ -121,40 +127,40 @@ commands["/clearmonsters"] = function(player)
 	table.clear(data.monsters)
 	table.clear(data.storage)
 	MansionService.rebuild(player)
-	Notify.toast(player, "Your mansion and Storage are empty now.")
+	tell("Your mansion and Storage are empty now.")
 end
 
-commands["/tutorial"] = function(player, argument)
+commands["/tutorial"] = function(player, argument, tell)
 	local wanted = string.lower(argument or "")
 	if wanted == "skip" then
 		TutorialService.skip(player)
-		Notify.toast(player, "Tutorial skipped. Everything is unlocked.")
+		tell("Tutorial skipped. Everything is unlocked.")
 	elseif wanted == "restart" then
 		TutorialService.restart(player)
-		Notify.toast(player, "Tutorial restarted from the first step.")
+		tell("Tutorial restarted from the first step.")
 	else
-		Notify.toast(player, "Try: /tutorial skip or /tutorial restart")
+		tell("Try: /tutorial skip or /tutorial restart")
 	end
 end
 
--- Only ever the player who typed it: the command has no target argument.
-commands["/reset"] = function(player, argument)
+-- Only ever the player who typed it: runCommand never sends it to another player.
+commands["/reset"] = function(player, argument, tell)
 	if string.lower(argument or "") ~= "confirm" then
-		Notify.toast(player, "This wipes your whole save. Type /reset confirm to do it.")
+		tell("This wipes your whole save. Type /reset confirm to do it.")
 		return
 	end
 	if not DataService.reset(player) then
-		Notify.toast(player, "Your save is still loading. Try again in a moment.")
+		tell("Your save is still loading. Try again in a moment.")
 	end
 end
 
-commands["/summon"] = function(player)
+commands["/summon"] = function(_, _, tell)
 	if not WatcherService.summon() then
-		Notify.toast(player, "An event is already playing. Wait for it to end first.")
+		tell("An event is already playing. Wait for it to end first.")
 	end
 end
 
-commands["/event"] = function(player, argument)
+commands["/event"] = function(_, argument, tell)
 	local wanted = string.lower((string.gsub(argument or "", "%s", "")))
 	local ids: { string } = {}
 	for _, event in Events.List do
@@ -162,16 +168,16 @@ commands["/event"] = function(player, argument)
 			table.insert(ids, event.id)
 			if string.lower(event.id) == wanted then
 				if not WatcherService.summon(event.id) then
-					Notify.toast(player, "An event is already playing. Wait for it to end first.")
+					tell("An event is already playing. Wait for it to end first.")
 				end
 				return
 			end
 		end
 	end
-	Notify.toast(player, `Try /event with one of: {table.concat(ids, ", ")}`)
+	tell(`Try /event with one of: {table.concat(ids, ", ")}`)
 end
 
-commands["/give"] = function(player, argument)
+commands["/give"] = function(player, argument, tell)
 	local data = DataService.get(player)
 	local itemId, countText = string.match(argument or "", "^(%S+)%s*(%S*)")
 	local item = nil
@@ -186,7 +192,7 @@ commands["/give"] = function(player, argument)
 		end
 	end
 	if not data or not item then
-		Notify.toast(player, "Try: /give VoidVac, /give MoonVac, /give BaitBell 5 or /give PumpkinCandy 3")
+		tell("Try: /give VoidVac, /give MoonVac, /give BaitBell 5 or /give PumpkinCandy 3")
 		return
 	end
 	local count = math.clamp(math.floor(tonumber(countText) or 1), 1, 99)
@@ -195,30 +201,30 @@ commands["/give"] = function(player, argument)
 		local equipped: { [string]: string } = data.equipped
 		data.inventory[item.id] = 1
 		equipped[equipSlot] = item.id
-		Notify.toast(player, `You got the {item.name} and you're using it.`)
+		tell(`You got the {item.name} and you're using it.`)
 	else
 		data.inventory[item.id] = (data.inventory[item.id] or 0) + count
-		Notify.toast(player, `You now have {data.inventory[item.id]} x {item.name}.`)
+		tell(`You now have {data.inventory[item.id]} x {item.name}.`)
 	end
 	HuntService.refreshItems(player)
 	CakeService.syncTools(player)
 end
 
-commands["/haunt"] = function(player)
+commands["/haunt"] = function(player, _, tell)
 	local event = WatcherService.current()
 	local gained = if event and event.effect
 		then HauntService.eventRollFor(player, event, true)
 		else HauntService.rollFor(player, true)
 	if gained == 0 then
-		Notify.toast(player, "No monster could take an effect (they already have them all).")
+		tell("No monster could take an effect (they already have them all).")
 	end
 end
 
-commands["/skip"] = function(player, argument)
+commands["/skip"] = function(player, argument, tell)
 	local hours = tonumber(argument)
 	local data = DataService.get(player)
 	if not hours or hours <= 0 or not data then
-		Notify.toast(player, "Try: /skip 12 (hours)")
+		tell("Try: /skip 12 (hours)")
 		return
 	end
 	-- Moving every timestamp back is the same as that much time passing.
@@ -227,31 +233,28 @@ commands["/skip"] = function(player, argument)
 		caught.grownAt = (caught.grownAt or os.time()) - seconds
 	end
 	CareService.refresh(player)
-	Notify.toast(player, `Your monsters skipped {hours} hours ahead.`)
+	tell(`Your monsters skipped {hours} hours ahead.`)
 end
 
-commands["/grow"] = function(player, argument)
+commands["/grow"] = function(player, argument, tell)
 	local spurts = tonumber(argument)
 	if not spurts or spurts < 1 or spurts > 200 then
-		Notify.toast(player, "Try: /grow 5 (growth spurts for every monster; /grow 25 makes Titans)")
+		tell("Try: /grow 5 (growth spurts for every monster; /grow 25 makes Titans)")
 		return
 	end
 	MansionService.grow(player, math.floor(spurts))
-	Notify.toast(player, `Your monsters had {math.floor(spurts)} growth spurts.`)
+	tell(`Your monsters had {math.floor(spurts)} growth spurts.`)
 end
 
-commands["/calm"] = function(player)
+commands["/calm"] = function(player, _, tell)
 	local calm = not player:GetAttribute("Calm")
 	player:SetAttribute("Calm", if calm then true else nil)
-	Notify.toast(
-		player,
-		if calm then "Monsters leave you alone now. /calm again to undo." else "Monsters attack you again."
-	)
+	tell(if calm then "Monsters leave you alone now. /calm again to undo." else "Monsters attack you again.")
 end
 
-commands["/attack"] = function(player)
+commands["/attack"] = function(player, _, tell)
 	if not MonsterAiService.provoke(player) then
-		Notify.toast(player, "Go into a zone first, with a monster in it.")
+		tell("Go into a zone first, with a monster in it.")
 	end
 end
 
@@ -260,7 +263,7 @@ local function squash(text: string): string
 	return string.lower((string.gsub(text, "[%s_]", "")))
 end
 
-commands["/spawn"] = function(player, argument)
+commands["/spawn"] = function(player, argument, tell)
 	local words = string.split(argument or "", " ")
 	local sizeId = "Normal"
 	local last = words[#words]
@@ -272,7 +275,7 @@ commands["/spawn"] = function(player, argument)
 	end
 	local wanted = squash(table.concat(words, ""))
 	if wanted == "" then
-		Notify.toast(player, "Try: /spawn Gravepup, /spawn TheBogKing Huge or /spawn all")
+		tell("Try: /spawn Gravepup, /spawn TheBogKing Huge or /spawn all")
 		return
 	end
 
@@ -284,7 +287,7 @@ commands["/spawn"] = function(player, argument)
 			end
 		end
 		if not zoneIndex then
-			Notify.toast(player, "Go into a zone first, then try /spawn all again.")
+			tell("Go into a zone first, then try /spawn all again.")
 			return
 		end
 		local count = 0
@@ -293,42 +296,83 @@ commands["/spawn"] = function(player, argument)
 				count += 1
 			end
 		end
-		Notify.toast(player, `{count} monsters came to you. Only you can catch them.`)
+		tell(`{count} monsters came to you. Only you can catch them.`)
 		return
 	end
 
 	for id in Monsters do
 		if squash(id) == wanted then
 			local _, message = SpawnService.spawnFor(player, id, sizeId)
-			Notify.toast(player, message)
+			tell(message)
 			return
 		end
 	end
-	Notify.toast(player, `There's no monster called "{argument}". Try /spawn Gravepup`)
+	tell(`There's no monster called "{argument}". Try /spawn Gravepup`)
 end
 
 local MaxArgumentLength = 60
 
--- Runs one command for an admin. Anything else (not an admin, unknown command, odd
--- argument) is ignored.
-local function runCommand(player: Player, name: string, argument: string?)
-	local command = commands[string.lower(name)]
-	if not command or not Admins.isAdmin(player) then
+-- Commands that act on the whole server or only ever on yourself: a picked player is ignored.
+local untargeted: { [string]: boolean } = { ["/summon"] = true, ["/event"] = true, ["/reset"] = true }
+
+-- Runs one command for an admin, on `target` (another player in the server) or on the admin.
+-- Anything else (not an admin, unknown command, odd argument) is ignored.
+local function runCommand(admin: Player, name: string, argument: string?, target: Player?)
+	local key = string.lower(name)
+	local command = commands[key]
+	if not command or not Admins.isAdmin(admin) then
 		return
 	end
 	if argument and (argument == "" or #argument > MaxArgumentLength) then
 		argument = nil
 	end
-	local ok, err = pcall(command, player, argument)
+	local who = if target and target.Parent == Players and not untargeted[key] then target else admin
+	if target and target ~= admin and key == "/reset" then
+		Notify.toast(admin, "Reset only ever wipes your own save.")
+		return
+	end
+	local function tell(text: string)
+		Notify.toast(admin, if who ~= admin then `{who.DisplayName}: {text}` else text)
+	end
+	local ok, err = pcall(command, who, argument, tell)
 	if not ok then
 		warn(`DevService: {name} failed: {err}`)
+	elseif who ~= admin then
+		print(`DevService: {admin.Name} ran {name} {argument or ""} on {who.Name}`)
 	end
 end
 
--- Runs a chat message if it's one of the commands above.
+-- The player a chat command names with "@name" at the end (name or display name, any
+-- capitals, the start of it is enough), or nil.
+local function findPlayer(wanted: string): Player?
+	wanted = string.lower(wanted)
+	for _, other in Players:GetPlayers() do
+		local name, display = string.lower(other.Name), string.lower(other.DisplayName)
+		if string.sub(name, 1, #wanted) == wanted or string.sub(display, 1, #wanted) == wanted then
+			return other
+		end
+	end
+	return nil
+end
+
+-- Runs a chat message if it's one of the commands above. "/money 5m @Biggie" runs it on
+-- that player instead of yourself.
 local function run(player: Player, message: string)
 	local name, rest = string.match(message, "^%s*(/%S+)%s*(.-)%s*$")
-	if name then
+	if not name then
+		return
+	end
+	local before, wanted = string.match(rest or "", "^(.-)%s*@(%S+)$")
+	if wanted then
+		local target = findPlayer(wanted)
+		if not target then
+			if Admins.isAdmin(player) then
+				Notify.toast(player, `Nobody called "{wanted}" is in this server.`)
+			end
+			return
+		end
+		runCommand(player, name, before, target)
+	else
 		runCommand(player, name, rest)
 	end
 end
@@ -338,11 +382,12 @@ local function useAdminRemote()
 	local remotes = ReplicatedStorage:WaitForChild("Remotes")
 	local remote = Instance.new("RemoteEvent")
 	remote.Name = "AdminCommand"
-	remote.OnServerEvent:Connect(function(player: Player, name: unknown, argument: unknown)
+	remote.OnServerEvent:Connect(function(player: Player, name: unknown, argument: unknown, targetId: unknown)
 		if type(name) ~= "string" or #name > 20 then
 			return
 		end
-		runCommand(player, name, if type(argument) == "string" then argument else nil)
+		local target = if type(targetId) == "number" then Players:GetPlayerByUserId(targetId) else nil
+		runCommand(player, name, if type(argument) == "string" then argument else nil, target)
 	end)
 	remote.Parent = remotes
 end

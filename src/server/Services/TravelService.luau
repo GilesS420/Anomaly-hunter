@@ -15,10 +15,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
 
+local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
 local Travel = require(ReplicatedStorage.Shared.Util.Travel)
 local TravelConfig = require(ReplicatedStorage.Shared.Config.Travel)
 local Tutorial = require(ReplicatedStorage.Shared.Util.Tutorial)
 local Zones = require(ReplicatedStorage.Shared.Config.Zones)
+local DataService = require(script.Parent.DataService)
 local HuntService = require(script.Parent.HuntService)
 local Notify = require(script.Parent.Parent.Notify)
 local PlotService = require(script.Parent.PlotService)
@@ -133,10 +135,25 @@ local function portalSpot(): CFrame?
 	return inFront(row, Vector3.new(reach * 2, 1, reach * 2))
 end
 
-local function destinationSpot(destination: TravelConfig.Destination): CFrame?
+-- In front of the gate of the newest zone this player has opened (Giles 2026-10-21), or the
+-- middle of the row if that gate isn't there.
+local function newestGateSpot(player: Player): CFrame?
+	local data = DataService.get(player)
+	local zone = Hunt.newestZone(if data then data.wingsOwned else 1)
+	local gate = zone and World.find(World.find(World.find(workspace, "Hub"), "ZoneGates"), zone.id)
+	if gate then
+		local frame, size = bounds(gate)
+		if frame and size then
+			return inFront(frame, size)
+		end
+	end
+	return portalSpot()
+end
+
+local function destinationSpot(player: Player, destination: TravelConfig.Destination): CFrame?
 	local landmarks = destination.landmarks
 	if not landmarks or #landmarks == 0 then
-		return portalSpot()
+		return newestGateSpot(player)
 	elseif #landmarks == 1 then
 		return landmarkSpot(landmarks[1])
 	end
@@ -174,7 +191,7 @@ FastTravel.OnServerEvent:Connect(function(player, id)
 	if now - (lastTrip[player] or -math.huge) < TravelConfig.Cooldown then
 		return
 	end
-	local spot = destinationSpot(destination)
+	local spot = destinationSpot(player, destination)
 	if not spot then
 		warn(`TravelService: nothing to travel to for {destination.id} (see Workspace > Hub)`)
 		return
