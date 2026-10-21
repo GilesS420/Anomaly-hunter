@@ -739,10 +739,11 @@ def creak(duration=1.2):
 def night_loop():
     d = NIGHT
     buf = silence(d)
+    wind = 0.3  # Giles: less wind (it was 1.0)
     for center, width, gain, pan in [(380, 70, 0.22, -0.4), (820, 110, 0.12, 0.5)]:
-        band = looped_band(d, center, width) * gain * lfo(d, rng.integers(2, 4), rng.uniform(0, 6), 0.2, 1)
+        band = looped_band(d, center, width) * gain * wind * lfo(d, rng.integers(2, 4), rng.uniform(0, 6), 0.2, 1)
         place(buf, stereo(band, pan), 0)
-    place(buf, stereo(looped_noise(d, 60, 400, -6) * 0.05), 0)
+    place(buf, stereo(looped_noise(d, 60, 400, -6) * 0.05 * wind), 0)
     # three crickets, each chirping in its own rhythm, now and then taking a rest
     for pitch, every, pan in [(4300, 0.62, -0.7), (4750, 0.81, 0.6), (3900, 1.13, 0.1)]:
         at = rng.uniform(0, every)
@@ -755,7 +756,9 @@ def night_loop():
     for at in (18.0, 41.0):
         place(buf, stereo(creak(rng.uniform(0.9, 1.5)) * 0.2, rng.uniform(-0.8, 0.8)), at, wrap=True)
     place(buf, stereo(bell(note("D3"), 6.0, 0.4) * 0.07, 0.2), 26.0, wrap=True)
-    return looped(buf, 3.0, 0.4, -30)
+    # a fixed gain (what the first version was normalised to), so with less wind the crickets,
+    # owl and bell stay exactly as loud as they were
+    return limit(reverb(buf, 3.0, 0.4, wrap=True) * 0.397)
 
 
 def wind_up():
@@ -776,12 +779,12 @@ def wind_up():
 
 
 def distant_toll():
-    """A far-off church bell, a gust of wind and a whisper."""
+    """A far-off church bell, a soft breath of wind and a whisper."""
     buf = silence(5.0)
-    place(buf, stereo(whoosh(2.5, 250, 1500) * 0.35, -0.3), 0)
+    place(buf, stereo(whoosh(2.5, 250, 1500) * 0.1, -0.3), 0)  # Giles: less wind (was 0.35)
     place(buf, stereo(bell(note("A2"), 4.5, 0.4) * 0.5, 0.3), 0.6)
     place(buf, stereo(whisper(1.0) * 0.25, -0.7), 2.4)
-    return loudness(trim_tail(reverb(buf, 3.0, 0.5)), -25)
+    return limit(trim_tail(reverb(buf, 3.0, 0.5)) * 4.136)  # the first version's gain, bell unchanged
 
 
 def creaky_house():
