@@ -27,6 +27,7 @@ export type Placed = {
 	bitesLeft: number,
 	eaten: { string }, -- uids that had a bite
 	gaveEffect: boolean?, -- a bite has given an effect
+	biteAt: number?, -- when the next bite is due (older saves: Cakes.nextBiteAt works it out)
 }
 
 -- One bite: who ate, the effect it got (nil when the mutation roll missed) and the combo that
@@ -98,29 +99,49 @@ function Cakes.pickEffect(
 	return if force then first else nil
 end
 
+-- How many bites a cake gets: more for pricier cakes.
+function Cakes.bites(itemId: string): number
+	return CakeConfig.BitesById[itemId] or CakeConfig.Bites
+end
+
+-- Picks when the next bite lands: a random moment in the middle 80% of its share of the time.
+local function rollBite(cake: Placed, random: Random?)
+	local total = Cakes.bites(cake.itemId)
+	local done = math.clamp(total - cake.bitesLeft, 0, total - 1)
+	local share = Cakes.Seconds / total
+	local roll = if random then random:NextNumber() else math.random() -- no Random outside Roblox (tests)
+	cake.biteAt = cake.placedAt + (done + 0.1 + 0.8 * roll) * share
+end
+
 -- A new cake at (x, y, z) relative to the plot.
-function Cakes.new(itemId: string, x: number, y: number, z: number, now: number): Placed
-	return {
+function Cakes.new(itemId: string, x: number, y: number, z: number, now: number, random: Random?): Placed
+	local cake: Placed = {
 		itemId = itemId,
 		x = x,
 		y = y,
 		z = z,
 		placedAt = now,
 		checkedAt = now,
-		bitesLeft = CakeConfig.Bites,
+		bitesLeft = Cakes.bites(itemId),
 		eaten = {},
 	}
+	rollBite(cake, random)
+	return cake
 end
 
 function Cakes.expiresAt(cake: Placed): number
 	return cake.placedAt + Cakes.Seconds
 end
 
--- When the next bite is due: the bites are spread evenly over the cake's time, each in the
--- middle of its share (2.5, 7.5 and 12.5 minutes for 3 bites over 15).
+-- When the next bite is due (rolled when the cake is set out and after every bite). Older
+-- saves without one: the middle of the next bite's share of the time.
 function Cakes.nextBiteAt(cake: Placed): number
-	local share = Cakes.Seconds / CakeConfig.Bites
-	return cake.placedAt + (CakeConfig.Bites - cake.bitesLeft + 0.5) * share
+	if cake.biteAt then
+		return cake.biteAt
+	end
+	local total = Cakes.bites(cake.itemId)
+	local share = Cakes.Seconds / total
+	return cake.placedAt + (math.max(total - cake.bitesLeft, 0) + 0.5) * share
 end
 
 -- True once it's eaten up or has gone stale.
@@ -172,6 +193,9 @@ function Cakes.bite(
 ): Bite
 	local force = cake.bitesLeft <= 1 and not cake.gaveEffect
 	cake.bitesLeft -= 1
+	if cake.bitesLeft > 0 then
+		rollBite(cake, random)
+	end
 	local uid = caught.uid or ""
 	table.insert(cake.eaten, uid)
 	local item = items[cake.itemId]
@@ -208,7 +232,7 @@ function Cakes.catchUp(
 end
 
 -- One short line saying what a cake does, with the real odds per bite:
--- "3 bites, at least one effect · Each bite: 50% Slimed (x2)".
+-- "3 bites, at least one effect · Each bite: 30% Slimed (x2)".
 function Cakes.describe(item: Shop.Item): string
 	local odds = {}
 	local left = CakeConfig.BiteEffectChance / 100 -- chance the roll gets this far
@@ -221,7 +245,7 @@ function Cakes.describe(item: Shop.Item): string
 			table.insert(odds, `{percent}% {Format.name(effect.id)} (x{effect.multiplier})`)
 		end
 	end
-	return `{CakeConfig.Bites} bites, at least one effect · Each bite: {table.concat(odds, ", ")}`
+	return `{Cakes.bites(item.id)} bites, at least one effect · Each bite: {table.concat(odds, ", ")}`
 end
 
 return Cakes

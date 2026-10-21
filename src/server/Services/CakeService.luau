@@ -208,7 +208,7 @@ local function tryPlace(player: Player, itemId: string): (boolean, string)
 	local left = (inventory[item.id] or 0) - 1
 	inventory[item.id] = if left > 0 then left else nil
 	local offset = plot.frame:PointToObjectSpace(spot)
-	local saved = Cakes.new(item.id, offset.X, offset.Y, offset.Z, os.time())
+	local saved = Cakes.new(item.id, offset.X, offset.Y, offset.Z, os.time(), random)
 	table.insert(data.cakes, saved)
 	show(player, saved)
 	return true,

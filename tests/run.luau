@@ -1099,17 +1099,17 @@ do
 		math.abs(candyHits / tries - CakeConfig.BiteEffectChance / 100) < 0.03
 	)
 	check(
-		"a bite of Fang Fudge lands Vampire about 17.5% of the time",
-		math.abs(vampires / tries - 0.175) < 0.03
+		"a bite of Fang Fudge lands Vampire about 10.5% of the time",
+		math.abs(vampires / tries - 0.105) < 0.03
 	)
 	check(
 		"the odds shown are the real odds per bite",
-		Cakes.describe(fudge) == "3 bites, at least one effect · Each bite: 17.5% Vampire (x2.5)"
+		Cakes.describe(fudge) == "3 bites, at least one effect · Each bite: 10.5% Vampire (x2.5)"
 	)
 	check(
 		"a chance cake shows each effect's real odds",
 		Cakes.describe(mousse)
-			== "3 bites, at least one effect · Each bite: 12.5% Mummy (x4), 37.5% Batty (x3)"
+			== "6 bites, at least one effect · Each bite: 7.5% Mummy (x4), 22.5% Batty (x3)"
 	)
 
 	-- A bite never feeds and goes to a monster the effect can land on first.
@@ -1152,7 +1152,8 @@ do
 	local timed = Cakes.new("PumpkinCandy", 0, 0, 0, t0)
 	check(
 		"bites are spread over the cake's time",
-		Cakes.nextBiteAt(timed) == t0 + Cakes.Seconds / CakeConfig.Bites / 2
+		Cakes.nextBiteAt(timed) >= t0 + Cakes.Seconds / Cakes.bites("PumpkinCandy") * 0.1
+			and Cakes.nextBiteAt(timed) <= t0 + Cakes.Seconds / Cakes.bites("PumpkinCandy") * 0.9
 	)
 	local herd = {}
 	for i = 1, 10 do
@@ -1185,7 +1186,7 @@ do
 		for _, b in bites do
 			effects += if b.effect then 1 else 0
 		end
-		sure = sure and #bites == CakeConfig.Bites and effects == 1 and bites[#bites].effect ~= nil
+		sure = sure and #bites == Cakes.bites(id) and effects == 1 and bites[#bites].effect ~= nil
 	end
 	check("every cake gives an effect on its last bite at the latest, even unlucky", sure)
 	local stale = Cakes.new("PumpkinCandy", 0, 0, 0, t0)

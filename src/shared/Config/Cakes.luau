@@ -3,8 +3,9 @@
 -- hotbar and click while standing in one of your wings). Monsters come for a bite, and a bite
 -- may give them a mutation (the treat's effect, Config/Shop.Bakery).
 --
--- A cake is out for Minutes minutes and gets Bites bites, evenly spread (with 3 bites over 15
--- minutes: at 2.5, 7.5 and 12.5 minutes). For each bite a monster that hasn't had one yet
+-- A cake is out for Minutes minutes and gets its bites (Bites, more for pricier cakes) spread
+-- over that time: each bite lands at a random moment within its own share of the time, so
+-- cakes set out together don't all get eaten at once. For each bite a monster that hasn't had one yet
 -- comes over: one within the cake's Reach if there is one, else any (monsters the effect can
 -- still land on first). A bite rolls BiteEffectChance, then the treat's own odds
 -- (Util/Cakes.pickEffect). The last bite always gives an effect if the cake hasn't yet, so
@@ -16,10 +17,24 @@
 local Cakes = {}
 
 Cakes.Minutes = 15
-Cakes.Bites = 3
-Cakes.CheckSeconds = 30 -- how often a cake looks whether its next bite is due (online)
+Cakes.Bites = 3 -- a cake not listed in BitesById
+Cakes.BitesById = {
+	PumpkinCandy = 3,
+	FangFudge = 3,
+	StaticCupcake = 4,
+	EctoplasmPie = 4,
+	FrostTart = 4,
+	GildedTruffle = 5,
+	StitchCupcake = 5,
+	CursedCake = 6,
+	BloodMoonPie = 6,
+	BoneMarrowMousse = 6,
+	WitchsBrewTart = 7,
+	EclipseEclair = 8,
+} :: { [string]: number }
+Cakes.CheckSeconds = 5 -- how often a cake looks whether its next bite is due (online)
 Cakes.PerWing = 5 -- cakes out at once per owned wing (the Foyer counts): 5 to start, 30 with every wing
-Cakes.BiteEffectChance = 50 -- percent a bite rolls for the effect at all
+Cakes.BiteEffectChance = 30 -- percent a bite rolls for the effect at all (Giles 2026-10-21: rarer)
 
 -- How far each cake reaches (studs, a circle round it on the floor): monsters inside it come
 -- for a bite first. Better cakes reach further. A wing is 40 x 40 studs. Hover over (or tap)
