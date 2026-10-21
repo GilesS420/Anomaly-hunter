@@ -3,8 +3,9 @@
 -- window, the top-right to the player list): your money, your hearts while you're in a zone, the
 -- monster you're carrying, a big "Return Charm" button (tap or click it; R works too on
 -- a keyboard) that takes you home, and in a zone a "Bait Bell" button (B) that brings a rarer
--- monster to you. Each button shows only if you own one. A "Backpack" button (G) is always
--- there and opens your items and monsters (InventoryController), and so is a "Codex" button
+-- monster to you. Each button shows only if you own one. A "Mansion" button (M) is always
+-- there and lists your mansion monsters (MansionListController), and so are a "Backpack" button
+-- (G) that opens your items and monsters (InventoryController), a "Codex" button
 -- (C, CodexController) and a "Settings" button (SettingsController).
 -- Everything shown comes from the server: player attributes Zone / Hearts / Carrying /
 -- CarryingSize / CarryingCount / BagSize / ReturnCharms / BaitBells and
@@ -102,6 +103,14 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, TextButt
 	)
 	local bell =
 		itemButton("BaitBell", 5, Color3.fromRGB(190, 110, 50), if keys then "Bait Bell (B)" else "Bait Bell")
+	-- Always there; MansionListController lists your mansion monsters with it.
+	local mansion = itemButton(
+		"Mansion",
+		6,
+		Color3.fromRGB(90, 50, 90),
+		if keys then "☰ Mansion (M)" else "☰ Mansion"
+	)
+	mansion.Visible = true
 	-- Always there; InventoryController opens the Backpack with it.
 	local backpack =
 		itemButton("Backpack", 7, Color3.fromRGB(70, 60, 110), if keys then "Backpack (G)" else "Backpack")
