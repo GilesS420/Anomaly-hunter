@@ -63,4 +63,17 @@ function Mansion.canBuyNext(wingsOwned: number, money: number): (BuyResult, Wing
 	return "Ok", wing
 end
 
+-- What the sign outside the mansion brags about: the total of every monster's value, and
+-- which one is worth the most (its index, nil for an empty mansion; the first wins a tie).
+function Mansion.worth(values: { number }): (number, number?)
+	local total, best = 0, nil
+	for index, value in values do
+		total += value
+		if best == nil or value > values[best] then
+			best = index
+		end
+	end
+	return total, best
+end
+
 return Mansion

@@ -2257,6 +2257,17 @@ do
 	check("settings work during the tutorial", TutorialUtil.isUnlocked("Gate", "Settings"))
 end
 
+-- The worth sign and trophy stand outside each mansion (Util/Mansion.worth).
+do
+	local total, best = Mansion.worth({ 100, 2500, 40 })
+	check("mansion worth adds every monster", total == 2640)
+	check("mansion worth picks the most valuable", best == 2)
+	local emptyTotal, none = Mansion.worth({})
+	check("empty mansion is worth nothing and has no best", emptyTotal == 0 and none == nil)
+	local _, first = Mansion.worth({ 50, 50 })
+	check("mansion worth tie goes to the first", first == 1)
+end
+
 if failures > 0 then
 	error(`{failures} check(s) failed`)
 end
