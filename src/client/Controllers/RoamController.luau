@@ -37,6 +37,8 @@ local MID_DISTANCE = 320 -- closer than this: moved every MID_EVERY frames, limb
 local MID_EVERY = 3
 local FAR_EVERY = 8 -- further away: moved every FAR_EVERY frames
 local BEHIND_SLACK = 30 -- monsters this close still animate when just behind the camera
+local CLOSE_DISTANCE = 45 -- further than this, limbs swing on every other frame only
+local RAINBOW_EVERY = 3 -- rainbow colours change slowly, so every few frames is plenty
 
 type Swing = {
 	motor: Motor6D,
@@ -58,7 +60,7 @@ type State = {
 	lookVersion: any, -- the server rebuilds the blocks when effects change (LookVersion)
 	rescanUntil: number?, -- os.clock(): keep looking for the new joints until then
 	nextScan: number?,
-	rainbow: { BasePart }?, -- parts of a Rainbow monster, recoloured every frame
+	rainbow: { { part: BasePart, start: number } }?, -- parts of a Rainbow monster, recoloured
 	slot: number, -- spreads far monsters' updates over different frames
 	lastUpdate: number, -- os.clock() of the last frame it was moved
 }
@@ -224,7 +226,8 @@ function RoamController.start()
 				position += Vector3.new(0, math.sin(clock * BOB_SPEED + state.phase) * BOB_HEIGHT, 0)
 			end
 
-			if gait and animate then
+			local limbs = animate and (held or distance < CLOSE_DISTANCE or (frame + state.slot) % 2 == 0)
+			if gait and limbs then
 				local swings = state.swings
 				local lookVersion = model:GetAttribute("LookVersion")
 				local now = os.clock()
@@ -241,22 +244,22 @@ function RoamController.start()
 				if not swings or changed or stale or settling then
 					state.lookVersion = lookVersion
 					state.nextScan = now + 0.5
-					local rainbow: { BasePart } = {}
+					local rainbow = {}
 					for _, part in model:GetDescendants() do
-						if part:IsA("BasePart") and typeof(part:GetAttribute("Rainbow")) == "number" then
-							table.insert(rainbow, part)
+						local start = part:GetAttribute("Rainbow")
+						if part:IsA("BasePart") and typeof(start) == "number" then
+							table.insert(rainbow, { part = part, start = start })
 						end
 					end
 					state.rainbow = if #rainbow > 0 then rainbow else nil
 					swings = findSwings(model, swings)
 					state.swings = swings
 				end
-				if state.rainbow then
+				if state.rainbow and (frame + state.slot) % RAINBOW_EVERY == 0 then
 					-- Rainbow catches keep cycling through the colours, each part a bit ahead
 					-- of the one below it.
-					for _, part in state.rainbow do
-						local start = part:GetAttribute("Rainbow") :: number
-						part.Color = Color3.fromHSV((start + clock * RAINBOW_SPEED) % 1, 0.75, 1)
+					for _, entry in state.rainbow do
+						entry.part.Color = Color3.fromHSV((entry.start + clock * RAINBOW_SPEED) % 1, 0.75, 1)
 					end
 				end
 				for _, swing in swings :: { Swing } do
