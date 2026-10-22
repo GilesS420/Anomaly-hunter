@@ -559,26 +559,79 @@ local function addBits(set: Set, kind: string, count: number)
 				random:NextNumber(0.25, 0.45)
 			)
 		elseif kind == "Spiders" then
-			-- A black spider with a little head and legs, hanging on a long silk thread.
-			local black = Color3.fromRGB(15, 12, 18)
-			add("Spider", Enum.PartType.Ball, Vector3.one * 1.1, black, CFrame.identity, true)
-			add("SpiderHead", Enum.PartType.Ball, Vector3.one * 0.65, black, CFrame.new(0, 0, -0.75), true)
-			for leg = -1, 1 do
+			-- A hairy brown-black spider: a fat abdomen with a red hourglass on its back, a
+			-- smaller head with glinting red eyes and fangs, and eight bent legs (up to the knee,
+			-- then down), hanging on a fine silk thread.
+			local body = Color3.fromRGB(35, 25, 22)
+			local leg = Color3.fromRGB(25, 18, 16)
+			add(
+				"Abdomen",
+				Enum.PartType.Ball,
+				Vector3.new(1.3, 1.1, 1.6),
+				body,
+				CFrame.new(0, 0.1, 0.55),
+				true
+			)
+			add(
+				"Hourglass",
+				Enum.PartType.Block,
+				Vector3.new(0.3, 0.06, 0.5),
+				Color3.fromRGB(200, 25, 25),
+				CFrame.new(0, 0.66, 0.55),
+				true
+			)
+			add(
+				"SpiderHead",
+				Enum.PartType.Ball,
+				Vector3.new(0.8, 0.7, 0.8),
+				body,
+				CFrame.new(0, 0, -0.45),
+				true
+			)
+			for side = -1, 1, 2 do
 				add(
-					"SpiderLeg",
+					"SpiderEye",
+					Enum.PartType.Ball,
+					Vector3.one * 0.14,
+					Color3.fromRGB(255, 40, 40),
+					CFrame.new(side * 0.14, 0.15, -0.8)
+				)
+				add(
+					"Fang",
 					Enum.PartType.Block,
-					Vector3.new(2.8, 0.12, 0.12),
-					black,
-					CFrame.new(0, 0.05, leg * 0.3) * CFrame.Angles(0, leg * 0.35, 0),
+					Vector3.new(0.08, 0.25, 0.08),
+					Color3.fromRGB(60, 45, 40),
+					CFrame.new(side * 0.1, -0.2, -0.82),
 					true
 				)
+				for index, spread in { -0.55, -0.2, 0.2, 0.55 } do
+					local yaw = CFrame.Angles(0, spread * side, 0) * CFrame.new(0, 0, -0.35 + index * 0.08)
+					add(
+						"SpiderThigh",
+						Enum.PartType.Block,
+						Vector3.new(1.08, 0.1, 0.1),
+						leg,
+						yaw * CFrame.new(side * 0.75, 0.3, 0) * CFrame.Angles(0, 0, side * math.rad(33.7)),
+						true
+					)
+					add(
+						"SpiderShin",
+						Enum.PartType.Block,
+						Vector3.new(1.26, 0.08, 0.08),
+						leg,
+						yaw * CFrame.new(side * 1.4, 0, 0) * CFrame.Angles(0, 0, side * math.rad(-71.6)),
+						true
+					)
+				end
 			end
+			-- Fine, matte silk: no glowing beam.
 			add(
 				"Thread",
 				Enum.PartType.Block,
-				Vector3.new(0.06, 24, 0.06),
-				Color3.fromRGB(230, 230, 240),
-				CFrame.new(0, 12.4, 0)
+				Vector3.new(0.03, 30, 0.03),
+				Color3.fromRGB(200, 200, 205),
+				CFrame.new(0, 15.6, 0.3),
+				true
 			)
 		elseif kind == "Hands" then
 			-- A bony hand: palm, four fingers and a thumb, reaching up out of the ground.
@@ -851,7 +904,7 @@ local function addWeather(set: Set, weather: Events.Weather, scale: number)
 	elseif weather.kind == "Brooms" then
 		bits("Brooms", 7)
 	elseif weather.kind == "Spiders" then
-		bits("Spiders", 30)
+		bits("Spiders", 45)
 	elseif weather.kind == "Hands" then
 		bits("Hands", 24)
 	elseif weather.kind == "SkyLanterns" then
@@ -871,7 +924,8 @@ end
 
 local FallRadius = 90 -- coins and candy fall within this many studs of the camera
 local FloatRadius = 60
-local NearRadius = 40 -- spiders and hands
+local NearRadius = 40 -- skeleton hands and crates
+local HangRadius = 90 -- spiders, spread wide and mostly overhead
 
 -- Moves the coins, candy or eyes along. A bit that has fallen past the camera (or that the
 -- camera has walked away from) starts again above it.
@@ -889,12 +943,13 @@ local function stepWeather(weather: Weather, camera: Vector3, deltaTime: number,
 		local flat = Vector3.new(bit.position.X - camera.X, 0, bit.position.Z - camera.Z)
 		local mode = weather.mode
 		if mode == "hang" or mode == "ground" then
-			if bit.position == Vector3.zero or flat.Magnitude > NearRadius * 1.3 then
-				bit.position = spot(camera, NearRadius, 0)
+			local radius = if mode == "hang" then HangRadius else NearRadius
+			if bit.position == Vector3.zero or flat.Magnitude > radius * 1.3 then
+				bit.position = spot(camera, radius, 0)
 			end
 			if mode == "hang" then
 				-- Swinging gently up and down on its thread, turning slowly.
-				local height = ground + 8 + (bit.phase % 1) * 14 + math.sin(t * 0.6 + bit.phase) * 2.5
+				local height = ground + 10 + (bit.phase % 1) * 18 + math.sin(t * 0.6 + bit.phase) * 2.5
 				local at = Vector3.new(bit.position.X, height, bit.position.Z)
 				place(bit, CFrame.new(at) * CFrame.Angles(0, bit.phase + t * 0.3, 0))
 			else
