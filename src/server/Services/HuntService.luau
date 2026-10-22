@@ -11,13 +11,15 @@
 --
 -- Remotes in ReplicatedStorage.HuntRemotes:
 --   UseReturnCharm  client -> server ()  (the Return Charm button)
---   UseBaitBell     client -> server ()  (the Bait Bell button: a rarer monster comes to you)
+--   UseBaitBell     client -> server (bellId?)  (a Bait Bell button: a rarer monster comes to you;
+--                   bellId is "BaitBell", "SilverBell" or "GoldBell", the plain bell if left out)
 -- Player attributes ReturnCharms and BaitBells (numbers) mirror how many the player owns, so
 -- the buttons only show when there is one to use. Every owned vacuum, the Bait Bells and the
 -- Return Charms are also Tools in the hotbar (Section "Tool"): catching only works with a
 -- vacuum in your hand (heldVacuum), holding one makes it the vacuum you use, and clicking
 -- with the bell or charm in hand uses one. Carrying / CarryingSize name the latest
--- catch in the bag, CarryingCount and BagSize say how full it is.
+-- catch in the bag, CarryingCount and BagSize say how full it is, BagList names every catch
+-- in it (one per line).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -52,7 +54,7 @@ remotes.Name = "HuntRemotes"
 local UseReturnCharm = Instance.new("RemoteEvent") -- client -> server: ()
 UseReturnCharm.Name = "UseReturnCharm"
 UseReturnCharm.Parent = remotes
-local UseBaitBell = Instance.new("RemoteEvent") -- client -> server: ()
+local UseBaitBell = Instance.new("RemoteEvent") -- client -> server: (bellId?)
 UseBaitBell.Name = "UseBaitBell"
 UseBaitBell.Parent = remotes
 
@@ -105,6 +107,13 @@ local function setCarrying(player: Player, bag: { Value.CaughtMonster }?)
 	player:SetAttribute("Carrying", if latest then latest.monsterId else nil)
 	player:SetAttribute("CarryingSize", if latest then latest.size else nil)
 	player:SetAttribute("CarryingCount", if latest then #list else nil)
+	-- Every catch in the bag, one per line ("Big Gloomlet", "Gold Normal Wisp Jack"), for the HUD.
+	local lines: { string } = {}
+	for _, caught in list do
+		local variant = if caught.variant then `{caught.variant} ` else ""
+		table.insert(lines, `{variant}{caught.size} {Format.name(caught.monsterId)}`)
+	end
+	player:SetAttribute("BagList", if #lines > 0 then table.concat(lines, "\n") else nil)
 	player:SetAttribute("BagSize", bagSize(player))
 end
 
@@ -249,10 +258,10 @@ local function syncTools(player: Player)
 			tool.Equipped:Connect(function()
 				holdVacuum(player, item.id)
 			end)
-		elseif item.id == "BaitBell" then
+		elseif item.kind == "Lure" then
 			tool.ToolTip = "Click in a zone to ring it: a rarer monster comes to you"
 			tool.Activated:Connect(function()
-				HuntService.useBaitBell(player)
+				HuntService.useBaitBell(player, item.id)
 			end)
 		elseif item.id == "ReturnCharm" then
 			tool.ToolTip = "Click to go home with your catch"
@@ -270,7 +279,12 @@ end
 function HuntService.refreshItems(player: Player)
 	local data = DataService.get(player)
 	player:SetAttribute("ReturnCharms", if data then itemCount(data, "ReturnCharm") else 0)
-	player:SetAttribute("BaitBells", if data then itemCount(data, "BaitBell") else 0)
+	-- BaitBells, SilverBells, GoldBells
+	for _, item in Shop.Workshop do
+		if item.kind == "Lure" then
+			player:SetAttribute(`{item.id}s`, if data then itemCount(data, item.id) else 0)
+		end
+	end
 	setCarrying(player, carrying[player])
 	syncTools(player)
 end
@@ -384,19 +398,24 @@ function HuntService.useReturnCharm(player: Player)
 	goHome(player, true)
 end
 
--- Rings a Bait Bell (the button, B, or clicking with the bell in hand).
-function HuntService.useBaitBell(player: Player)
+-- Rings a Bait Bell (a button, B, or clicking with the bell in hand). `bellId` picks the kind
+-- (Shop.luau, kind "Lure"); the plain Bait Bell if left out.
+function HuntService.useBaitBell(player: Player, bellId: unknown)
+	local bell = Workshop.item(if typeof(bellId) == "string" then bellId else "BaitBell")
+	if not bell or bell.kind ~= "Lure" then
+		return
+	end
 	local data = DataService.get(player)
 	local zone = Hunt.zoneById(player:GetAttribute("Zone"))
 	if not data then
 		return
 	end
 	if not zone then
-		Notify.toast(player, "Ring the Bait Bell in a zone to call a monster.")
+		Notify.toast(player, `Ring the {bell.name} in a zone to call a monster.`)
 		return
 	end
-	if itemCount(data, "BaitBell") <= 0 then
-		Notify.toast(player, "You don't have a Bait Bell. The Hunter's Workshop sells them.")
+	if itemCount(data, bell.id) <= 0 then
+		Notify.toast(player, `You don't have a {bell.name}. The Hunter's Workshop sells them.`)
 		return
 	end
 	-- A monster you couldn't catch would waste the bell.
@@ -411,9 +430,9 @@ function HuntService.useBaitBell(player: Player)
 		)
 		return
 	end
-	local ok, message = SpawnService.lure(player, zone.index, data.equipped.vacuum)
+	local ok, message = SpawnService.lure(player, zone.index, data.equipped.vacuum, bell.id)
 	if ok then
-		useItem(data, "BaitBell") -- only used up when a monster actually came
+		useItem(data, bell.id) -- only used up when a monster actually came
 		HuntService.refreshItems(player)
 	end
 	Notify.toast(player, message)

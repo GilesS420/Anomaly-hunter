@@ -53,7 +53,8 @@ end
 
 local hash = Rng.hash
 
--- True if the item is for sale in this slot. Free starter tools always are; an event treat
+-- True if the item is for sale in this slot. Vacuums always are (they're expensive, so a
+-- player who saved up never waits on luck: Giles 2026-10-22); an event treat
 -- is exactly while its Watcher event (`liveEvent`, an id) is live. `chanceMultiplier` raises
 -- the restock chances (Sugar Rush), and anything in stock without it stays in stock.
 function Workshop.inStock(
@@ -65,7 +66,7 @@ function Workshop.inStock(
 	if item.event then
 		return item.event == liveEvent
 	end
-	if item.price <= 0 then
+	if item.price <= 0 or item.kind == "Vacuum" then
 		return true
 	end
 	local roll = (hash(`{slot}:{item.id}`) % 10000) / 100 -- 0 to 99.99
@@ -217,7 +218,20 @@ function Workshop.describe(item: Shop.Item): string
 		end
 		return table.concat(parts, " · ")
 	elseif item.kind == "Lure" then
-		return "Ring it in a zone and a rarer monster comes to you"
+		local odds = item.lureOdds
+		if odds then
+			local parts = {}
+			for _, rarity in { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Divine" } do
+				if odds[rarity] then
+					table.insert(parts, `{rarity} {odds[rarity]}%`)
+				end
+			end
+			return `Ring it in a zone: {table.concat(parts, " · ")} comes to you`
+		end
+		local steps = item.lureSteps or 1
+		local up = if steps == 1 then "one rarity" else `{steps} rarities`
+		local cap = if item.maxRarity then `, up to {item.maxRarity}` else ""
+		return `Ring it in a zone: a monster {up} rarer comes to you{cap}`
 	elseif item.kind == "Charm" then
 		return "Takes you home from a zone, with your catch"
 	end

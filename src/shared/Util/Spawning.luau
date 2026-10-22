@@ -46,43 +46,76 @@ function Spawning.rollMonster(zoneIndex: number, random: Random?): Monsters.Mons
 	end, random)
 end
 
--- The rarest rarity a Bait Bell can bring (Shop.luau BaitBell.maxRarity; nil = no limit).
-local lureMaxOrder = math.huge
-for _, item in Shop.Workshop do
-	if item.id == "BaitBell" and item.maxRarity then
-		lureMaxOrder = Rarities[item.maxRarity].order
-	end
-end
-
--- A Bait Bell's monster: a normal roll, then the next rarity up that this zone has (the
--- same one if the roll was already the zone's rarest), but never above the bell's maxRarity
--- (rolls at or above it give that rarity). Picked by spawnWeight within that rarity.
-function Spawning.rollLured(zoneIndex: number, random: Random?): Monsters.Monster
-	local rolled = Spawning.rollMonster(zoneIndex, random)
-	local rolledOrder = Rarities[rolled.rarity].order
-	local nextOrder = math.huge
-	for _, m in Spawning.monstersInZone(zoneIndex) do
-		local order = Rarities[m.rarity].order
-		if order > rolledOrder and order < nextOrder then
-			nextOrder = order
+-- A Bait Bell's monster (Shop.luau, kind "Lure"; `bellId` defaults to the plain Bait Bell).
+-- With lureOdds the rarity is picked from those odds (only rarities this zone has). Otherwise
+-- it's a normal roll moved lureSteps rarities up the zone's ladder (staying at the zone's
+-- rarest), but never above the bell's maxRarity. Picked by spawnWeight within that rarity.
+function Spawning.rollLured(zoneIndex: number, random: Random?, bellId: string?): Monsters.Monster
+	local bell: Shop.Item? = nil
+	for _, item in Shop.Workshop do
+		if item.id == (bellId or "BaitBell") then
+			bell = item
 		end
 	end
-	if nextOrder == math.huge then
-		nextOrder = rolledOrder
+	local monsters = Spawning.monstersInZone(zoneIndex)
+	local function ofRarity(rarity: string): { Monsters.Monster }
+		local list = {}
+		for _, m in monsters do
+			if m.rarity == rarity then
+				table.insert(list, m)
+			end
+		end
+		return list
 	end
-	nextOrder = math.min(nextOrder, lureMaxOrder)
+	local function pick(list: { Monsters.Monster }): Monsters.Monster
+		return Rng.pickWeighted(list, function(m)
+			return m.spawnWeight :: number
+		end, random)
+	end
+
+	local odds = bell and bell.lureOdds
+	if odds then
+		local choices: { { rarity: string, chance: number } } = {}
+		for rarity, chance in odds do
+			if #ofRarity(rarity) > 0 then
+				table.insert(choices, { rarity = rarity, chance = chance })
+			end
+		end
+		table.sort(choices, function(a, b)
+			return Rarities[a.rarity].order < Rarities[b.rarity].order
+		end)
+		if #choices > 0 then
+			local choice = Rng.pickWeighted(choices, function(c)
+				return c.chance
+			end, random)
+			return pick(ofRarity(choice.rarity))
+		end
+	end
+
+	-- The zone's rarities, commonest first.
+	local ladder: { number } = {}
+	for _, m in monsters do
+		local order = Rarities[m.rarity].order
+		if not table.find(ladder, order) then
+			table.insert(ladder, order)
+		end
+	end
+	table.sort(ladder)
+	local rolled = Spawning.rollMonster(zoneIndex, random)
+	local at = table.find(ladder, Rarities[rolled.rarity].order) or 1
+	local steps = if bell and bell.lureSteps then bell.lureSteps else 1
+	local order = ladder[math.min(at + steps, #ladder)]
+	local maxRarity = bell and bell.maxRarity
+	if maxRarity then
+		order = math.min(order, Rarities[maxRarity].order)
+	end
 	local candidates = {}
-	for _, m in Spawning.monstersInZone(zoneIndex) do
-		if Rarities[m.rarity].order == nextOrder then
+	for _, m in monsters do
+		if Rarities[m.rarity].order == order then
 			table.insert(candidates, m)
 		end
 	end
-	if #candidates == 0 then
-		return rolled
-	end
-	return Rng.pickWeighted(candidates, function(m)
-		return m.spawnWeight :: number
-	end, random)
+	return if #candidates > 0 then pick(candidates) else rolled
 end
 
 -- Orbs are drawn as balls 3 studs across at Normal size, scaled by size.

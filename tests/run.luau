@@ -667,17 +667,18 @@ do
 		Workshop.inStock(siphon, 1234) == Workshop.inStock(siphon, 1234)
 	)
 	local slots = 20_000
-	local phantomIn, voidIn = 0, 0
+	local voidIn, bellIn = 0, 0
+	local bell = Workshop.item("BaitBell") :: Shop.Item
 	for slot = 1, slots do
-		if Workshop.inStock(phantomVac, slot) then
-			phantomIn += 1
-		end
-		if Workshop.inStock(voidVac, slot) then
+		if Workshop.inStock(phantomVac, slot) and Workshop.inStock(voidVac, slot) then
 			voidIn += 1
 		end
+		if Workshop.inStock(bell, slot) then
+			bellIn += 1
+		end
 	end
-	check("Phantom Vac is in stock about 80% of restocks", math.abs(phantomIn / slots - 0.80) < 0.02)
-	check("Void Vac is in stock about 6% of restocks", math.abs(voidIn / slots - 0.06) < 0.01)
+	check("vacuums are in stock in every restock", voidIn == slots)
+	check("Bait Bells are in stock about 50% of restocks", math.abs(bellIn / slots - 0.50) < 0.02)
 	check(
 		"starter tools are always in stock and owned",
 		Workshop.inStock(starter, 7) and Workshop.owns({}, starter)
@@ -759,6 +760,33 @@ do
 	check(
 		"a Bait Bell brings a Legendary about 10% of the time",
 		math.abs(legendaries / 20_000 - 0.10) < 0.01
+	)
+end
+
+-- Silver Bell: two rarities up, up to Mythic. Gold Bell: Legendary 85%, Mythic 14%, Divine 1%.
+do
+	local rng = fakeRandom(11)
+	local silverLow, silverTooRare = 0, 0
+	for _ = 1, 5000 do
+		local order = Rarities[Spawning.rollLured(1, rng, "SilverBell").rarity].order
+		if order < Rarities.Rare.order then
+			silverLow += 1
+		elseif order > Rarities.Mythic.order then
+			silverTooRare += 1
+		end
+	end
+	check("a Silver Bell brings Rare or better, never Divine", silverLow == 0 and silverTooRare == 0)
+	local counts: { [string]: number } = {}
+	for _ = 1, 20_000 do
+		local rarity = Spawning.rollLured(1, rng, "GoldBell").rarity
+		counts[rarity] = (counts[rarity] or 0) + 1
+	end
+	check(
+		"a Gold Bell follows its odds",
+		math.abs((counts.Legendary or 0) / 20_000 - 0.85) < 0.015
+			and math.abs((counts.Mythic or 0) / 20_000 - 0.14) < 0.015
+			and (counts.Divine or 0) > 0
+			and (counts.Epic or 0) == 0
 	)
 end
 
@@ -1154,17 +1182,17 @@ do
 		math.abs(candyHits / tries - CakeConfig.BiteEffectChance / 100) < 0.03
 	)
 	check(
-		"a bite of Fang Fudge lands Vampire about 17.5% of the time",
-		math.abs(vampires / tries - 0.175) < 0.03
+		"a bite of Fang Fudge lands Vampire about 10.5% of the time",
+		math.abs(vampires / tries - 0.105) < 0.03
 	)
 	check(
 		"the odds shown are the real odds per bite",
-		Cakes.describe(fudge) == "3 bites, at least one effect · Each bite: 17.5% Vampire (x2.5)"
+		Cakes.describe(fudge) == "3 bites, at least one effect · Each bite: 10.5% Vampire (x2.5)"
 	)
 	check(
 		"a chance cake shows each effect's real odds",
 		Cakes.describe(mousse)
-			== "3 bites, at least one effect · Each bite: 12.5% Mummy (x4), 37.5% Batty (x3)"
+			== "6 bites, at least one effect · Each bite: 7.5% Mummy (x4), 22.5% Batty (x3)"
 	)
 
 	-- A bite never feeds and goes to a monster the effect can land on first.
@@ -1207,7 +1235,8 @@ do
 	local timed = Cakes.new("PumpkinCandy", 0, 0, 0, t0)
 	check(
 		"bites are spread over the cake's time",
-		Cakes.nextBiteAt(timed) == t0 + Cakes.Seconds / CakeConfig.Bites / 2
+		Cakes.nextBiteAt(timed) >= t0 + Cakes.Seconds / Cakes.bites("PumpkinCandy") * 0.1
+			and Cakes.nextBiteAt(timed) <= t0 + Cakes.Seconds / Cakes.bites("PumpkinCandy") * 0.9
 	)
 	local herd = {}
 	for i = 1, 10 do
@@ -1240,7 +1269,7 @@ do
 		for _, b in bites do
 			effects += if b.effect then 1 else 0
 		end
-		sure = sure and #bites == CakeConfig.Bites and effects == 1 and bites[#bites].effect ~= nil
+		sure = sure and #bites == Cakes.bites(id) and effects == 1 and bites[#bites].effect ~= nil
 	end
 	check("every cake gives an effect on its last bite at the latest, even unlucky", sure)
 	local stale = Cakes.new("PumpkinCandy", 0, 0, 0, t0)

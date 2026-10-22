@@ -345,7 +345,12 @@ end
 
 -- Bait Bell: brings one rarer monster near the hunter in their zone. Returns whether it
 -- worked and a message for them. The caller uses up the bell only when it worked.
-function SpawnService.lure(player: Player, zoneIndex: number, vacuumId: string): (boolean, string)
+function SpawnService.lure(
+	player: Player,
+	zoneIndex: number,
+	vacuumId: string,
+	bellId: string?
+): (boolean, string)
 	local state = states[zoneIndex]
 	local folder = if state then monstersFolder(state) else nil
 	local character = player.Character
@@ -358,15 +363,15 @@ function SpawnService.lure(player: Player, zoneIndex: number, vacuumId: string):
 		return false, "Your bell's monster is still here. Catch it first!"
 	end
 
-	-- One rarity up, but never one the hunter's vacuum can't hold.
+	-- Rarer (how much depends on the bell), but never one the hunter's vacuum can't hold.
 	local tier = Catching.vacuumTier(vacuumId)
-	local monster = Spawning.rollLured(zoneIndex, random)
+	local monster = Spawning.rollLured(zoneIndex, random, bellId)
 	for _ = 1, 20 do
 		local rarity = Rarities[monster.rarity]
 		if not rarity.vacuumTier or rarity.vacuumTier <= tier then
 			break
 		end
-		monster = Spawning.rollLured(zoneIndex, random)
+		monster = Spawning.rollLured(zoneIndex, random, bellId)
 	end
 	local rarity = Rarities[monster.rarity]
 	if rarity.vacuumTier and rarity.vacuumTier > tier then
