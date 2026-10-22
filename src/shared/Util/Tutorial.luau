@@ -26,6 +26,7 @@ Tutorial.HintSeconds = 120 -- stuck on one step this long: a bigger hint shows
 -- The fast-travel features match Config/Travel's destination ids. Anything not listed is
 -- locked until the tutorial is done.
 Tutorial.Unlocks = {
+	Home = "Gate", -- the Mansion fast-travel button
 	Portals = "Gate",
 	Hotbar = "Catch",
 	Backpack = "Pickup",

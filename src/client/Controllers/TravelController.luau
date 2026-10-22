@@ -1,5 +1,5 @@
 --!strict
--- Fast-travel buttons in a row at the top middle of the screen: Portals, Shops, Sell
+-- Fast-travel buttons in a row at the top middle of the screen: Mansion, Portals, Shops, Sell
 -- (Config/Travel.Destinations). Tap or click one to jump there. They only show in the hub
 -- (player attribute Zone is not set); in a zone the exit or a Return Charm takes you home.
 -- The server checks everything again, see TravelService.
