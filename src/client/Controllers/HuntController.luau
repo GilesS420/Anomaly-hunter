@@ -3,9 +3,9 @@
 -- window, the top-right to the player list): your money, your hearts while you're in a zone, the
 -- monster you're carrying, a big "Return Charm" button (tap or click it; R works too on
 -- a keyboard) that takes you home, and in a zone a button per kind of Bait Bell (Bait, Silver,
--- Gold; B rings the cheapest you own) that brings a rarer monster to you. Each button shows only if you own one. A "Mansion" button (M) is always
--- there and lists your mansion monsters (MansionListController), and so are a "Backpack" button
--- (G) that opens your items and monsters (InventoryController), a "Codex" button
+-- Gold; B rings the cheapest you own) that brings a rarer monster to you. Each button shows
+-- only if you own one. A "Backpack" button (G) is always there and opens your items and
+-- monsters (InventoryController), and so are a "Codex" button
 -- (C, CodexController) and a "Settings" button (SettingsController).
 -- Everything shown comes from the server: player attributes Zone / Hearts / Carrying /
 -- CarryingSize / CarryingCount / BagSize / ReturnCharms / BaitBells / SilverBells / GoldBells and
@@ -62,7 +62,7 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 	local column = Instance.new("Frame")
 	column.Name = "Hud"
 	column.AnchorPoint = Vector2.new(0, 0.5)
-	column.Position = UDim2.new(0, 16, 0.5, 0)
+	column.Position = UDim2.new(0, 32, 0.5, 0) -- room for the mansion tab at the edge (MansionListController)
 	column.Size = UDim2.fromOffset(HUD_WIDTH, 0)
 	column.AutomaticSize = Enum.AutomaticSize.Y
 	column.BackgroundTransparency = 1
@@ -108,19 +108,11 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 		Color3.fromRGB(120, 70, 200),
 		if keys then "Return Charm (R)" else "Return Charm"
 	)
-	-- LayoutOrder 5.1, 5.2, 5.3: between the charm and the Mansion button.
+	-- LayoutOrder 5.1, 5.2, 5.3: between the charm and the Backpack.
 	local bells: { TextButton } = {}
 	for i, kind in Bells do
 		table.insert(bells, itemButton(kind.id, 5 + i / 10, kind.color, kind.name))
 	end
-	-- Always there; MansionListController lists your mansion monsters with it.
-	local mansion = itemButton(
-		"Mansion",
-		6,
-		Color3.fromRGB(90, 50, 90),
-		if keys then "☰ Mansion (M)" else "☰ Mansion"
-	)
-	mansion.Visible = true
 	-- Always there; InventoryController opens the Backpack with it.
 	local backpack =
 		itemButton("Backpack", 7, Color3.fromRGB(70, 60, 110), if keys then "Backpack (G)" else "Backpack")

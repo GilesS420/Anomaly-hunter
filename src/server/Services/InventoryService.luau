@@ -32,6 +32,7 @@ local Format = require(ReplicatedStorage.Shared.Util.Format)
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.Inventory)
 local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
+local Rarities = require(ReplicatedStorage.Shared.Config.Rarities)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
@@ -53,6 +54,8 @@ export type MonsterRow = {
 	details: string, -- "Big Rare · Ghost · $1.2M"
 	color: Color3, -- rarity colour
 	value: string, -- "$1.2M"
+	worth: number, -- the sell price as a number, for sorting
+	rarityOrder: number, -- Config/Rarities order (Common 1, Divine 7), for sorting
 	look: string, -- the preview model's name in InventoryPreviews
 	stored: boolean,
 	locked: boolean,
@@ -155,6 +158,8 @@ local function monsterRow(caught: Value.CaughtMonster, stored: boolean, value: n
 		details = table.concat(parts, " · "),
 		color = MonsterModel.color(monster.rarity),
 		value = Format.money(value),
+		worth = value,
+		rarityOrder = if Rarities[monster.rarity] then Rarities[monster.rarity].order else 0,
 		look = lookOf(caught),
 		stored = stored,
 		locked = caught.locked == true,
