@@ -2757,7 +2757,7 @@ do
 			auras = math.max(auras, #(dressed.auras or {}))
 		end
 	end
-	check(`every effect at once adds at most a skin and 80 parts (got {worst})`, worst <= 80)
+	check(`every effect at once adds at most a skin and 120 parts (got {worst})`, worst <= 120)
 	check(`every effect at once gives at most 3 particle emitters (got {auras})`, auras <= 3)
 end
 

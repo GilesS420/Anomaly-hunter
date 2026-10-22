@@ -33,10 +33,12 @@
 -- Monsters can stack every effect, and each skin, band set or tuft set copies the monster's
 -- parts again (one with every effect came to 500+ parts and 40 particle emitters, which tanks
 -- the frame rate). Skins all sit at the same spot, so only the outermost was ever visible
--- anyway. So a monster draws at most one shell, one wrap and one fur (the newest effect's),
--- MaxExtraGroups groups of extras and MaxAuras particle emitters. Colours still mix from every
--- effect, and every effect still counts for value.
+-- anyway. So a monster draws at most one shell, one wrap and one fur (its most valuable
+-- effect's), the MaxExtraGroups most valuable groups of extras and MaxAuras particle emitters,
+-- so a rare effect always shows. Colours still mix from every effect, and every effect still
+-- counts for value.
 
+local Effects = require("./Effects")
 local Looks = require("./Looks")
 
 local MaxExtraGroups = 3
@@ -1024,9 +1026,22 @@ end
 
 -- The look with effects (already merged into combos, see Value.resolveEffects) and the
 -- catch variant applied. With nothing to apply it returns the look itself.
+-- How much an effect or combo is worth (unknown ids count as nothing).
+local function worth(id: string): number
+	local effect = Effects.List[id] or Effects.Combos[id]
+	return if effect then effect.multiplier else 0
+end
+
 function EffectLooks.dress(look: Looks.Look, effects: { string }?, variant: string?): DressedLook
+	-- Cheapest first, so the most valuable effects are the ones whose skin and extras show
+	-- (see the top), whatever order the monster got them in.
+	local ordered = table.clone(effects or {})
+	table.sort(ordered, function(a: string, b: string): boolean
+		local wa, wb = worth(a), worth(b)
+		return if wa ~= wb then wa < wb else a < b
+	end)
 	local styles: { Style } = {}
-	collect(effects or {}, styles, {})
+	collect(ordered, styles, {})
 	local variantStyle = if variant then EffectLooks.Styles[variant] else nil
 	if variantStyle then
 		table.insert(styles, variantStyle)
@@ -1063,7 +1078,7 @@ function EffectLooks.dress(look: Looks.Look, effects: { string }?, variant: stri
 			end
 		end
 	end
-	-- One shell, one wrap and one fur at most: the newest effect's (see the top).
+	-- One shell, one wrap and one fur at most: the most valuable effect's (see the top).
 	local shell: Style?, wrap: Style?, fur: Style? = nil, nil, nil
 	for _, style in effectStyles do
 		shell = if style.shell then style else shell
@@ -1090,7 +1105,8 @@ function EffectLooks.dress(look: Looks.Look, effects: { string }?, variant: stri
 		end
 		recolor(solid, variantStyle)
 	end
-	-- The newest extras and particles, a few at most (see the top); the variant's come first.
+	-- The most valuable effects' extras and particles, a few at most (see the top); the
+	-- variant's come first.
 	local stack: { [string]: number } = {}
 	local auras: { Aura } = {}
 	local groups = 0
