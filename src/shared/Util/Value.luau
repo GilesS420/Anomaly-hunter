@@ -46,11 +46,22 @@ function Value.variantMultiplier(variantId: string?): number
 	return if variantId then variantMultipliers[variantId] or 1 else 1
 end
 
+-- Combos, the strongest first: when one effect is in two recipes (Cursed, Moldy), the
+-- better combo takes it, the same way every time.
+local combosByStrength: { Effects.Combo } = {}
+for _, combo in Effects.Combos do
+	table.insert(combosByStrength, combo)
+end
+table.sort(combosByStrength, function(a, b)
+	return if a.multiplier == b.multiplier then a.id < b.id else a.multiplier > b.multiplier
+end)
+
 -- Turns a list of effect ids into effect and combo ids, merging any combo recipes.
 function Value.resolveEffects(effectIds: { string }): { string }
 	local remaining = table.clone(effectIds)
 	local resolved = {}
-	for comboId, combo in Effects.Combos do
+	for _, combo in combosByStrength do
+		local comboId = combo.id
 		local a = table.find(remaining, combo.recipe[1])
 		local b = table.find(remaining, combo.recipe[2])
 		if a and b then
@@ -128,14 +139,18 @@ end
 function Value.monsterEffectMultiplier(caught: CaughtMonster): number
 	local share = Value.CheapEffectShare
 		+ (1 - Value.CheapEffectShare) * (Value.priceShare(caught.monsterId) or 1)
-	local critter = 0
-	for _, id in caught.effects do
+	local critter, rest = 0, 0
+	for _, id in Value.resolveEffects(caught.effects) do
 		local effect = Effects.List[id]
-		if effect and effect.source == "Critter" then
-			critter += effect.multiplier - 1
+		local combo = Effects.Combos[id]
+		assert(effect or combo, "unknown effect " .. id)
+		local multiplier = if effect then effect.multiplier elseif combo then combo.multiplier else 1
+		if (effect and effect.source == "Critter") or (combo and combo.critter) then
+			critter += multiplier - 1
+		else
+			rest += multiplier - 1
 		end
 	end
-	local rest = Value.effectMultiplier(caught.effects) - 1 - critter
 	return 1 + rest * share + critter
 end
 
