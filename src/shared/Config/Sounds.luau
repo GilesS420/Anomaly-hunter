@@ -123,6 +123,19 @@ Sounds.Events = {
 		ambience = "Flicker",
 		musicVolume = 0.4,
 	},
+	MimicNight = {
+		warning = "FlickerWarning",
+		start = "BloodMoonStart",
+		ambience = "Flicker",
+		musicVolume = 0.4,
+	},
+	BreachStorm = {
+		warning = "WatcherAwakensWarning",
+		start = "BloodMoonStart",
+		ambience = "BloodMoon",
+		musicVolume = 0.3,
+		thunder = true,
+	},
 	-- the Watcher's organ and drone take over completely
 	WatcherAwakens = {
 		warning = "WatcherAwakensWarning",

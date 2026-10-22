@@ -2,7 +2,9 @@
 -- Catching: click or tap a wild monster. It freezes in your vacuum's beam and a catch meter
 -- fills by itself (1-3 seconds, longer for rarer monsters); no holding (Giles 2026-10-22).
 -- On the way the monster struggles (Config/Struggles): the meter stops and you must tap while
--- a sweeping needle is in a zone. Miss, or wait too long, and it breaks free. Walking out of
+-- a sweeping needle is in a zone. Miss, or wait too long, and it breaks free. Rare and event
+-- monsters then throw the Lucky Ring: tap as it lines up and the catch lands at once with a
+-- better shot at a variant; miss and the meter drops back to half. Walking out of
 -- reach or getting knocked out lets it escape too (dazed for a moment, so you can grab it
 -- again).
 -- The client only says "start catching this", "stop" and "tapped at"; every rule is checked
@@ -14,7 +16,9 @@
 --               catching stopped needing a hold; kept so an older client can't break it)
 --   Strike      client -> server (serverTime the player tapped)
 --   State       server -> client ("Holding", {model, seconds}), ("Struggle", {model, startedAt,
---               speed, centre, width, timeout}), ("Struggled", {model}) or ("Ended", {result, model})
+--               speed, centre, width, timeout}), ("Struggled", {model}), ("Ring", {model,
+--               startedAt, seconds, startScale, window}), ("Ringed", {model, hit}) or ("Ended",
+--               {result, model})
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -48,6 +52,8 @@ type Hold = {
 	plan: Catching.StrugglePlan,
 	nextMark: number, -- index into plan.marks of the next struggle
 	struggle: { startedAt: number, centre: number }?, -- the struggle going on now
+	ring: number?, -- server time the Lucky Ring appeared, while it's up
+	ringDone: boolean, -- the Lucky Ring has come (once per catch)
 	glow: Highlight,
 	beam: Beam,
 	from: Attachment, -- on the hunter
@@ -74,7 +80,7 @@ end
 local StartCatch = remote("StartCatch") -- client -> server: (model)
 local StopCatch = remote("StopCatch") -- client -> server: ()
 local Strike = remote("Strike") -- client -> server: (serverTime of the tap)
-local State = remote("State") -- server -> client: ("Holding" | "Struggle" | "Struggled" | "Ended", info)
+local State = remote("State") -- server -> client: ("Holding" | "Struggle" | "Struggled" | "Ring" | "Ringed" | "Ended", info)
 
 -- Shop names by item id ("PhantomVac" -> "Phantom Vac"), and vacuum names by tier.
 local itemNames: { [string]: string } = {}
@@ -160,7 +166,8 @@ local function release(player: Player, message: string?)
 	end
 end
 
-local function finish(player: Player)
+-- lucky: landed with the Lucky Ring (a better shot at a variant).
+local function finish(player: Player, lucky: boolean?)
 	local hold = clear(player)
 	if not hold then
 		return
@@ -184,9 +191,10 @@ local function finish(player: Player)
 		State:FireClient(player, "Ended", { result = "Escaped", model = model })
 		return
 	end
+	local boost = if lucky then Struggles.Ring.variantBoost else nil
 	local caught = if inHub
-		then WatcherService.capture(model, vacuumId)
-		else SpawnService.capture(model, vacuumId)
+		then WatcherService.capture(model, vacuumId, boost)
+		else SpawnService.capture(model, vacuumId, boost)
 	if not caught then
 		State:FireClient(player, "Ended", { result = "Gone", model = model })
 		return
@@ -217,7 +225,8 @@ local function finish(player: Player)
 		bonus = ` Bonus: {table.concat(names, " and ")}!`
 	end
 	local variant = if caught.variant then `{caught.variant} ` else ""
-	Notify.toast(player, `Caught a {variant}{caught.size} {hold.name}!{bonus} {afterward}`)
+	local perfect = if lucky then "PERFECT CATCH! " else ""
+	Notify.toast(player, `{perfect}Caught a {variant}{caught.size} {hold.name}!{bonus} {afterward}`)
 	State:FireClient(player, "Ended", { result = "Caught", monsterId = caught.monsterId, model = model })
 end
 
@@ -374,6 +383,8 @@ local function onStartCatch(player: Player, model: unknown)
 		plan = plan,
 		nextMark = 1,
 		struggle = nil,
+		ring = nil,
+		ringDone = false,
 		glow = glow,
 		beam = beam,
 		from = from,
@@ -420,10 +431,37 @@ local function endStruggle(player: Player, hold: Hold, serverNow: number)
 	State:FireClient(player, "Struggled", { model = hold.model })
 end
 
+-- The Lucky Ring appears: the meter stops while it shrinks.
+local function beginRing(player: Player, hold: Hold, serverNow: number)
+	hold.filled = (hold.plan.ring :: number) * hold.total
+	hold.ring = serverNow
+	hold.ringDone = true
+	hold.model:SetAttribute("CatchPaused", hold.filled / hold.total)
+	local ring = Struggles.Ring
+	State:FireClient(player, "Ring", {
+		model = hold.model,
+		startedAt = serverNow,
+		seconds = ring.seconds,
+		startScale = ring.startScale,
+		window = ring.window,
+	})
+end
+
+-- Missed the ring: the monster jerks the meter back, then it fills on from there.
+local function missRing(player: Player, hold: Hold, serverNow: number)
+	hold.ring = nil
+	hold.filled = math.min(hold.filled, Struggles.Ring.fallBack * hold.total)
+	hold.fillStart = serverNow
+	hold.model:SetAttribute("CatchPaused", nil)
+	hold.model:SetAttribute("CatchStart", serverNow - hold.filled)
+	hold.model:SetAttribute("CatchEnd", serverNow - hold.filled + hold.total)
+	State:FireClient(player, "Ringed", { model = hold.model, hit = false })
+	Notify.toast(player, `{hold.name} jerked back! Keep going.`)
+end
+
 local function onStrike(player: Player, tappedAt: unknown)
 	local hold = holds[player]
-	local struggle = hold and hold.struggle
-	if not hold or not struggle then
+	if not hold or not (hold.struggle or hold.ring) then
 		return
 	end
 	local serverNow = workspace:GetServerTimeNow()
@@ -434,6 +472,17 @@ local function onStrike(player: Player, tappedAt: unknown)
 			and tappedAt >= serverNow - Struggles.LagAllowance
 		then tappedAt
 		else serverNow
+	local ringAt = hold.ring
+	if ringAt then
+		if Catching.ringHit(at - ringAt) then
+			State:FireClient(player, "Ringed", { model = hold.model, hit = true })
+			finish(player, true)
+		else
+			missRing(player, hold, serverNow)
+		end
+		return
+	end
+	local struggle = hold.struggle :: { startedAt: number, centre: number }
 	if Catching.struggleHit(at - struggle.startedAt, hold.plan.speed, struggle.centre, hold.plan.zone) then
 		endStruggle(player, hold, serverNow)
 	else
@@ -459,11 +508,18 @@ local function update()
 			if serverNow - struggle.startedAt > Struggles.TimeoutSeconds + Struggles.LagAllowance then
 				release(player, `{hold.name} broke free! Tap when the needle is in the zone.`)
 			end
+		elseif hold.ring then
+			if serverNow - hold.ring > Struggles.Ring.seconds + Struggles.LagAllowance then
+				missRing(player, hold, serverNow)
+			end
 		else
 			local filled = hold.filled + (serverNow - hold.fillStart)
 			local mark = hold.plan.marks[hold.nextMark]
+			local ring = hold.plan.ring
 			if mark and filled >= mark * hold.total then
 				beginStruggle(player, hold, serverNow)
+			elseif ring and not hold.ringDone and filled >= ring * hold.total then
+				beginRing(player, hold, serverNow)
 			elseif filled >= hold.total then
 				finish(player)
 			end
@@ -486,7 +542,7 @@ function CatchService.start()
 	StopCatch.OnServerEvent:Connect(function(player)
 		pendingStart[player] = nil
 		local hold = holds[player]
-		if hold and not hold.struggle then -- letting go mid-struggle is how a fresh tap starts
+		if hold and not hold.struggle and not hold.ring then -- an old client lets go to tap
 			release(player, `{hold.name} got away!`)
 		end
 	end)

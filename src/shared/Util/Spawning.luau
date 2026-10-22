@@ -160,8 +160,8 @@ function Spawning.rollCatchEffects(vacuumId: string, random: Random?): { string 
 end
 
 -- The catch variant a monster gets (nil for none): rarest first, each with the vacuum's
--- chance for it, so a catch never gets two.
-function Spawning.rollVariant(vacuumId: string, random: Random?): string?
+-- chance for it (times boost: a Lucky Ring catch, Config/Struggles), so a catch never gets two.
+function Spawning.rollVariant(vacuumId: string, random: Random?, boost: number?): string?
 	local vacuum = Tools.Vacuums[vacuumId]
 	local chances = if vacuum then vacuum.variants else nil
 	if not chances then
@@ -169,7 +169,7 @@ function Spawning.rollVariant(vacuumId: string, random: Random?): string?
 	end
 	for _, variant in Variants do
 		local chance = chances[variant.id]
-		if chance and Rng.chance(chance, random) then
+		if chance and Rng.chance(math.min(chance * (boost or 1), 100), random) then
 			return variant.id
 		end
 	end

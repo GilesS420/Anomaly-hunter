@@ -190,6 +190,16 @@ Shop.Bakery = {
 		event = "BloodMoon",
 	},
 	{
+		id = "RiftRoll",
+		name = "Rift Roll",
+		kind = "Food",
+		price = 350_000_000,
+		restockChance = 100,
+		rarity = "Event",
+		grantsEffect = "Rifted",
+		event = "BreachStorm",
+	},
+	{
 		id = "BoneMarrowMousse",
 		name = "Bone Marrow Mousse",
 		kind = "Food",
@@ -206,6 +216,16 @@ Shop.Bakery = {
 		restockChance = 2,
 		rarity = "Legendary",
 		grantsEffect = "Buried",
+	},
+	{
+		id = "MimicMacaron",
+		name = "Mimic Macaron",
+		kind = "Food",
+		price = 1_500_000_000,
+		restockChance = 100,
+		rarity = "Event",
+		grantsEffect = "Mimic",
+		event = "MimicNight",
 	},
 	{
 		id = "WitchsBrewTart",

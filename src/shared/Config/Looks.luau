@@ -7355,4 +7355,275 @@ Looks.EyeOfTheWatcher = {
 	},
 }
 
+-- Mimic Night, Phantom: a wooden crate on four crab legs. Its lid chomps up and down on two rows
+-- of teeth, a tongue lolls out, and two hungry eyes glare from under the lid.
+local CrateWood = { 150, 105, 60 }
+local CrateDark = { 95, 62, 35 }
+local Tongue = { 220, 90, 120 }
+local MimicEye = { 255, 220, 80 }
+local crateLid = 30 -- the lid stands open this far (degrees)
+Looks.CrateMimic = {
+	gait = "walk",
+	top = 1.7,
+	grow = 2,
+	pieces = {
+		block("Box", { 1.8, 1.4, 1.6 }, { 0, 0, 0 }, CrateWood),
+		block("Inside", { 1.6, 0.05, 1.4 }, { 0, 0.71, 0 }, Black),
+		block("PlankLow", { 1.82, 0.08, 0.05 }, { 0, -0.3, -0.81 }, CrateDark),
+		block("PlankHigh", { 1.82, 0.08, 0.05 }, { 0, 0.15, -0.81 }, CrateDark),
+		block("LeftBand", { 0.14, 1.42, 0.05 }, { -0.84, 0, -0.82 }, Iron),
+		block("RightBand", { 0.14, 1.42, 0.05 }, { 0.84, 0, -0.82 }, Iron),
+		block("Nail1", { 0.08, 0.08, 0.04 }, { -0.84, 0.5, -0.85 }, { 170, 170, 175 }),
+		block("Nail2", { 0.08, 0.08, 0.04 }, { 0.84, 0.5, -0.85 }, { 170, 170, 175 }),
+		block("LeftEye", { 0.32, 0.22, 0.05 }, { -0.45, 0.42, -0.83 }, MimicEye, true),
+		block("RightEye", { 0.32, 0.22, 0.05 }, { 0.45, 0.42, -0.83 }, MimicEye, true),
+		block("LeftPupil", { 0.1, 0.18, 0.04 }, { -0.45, 0.42, -0.86 }, Black),
+		block("RightPupil", { 0.1, 0.18, 0.04 }, { 0.45, 0.42, -0.86 }, Black),
+		tilt(block("LeftBrow", { 0.4, 0.08, 0.05 }, { -0.45, 0.6, -0.83 }, Black), 0, 0, -20),
+		tilt(block("RightBrow", { 0.4, 0.08, 0.05 }, { 0.45, 0.6, -0.83 }, Black), 0, 0, 20),
+		block("Tooth1", { 0.14, 0.2, 0.08 }, { -0.6, 0.8, -0.72 }, White),
+		block("Tooth2", { 0.14, 0.2, 0.08 }, { -0.3, 0.8, -0.72 }, White),
+		block("Tooth3", { 0.14, 0.2, 0.08 }, { 0, 0.8, -0.72 }, White),
+		block("Tooth4", { 0.14, 0.2, 0.08 }, { 0.3, 0.8, -0.72 }, White),
+		block("Tooth5", { 0.14, 0.2, 0.08 }, { 0.6, 0.8, -0.72 }, White),
+		limb("Tongue", { 0.5, 0.1, 0.9 }, { 0, 0.76, -0.95 }, Tongue, "X", 12, 2, 0.3, { 0, 0, 0.45 }),
+		tilt(
+			limb("Lid", { 1.9, 0.25, 1.7 }, { 0, 1.23, 0.18 }, CrateWood, "X", 12, 2, 0, { 0, -0.13, 0.85 }),
+			crateLid,
+			0,
+			0
+		),
+		tilt(
+			limb(
+				"LidPlank",
+				{ 1.92, 0.27, 0.12 },
+				{ 0, 1.23, 0.18 },
+				CrateDark,
+				"X",
+				12,
+				2,
+				0,
+				{ 0, -0.13, 0.85 }
+			),
+			crateLid,
+			0,
+			0
+		),
+		tilt(
+			limb(
+				"LidTooth1",
+				{ 0.14, 0.2, 0.08 },
+				{ -0.45, 1.46, -0.62 },
+				White,
+				"X",
+				12,
+				2,
+				0,
+				{ 0, 0.07, 1.65 }
+			),
+			crateLid,
+			0,
+			0
+		),
+		tilt(
+			limb(
+				"LidTooth2",
+				{ 0.14, 0.2, 0.08 },
+				{ -0.15, 1.46, -0.62 },
+				White,
+				"X",
+				12,
+				2,
+				0,
+				{ 0, 0.07, 1.65 }
+			),
+			crateLid,
+			0,
+			0
+		),
+		tilt(
+			limb(
+				"LidTooth3",
+				{ 0.14, 0.2, 0.08 },
+				{ 0.15, 1.46, -0.62 },
+				White,
+				"X",
+				12,
+				2,
+				0,
+				{ 0, 0.07, 1.65 }
+			),
+			crateLid,
+			0,
+			0
+		),
+		tilt(
+			limb(
+				"LidTooth4",
+				{ 0.14, 0.2, 0.08 },
+				{ 0.45, 1.46, -0.62 },
+				White,
+				"X",
+				12,
+				2,
+				0,
+				{ 0, 0.07, 1.65 }
+			),
+			crateLid,
+			0,
+			0
+		),
+		limb(
+			"FrontLeftLeg",
+			{ 0.25, 1.3, 0.25 },
+			{ -0.6, -1.35, -0.5 },
+			CrateDark,
+			"X",
+			30,
+			2.5,
+			0,
+			{ 0, 0.65, 0 }
+		),
+		limb(
+			"FrontRightLeg",
+			{ 0.25, 1.3, 0.25 },
+			{ 0.6, -1.35, -0.5 },
+			CrateDark,
+			"X",
+			30,
+			2.5,
+			0.5,
+			{ 0, 0.65, 0 }
+		),
+		limb(
+			"BackLeftLeg",
+			{ 0.25, 1.3, 0.25 },
+			{ -0.6, -1.35, 0.5 },
+			CrateDark,
+			"X",
+			30,
+			2.5,
+			0.5,
+			{ 0, 0.65, 0 }
+		),
+		limb(
+			"BackRightLeg",
+			{ 0.25, 1.3, 0.25 },
+			{ 0.6, -1.35, 0.5 },
+			CrateDark,
+			"X",
+			30,
+			2.5,
+			0,
+			{ 0, 0.65, 0 }
+		),
+	},
+}
+
+-- Mimic Night, Phantom: an old barrel that hops on two stubby legs. A jagged mouth splits its
+-- front, its lid rattles up and down, and little claws poke out of its sides.
+local BarrelWood = { 125, 80, 45 }
+local BarrelBand = { 60, 60, 65 }
+Looks.BarrelMimic = {
+	gait = "walk",
+	top = 1.15,
+	grow = 2,
+	pieces = {
+		tilt({
+			name = "Barrel",
+			size = { 1.8, 1.5, 1.5 },
+			at = { 0, 0, 0 },
+			color = BarrelWood,
+			shape = "Cylinder",
+		}, 0, 0, 90),
+		tilt({
+			name = "TopBand",
+			size = { 0.12, 1.58, 1.58 },
+			at = { 0, 0.6, 0 },
+			color = BarrelBand,
+			shape = "Cylinder",
+		}, 0, 0, 90),
+		tilt({
+			name = "LowBand",
+			size = { 0.12, 1.58, 1.58 },
+			at = { 0, -0.6, 0 },
+			color = BarrelBand,
+			shape = "Cylinder",
+		}, 0, 0, 90),
+		tilt(
+			slide({
+				name = "Lid",
+				size = { 0.15, 1.4, 1.4 },
+				at = { 0, 0.97, 0 },
+				color = BarrelBand,
+				shape = "Cylinder",
+				joint = { axis = "X", amp = 0.15, speed = 3 },
+			}),
+			0,
+			0,
+			90
+		),
+		block("Mouth", { 0.95, 0.5, 0.1 }, { 0, 0.05, -0.72 }, Black),
+		block("Gum", { 0.95, 0.06, 0.1 }, { 0, 0.3, -0.73 }, Blood),
+		block("Tooth1", { 0.12, 0.18, 0.06 }, { -0.33, 0.21, -0.78 }, White),
+		block("Tooth2", { 0.12, 0.18, 0.06 }, { -0.11, 0.21, -0.78 }, White),
+		block("Tooth3", { 0.12, 0.18, 0.06 }, { 0.11, 0.21, -0.78 }, White),
+		block("Tooth4", { 0.12, 0.18, 0.06 }, { 0.33, 0.21, -0.78 }, White),
+		block("LowTooth1", { 0.12, 0.16, 0.06 }, { -0.22, -0.12, -0.78 }, White),
+		block("LowTooth2", { 0.12, 0.16, 0.06 }, { 0, -0.12, -0.78 }, White),
+		block("LowTooth3", { 0.12, 0.16, 0.06 }, { 0.22, -0.12, -0.78 }, White),
+		limb("Tongue", { 0.35, 0.08, 0.5 }, { 0.1, -0.12, -0.95 }, Tongue, "Y", 20, 2, 0, { 0, 0, 0.25 }),
+		block("LeftEye", { 0.26, 0.26, 0.05 }, { -0.3, 0.55, -0.74 }, MimicEye, true),
+		block("RightEye", { 0.26, 0.26, 0.05 }, { 0.3, 0.55, -0.74 }, MimicEye, true),
+		block("LeftPupil", { 0.09, 0.2, 0.04 }, { -0.3, 0.55, -0.77 }, Black),
+		block("RightPupil", { 0.09, 0.2, 0.04 }, { 0.3, 0.55, -0.77 }, Black),
+		limb(
+			"LeftArm",
+			{ 0.18, 0.6, 0.18 },
+			{ -0.85, -0.05, -0.1 },
+			BarrelWood,
+			"Z",
+			25,
+			2,
+			0,
+			{ 0, 0.3, 0 }
+		),
+		limb("LeftClaw", { 0.25, 0.15, 0.25 }, { -0.85, -0.4, -0.1 }, Bone, "Z", 25, 2, 0, { 0, 0.65, 0 }),
+		limb(
+			"RightArm",
+			{ 0.18, 0.6, 0.18 },
+			{ 0.85, -0.05, -0.1 },
+			BarrelWood,
+			"Z",
+			-25,
+			2,
+			0,
+			{ 0, 0.3, 0 }
+		),
+		limb("RightClaw", { 0.25, 0.15, 0.25 }, { 0.85, -0.4, -0.1 }, Bone, "Z", -25, 2, 0, { 0, 0.65, 0 }),
+		limb(
+			"LeftLeg",
+			{ 0.35, 1.1, 0.35 },
+			{ -0.35, -1.45, 0 },
+			BarrelBand,
+			"X",
+			30,
+			2.5,
+			0,
+			{ 0, 0.55, 0 }
+		),
+		limb(
+			"RightLeg",
+			{ 0.35, 1.1, 0.35 },
+			{ 0.35, -1.45, 0 },
+			BarrelBand,
+			"X",
+			30,
+			2.5,
+			0.5,
+			{ 0, 0.55, 0 }
+		),
+	},
+}
+
 return Looks

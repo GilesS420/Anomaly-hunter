@@ -71,6 +71,7 @@ Effects.List = {
 	Cursed = { id = "Cursed", multiplier = 5, source = "Food", from = "CursedCake" },
 	Bloodmoon = { id = "Bloodmoon", multiplier = 6, source = "Event", from = "BloodMoon" },
 	Mimic = { id = "Mimic", multiplier = 8, source = "Event", from = "MimicNight" },
+	Rifted = { id = "Rifted", multiplier = 6, source = "Event", from = "BreachStorm" },
 	Hexed = { id = "Hexed", multiplier = 8, source = "Food", from = "WitchsBrewTart" },
 	Eclipsed = { id = "Eclipsed", multiplier = 15, source = "Food", from = "EclipseEclair" },
 	Watched = { id = "Watched", multiplier = 20, source = "Survive", from = "WatcherAwakens" },

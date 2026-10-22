@@ -12,6 +12,7 @@
 --   /summon           starts the next Watcher event right away (skipping its warning)
 --   /event BloodMoon  starts that Watcher event right away (/event alone lists them;
 --                     any capitals: /event frostfog works too)
+--   /ghost            the Golden Ghost zips through the hub right now
 --   /give VoidVac     gives a Workshop item or Bakery cake for free (tools are equipped;
 --                     /give BaitBell 5 or /give PumpkinCandy 3 gives several)
 --   /haunt            every monster in your mansion picks up a roaming effect right now
@@ -25,7 +26,7 @@
 --                     add a size: /spawn TheBogKing Huge). Only you can catch it and it never
 --                     attacks. /spawn all brings every monster of the zone you're in.
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
--- Any command but /summon, /event and /reset can be run on another player in the server, or
+-- Any command but /summon, /event, /ghost and /reset can be run on another player in the server, or
 -- on everyone in it: pick them at the top of the panel, or end a chat command with @name
 -- (/money 5m @Biggie) or @all.
 -- The results come back to the admin, starting with that player's name.
@@ -52,6 +53,7 @@ local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local CakeService = require(script.Parent.CakeService)
 local CareService = require(script.Parent.CareService)
 local DataService = require(script.Parent.DataService)
+local GoldenGhostService = require(script.Parent.GoldenGhostService)
 local HauntService = require(script.Parent.HauntService)
 local HuntService = require(script.Parent.HuntService)
 local MonsterAiService = require(script.Parent.MonsterAiService)
@@ -158,6 +160,12 @@ end
 commands["/summon"] = function(_, _, tell)
 	if not WatcherService.summon() then
 		tell("An event is already playing. Wait for it to end first.")
+	end
+end
+
+commands["/ghost"] = function(_, _, tell)
+	if not GoldenGhostService.spawn() then
+		tell("The Golden Ghost is already out.")
 	end
 end
 
@@ -314,7 +322,8 @@ end
 local MaxArgumentLength = 60
 
 -- Commands that act on the whole server or only ever on yourself: a picked player is ignored.
-local untargeted: { [string]: boolean } = { ["/summon"] = true, ["/event"] = true, ["/reset"] = true }
+local untargeted: { [string]: boolean } =
+	{ ["/summon"] = true, ["/event"] = true, ["/ghost"] = true, ["/reset"] = true }
 
 -- Runs one command for an admin, on `target` (another player in the server) or on the admin.
 -- Anything else (not an admin, unknown command, odd argument) is ignored.

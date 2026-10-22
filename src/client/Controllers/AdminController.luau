@@ -488,6 +488,10 @@ local function build()
 	button(nextRow, "Start next now", Ui.Colors.sell, 140, function()
 		send("/summon")
 	end)
+	local ghostRow = row(server, "Golden Ghost")
+	button(ghostRow, "Send it now", Ui.Colors.sell, 120, function()
+		send("/ghost")
+	end)
 
 	openTab("Player")
 end
