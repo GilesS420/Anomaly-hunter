@@ -122,7 +122,7 @@ local function textLine(parent: Instance, text: string, color: Color3, y: number
 	label.BackgroundTransparency = 1
 	label.Position = UDim2.fromScale(0, y)
 	label.Size = UDim2.fromScale(1, height)
-	label.Font = Enum.Font.GothamBold
+	label.Font = Enum.Font.FredokaOne
 	label.Text = text
 	label.TextColor3 = color
 	label.TextScaled = true
@@ -258,7 +258,14 @@ local function buildOwnedWing(state: State, wing: Wings.Wing, owned: { [string]:
 				now[spec.name] = was
 				old[spec.name] = nil
 			else
-				now[spec.name] = { key = key, part = Recipe.buildPart(spec, base, folder) }
+				local part = Recipe.buildPart(spec, base, folder)
+				-- No shadows from mansion lamps: eight mansions of shadow-casting lamps cost a
+				-- lot of FPS near the plots (the hub landmarks keep theirs).
+				local light = part:FindFirstChildOfClass("PointLight")
+				if light then
+					light.Shadows = false
+				end
+				now[spec.name] = { key = key, part = part }
 			end
 		end
 		for _, gone in old do

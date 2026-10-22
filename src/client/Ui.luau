@@ -74,7 +74,7 @@ function Ui.text(
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
 	label.Size = size
-	label.Font = if bold then Enum.Font.GothamBold else Enum.Font.Gotham
+	label.Font = if bold then Enum.Font.FredokaOne else Enum.Font.FredokaOne
 	label.Text = text
 	label.TextColor3 = color
 	label.TextScaled = true
@@ -87,8 +87,9 @@ function Ui.text(
 	return label
 end
 
--- The spooky title font.
-Ui.TitleFont = Enum.Font.Creepster
+-- Fonts (Giles picked set B, 2026-10-21): Luckiest Guy for titles, signs and banners;
+-- Fredoka One for all other text.
+Ui.TitleFont = Enum.Font.LuckiestGuy
 
 -- A thin outline round a frame or button.
 function Ui.rim(parent: Instance, color: Color3, thickness: number): UIStroke
@@ -123,7 +124,7 @@ end
 function Ui.button(parent: Instance, text: string, color: Color3, size: UDim2): TextButton
 	local button = Instance.new("TextButton")
 	button.Size = size
-	button.Font = Enum.Font.GothamBlack
+	button.Font = Enum.Font.FredokaOne
 	button.Text = text
 	button.TextColor3 = Ui.Colors.text
 	button.TextStrokeTransparency = 0.6

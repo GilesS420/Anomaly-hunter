@@ -2,7 +2,7 @@
 -- The Haunted Bakery: buy cakes to set out for your monsters. Hold the prompt at
 -- Workspace.Hub.Landmarks.Bakery to open the window. The stock changes every 5 minutes, at
 -- the same moment as the Workshop's and by the same rules (Util/Workshop), and you can buy up
--- to Shop.ConsumablesPerRestock of each cake per restock. Bought cakes go into your Roblox
+-- to a random number (Shop.StockMin to StockMax) of each cake per restock. Bought cakes go into your Roblox
 -- hotbar, where you hold one in your mansion and click to set it out (CakeService;
 -- Util/Cakes says what a cake does).
 --
@@ -97,7 +97,7 @@ local function viewFor(data: DataService.Data): View
 			inStock = inStock,
 			count = data.inventory[item.id] or 0,
 			bought = bought[item.id] or 0,
-			limit = Workshop.limit(item),
+			limit = Workshop.limit(item, slot),
 		})
 	end
 	table.sort(treats, function(a, b)
@@ -149,7 +149,7 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 	elseif check == "TooPoor" and item then
 		message = `You need {Format.money(item.price - data.money)} more for the {item.name}.`
 	elseif check == "SoldOut" and item then
-		message = `You bought all {Workshop.limit(item)} this restock. More in {countdown(
+		message = `You bought all {Workshop.limit(item, slot)} this restock. More in {countdown(
 			Workshop.restockAt(slot) - os.time()
 		)}.`
 	elseif check == "OutOfStock" and item and item.event then

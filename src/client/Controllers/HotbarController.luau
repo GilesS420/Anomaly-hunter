@@ -201,7 +201,7 @@ function HotbarController.start()
 		button.Name = `Slot{i}`
 		button.LayoutOrder = i
 		button.Visible = false
-		button.Font = Enum.Font.GothamBold
+		button.Font = Enum.Font.FredokaOne
 		button.TextWrapped = true
 		local limit = button:FindFirstChildOfClass("UITextSizeConstraint") :: UITextSizeConstraint
 		limit.MaxTextSize = 13

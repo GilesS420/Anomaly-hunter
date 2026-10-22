@@ -109,7 +109,7 @@ local function show(player: Player, saved: Cakes.Placed): Live?
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
 	label.Size = UDim2.fromScale(1, 1)
-	label.Font = Enum.Font.GothamBold
+	label.Font = Enum.Font.FredokaOne
 	label.TextScaled = true
 	label.TextColor3 = Color3.fromRGB(255, 220, 240)
 	label.TextStrokeTransparency = 0.4

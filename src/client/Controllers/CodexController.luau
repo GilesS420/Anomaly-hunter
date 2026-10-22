@@ -5,7 +5,8 @@
 --                  yet are a "?" with no name. Four dots on each card are the catch variants
 --                  (Silver, Gold, Shiny, Rainbow): each one lights up once you've caught that
 --                  monster in that colour. The strip above the cards counts how many you've
---                  found and how many of each variant, the extra goals for every page.
+--                  found and how many of each variant, the extra goals for every page, with
+--                  the money each goal pays once it's done (a tick once it's paid).
 --   Effects        every effect (unfound ones say where they come from) and the secret combos
 --                  (the recipe shows once you've made one).
 -- The look is a plain field journal: square numbered cards, flat tabs, and the goals as a
@@ -17,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 
+local Format = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"):WaitForChild("Format"))
 local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
@@ -32,9 +34,19 @@ type MonsterCard = {
 	variants: { [string]: boolean },
 	look: string?,
 }
-type Page = { id: string, title: string, progress: Progress, monsters: { MonsterCard } }
+type Rewards = { [string]: { amount: number, claimed: boolean } }
+type Page = { id: string, title: string, progress: Progress, monsters: { MonsterCard }, rewards: Rewards? }
 type EffectCard = { id: string, name: string, multiplier: number, found: boolean, hint: string, combo: boolean }
-type View = { pages: { Page }, effects: { EffectCard }, variants: { string } }
+type View = { pages: { Page }, effects: { EffectCard }, effectRewards: Rewards?, variants: { string } }
+
+-- " · $250K" for a goal still to do, " ✓" once it's paid.
+local function rewardText(rewards: Rewards?, goal: string): string
+	local reward = rewards and rewards[goal]
+	if not reward or reward.amount <= 0 then
+		return ""
+	end
+	return if reward.claimed then " ✓" else ` · {Format.money(reward.amount)}`
+end
 
 local EffectsTab = "Effects"
 
@@ -206,7 +218,7 @@ function CodexController.start()
 		label.BackgroundTransparency = 1
 		label.AutomaticSize = Enum.AutomaticSize.X
 		label.Size = UDim2.new(0, 0, 1, 0)
-		label.Font = Enum.Font.GothamMedium
+		label.Font = Enum.Font.FredokaOne
 		label.TextSize = if small then 13 else 15
 		label.TextColor3 = Ui.Colors.muted
 		label.Text = text
@@ -323,11 +335,19 @@ function CodexController.start()
 
 	local function monsterPage(page: Page, variants: { string })
 		local progress = page.progress
-		chip(1, `Found {progress.found}/{progress.total}`, Ui.Colors.lamp, false)
+		chip(
+			1,
+			`Found {progress.found}/{progress.total}{rewardText(page.rewards, "Found")}`,
+			Ui.Colors.lamp,
+			false
+		)
 		for i, variant in variants do
 			chip(
 				i + 1,
-				`{variant} {progress.variants[variant] or 0}/{progress.total}`,
+				`{variant} {progress.variants[variant] or 0}/{progress.total}{rewardText(
+					page.rewards,
+					variant
+				)}`,
 				VariantColor[variant] or Ui.Colors.muted,
 				variant == "Rainbow"
 			)
@@ -360,7 +380,7 @@ function CodexController.start()
 		end
 	end
 
-	local function effectsPage(effects: { EffectCard })
+	local function effectsPage(effects: { EffectCard }, rewards: Rewards?)
 		local found, total, combos, comboTotal = 0, 0, 0, 0
 		for _, effect in effects do
 			if effect.combo then
@@ -371,8 +391,8 @@ function CodexController.start()
 				found += if effect.found then 1 else 0
 			end
 		end
-		chip(1, `Effects {found}/{total}`, Ui.Colors.lamp, false)
-		chip(2, `Secret combos {combos}/{comboTotal}`, Ui.Colors.equip, false)
+		chip(1, `Effects {found}/{total}{rewardText(rewards, "Effects")}`, Ui.Colors.lamp, false)
+		chip(2, `Secret combos {combos}/{comboTotal}{rewardText(rewards, "Combos")}`, Ui.Colors.equip, false)
 		window.status.Text = "Haunted effects make monsters worth more. Combos are secret until you make one."
 		for i, effect in effects do
 			local key = `e:{effect.id}`
@@ -423,7 +443,7 @@ function CodexController.start()
 				button.BackgroundColor3 = Color3.fromRGB(40, 32, 54)
 				button.BorderSizePixel = 0
 				button.AutoButtonColor = true
-				button.Font = Enum.Font.GothamMedium
+				button.Font = Enum.Font.FredokaOne
 				button.TextSize = if small then 13 else 15
 				button.TextWrapped = true
 				button.TextXAlignment = Enum.TextXAlignment.Left
@@ -462,7 +482,7 @@ function CodexController.start()
 			end
 		end
 		if shown == EffectsTab then
-			effectsPage(current.effects)
+			effectsPage(current.effects, current.effectRewards)
 			return
 		end
 		for _, page in current.pages do

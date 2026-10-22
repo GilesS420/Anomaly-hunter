@@ -7,7 +7,7 @@ export type Destination = {
 	label: string, -- button text
 	color: { number }, -- button colour, RGB
 	-- Hub.Landmarks to land at: one, in front of it; two, at a spot just as far from both
-	-- (in front of the pair). None: the row of Zone Gates.
+	-- (in front of the pair). None: the gate of the newest zone the player has opened.
 	landmarks: { string }?,
 }
 

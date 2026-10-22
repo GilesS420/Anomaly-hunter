@@ -49,7 +49,7 @@ Tutorial.Text = {
 -- Shown under the guide card after HintSeconds on one step.
 Tutorial.Hints = {
 	Gate = "The Zone Gates are at the far end of the hub. Tap Portals to jump there.",
-	Catch = "Keep holding until the meter is full. Letting go early lets it get away.",
+	Catch = "Keep holding until the meter is full. When it struggles, tap as the needle crosses the green zone.",
 	Home = "Walk back through the exit arch you came in by.",
 	Pickup = "Go into your mansion and stand right next to the Gloomlet, then press E or tap the prompt.",
 	Sell = "Hold the Collector's prompt to open the sell window, then tap Sell.",
