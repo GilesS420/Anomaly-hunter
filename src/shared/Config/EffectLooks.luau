@@ -35,12 +35,13 @@
 -- the frame rate). Skins all sit at the same spot, so only the outermost was ever visible
 -- anyway. So a monster draws at most one shell, one wrap and one fur (its most valuable
 -- effect's), the MaxExtraGroups most valuable groups of extras and MaxAuras particle emitters,
--- so a rare effect always shows. Colours still mix from every effect, and every effect still
--- counts for value.
+-- so a rare effect always shows. Colours come from the MaxShown most valuable effects too:
+-- mixing every effect's tint turned monsters grey. Every effect still counts for value.
 
 local Effects = require("./Effects")
 local Looks = require("./Looks")
 
+local MaxShown = 3 -- effects drawn on a monster, the most valuable ones
 local MaxExtraGroups = 3
 local MaxAuras = 3
 
@@ -1033,13 +1034,16 @@ local function worth(id: string): number
 end
 
 function EffectLooks.dress(look: Looks.Look, effects: { string }?, variant: string?): DressedLook
-	-- Cheapest first, so the most valuable effects are the ones whose skin and extras show
-	-- (see the top), whatever order the monster got them in.
+	-- Only the most valuable few are drawn, cheapest first so the most valuable one's skin
+	-- shows (see the top), whatever order the monster got them in.
 	local ordered = table.clone(effects or {})
 	table.sort(ordered, function(a: string, b: string): boolean
 		local wa, wb = worth(a), worth(b)
 		return if wa ~= wb then wa < wb else a < b
 	end)
+	while #ordered > MaxShown do
+		table.remove(ordered, 1)
+	end
 	local styles: { Style } = {}
 	collect(ordered, styles, {})
 	local variantStyle = if variant then EffectLooks.Styles[variant] else nil
