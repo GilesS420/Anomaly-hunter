@@ -1508,6 +1508,31 @@ do
 		"a monster with every Roam effect picks up nothing",
 		Haunting.roll(monster(allRoam), 1, nil, random, true) == nil
 	)
+	check(
+		"a monster with RoamMaxPerMonster roaming effects picks up nothing more",
+		Haunting.roamCount({ "Vampire", "Batty", "Ghost" }) == 2
+			and Haunting.roll(monster({ "Vampire", "Batty", "Ghost" }), 1, nil, random, true) == nil
+	)
+	local frostEvent: any = nil
+	for _, event in Events.List do
+		if event.effect == "Frostbitten" then
+			frostEvent = event
+		end
+	end
+	check(
+		"a live event's effect still lands on a monster full of roaming effects",
+		frostEvent ~= nil
+			and Haunting.roll(monster({ "Vampire", "Batty" }), 1, frostEvent, random, true)
+				== "Frostbitten"
+	)
+	local busy = monster({})
+	busy.familiarity = 1
+	busy.grownAt = 0
+	Haunting.catchUp(busy, 1, 0, 30 * 24 * 3600, alwaysHit :: any)
+	check(
+		"a month away still stops at RoamMaxPerMonster roaming effects",
+		Haunting.roamCount(busy.effects) == Effects.RoamMaxPerMonster
+	)
 	-- Event effects: every launch event with an effect has a chance, and its effect exists.
 	local eventsOk = true
 	for _, event in Events.List do

@@ -34,6 +34,10 @@ Effects.RoamRollSeconds = 5 * 60
 Effects.RoamChance = 0.75 -- 1.5% a roll at 100% Familiarity: about 4 effects a day (Giles 2026-10-21: slower)
 Effects.RoamFamiliarityBonus = 1
 Effects.RoamOddsPerWing = 0.1
+-- At most this many roaming (Roam and Critter) effects per monster. With no limit every
+-- monster ended up with all five within a day or two and they all looked the same (Giles
+-- 2026-10-22); now each picks up its own mix, and cakes, vacuums and events give the rest.
+Effects.RoamMaxPerMonster = 2
 Effects.EventEffectWeight = 25
 
 -- Critter effects (Giles 2026-10-22): only monsters worth up to CritterMaxValue (base value)

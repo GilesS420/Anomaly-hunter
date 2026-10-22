@@ -41,6 +41,18 @@ function Haunting.pool(eventEffect: string?): { Option }
 	return options
 end
 
+-- How many roaming (Roam and Critter) effects the monster has.
+function Haunting.roamCount(effects: { string }): number
+	local count = 0
+	for _, id in effects do
+		local effect = Effects.List[id]
+		if effect and (effect.source == "Roam" or effect.source == "Critter") then
+			count += 1
+		end
+	end
+	return count
+end
+
 -- One roll for a monster: the effect it picks up, or nil. It only picks effects the monster doesn't have yet that still fit. force skips the
 -- chance (Studio /haunt). Doesn't change the monster.
 function Haunting.roll(
@@ -51,11 +63,19 @@ function Haunting.roll(
 	force: boolean?
 ): string?
 	local odds = if event then event.effectOddsMultiplier else nil
+	local full = Haunting.roamCount(caught.effects) >= Effects.RoamMaxPerMonster
+	if full and not (event and event.effect) then
+		return nil -- only a live event's own effect can still land
+	end
 	if not force and not Rng.chance(Haunting.chance(caught.familiarity, wingsOwned, odds), random) then
 		return nil
 	end
 	local options = {}
 	for _, option in Haunting.pool(if event then event.effect else nil) do
+		local roaming = option.id ~= (if event then event.effect else nil)
+		if full and roaming then
+			continue
+		end
 		if Value.fits(caught.effects, option.id, caught.monsterId) == "Ok" then
 			table.insert(options, option)
 		end
@@ -93,11 +113,13 @@ function Haunting.catchUp(
 			table.insert(gained, effectId)
 		end
 		local left = false
-		for _, option in Haunting.pool(nil) do
-			left = left or Value.fits(caught.effects, option.id, caught.monsterId) == "Ok"
+		if Haunting.roamCount(caught.effects) < Effects.RoamMaxPerMonster then
+			for _, option in Haunting.pool(nil) do
+				left = left or Value.fits(caught.effects, option.id, caught.monsterId) == "Ok"
+			end
 		end
 		if not left then
-			break -- it has every roaming effect
+			break -- it has all the roaming effects it can get
 		end
 		at += Effects.RoamRollSeconds
 	end
