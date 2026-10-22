@@ -3,8 +3,8 @@
 --   * In the open hub (not on a mansion plot, not in a zone) hunters walk at
 --     Config/Travel.HubWalkSpeed; everywhere else at the normal StarterPlayer speed.
 --     A Slow attack (player attribute Slowed, MonsterAiService) always wins.
---   * Fast travel: the buttons at the top of the screen jump you to the Zone Gates, between
---     the Haunted Bakery and the Hunter's Workshop, or the Collector. Only from the hub and with nothing in your
+--   * Fast travel: the buttons at the top of the screen jump you to your own mansion, the
+--     Zone Gates, between the Haunted Bakery and the Hunter's Workshop, or the Collector. Only from the hub and with nothing in your
 --     vacuum, so it never replaces the Return Charm (which gets you OUT of a zone).
 --
 -- Remotes in ReplicatedStorage.TravelRemotes:
@@ -151,6 +151,9 @@ local function newestGateSpot(player: Player): CFrame?
 end
 
 local function destinationSpot(player: Player, destination: TravelConfig.Destination): CFrame?
+	if destination.home then
+		return PlotService.spawnCFrame(player)
+	end
 	local landmarks = destination.landmarks
 	if not landmarks or #landmarks == 0 then
 		return newestGateSpot(player)

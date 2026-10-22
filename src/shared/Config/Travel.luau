@@ -9,6 +9,7 @@ export type Destination = {
 	-- Hub.Landmarks to land at: one, in front of it; two, at a spot just as far from both
 	-- (in front of the pair). None: the gate of the newest zone the player has opened.
 	landmarks: { string }?,
+	home: boolean?, -- your own mansion plot instead (where you spawn)
 }
 
 return {
@@ -21,6 +22,8 @@ return {
 	-- Studs between where you land and the shop or the row of gates.
 	StandOff = 10,
 	Destinations = {
+		-- Giles 2026-10-22: a button to get home to your mansion.
+		{ id = "Home", label = "Mansion", color = { 120, 70, 190 }, home = true },
 		{ id = "Portals", label = "Portals", color = { 60, 140, 110 } },
 		{ id = "Shops", label = "Shops", color = { 160, 95, 170 }, landmarks = { "Bakery", "Workshop" } },
 		{ id = "Sell", label = "Sell", color = { 205, 135, 30 }, landmarks = { "Collector" } },

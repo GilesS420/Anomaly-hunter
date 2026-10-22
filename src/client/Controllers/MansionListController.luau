@@ -1,5 +1,5 @@
 --!strict
--- A slim arrow tab on the left edge of the screen that slides out a small list of the
+-- A slim arrow tab on the right edge of the screen that slides out a small list of the
 -- monsters in your mansion (Giles 2026-10-22: a sideways hamburger menu, not too big). Each
 -- row has a Pick up button, and the list sorts by price, rarity or name. M toggles it on a
 -- keyboard. Rows come from InventoryRemotes.GetView and picking up uses InventoryRemotes.Move,
@@ -72,7 +72,7 @@ function MansionListController.start()
 	-- The panel and its tab move together: shut, only the tab shows at the screen's edge.
 	local drawer = Instance.new("Frame")
 	drawer.Name = "Drawer"
-	drawer.AnchorPoint = Vector2.new(0, 0.5)
+	drawer.AnchorPoint = Vector2.new(1, 0.5) -- on the right edge: the left one holds the HUD
 	drawer.Size = UDim2.new(0, PANEL_WIDTH + TAB_WIDTH, 0.55, 0)
 	drawer.BackgroundTransparency = 1
 	drawer.Parent = gui
@@ -83,6 +83,7 @@ function MansionListController.start()
 
 	local panel = Instance.new("Frame")
 	panel.Name = "Panel"
+	panel.Position = UDim2.fromOffset(TAB_WIDTH - 2, 0)
 	panel.Size = UDim2.new(0, PANEL_WIDTH, 1, 0)
 	panel.BackgroundColor3 = Ui.Colors.panel
 	panel.BackgroundTransparency = 0.08
@@ -126,10 +127,10 @@ function MansionListController.start()
 	local tab = Instance.new("TextButton")
 	tab.Name = "Tab"
 	tab.AnchorPoint = Vector2.new(0, 0.5)
-	tab.Position = UDim2.new(0, PANEL_WIDTH - 2, 0.5, 0)
+	tab.Position = UDim2.fromScale(0, 0.5)
 	tab.Size = UDim2.fromOffset(TAB_WIDTH, 64)
 	tab.Font = Enum.Font.FredokaOne
-	tab.Text = "▶"
+	tab.Text = "◀"
 	tab.TextSize = 18
 	tab.TextColor3 = Ui.Colors.text
 	tab.Parent = drawer
@@ -221,8 +222,8 @@ function MansionListController.start()
 
 	-- Shut, the drawer sits off screen so only the tab sticks out.
 	local function place(animate: boolean)
-		local target = UDim2.new(0, if isOpen then 8 else -PANEL_WIDTH, 0.5, 0)
-		tab.Text = if isOpen then "◀" else "▶"
+		local target = UDim2.new(1, if isOpen then -8 else PANEL_WIDTH, 0.5, 0)
+		tab.Text = if isOpen then "▶" else "◀"
 		if animate then
 			TweenService:Create(drawer, TweenInfo.new(0.2, Enum.EasingStyle.Quad), { Position = target })
 				:Play()

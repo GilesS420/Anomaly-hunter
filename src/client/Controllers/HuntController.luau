@@ -62,7 +62,7 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 	local column = Instance.new("Frame")
 	column.Name = "Hud"
 	column.AnchorPoint = Vector2.new(0, 0.5)
-	column.Position = UDim2.new(0, 32, 0.5, 0) -- room for the mansion tab at the edge (MansionListController)
+	column.Position = UDim2.new(0, 16, 0.5, 0)
 	column.Size = UDim2.fromOffset(HUD_WIDTH, 0)
 	column.AutomaticSize = Enum.AutomaticSize.Y
 	column.BackgroundTransparency = 1
