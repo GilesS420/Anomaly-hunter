@@ -1,16 +1,17 @@
 --!strict
 -- Catch controls, the same with a mouse or a finger:
---   press and HOLD on a monster    your vacuum's beam freezes it, and
---                                  the catch meter fills by itself (about 1-3 seconds)
---   keep holding until it's full   caught! Bring it to the zone's Exit
---   let go early                   it gets away (but stays dazed for a moment, so try again)
---   it struggles                   the meter stops and a needle sweeps over a bar: tap (or
---                                  press Space or E) while it's in the glowing zone, then
---                                  keep holding. Miss and it breaks free (Config/Struggles)
+--   click or tap a monster         your vacuum's beam freezes it, and the catch meter fills
+--                                  by itself (about 1-3 seconds); no need to hold
+--   it struggles                   the meter stops and a needle sweeps over a bar: click or
+--                                  tap anywhere (or press F) while it's in the green zone.
+--                                  Miss and it breaks free, dazed for a moment, so try again
+--                                  (Config/Struggles)
+--   the meter is full              caught! Bring it to the zone's Exit
+--   walk out of reach              it gets away
 -- Only with a vacuum in your hand (or nothing, so the server can say to pick one): a press
 -- while holding a cake, a monster or the Bait Bell is that item's click, not a catch.
 -- No dragging and the camera never locks. The server decides everything (reach, vacuum
--- strength, timing, see server/Services/CatchService.luau); this only sends "start"/"stop"/
+-- strength, timing, see server/Services/CatchService.luau); this only sends "start" and
 -- "tapped at" and draws the meter.
 
 local CollectionService = game:GetService("CollectionService")
@@ -31,8 +32,7 @@ local RAY_LENGTH = 300 -- studs; the server checks the real reach
 local TAP_SLACK = 28 -- pixels around an orb that still count as pressing it (fingers are big)
 local BAR_MAX_WIDTH = 320
 
-local pressing: InputObject? = nil -- the mouse button or finger currently held down on a monster
-local target: Model? = nil -- the monster this press asked the server to catch (until let go)
+local target: Model? = nil -- the monster the last click asked the server to catch
 local held: Model? = nil -- the monster the server says we're catching right now
 local heldSeconds = 0 -- fallback timing if the model's attributes haven't arrived yet
 local heldSince = 0
@@ -110,7 +110,7 @@ local function monsterAt(screenPosition: Vector3): Model?
 	return best
 end
 
--- The meter near the bottom: "Hold! Catching Wisp Jack" over a bar that fills up.
+-- The meter near the bottom: "Catching Wisp Jack..." over a bar that fills up.
 -- 320 pixels wide, or half the screen on small phones.
 local function buildUi(): (Frame, TextLabel, Frame, Frame, Frame, Frame)
 	local gui = Instance.new("ScreenGui")
@@ -238,7 +238,6 @@ local FULL_COLOR = Color3.fromRGB(120, 255, 140)
 function CatchController.start()
 	local remotes = ReplicatedStorage:WaitForChild("CatchRemotes")
 	local StartCatch = remotes:WaitForChild("StartCatch") :: RemoteEvent
-	local StopCatch = remotes:WaitForChild("StopCatch") :: RemoteEvent
 	local State = remotes:WaitForChild("State") :: RemoteEvent
 
 	local Strike = remotes:WaitForChild("Strike") :: RemoteEvent
@@ -252,92 +251,39 @@ function CatchController.start()
 		track.Visible = false
 	end
 
-	-- The finger or button came up (or the window lost focus): stop if we started anything.
-	local function letGo()
-		local wasCatching = target ~= nil or held ~= nil
-		pressing = nil
+	local function stopShowing()
 		target = nil
 		held = nil
 		meter.Visible = false
 		endStruggle()
-		if wasCatching then
-			StopCatch:FireServer()
-		end
 	end
 
 	UserInputService.InputBegan:Connect(function(input, processed)
-		-- A finger whose release never arrived (it can happen on some phones) would otherwise
-		-- block every new press.
-		local current = pressing
-		if
-			current
-			and (
-				current.UserInputState == Enum.UserInputState.End
-				or current.UserInputState == Enum.UserInputState.Cancel
-			)
-		then
-			letGo()
-		end
-		-- Mid-struggle, any click or tap (or Space or E) is the tap; a new click or finger also
-		-- becomes the one to keep holding.
-		if struggle and held then
-			local key = input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.E
-			if (key and not processed) or (isPointer(input) and not processed) then
-				if not struck then
-					struck = true
-					Strike:FireServer(workspace:GetServerTimeNow())
-				end
-				if isPointer(input) and not pressing then
-					pressing = input
-				end
+		if held then
+			-- Catching: the meter fills by itself. Mid-struggle any click or tap (or F) is the
+			-- tap; other clicks do nothing, so they can't start a second catch.
+			local key = input.KeyCode == Enum.KeyCode.F
+			if struggle and not struck and not processed and (key or isPointer(input)) then
+				struck = true
+				Strike:FireServer(workspace:GetServerTimeNow())
 			end
 			return
 		end
-		if processed or not isPointer(input) or pressing or not handFree() then
+		if processed or not isPointer(input) or not handFree() then
 			return
 		end
 		local model = monsterAt(input.Position)
 		if not model then
 			return
 		end
-		pressing = input
 		target = model
 		StartCatch:FireServer(model)
-	end)
-
-	UserInputService.InputEnded:Connect(function(input)
-		local current = pressing
-		if not current then
-			return
-		end
-		local isSameTouch = rawequal(input, current)
-		local isMouseRelease = current.UserInputType == Enum.UserInputType.MouseButton1
-			and input.UserInputType == Enum.UserInputType.MouseButton1
-		if isSameTouch or isMouseRelease then
-			if struggle and held then
-				pressing = nil -- letting go mid-struggle is fine; the tap counts
-			else
-				letGo()
-			end
-		end
-	end)
-
-	-- Alt-tabbing away while holding the mouse never sends a release, so count it as one.
-	UserInputService.WindowFocusReleased:Connect(function()
-		if pressing then
-			letGo()
-		end
 	end)
 
 	State.OnClientEvent:Connect(function(kind: unknown, info: unknown)
 		if kind == "Holding" then
 			local model = if typeof(info) == "table" then (info :: any).model else nil
 			local seconds = if typeof(info) == "table" then (info :: any).seconds else nil
-			if not pressing then
-				-- Let go before the server answered: stop straight away.
-				StopCatch:FireServer()
-				return
-			end
 			if typeof(model) ~= "Instance" or not model:IsA("Model") or model ~= target then
 				-- An answer for an older press that we already stopped; ignore it.
 				return
@@ -347,7 +293,7 @@ function CatchController.start()
 			heldSince = os.clock()
 			local monsterId = model:GetAttribute("MonsterId")
 			local name = if typeof(monsterId) == "string" then Format.name(monsterId) else model.Name
-			holdText = `Hold! Catching {name}`
+			holdText = `Catching {name}...`
 			title.Text = holdText
 			fill.Size = UDim2.fromScale(0, 1)
 			fill.BackgroundColor3 = EMPTY_COLOR
@@ -370,8 +316,8 @@ function CatchController.start()
 			zone.Size = UDim2.fromScale(active.width, 1)
 			track.Visible = true
 			title.Text = if touch
-				then "It's struggling! TAP in the green!"
-				else "It's struggling! Click or SPACE in the green!"
+				then "It's struggling! TAP when the needle is in the green!"
+				else "It's struggling! CLICK (or F) when the needle is in the green!"
 		elseif kind == "Struggled" then
 			local data = if typeof(info) == "table" then info :: any else nil
 			if not data or data.model ~= held then
@@ -379,10 +325,6 @@ function CatchController.start()
 			end
 			endStruggle()
 			title.Text = holdText
-			if not pressing then
-				-- Tapped with a key after letting go: nothing is holding it any more.
-				letGo()
-			end
 		elseif kind == "Ended" then
 			-- Caught, escaped or gone; the server sends a message saying which.
 			-- An end for an older press (a quick re-tap on another monster) must not cancel
@@ -391,11 +333,7 @@ function CatchController.start()
 			if typeof(model) == "Instance" and model ~= target then
 				return
 			end
-			-- target stays set until the press ends, so letting go still sends StopCatch
-			-- (the server ignores it when nothing is being caught).
-			held = nil
-			meter.Visible = false
-			endStruggle()
+			stopShowing()
 		end
 	end)
 
