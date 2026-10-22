@@ -31,8 +31,9 @@ function Watcher.pool(): { Events.WatcherEvent }
 end
 
 -- The event that plays next. With all the eyes open it's The Watcher Awakens; otherwise one
--- picked by weight, never the one that just played (`lastId`).
-function Watcher.pick(lastId: string?, eyes: number, random: Random?): Events.WatcherEvent
+-- picked by weight, never one of the last Events.NoRepeat that played (`recent`, oldest
+-- first), so the same few don't keep coming round.
+function Watcher.pick(recent: { string }?, eyes: number, random: Random?): Events.WatcherEvent
 	if eyes >= Events.EyesToAwaken then
 		for _, event in Events.List do
 			if event.launch and event.awakening then
@@ -42,7 +43,7 @@ function Watcher.pick(lastId: string?, eyes: number, random: Random?): Events.Wa
 	end
 	local options: { Events.WatcherEvent } = {}
 	for _, event in Watcher.pool() do
-		if event.id ~= lastId then
+		if not table.find(recent or {}, event.id) then
 			table.insert(options, event)
 		end
 	end
@@ -72,20 +73,22 @@ Watcher.Epoch = 1792454400 -- 2026-10-20 00:00 UTC
 export type Slot = {
 	index: number,
 	event: Events.WatcherEvent,
+	recent: { string }, -- the events before this one (Events.NoRepeat of them, oldest first)
 	eyes: number, -- open before this event plays
 	warnAt: number, -- the calm ends and the warning starts
 	startAt: number, -- the event starts
 	endAt: number, -- the event ends and the next slot's calm starts
 }
 
-local function slot(index: number, from: number, eyes: number, lastId: string?): Slot
+local function slot(index: number, from: number, eyes: number, recent: { string }): Slot
 	local rng = Rng.seeded(`watcher:{index}`)
 	local warnAt = from + Watcher.gap(rng)
-	local event = Watcher.pick(lastId, eyes, rng)
+	local event = Watcher.pick(recent, eyes, rng)
 	local startAt = warnAt + Events.WarningSeconds
 	return {
 		index = index,
 		event = event,
+		recent = recent,
 		eyes = eyes,
 		warnAt = warnAt,
 		startAt = startAt,
@@ -94,18 +97,18 @@ local function slot(index: number, from: number, eyes: number, lastId: string?):
 end
 
 function Watcher.nextSlot(previous: Slot): Slot
-	return slot(
-		previous.index + 1,
-		previous.endAt,
-		Watcher.eyesAfter(previous.eyes, previous.event),
-		previous.event.id
-	)
+	local recent = table.clone(previous.recent)
+	table.insert(recent, previous.event.id)
+	while #recent > Events.NoRepeat do
+		table.remove(recent, 1)
+	end
+	return slot(previous.index + 1, previous.endAt, Watcher.eyesAfter(previous.eyes, previous.event), recent)
 end
 
 -- The slot that is in its calm, warning or event at `time`. Walks the schedule from Epoch,
 -- so call it once and then step with nextSlot.
 function Watcher.slotAt(time: number): Slot
-	local current = slot(1, Watcher.Epoch, 0, nil)
+	local current = slot(1, Watcher.Epoch, 0, {})
 	while current.endAt <= time do
 		current = Watcher.nextSlot(current)
 	end

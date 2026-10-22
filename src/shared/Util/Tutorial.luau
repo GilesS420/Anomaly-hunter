@@ -38,7 +38,7 @@ Tutorial.Unlocks = {
 -- What the guide card says for each step.
 Tutorial.Text = {
 	Gate = "Follow the glowing trail to the Pumpkin Graveyard gate, or tap Portals at the top.",
-	Catch = "Press 1 to hold your vacuum, then press and HOLD on the Gloomlet to catch it.",
+	Catch = "Press 1 to hold your vacuum, then click the Gloomlet to catch it.",
 	Home = "Got it! Follow the trail to the exit, or use your free Return Charm (R).",
 	Pickup = "Your Gloomlet turned Cobwebbed: effects make monsters worth more! Press E next to it to put it in your Backpack.",
 	Sell = "The Collector buys monsters from your Backpack. Tap Sell at the top and sell your Gloomlet.",
@@ -49,7 +49,7 @@ Tutorial.Text = {
 -- Shown under the guide card after HintSeconds on one step.
 Tutorial.Hints = {
 	Gate = "The Zone Gates are at the far end of the hub. Tap Portals to jump there.",
-	Catch = "Keep holding until the meter is full. When it struggles, tap as the needle crosses the green zone.",
+	Catch = "When it struggles, click or tap as the needle crosses the green zone. Stay close until the meter is full.",
 	Home = "Walk back through the exit arch you came in by.",
 	Pickup = "Go into your mansion and stand right next to the Gloomlet, then press E or tap the prompt.",
 	Sell = "Hold the Collector's prompt to open the sell window, then tap Sell.",

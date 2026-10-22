@@ -59,12 +59,30 @@ type Bit = {
 	phase: number,
 }
 
+-- How a kind of bit moves:
+--   fall    from the sky past you (coins, candy, leaves)
+--   float   hovering round you (eyes)
+--   circle  round the hub (ghosts, lanterns, witches)
+--   rise    up from the ground into the sky (paper lanterns)
+--   hang    dangling round you on a thread (spiders)
+--   ground  pushing up out of the ground round you and sinking back (skeleton hands)
+type Mode = "fall" | "float" | "circle" | "rise" | "hang" | "ground"
+
 type Weather = {
 	kind: string,
 	bits: { Bit },
-	floating: boolean, -- eyes hover round you instead of falling
-	circling: boolean, -- ghosts and lanterns go round the hub instead
-	centre: Vector3, -- circling: the middle of Watcher Square
+	mode: Mode,
+	centre: Vector3, -- circle: the middle of Watcher Square
+}
+
+local Modes: { [string]: Mode } = {
+	Eyes = "float",
+	Ghosts = "circle",
+	Lanterns = "circle",
+	Brooms = "circle",
+	SkyLanterns = "rise",
+	Spiders = "hang",
+	Hands = "ground",
 }
 
 type Set = {
@@ -437,14 +455,16 @@ local function hubCentre(): Vector3
 	return Vector3.zero
 end
 
+local LeafColors = { { 220, 110, 30 }, { 190, 60, 25 }, { 240, 170, 40 }, { 130, 80, 35 } }
+local Bone = Color3.fromRGB(235, 228, 205)
+
 local function addBits(set: Set, kind: string, count: number)
-	local circling = kind == "Ghosts" or kind == "Lanterns"
+	local mode: Mode = Modes[kind] or "fall"
 	local weather: Weather = {
 		kind = kind,
 		bits = {},
-		floating = kind == "Eyes",
-		circling = circling,
-		centre = if circling then hubCentre() else Vector3.zero,
+		mode = mode,
+		centre = if mode == "circle" then hubCentre() else Vector3.zero,
 	}
 	for index = 1, count do
 		local parts: { Part } = {}
@@ -453,7 +473,131 @@ local function addBits(set: Set, kind: string, count: number)
 		local orbit = Vector3.zero
 		local opaque = 0
 		local fall = 0
-		if kind == "Ghosts" then
+		-- A part of a many-part bit, placed at `at` in the bit (forward is -Z).
+		local function add(
+			name: string,
+			shape: Enum.PartType,
+			size: Vector3,
+			color: Color3,
+			at: CFrame,
+			matte: boolean?
+		)
+			local part = piecePart(`{name}{index}`, shape, size, color, set.holder)
+			if matte then
+				part.Material = Enum.Material.SmoothPlastic
+			end
+			table.insert(parts, part)
+			table.insert(layout, at)
+		end
+		if kind == "Brooms" then
+			-- A witch on a broomstick: stick, straw bristles, a dark body, a green face and a
+			-- pointy hat, flying in wide circles high over the hub.
+			local black = Color3.fromRGB(25, 15, 35)
+			add(
+				"Broom",
+				Enum.PartType.Block,
+				Vector3.new(0.3, 0.3, 6),
+				Color3.fromRGB(110, 70, 35),
+				CFrame.identity,
+				true
+			)
+			add(
+				"Bristles",
+				Enum.PartType.Block,
+				Vector3.new(1.3, 1.3, 1.8),
+				Color3.fromRGB(210, 170, 80),
+				CFrame.new(0, 0, 3.6),
+				true
+			)
+			add("Witch", Enum.PartType.Block, Vector3.new(1.4, 2, 1), black, CFrame.new(0, 1.1, 0.6), true)
+			add(
+				"Face",
+				Enum.PartType.Ball,
+				Vector3.one * 1.1,
+				Color3.fromRGB(120, 255, 120),
+				CFrame.new(0, 2.6, 0.4)
+			)
+			add(
+				"HatBrim",
+				Enum.PartType.Cylinder,
+				Vector3.new(0.15, 2.4, 2.4),
+				black,
+				CFrame.new(0, 3.1, 0.4) * CFrame.Angles(0, 0, math.rad(90)),
+				true
+			)
+			add(
+				"Hat",
+				Enum.PartType.Block,
+				Vector3.new(0.9, 1.8, 0.9),
+				black,
+				CFrame.new(0, 4, 0.6) * CFrame.Angles(math.rad(15), 0, 0),
+				true
+			)
+			orbit = Vector3.new(
+				random:NextNumber(60, 140),
+				random:NextNumber(40, 70),
+				random:NextNumber(0.25, 0.45)
+			)
+		elseif kind == "Spiders" then
+			-- A black spider with a little head and legs, hanging on a long silk thread.
+			local black = Color3.fromRGB(15, 12, 18)
+			add("Spider", Enum.PartType.Ball, Vector3.one * 1.1, black, CFrame.identity, true)
+			add("SpiderHead", Enum.PartType.Ball, Vector3.one * 0.65, black, CFrame.new(0, 0, -0.75), true)
+			for leg = -1, 1 do
+				add(
+					"SpiderLeg",
+					Enum.PartType.Block,
+					Vector3.new(2.8, 0.12, 0.12),
+					black,
+					CFrame.new(0, 0.05, leg * 0.3) * CFrame.Angles(0, leg * 0.35, 0),
+					true
+				)
+			end
+			add(
+				"Thread",
+				Enum.PartType.Block,
+				Vector3.new(0.06, 24, 0.06),
+				Color3.fromRGB(230, 230, 240),
+				CFrame.new(0, 12.4, 0)
+			)
+		elseif kind == "Hands" then
+			-- A bony hand: palm, four fingers and a thumb, reaching up out of the ground.
+			add("Palm", Enum.PartType.Block, Vector3.new(1.6, 1.9, 0.5), Bone, CFrame.identity, true)
+			for finger, x in { -0.6, -0.2, 0.2, 0.6 } do
+				local tall = if finger == 1 or finger == 4 then 1.2 else 1.5
+				add(
+					"Finger",
+					Enum.PartType.Block,
+					Vector3.new(0.3, tall, 0.3),
+					Bone,
+					CFrame.new(x, 0.95 + tall / 2, 0),
+					true
+				)
+			end
+			add(
+				"Thumb",
+				Enum.PartType.Block,
+				Vector3.new(0.3, 1.1, 0.3),
+				Bone,
+				CFrame.new(1, 0.3, 0) * CFrame.Angles(0, 0, math.rad(-45)),
+				true
+			)
+		elseif kind == "SkyLanterns" then
+			-- A glowing paper lantern drifting up into the sky.
+			add(
+				"SkyLantern",
+				Enum.PartType.Block,
+				Vector3.new(1.3, 1.7, 1.3),
+				Color3.fromRGB(255, 170, 70),
+				CFrame.identity
+			)
+			opaque = 0.1
+			fall = -random:NextNumber(3, 6) -- rises
+		elseif kind == "Leaves" then
+			local color = rgb(LeafColors[random:NextInteger(1, #LeafColors)])
+			add("Leaf", Enum.PartType.Block, Vector3.new(1.2, 0.08, 0.9), color, CFrame.identity, true)
+			fall = random:NextNumber(5, 9)
+		elseif kind == "Ghosts" then
 			-- A glowing head with two black eyes and a tail of shrinking puffs, flying in
 			-- circles high over the hub, some near and some far, at different speeds.
 			local pale = Color3.fromRGB(225, 240, 255)
@@ -622,6 +766,16 @@ local function addWeather(set: Set, weather: Events.Weather, scale: number)
 		addSparkles(set, { 200, 230, 255 })
 	elseif weather.kind == "Lanterns" then
 		bits("Lanterns", 26)
+	elseif weather.kind == "Brooms" then
+		bits("Brooms", 7)
+	elseif weather.kind == "Spiders" then
+		bits("Spiders", 30)
+	elseif weather.kind == "Hands" then
+		bits("Hands", 24)
+	elseif weather.kind == "SkyLanterns" then
+		bits("SkyLanterns", 70)
+	elseif weather.kind == "Leaves" then
+		bits("Leaves", 120)
 	end
 	for index = before + 1, #set.emitters do
 		set.emitters[index].rate *= scale
@@ -630,15 +784,58 @@ end
 
 local FallRadius = 90 -- coins and candy fall within this many studs of the camera
 local FloatRadius = 60
+local NearRadius = 40 -- spiders and hands
 
 -- Moves the coins, candy or eyes along. A bit that has fallen past the camera (or that the
 -- camera has walked away from) starts again above it.
 local function stepWeather(weather: Weather, camera: Vector3, deltaTime: number, t: number, alpha: number)
 	local parts: { BasePart } = {}
 	local frames: { CFrame } = {}
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local ground = if root and root:IsA("BasePart") then root.Position.Y - 3 else camera.Y - 8
+	local function place(bit: Bit, frame: CFrame)
+		for index, part in bit.parts do
+			table.insert(parts, part)
+			table.insert(frames, frame * bit.shape[index])
+		end
+	end
 	for _, bit in weather.bits do
 		local flat = Vector3.new(bit.position.X - camera.X, 0, bit.position.Z - camera.Z)
-		if weather.circling then
+		local mode = weather.mode
+		if mode == "hang" or mode == "ground" then
+			if bit.position == Vector3.zero or flat.Magnitude > NearRadius * 1.3 then
+				bit.position = spot(camera, NearRadius, 0)
+			end
+			if mode == "hang" then
+				-- Swinging gently up and down on its thread, turning slowly.
+				local height = ground + 8 + (bit.phase % 1) * 14 + math.sin(t * 0.6 + bit.phase) * 2.5
+				local at = Vector3.new(bit.position.X, height, bit.position.Z)
+				place(bit, CFrame.new(at) * CFrame.Angles(0, bit.phase + t * 0.3, 0))
+			else
+				-- Out of the ground, a wave of the fingers, and back down again.
+				local up = math.max(0, math.sin(t * 0.5 + bit.phase))
+				local at = Vector3.new(bit.position.X, ground - 2.6 + up * 2.8, bit.position.Z)
+				local facing = Vector3.new(camera.X, at.Y, camera.Z)
+				local frame = if (facing - at).Magnitude > 0.1
+					then CFrame.lookAt(at, facing)
+					else CFrame.new(at)
+				place(bit, frame * CFrame.Angles(0, 0, math.sin(t * 2 + bit.phase) * 0.2))
+			end
+		elseif mode == "rise" then
+			if
+				bit.position == Vector3.zero
+				or bit.position.Y > camera.Y + 90
+				or flat.Magnitude > FallRadius * 1.3
+			then
+				-- The first time, spread them over the whole height so they don't arrive as one wave.
+				local above = if bit.position == Vector3.zero then random:NextNumber(0, 90) else 0
+				bit.position = Vector3.new(0, ground + above - camera.Y, 0) + spot(camera, FallRadius, 0)
+			end
+			bit.position += bit.velocity * deltaTime
+			local sway = math.sin(t * 0.7 + bit.phase) * 0.15
+			place(bit, CFrame.new(bit.position) * CFrame.Angles(sway, bit.phase, -sway))
+		elseif mode == "circle" then
 			local turn = bit.phase + t * bit.orbit.Z
 			local ahead = Vector3.new(-math.sin(turn), 0, math.cos(turn)) * math.sign(bit.orbit.Z)
 			local bob = if weather.kind == "Lanterns"
@@ -654,7 +851,7 @@ local function stepWeather(weather: Weather, camera: Vector3, deltaTime: number,
 				table.insert(parts, part)
 				table.insert(frames, frame * bit.shape[index])
 			end
-		elseif weather.floating then
+		elseif mode == "float" then
 			if bit.position == Vector3.zero or flat.Magnitude > FloatRadius * 1.3 then
 				bit.position = spot(camera, FloatRadius, random:NextNumber(4, 30))
 			end
@@ -679,11 +876,17 @@ local function stepWeather(weather: Weather, camera: Vector3, deltaTime: number,
 			end
 			bit.position += bit.velocity * deltaTime
 			bit.angle += bit.spin * deltaTime
+			local position = bit.position
+			if weather.kind == "Leaves" then
+				-- Leaves see-saw from side to side as they drift down.
+				position += Vector3.new(
+					math.sin(t * 1.3 + bit.phase) * 2,
+					0,
+					math.cos(t * 1.1 + bit.phase) * 1.5
+				)
+			end
 			table.insert(parts, bit.parts[1])
-			table.insert(
-				frames,
-				CFrame.new(bit.position) * CFrame.Angles(bit.angle.X, bit.angle.Y, bit.angle.Z)
-			)
+			table.insert(frames, CFrame.new(position) * CFrame.Angles(bit.angle.X, bit.angle.Y, bit.angle.Z))
 		end
 		for _, part in bit.parts do
 			part.Transparency = 1 - alpha * (1 - bit.opaque)

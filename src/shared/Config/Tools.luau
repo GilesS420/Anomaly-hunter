@@ -2,9 +2,9 @@
 -- How the vacuums behave. Prices and stock live in Shop.luau (tiers there too).
 -- All numbers are placeholders to tune in playtesting.
 --
--- Catching: press and hold on a monster. The vacuum's beam freezes it (reach = how far away
--- you can grab it from) and fills the catch meter (catchSeconds = how long that takes). Let
--- go early and it escapes, but stays dazed for stunSeconds so you can grab it again quickly.
+-- Catching: click or tap a monster. The vacuum's beam freezes it (reach = how far away you
+-- can grab it from) and fills the catch meter (catchSeconds = how long that takes). If it
+-- breaks free it stays dazed for stunSeconds so you can grab it again quickly.
 -- A vacuum carries `bag` monsters per trip. When a catch lands it may roll one of the
 -- vacuum's catchEffects (Effects.CatchChance each) and one catch variant (Config/Variants,
 -- percent chance each, rarest checked first).

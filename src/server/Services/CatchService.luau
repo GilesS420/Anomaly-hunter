@@ -1,16 +1,17 @@
 --!strict
--- Catching: press and hold on a wild monster. It freezes in your vacuum's beam and a catch
--- meter fills by itself (1-3 seconds, longer for rarer monsters). Let go early, walk out of
--- reach or get knocked out and it escapes (dazed for a moment, so you can grab it again).
+-- Catching: click or tap a wild monster. It freezes in your vacuum's beam and a catch meter
+-- fills by itself (1-3 seconds, longer for rarer monsters); no holding (Giles 2026-10-22).
 -- On the way the monster struggles (Config/Struggles): the meter stops and you must tap while
--- a sweeping needle is in a zone. Miss, or wait too long, and it breaks free. Letting go
--- doesn't count during a struggle, so the tap can be a fresh click.
+-- a sweeping needle is in a zone. Miss, or wait too long, and it breaks free. Walking out of
+-- reach or getting knocked out lets it escape too (dazed for a moment, so you can grab it
+-- again).
 -- The client only says "start catching this", "stop" and "tapped at"; every rule is checked
 -- here.
 --
 -- Remotes in ReplicatedStorage.CatchRemotes:
 --   StartCatch  client -> server (model)
---   StopCatch   client -> server ()
+--   StopCatch   client -> server () lets go (the client doesn't send it any more since
+--               catching stopped needing a hold; kept so an older client can't break it)
 --   Strike      client -> server (serverTime the player tapped)
 --   State       server -> client ("Holding", {model, seconds}), ("Struggle", {model, startedAt,
 --               speed, centre, width, timeout}), ("Struggled", {model}) or ("Ended", {result, model})
@@ -385,7 +386,7 @@ local function onStartCatch(player: Player, model: unknown)
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		hold.died = humanoid.Died:Connect(function()
-			release(player, `{name} got away! Hold until the meter is full.`)
+			release(player, `{name} got away!`)
 		end)
 	end
 
@@ -486,7 +487,7 @@ function CatchService.start()
 		pendingStart[player] = nil
 		local hold = holds[player]
 		if hold and not hold.struggle then -- letting go mid-struggle is how a fresh tap starts
-			release(player, `{hold.name} got away! Hold until the meter is full.`)
+			release(player, `{hold.name} got away!`)
 		end
 	end)
 

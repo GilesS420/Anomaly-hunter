@@ -1,6 +1,6 @@
 --!strict
 -- The struggle: every catch has quick time moments where the monster fights the vacuum. The
--- meter stops, a needle sweeps back and forth over a bar, and you tap (or press Space or E)
+-- meter stops, a needle sweeps back and forth over a bar, and you click or tap (or press F)
 -- while the needle is in the glowing zone. Hit it and the meter fills on; miss it, or wait
 -- too long, and the monster breaks free (dazed, so you can try again).
 -- Rarer monsters struggle more often, with a faster needle and a smaller zone; bigger ones

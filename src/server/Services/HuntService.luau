@@ -254,7 +254,7 @@ local function syncTools(player: Player)
 		tool:SetAttribute("Order", item.price)
 		if Workshop.isTool(item) then
 			tool:SetAttribute("VacuumId", item.id)
-			tool.ToolTip = "Hold it and press and HOLD on a monster to catch it"
+			tool.ToolTip = "Hold it and click a monster to catch it"
 			tool.Equipped:Connect(function()
 				holdVacuum(player, item.id)
 			end)
@@ -363,7 +363,7 @@ local function enterZone(player: Player, zone: Zones.Zone, arrival: BasePart, fa
 	player:SetAttribute("Zone", zone.id)
 	player:SetAttribute("Hearts", Zones.MaxHearts)
 	Notify.toast(player, `Entering {zone.name}`)
-	Notify.toast(player, "Hold your vacuum (hotbar), then press and HOLD on a monster to catch it!")
+	Notify.toast(player, "Hold your vacuum (hotbar), then click or tap a monster to catch it!")
 	PlotService.teleport(player, standAbove(arrival, facing))
 end
 

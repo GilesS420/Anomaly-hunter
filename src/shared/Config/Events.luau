@@ -17,7 +17,18 @@ export type Rgb = { number } -- { red, green, blue }, 0 to 255 (Color3.fromRGB)
 -- the sky pieces (moon, eye, aurora, sparkles, flashes) are drawn by each client around its
 -- own camera (client/Controllers/SkyController), so players in zones see them too.
 export type Weather = {
-	kind: "Snow" | "Rain" | "Coins" | "Candy" | "Eyes" | "Ghosts" | "Lanterns",
+	kind: "Snow"
+		| "Rain"
+		| "Coins"
+		| "Candy"
+		| "Eyes"
+		| "Ghosts"
+		| "Lanterns"
+		| "Brooms"
+		| "Spiders"
+		| "Hands"
+		| "SkyLanterns"
+		| "Leaves",
 	color: Rgb?,
 }
 
@@ -42,6 +53,11 @@ export type Sky = {
 	--   Eyes   eyeballs floating in the air, all turning to look at you
 	--   Ghosts    pale ghosts flying in circles high over the hub (Phantom Swarm)
 	--   Lanterns  a parade of grinning lantern heads marching round the hub (Nightmare Parade)
+	--   Brooms       witches on broomsticks circling high over the hub (Witching Hour)
+	--   Spiders      spiders dangling on threads all around you (Spider Season)
+	--   Hands        skeleton hands pushing up out of the ground round you (Bone Rattle)
+	--   SkyLanterns  glowing paper lanterns drifting up into the sky (Ghost Market)
+	--   Leaves       autumn leaves see-sawing down (Harvest Moon)
 	weather: Weather?,
 	edge: Rgb?, -- the event's colour: its icon, its banner and the screen frame
 	frame: boolean?, -- a glow round the edges of the screen in the edge colour (only the scariest)
@@ -106,6 +122,9 @@ Events.MaxMonsters = 10
 -- catch all event long, not just in the first minute (a set with noRespawn excepted).
 Events.RespawnSeconds = 20
 
+-- An event can't come back until this many other events have played since (the clock's pick).
+Events.NoRepeat = 3
+
 -- Event monsters drift between the mansions, this many studs above the ground.
 Events.HoverHeight = 3
 Events.DriftSpeed = 5 -- studs per second
@@ -126,7 +145,7 @@ Events.List = {
 		name = "Frost Fog",
 		icon = "❄️",
 		launch = true,
-		weight = 30,
+		weight = 13,
 		effect = "Frostbitten",
 		effectChance = 6,
 		durationSeconds = 180,
@@ -149,7 +168,7 @@ Events.List = {
 		name = "Sugar Rush",
 		icon = "🍬",
 		launch = true,
-		weight = 25,
+		weight = 11,
 		effect = "Sugarcoated",
 		effectChance = 6,
 		durationSeconds = 180,
@@ -174,7 +193,7 @@ Events.List = {
 		name = "Gold Rush",
 		icon = "💰",
 		launch = true,
-		weight = 15,
+		weight = 8,
 		effect = "Gilded",
 		effectChance = 4,
 		durationSeconds = 180,
@@ -198,7 +217,7 @@ Events.List = {
 		name = "Flicker",
 		icon = "⚡",
 		launch = true,
-		weight = 20,
+		weight = 10,
 		effect = "Poltergeist",
 		effectChance = 4,
 		durationSeconds = 180,
@@ -218,11 +237,123 @@ Events.List = {
 		announce = "Flicker! The lights are failing and the Bakery sells Static Cupcakes.",
 	},
 	{
+		id = "SpiderSeason",
+		name = "Spider Season",
+		icon = "🕷️",
+		launch = true,
+		weight = 10,
+		effect = "Cobwebbed",
+		effectChance = 8,
+		effectOddsMultiplier = 2,
+		durationSeconds = 180,
+		sky = {
+			ambient = { 50, 50, 60 },
+			outdoorAmbient = { 75, 75, 90 },
+			tint = { 225, 225, 235 },
+			saturation = -0.5,
+			atmosphere = { color = { 150, 150, 165 }, decay = { 60, 60, 70 }, density = 0.45, haze = 2.5 },
+			mist = { 205, 205, 215 },
+			weather = { kind = "Spiders" },
+			edge = { 200, 200, 215 },
+		},
+		warning = "Something is skittering across the hub...",
+		announce = "Spider Season! Mansion monsters pick up effects twice as often and the Bakery sells Web Waffles.",
+	},
+	{
+		id = "HarvestMoon",
+		name = "Harvest Moon",
+		icon = "🌕",
+		launch = true,
+		weight = 10,
+		effect = "Harvested",
+		effectChance = 4,
+		growthMultiplier = 3,
+		durationSeconds = 180,
+		sky = {
+			ambient = { 80, 50, 30 },
+			outdoorAmbient = { 120, 75, 40 },
+			tint = { 255, 215, 170 },
+			saturation = 0.15,
+			atmosphere = { color = { 150, 90, 40 }, decay = { 90, 40, 10 }, density = 0.35, haze = 1.5 },
+			moon = { color = { 255, 150, 50 }, size = 110 },
+			weather = { kind = "Leaves" },
+			edge = { 255, 150, 50 },
+		},
+		warning = "The moon is rising, huge and orange...",
+		announce = "Harvest Moon! Monsters grow faster and the Bakery sells Pumpkin Spice Rolls.",
+	},
+	{
+		id = "WitchingHour",
+		name = "Witching Hour",
+		icon = "🧹",
+		launch = true,
+		weight = 9,
+		effect = "Bewitched",
+		effectChance = 3,
+		cakeEffectMultiplier = 2,
+		bakeryStockMultiplier = 2,
+		durationSeconds = 180,
+		sky = {
+			ambient = { 50, 25, 70 },
+			outdoorAmbient = { 70, 40, 95 },
+			tint = { 215, 200, 255 },
+			atmosphere = { color = { 70, 30, 100 }, decay = { 20, 80, 40 }, density = 0.45, haze = 2 },
+			aurora = { 140, 255, 140 },
+			mist = { 110, 255, 140 },
+			weather = { kind = "Brooms" },
+			edge = { 130, 255, 140 },
+		},
+		warning = "Cackling echoes over the rooftops...",
+		announce = "Witching Hour! Cakes work twice as well and the Bakery sells Cauldron Cupcakes.",
+	},
+	{
+		id = "GhostMarket",
+		name = "Ghost Market",
+		icon = "🏮",
+		launch = true,
+		weight = 9,
+		sellMultiplier = 1.5,
+		durationSeconds = 180,
+		sky = {
+			ambient = { 60, 45, 40 },
+			outdoorAmbient = { 95, 70, 55 },
+			tint = { 255, 230, 200 },
+			atmosphere = { color = { 120, 80, 50 }, decay = { 60, 30, 15 }, density = 0.3, haze = 1.5 },
+			sparkles = { 255, 200, 120 },
+			weather = { kind = "SkyLanterns" },
+			edge = { 255, 170, 80 },
+		},
+		warning = "Paper lanterns flicker on, one by one...",
+		announce = "Ghost Market! The Collector pays 50% more. Time to sell!",
+	},
+	{
+		id = "BoneRattle",
+		name = "Bone Rattle",
+		icon = "💀",
+		launch = true,
+		weight = 9,
+		effect = "Skeletal",
+		effectChance = 4,
+		durationSeconds = 180,
+		sky = {
+			ambient = { 40, 55, 45 },
+			outdoorAmbient = { 60, 80, 65 },
+			tint = { 215, 240, 215 },
+			saturation = -0.3,
+			atmosphere = { color = { 90, 120, 95 }, decay = { 30, 60, 35 }, density = 0.45, haze = 2.5 },
+			mist = { 190, 230, 190 },
+			weather = { kind = "Hands" },
+			edge = { 200, 240, 200 },
+		},
+		warning = "The ground is starting to rattle...",
+		announce = "Bone Rattle! Monsters can turn Skeletal and the Bakery sells Bone Biscuits.",
+	},
+	{
 		id = "BloodMoon",
 		name = "Blood Moon",
 		icon = "🩸",
 		launch = true,
-		weight = 10,
+		weight = 6,
 		effect = "Bloodmoon",
 		effectChance = 2,
 		durationSeconds = 240,
