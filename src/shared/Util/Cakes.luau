@@ -13,7 +13,7 @@ local Value = require("./Value")
 
 local Cakes = {}
 
-export type Fit = "Ok" | "Unknown" | "HasEffect"
+export type Fit = "Ok" | "Unknown" | "HasEffect" | "TooPricey"
 
 -- A cake standing in a mansion, as saved (DataService.Data.cakes). x, y, z are relative to the
 -- player's plot, because the plot can be a different one next time they join.
@@ -63,7 +63,7 @@ function Cakes.fits(caught: Value.CaughtMonster, item: Shop.Item?): Fit
 	end
 	local first: Fit = "Ok"
 	for i, option in Cakes.effectChances(item) do
-		local fits: Fit = Value.fits(caught.effects, option.effect)
+		local fits: Fit = Value.fits(caught.effects, option.effect, caught.monsterId)
 		if fits == "Ok" then
 			return "Ok"
 		elseif i == 1 then
@@ -89,7 +89,7 @@ function Cakes.pickEffect(
 	end
 	local first: string? = nil
 	for _, option in Cakes.effectChances(item) do
-		if Value.fits(caught.effects, option.effect) == "Ok" then
+		if Value.fits(caught.effects, option.effect, caught.monsterId) == "Ok" then
 			if Rng.chance(option.chance, random) then
 				return option.effect
 			end
@@ -245,7 +245,15 @@ function Cakes.describe(item: Shop.Item): string
 			table.insert(odds, `{percent}% {Format.name(effect.id)} (x{effect.multiplier})`)
 		end
 	end
-	return `{Cakes.bites(item.id)} bites, at least one effect · Each bite: {table.concat(odds, ", ")}`
+	local critter = false
+	for _, option in Cakes.effectChances(item) do
+		local effect = Effects.List[option.effect]
+		critter = critter or (effect ~= nil and effect.source == "Critter")
+	end
+	local only = if critter
+		then ` · Only for monsters worth up to {Format.money(Effects.CritterMaxValue)}`
+		else ""
+	return `{Cakes.bites(item.id)} bites, at least one effect · Each bite: {table.concat(odds, ", ")}{only}`
 end
 
 return Cakes

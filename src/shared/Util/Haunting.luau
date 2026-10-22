@@ -1,6 +1,7 @@
 --!strict
 -- Roaming effects: while a monster roams its owner's mansion it now and then picks up a
--- haunted effect (Cobwebbed, Possessed, Vampire, Batty, Mummy). Numbers live in
+-- haunted effect (Cobwebbed, Possessed, Vampire, Batty, Mummy; cheap monsters also the
+-- Critter effects: Glowbug, Moldy, Rusty, Fungal, Rat King). Numbers live in
 -- Config/Effects. While a Watcher event is live, monsters also roll for that event's own
 -- effect (eventRoll, numbers in Config/Events). Combos merge by themselves
 -- (Value.resolveEffects). Pure functions so they can be tested outside Roblox.
@@ -27,7 +28,7 @@ end
 function Haunting.pool(eventEffect: string?): { Option }
 	local options: { Option } = {}
 	for id, effect in Effects.List do
-		if effect.source == "Roam" and (effect.weight or 0) > 0 then
+		if (effect.source == "Roam" or effect.source == "Critter") and (effect.weight or 0) > 0 then
 			table.insert(options, { id = id, weight = effect.weight :: number })
 		end
 	end
@@ -55,7 +56,7 @@ function Haunting.roll(
 	end
 	local options = {}
 	for _, option in Haunting.pool(if event then event.effect else nil) do
-		if Value.fits(caught.effects, option.id) == "Ok" then
+		if Value.fits(caught.effects, option.id, caught.monsterId) == "Ok" then
 			table.insert(options, option)
 		end
 	end
@@ -93,7 +94,7 @@ function Haunting.catchUp(
 		end
 		local left = false
 		for _, option in Haunting.pool(nil) do
-			left = left or Value.fits(caught.effects, option.id) == "Ok"
+			left = left or Value.fits(caught.effects, option.id, caught.monsterId) == "Ok"
 		end
 		if not left then
 			break -- it has every roaming effect
