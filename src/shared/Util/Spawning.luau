@@ -142,8 +142,8 @@ function Spawning.rollSize(random: Random?): Sizes.Size
 end
 
 -- Effects a monster gets at the moment it's caught: each of the vacuum's catch effects
--- (Config/Tools) rolls Effects.CatchChance once.
-function Spawning.rollCatchEffects(vacuumId: string, random: Random?): { string }
+-- (Config/Tools) rolls Effects.CatchChance once (times boost: a Lucky Ring catch).
+function Spawning.rollCatchEffects(vacuumId: string, random: Random?, boost: number?): { string }
 	local effects = {}
 	local vacuum = Tools.Vacuums[vacuumId]
 	local candidates: { string } = if vacuum and vacuum.catchEffects then vacuum.catchEffects else {}
@@ -151,7 +151,7 @@ function Spawning.rollCatchEffects(vacuumId: string, random: Random?): { string 
 		if
 			Effects.List[effectId]
 			and not table.find(effects, effectId)
-			and Rng.chance(Effects.CatchChance, random)
+			and Rng.chance(math.min(Effects.CatchChance * (boost or 1), 100), random)
 		then
 			table.insert(effects, effectId)
 		end

@@ -1047,7 +1047,12 @@ end
 
 -- Removes a caught event monster and returns it as a save-ready entry (rolling catch
 -- effects and a variant from the hunter's vacuum, like SpawnService.capture). Nil if someone was faster.
-function WatcherService.capture(model: Model, vacuumId: string, variantBoost: number?): Value.CaughtMonster?
+function WatcherService.capture(
+	model: Model,
+	vacuumId: string,
+	variantBoost: number?,
+	effectBoost: number?
+): Value.CaughtMonster?
 	local spawned = live[model]
 	if not spawned then
 		return nil
@@ -1058,7 +1063,7 @@ function WatcherService.capture(model: Model, vacuumId: string, variantBoost: nu
 		uid = HttpService:GenerateGUID(false),
 		monsterId = spawned.monsterId,
 		size = spawned.size,
-		effects = Spawning.rollCatchEffects(vacuumId, random),
+		effects = Spawning.rollCatchEffects(vacuumId, random, effectBoost),
 		variant = Spawning.rollVariant(vacuumId, random, variantBoost),
 		familiarity = 0,
 	}

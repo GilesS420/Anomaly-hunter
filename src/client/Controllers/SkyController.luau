@@ -343,6 +343,27 @@ local function addSparkles(set: Set, color: Events.Rgb)
 	end)
 end
 
+-- The floor under the player: a ray straight down, so jumping doesn't lift the mist, the hands
+-- or the spiders with you. Mid-air with no floor in reach it keeps the last one found.
+local GroundRay = 60
+local lastGround: number? = nil
+local function groundY(camera: Vector3): number
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root or not root:IsA("BasePart") then
+		return lastGround or camera.Y - 8
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { character :: Instance, workspace.CurrentCamera }
+	params.IgnoreWater = true
+	local hit = workspace:Raycast(root.Position, Vector3.new(0, -GroundRay, 0), params)
+	if hit then
+		lastGround = hit.Position.Y
+	end
+	return lastGround or root.Position.Y - 3
+end
+
 -- Low fog rolling over the ground round the player's feet.
 local MistTexture = "rbxasset://textures/particles/smoke_main.dds"
 local function addMist(set: Set, color: Events.Rgb)
@@ -352,10 +373,7 @@ local function addMist(set: Set, color: Events.Rgb)
 		part = part,
 		opaque = 1,
 		place = function(_piece, camera)
-			local character = player.Character
-			local root = character and character:FindFirstChild("HumanoidRootPart")
-			local ground = if root and root:IsA("BasePart") then root.Position.Y - 3 else camera.Y - 8
-			return CFrame.new(camera.X, ground, camera.Z)
+			return CFrame.new(camera.X, groundY(camera), camera.Z)
 		end,
 	})
 	emit(set, part, 45, function(emitter)
@@ -860,9 +878,7 @@ local NearRadius = 40 -- spiders and hands
 local function stepWeather(weather: Weather, camera: Vector3, deltaTime: number, t: number, alpha: number)
 	local parts: { BasePart } = {}
 	local frames: { CFrame } = {}
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	local ground = if root and root:IsA("BasePart") then root.Position.Y - 3 else camera.Y - 8
+	local ground = groundY(camera)
 	local function place(bit: Bit, frame: CFrame)
 		for index, part in bit.parts do
 			table.insert(parts, part)
