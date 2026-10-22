@@ -3,8 +3,8 @@
 -- percent chance an item is in stock after a restock.
 -- Prices and restock chances are set by the balance sheet, docs in /mnt/project-files/balance.
 -- The upgrade order is Phantom Vac, Spirit Siphon, Library, Ballroom, Banshee Blower, Moon Vac,
--- Void Vac, each taking about 2-3x as long to afford as the one before. The Phantom Vac is in
--- stock in 80% of restocks, so the first purchase doesn't stall on luck.
+-- Void Vac, each taking about 2-3x as long to afford as the one before. Vacuums are always in
+-- stock (Util/Workshop.inStock), so their restockChance is not used.
 
 export type Item = {
 	id: string,
@@ -17,6 +17,8 @@ export type Item = {
 	grantsEffect: string?,
 	singleUse: boolean?,
 	maxRarity: string?, -- Bait Bell: the rarest rarity it can bring
+	lureSteps: number?, -- Bait Bell: how many rarities up from a normal roll (1 if not set)
+	lureOdds: { [string]: number }?, -- Bait Bell: fixed odds per rarity instead (percent)
 	-- Bakery chance cakes: tried in order, the first that hits (and fits) is the effect.
 	effectChances: { EffectChance }?,
 	event: string?, -- Bakery event treat: only sold while this Watcher event is live
@@ -176,6 +178,29 @@ Shop.Workshop = {
 		rarity = "Uncommon",
 		singleUse = true,
 		maxRarity = "Legendary",
+	},
+	-- Better bells (Giles 2026-10-22: more Bait Bell types). Mythic and Divine need a Void Vac,
+	-- so with a weaker vacuum these bring the best rarity it can catch.
+	{
+		id = "SilverBell",
+		name = "Silver Bell",
+		kind = "Lure",
+		price = 250_000,
+		restockChance = 25,
+		rarity = "Rare",
+		singleUse = true,
+		lureSteps = 2,
+		maxRarity = "Mythic",
+	},
+	{
+		id = "GoldBell",
+		name = "Gold Bell",
+		kind = "Lure",
+		price = 5_000_000,
+		restockChance = 8,
+		rarity = "Epic",
+		singleUse = true,
+		lureOdds = { Legendary = 85, Mythic = 14, Divine = 1 },
 	},
 	{
 		id = "PhantomVac",

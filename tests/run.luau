@@ -667,17 +667,18 @@ do
 		Workshop.inStock(siphon, 1234) == Workshop.inStock(siphon, 1234)
 	)
 	local slots = 20_000
-	local phantomIn, voidIn = 0, 0
+	local voidIn, bellIn = 0, 0
+	local bell = Workshop.item("BaitBell") :: Shop.Item
 	for slot = 1, slots do
-		if Workshop.inStock(phantomVac, slot) then
-			phantomIn += 1
-		end
-		if Workshop.inStock(voidVac, slot) then
+		if Workshop.inStock(phantomVac, slot) and Workshop.inStock(voidVac, slot) then
 			voidIn += 1
 		end
+		if Workshop.inStock(bell, slot) then
+			bellIn += 1
+		end
 	end
-	check("Phantom Vac is in stock about 80% of restocks", math.abs(phantomIn / slots - 0.80) < 0.02)
-	check("Void Vac is in stock about 6% of restocks", math.abs(voidIn / slots - 0.06) < 0.01)
+	check("vacuums are in stock in every restock", voidIn == slots)
+	check("Bait Bells are in stock about 50% of restocks", math.abs(bellIn / slots - 0.50) < 0.02)
 	check(
 		"starter tools are always in stock and owned",
 		Workshop.inStock(starter, 7) and Workshop.owns({}, starter)
@@ -759,6 +760,33 @@ do
 	check(
 		"a Bait Bell brings a Legendary about 10% of the time",
 		math.abs(legendaries / 20_000 - 0.10) < 0.01
+	)
+end
+
+-- Silver Bell: two rarities up, up to Mythic. Gold Bell: Legendary 85%, Mythic 14%, Divine 1%.
+do
+	local rng = fakeRandom(11)
+	local silverLow, silverTooRare = 0, 0
+	for _ = 1, 5000 do
+		local order = Rarities[Spawning.rollLured(1, rng, "SilverBell").rarity].order
+		if order < Rarities.Rare.order then
+			silverLow += 1
+		elseif order > Rarities.Mythic.order then
+			silverTooRare += 1
+		end
+	end
+	check("a Silver Bell brings Rare or better, never Divine", silverLow == 0 and silverTooRare == 0)
+	local counts: { [string]: number } = {}
+	for _ = 1, 20_000 do
+		local rarity = Spawning.rollLured(1, rng, "GoldBell").rarity
+		counts[rarity] = (counts[rarity] or 0) + 1
+	end
+	check(
+		"a Gold Bell follows its odds",
+		math.abs((counts.Legendary or 0) / 20_000 - 0.85) < 0.015
+			and math.abs((counts.Mythic or 0) / 20_000 - 0.14) < 0.015
+			and (counts.Divine or 0) > 0
+			and (counts.Epic or 0) == 0
 	)
 end
 

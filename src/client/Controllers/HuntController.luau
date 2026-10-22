@@ -2,13 +2,13 @@
 -- Hunt HUD on the left side, halfway down (the top-left corner belongs to Roblox's chat
 -- window, the top-right to the player list): your money, your hearts while you're in a zone, the
 -- monster you're carrying, a big "Return Charm" button (tap or click it; R works too on
--- a keyboard) that takes you home, and in a zone a "Bait Bell" button (B) that brings a rarer
--- monster to you. Each button shows only if you own one. A "Mansion" button (M) is always
+-- a keyboard) that takes you home, and in a zone a button per kind of Bait Bell (Bait, Silver,
+-- Gold; B rings the cheapest you own) that brings a rarer monster to you. Each button shows only if you own one. A "Mansion" button (M) is always
 -- there and lists your mansion monsters (MansionListController), and so are a "Backpack" button
 -- (G) that opens your items and monsters (InventoryController), a "Codex" button
 -- (C, CodexController) and a "Settings" button (SettingsController).
 -- Everything shown comes from the server: player attributes Zone / Hearts / Carrying /
--- CarryingSize / CarryingCount / BagSize / ReturnCharms / BaitBells and
+-- CarryingSize / CarryingCount / BagSize / ReturnCharms / BaitBells / SilverBells / GoldBells and
 -- leaderstats.Money.
 -- Messages ("Entering Murky Bayou") are toasts now, see ToastController.
 
@@ -46,7 +46,14 @@ local function label(name: string, order: number, color: Color3, parent: Instanc
 	return text
 end
 
-local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, TextButton)
+-- The kinds of Bait Bell, cheapest first: Workshop id, name, button color.
+local Bells = {
+	{ id = "BaitBell", name = "Bait Bell", color = Color3.fromRGB(190, 110, 50) },
+	{ id = "SilverBell", name = "Silver Bell", color = Color3.fromRGB(110, 125, 160) },
+	{ id = "GoldBell", name = "Gold Bell", color = Color3.fromRGB(200, 150, 20) },
+}
+
+local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextButton })
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "HuntUi"
 	gui.ResetOnSpawn = false
@@ -101,8 +108,11 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, TextButt
 		Color3.fromRGB(120, 70, 200),
 		if keys then "Return Charm (R)" else "Return Charm"
 	)
-	local bell =
-		itemButton("BaitBell", 5, Color3.fromRGB(190, 110, 50), if keys then "Bait Bell (B)" else "Bait Bell")
+	-- LayoutOrder 5.1, 5.2, 5.3: between the charm and the Mansion button.
+	local bells: { TextButton } = {}
+	for i, kind in Bells do
+		table.insert(bells, itemButton(kind.id, 5 + i / 10, kind.color, kind.name))
+	end
 	-- Always there; MansionListController lists your mansion monsters with it.
 	local mansion = itemButton(
 		"Mansion",
@@ -122,7 +132,7 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, TextButt
 	settings.Visible = true
 
 	gui.Parent = player:WaitForChild("PlayerGui")
-	return money, hearts, carrying, charm, bell
+	return money, hearts, carrying, charm, bells
 end
 
 -- Keeps the money row in step with leaderstats.Money, which the server makes once your
@@ -160,7 +170,7 @@ local function watchMoney(money: TextLabel)
 end
 
 function HuntController.start()
-	local money, hearts, carrying, button, bell = buildUi()
+	local money, hearts, carrying, button, bells = buildUi()
 	watchMoney(money)
 
 	local function refresh()
@@ -200,12 +210,18 @@ function HuntController.start()
 		local hasCharm = typeof(charms) == "number" and charms > 0
 		button.Visible = hasCharm and (inZone or typeof(monsterId) == "string")
 
-		-- The bell only works in a zone with room in the bag, and only if you own one.
-		local bells = player:GetAttribute("BaitBells")
-		bell.Visible = inZone and not bagFull and typeof(bells) == "number" and bells > 0
-		if bell.Visible then
-			local keyText = if UserInputService.KeyboardEnabled then " (B)" else ""
-			bell.Text = `Bait Bell x{bells}{keyText}`
+		-- A bell only works in a zone with room in the bag, and only if you own one. The B key
+		-- rings the first (cheapest) one showing.
+		local keyShown = false
+		for i, kind in Bells do
+			local bell = bells[i]
+			local owned = player:GetAttribute(`{kind.id}s`)
+			bell.Visible = inZone and not bagFull and typeof(owned) == "number" and owned > 0
+			if bell.Visible then
+				local keyText = if UserInputService.KeyboardEnabled and not keyShown then " (B)" else ""
+				keyShown = true
+				bell.Text = `{kind.name} x{owned}{keyText}`
+			end
 		end
 	end
 	for _, attribute in
@@ -219,6 +235,8 @@ function HuntController.start()
 			"BagList",
 			"ReturnCharms",
 			"BaitBells",
+			"SilverBells",
+			"GoldBells",
 		}
 	do
 		player:GetAttributeChangedSignal(attribute):Connect(refresh)
@@ -240,17 +258,21 @@ function HuntController.start()
 	end
 
 	local lastRung = 0
-	local function ringBell()
+	local function ringBell(bellId: string)
 		if os.clock() - lastRung < 1 then
 			return
 		end
 		lastRung = os.clock()
-		UseBaitBell:FireServer()
+		UseBaitBell:FireServer(bellId)
 	end
 
 	-- Activated works for mouse clicks and taps alike.
 	button.Activated:Connect(useCharm)
-	bell.Activated:Connect(ringBell)
+	for i, kind in Bells do
+		bells[i].Activated:Connect(function()
+			ringBell(kind.id)
+		end)
+	end
 
 	-- Optional keyboard shortcuts.
 	UserInputService.InputBegan:Connect(function(input, processed)
@@ -259,8 +281,13 @@ function HuntController.start()
 		end
 		if input.KeyCode == Enum.KeyCode.R and button.Visible then
 			useCharm()
-		elseif input.KeyCode == Enum.KeyCode.B and bell.Visible then
-			ringBell()
+		elseif input.KeyCode == Enum.KeyCode.B then
+			for i, kind in Bells do
+				if bells[i].Visible then
+					ringBell(kind.id)
+					break
+				end
+			end
 		end
 	end)
 end

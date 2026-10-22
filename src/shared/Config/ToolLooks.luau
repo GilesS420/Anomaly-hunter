@@ -195,10 +195,10 @@ function ToolLooks.VoidVac(): { Part }
 	return parts
 end
 
--- A brass hand bell in stepped rings, a wooden handle, a red bow and a glowing eye.
-function ToolLooks.BaitBell(): { Part }
+-- A hand bell in stepped rings, a wooden handle, a red bow and a glowing eye. Brass for the
+-- Bait Bell; the Silver and Gold Bells are the same shape in their own metal.
+local function bell(brass: { number }, rim: { number }, eyeColor: { number }): { Part }
 	local parts: { Part } = {}
-	local brass = { 200, 160, 60 }
 	part(parts, "Handle", { 0.4, 1.2, 0.4 }, { 0, 0, 0 }, { 92, 60, 40 }, "Wood")
 	local knob = part(parts, "Knob", { 0.6, 0.6, 0.6 }, { 0, 0.9, 0 }, { 92, 60, 40 }, "Wood")
 	knob.shape = "Ball"
@@ -206,15 +206,27 @@ function ToolLooks.BaitBell(): { Part }
 	part(parts, "BellTop", { 1, 0.4, 1 }, { 0, -1.05, 0 }, brass, "Metal")
 	part(parts, "BellMiddle", { 1.4, 0.5, 1.4 }, { 0, -1.5, 0 }, brass, "Metal")
 	part(parts, "BellBottom", { 1.8, 0.4, 1.8 }, { 0, -1.95, 0 }, brass, "Metal")
-	part(parts, "Rim", { 2, 0.15, 2 }, { 0, -2.225, 0 }, { 170, 130, 46 }, "Metal")
+	part(parts, "Rim", { 2, 0.15, 2 }, { 0, -2.225, 0 }, rim, "Metal")
 	local clapper = part(parts, "Clapper", { 0.5, 0.5, 0.5 }, { 0, -2.55, 0 }, { 60, 56, 52 }, "Metal")
 	clapper.shape = "Ball"
 	for i, side in { -1, 1 } do
 		part(parts, `Bow{i}`, { 0.3, 0.25, 0.1 }, { side * 0.2, -0.725, -0.4 }, { 180, 30, 40 }, "Fabric")
 	end
-	local eye = part(parts, "Eye", { 0.5, 0.25, 0.05 }, { 0, -1.5, -0.725 }, { 255, 90, 60 }, "Neon")
-	eye.light = glow({ 255, 90, 60 })
+	local eye = part(parts, "Eye", { 0.5, 0.25, 0.05 }, { 0, -1.5, -0.725 }, eyeColor, "Neon")
+	eye.light = glow(eyeColor)
 	return parts
+end
+
+function ToolLooks.BaitBell(): { Part }
+	return bell({ 200, 160, 60 }, { 170, 130, 46 }, { 255, 90, 60 })
+end
+
+function ToolLooks.SilverBell(): { Part }
+	return bell({ 205, 210, 225 }, { 160, 166, 182 }, { 120, 200, 255 })
+end
+
+function ToolLooks.GoldBell(): { Part }
+	return bell({ 255, 200, 40 }, { 220, 160, 20 }, { 200, 90, 255 })
 end
 
 -- A teal crystal in a silver frame, hanging from a short chain held in the fist, with a dark
@@ -246,6 +258,8 @@ ToolLooks.ById = {
 	MoonVac = ToolLooks.MoonVac,
 	VoidVac = ToolLooks.VoidVac,
 	BaitBell = ToolLooks.BaitBell,
+	SilverBell = ToolLooks.SilverBell,
+	GoldBell = ToolLooks.GoldBell,
 	ReturnCharm = ToolLooks.ReturnCharm,
 } :: { [string]: () -> { Part } }
 
