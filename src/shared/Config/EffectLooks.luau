@@ -43,10 +43,10 @@
 local Effects = require("./Effects")
 local Looks = require("./Looks")
 
-local MaxBest = 2 -- the most valuable effects are always drawn
-local MaxPicked = 2 -- plus this many of the others, picked per monster
-local MaxExtraGroups = 3
-local MaxAuras = 4
+local MaxBest = 3 -- the most valuable effects are always drawn
+local MaxPicked = 3 -- plus this many of the others, picked per monster
+local MaxExtraGroups = 4
+local MaxAuras = 5
 
 export type Extra = {
 	name: string,

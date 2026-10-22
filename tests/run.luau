@@ -2758,7 +2758,7 @@ do
 		end
 	end
 	check(`every effect at once adds at most a skin and 120 parts (got {worst})`, worst <= 120)
-	check(`every effect at once gives at most 4 particle emitters (got {auras})`, auras <= 4)
+	check(`every effect at once gives at most 5 particle emitters (got {auras})`, auras <= 5)
 end
 
 if failures > 0 then
