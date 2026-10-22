@@ -245,6 +245,12 @@ do
 		boosted += if Spawning.rollVariant("MoonVac", variantRng, 3) then 1 else 0
 	end
 	check("a Lucky Ring catch gets a variant more often", boosted > plain * 2)
+	local plainEffects, boostedEffects = 0, 0
+	for _ = 1, 20_000 do
+		plainEffects += #Spawning.rollCatchEffects("SpiritSiphon", variantRng)
+		boostedEffects += #Spawning.rollCatchEffects("SpiritSiphon", variantRng, 2)
+	end
+	check("a Lucky Ring catch gets its Ghost effect more often", boostedEffects > plainEffects * 1.6)
 end
 check(
 	"rarer monsters take longer to catch",
@@ -324,6 +330,16 @@ do
 		end
 	end
 	check(`an event never comes back within {Events.NoRepeat} others`, repeats == 0)
+	local later = Watcher.Epoch + 50_000
+	local timeline = Watcher.upcoming(later, 10)
+	local ordered = #timeline == 10 and timeline[1].endAt > later
+	for index = 2, #timeline do
+		ordered = ordered and timeline[index].startAt > timeline[index - 1].endAt
+	end
+	check(
+		"the admin timeline lists the schedule in order, starting with the event now",
+		ordered and timeline[1].startAt == Watcher.slotAt(later).startAt
+	)
 	local playedAll = true
 	for _, event in Watcher.pool() do
 		if (counts[event.id] or 0) == 0 then

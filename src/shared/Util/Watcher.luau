@@ -117,6 +117,28 @@ function Watcher.slotAt(time: number): Slot
 	return current
 end
 
+-- The schedule from `time` on, for the admin panel's timeline: the slot playing or coming up
+-- now and the `count` after it, each with the name players see (The Watcher Awakens with its
+-- monster set, rolled the same way WatcherService does).
+export type Upcoming = { name: string, icon: string, startAt: number, endAt: number }
+
+function Watcher.upcoming(time: number, count: number): { Upcoming }
+	local list: { Upcoming } = {}
+	local current = Watcher.slotAt(time)
+	for _ = 1, count do
+		local event = current.event
+		local set = Watcher.pickSet(event, Rng.seeded(`watcher-set:{current.index}`))
+		table.insert(list, {
+			name = if set then `{event.name}: {set.name}` else event.name,
+			icon = event.icon or "",
+			startAt = current.startAt,
+			endAt = current.endAt,
+		})
+		current = Watcher.nextSlot(current)
+	end
+	return list
+end
+
 -- How many event monsters appear for this many players in the server.
 function Watcher.monsterCount(players: number): number
 	return math.clamp(math.ceil(players * Events.MonstersPerPlayer), Events.MinMonsters, Events.MaxMonsters)

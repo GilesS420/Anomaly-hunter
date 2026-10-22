@@ -192,9 +192,10 @@ local function finish(player: Player, lucky: boolean?)
 		return
 	end
 	local boost = if lucky then Struggles.Ring.variantBoost else nil
+	local effectBoost = if lucky then Struggles.Ring.effectBoost else nil
 	local caught = if inHub
-		then WatcherService.capture(model, vacuumId, boost)
-		else SpawnService.capture(model, vacuumId, boost)
+		then WatcherService.capture(model, vacuumId, boost, effectBoost)
+		else SpawnService.capture(model, vacuumId, boost, effectBoost)
 	if not caught then
 		State:FireClient(player, "Ended", { result = "Gone", model = model })
 		return

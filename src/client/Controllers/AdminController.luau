@@ -6,7 +6,7 @@
 --
 -- Laid out to need little scrolling (Giles 2026-10-22): a "Works on" dropdown at the top
 -- (Me, Everyone, or any player in the server), tabs down the left (Player, Mansion, Items,
--- Spawn, Server) and one short page per tab, with dropdowns for long lists such as items,
+-- Spawn, Server; Server also shows a timeline of the next events) and one short page per tab, with dropdowns for long lists such as items,
 -- monsters and events. Events and "Reset my save" ignore "Works on".
 --
 -- Each button sends
@@ -19,6 +19,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local Events = require(ReplicatedStorage.Shared.Config.Events)
+local Watcher = require(ReplicatedStorage.Shared.Util.Watcher)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Sizes = require(ReplicatedStorage.Shared.Config.Sizes)
@@ -36,6 +37,7 @@ local RowHeight = 34
 local Gap = 8
 local SideWidth = 110
 local PopupMaxHeight = 240
+local TimelineLength = 10 -- events shown on the Server tab's timeline
 
 local remote: RemoteEvent
 local window: Ui.Window
@@ -491,6 +493,32 @@ local function build()
 	local ghostRow = row(server, "Golden Ghost")
 	button(ghostRow, "Send it now", Ui.Colors.sell, 120, function()
 		send("/ghost")
+	end)
+
+	-- The global schedule (the same in every server; a started event doesn't change it).
+	local timeline = Ui.text(server, "", UDim2.new(1, 0, 0, 0), Ui.Colors.text, false, 16)
+	timeline.LayoutOrder = nextOrder()
+	timeline.AutomaticSize = Enum.AutomaticSize.Y
+	timeline.TextScaled = false
+	timeline.TextSize = 16
+	timeline.TextWrapped = true
+	timeline.TextTruncate = Enum.TextTruncate.None
+	timeline.TextYAlignment = Enum.TextYAlignment.Top
+	task.spawn(function()
+		while timeline.Parent do
+			if window.isOpen() and server.Visible then
+				local now = workspace:GetServerTimeNow()
+				local lines = { "Upcoming events (every server):" }
+				for _, slot in Watcher.upcoming(now, TimelineLength) do
+					local when = if now >= slot.startAt
+						then `live, {Watcher.clock(slot.endAt - now)} left`
+						else `in {Watcher.clock(slot.startAt - now)}`
+					table.insert(lines, `{slot.icon} {slot.name}  ({when})`)
+				end
+				timeline.Text = table.concat(lines, "\n")
+			end
+			task.wait(1)
+		end
 	end)
 
 	openTab("Player")
