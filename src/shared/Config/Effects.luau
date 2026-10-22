@@ -16,6 +16,7 @@ export type Combo = {
 	id: string,
 	multiplier: number,
 	recipe: { string },
+	critter: boolean?, -- made of Critter effects: counts in full on cheap monsters, like them
 }
 
 local Effects = {}
@@ -83,6 +84,20 @@ Effects.Combos = {
 	Banshee = { id = "Banshee", multiplier = 12, recipe = { "Ghost", "Cursed" } },
 	Pharaoh = { id = "Pharaoh", multiplier = 15, recipe = { "Mummy", "Cursed" } },
 	Alpha = { id = "Alpha", multiplier = 25, recipe = { "Werewolf", "Bloodmoon" } },
+	-- Round 2 combos (Giles 2026-10-22). Each is worth more than its two effects added up.
+	PhantomWeaver = { id = "PhantomWeaver", multiplier = 4, recipe = { "Cobwebbed", "Possessed" } },
+	TrickOrTreat = { id = "TrickOrTreat", multiplier = 6, recipe = { "PumpkinHead", "Sugarcoated" } },
+	Wraith = { id = "Wraith", multiplier = 8, recipe = { "Ghost", "Poltergeist" } },
+	GlacierGoo = { id = "GlacierGoo", multiplier = 7, recipe = { "Slimed", "Frostbitten" } },
+	TombLord = { id = "TombLord", multiplier = 14, recipe = { "Mummy", "Buried" } },
+	WitchsDoll = { id = "WitchsDoll", multiplier = 16, recipe = { "Stitched", "Hexed" } },
+	HoardKing = { id = "HoardKing", multiplier = 18, recipe = { "Gilded", "Mimic" } },
+	EclipseWraith = { id = "EclipseWraith", multiplier = 40, recipe = { "Spectral", "Eclipsed" } },
+	TheUnseen = { id = "TheUnseen", multiplier = 60, recipe = { "Voidtouched", "Watched" } },
+	-- Critter combos: only cheap monsters can have their effects.
+	Lanternbot = { id = "Lanternbot", multiplier = 4, recipe = { "Glowbug", "Rusty" }, critter = true },
+	Rotbloom = { id = "Rotbloom", multiplier = 6, recipe = { "Moldy", "Fungal" }, critter = true },
+	PlagueKing = { id = "PlagueKing", multiplier = 10, recipe = { "RatKing", "Moldy" }, critter = true },
 } :: { [string]: Combo }
 
 return Effects

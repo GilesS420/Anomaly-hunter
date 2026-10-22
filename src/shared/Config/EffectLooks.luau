@@ -575,6 +575,69 @@ EffectLooks.Styles = {
 		glow = { 255, 30, 30 },
 		tint = { color = { 90, 20, 25 }, mix = 0.3 },
 	},
+	PhantomWeaver = {
+		includes = { "Cobwebbed", "Possessed" },
+		glow = { 230, 170, 255 },
+		auras = { { kind = "Sparkle", color = { 240, 220, 255 } } },
+	},
+	TrickOrTreat = {
+		includes = { "PumpkinHead", "Sugarcoated" },
+		glow = { 255, 160, 60 },
+		auras = { { kind = "Sparkle", color = { 255, 150, 40 } } },
+	},
+	Wraith = {
+		includes = { "Ghost", "Poltergeist" },
+		seeThrough = 0.6,
+		glow = { 200, 230, 255 },
+		auras = { { kind = "Mist", color = { 120, 140, 180 } } },
+	},
+	GlacierGoo = {
+		includes = { "Slimed", "Frostbitten" },
+		tint = { color = { 120, 220, 210 }, mix = 0.35 },
+		glow = { 140, 255, 230 },
+		auras = { { kind = "Drip", color = { 150, 240, 230 } } },
+	},
+	TombLord = {
+		includes = { "Mummy", "Buried" },
+		glow = Gold,
+		auras = { { kind = "Sparkle", color = Gold } },
+	},
+	WitchsDoll = {
+		includes = { "Stitched", "Hexed" },
+		glow = { 200, 90, 255 },
+		auras = { { kind = "Sparkle", color = { 200, 90, 255 } } },
+	},
+	HoardKing = {
+		includes = { "Gilded", "Mimic" },
+		material = { name = "Foil", reflectance = 0.08 },
+		auras = { { kind = "Sparkle", color = { 255, 240, 160 } } },
+	},
+	EclipseWraith = {
+		includes = { "Spectral", "Eclipsed" },
+		glow = { 255, 90, 60 },
+		auras = { { kind = "Mist", color = { 60, 20, 30 } } },
+	},
+	TheUnseen = {
+		includes = { "Voidtouched", "Watched" },
+		seeThrough = 0.3,
+		glow = { 255, 50, 120 },
+		auras = { { kind = "Sparkle", color = { 255, 60, 140 } } },
+	},
+	Lanternbot = {
+		includes = { "Glowbug", "Rusty" },
+		glow = { 255, 220, 120 },
+		auras = { { kind = "Sparkle", color = { 255, 200, 90 } } },
+	},
+	Rotbloom = {
+		includes = { "Moldy", "Fungal" },
+		tint = { color = { 110, 130, 70 }, mix = 0.3 },
+		auras = { { kind = "Sparkle", color = { 230, 255, 160 } } },
+	},
+	PlagueKing = {
+		includes = { "RatKing", "Moldy" },
+		glow = { 190, 255, 80 },
+		auras = { { kind = "Mist", color = { 110, 140, 60 } } },
+	},
 
 	-- Catch variants.
 	Silver = {

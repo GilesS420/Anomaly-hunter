@@ -1408,6 +1408,27 @@ do
 	)
 end
 
+-- Combos: each is worth more than its two effects added up, and a shared ingredient goes to
+-- the stronger combo.
+do
+	local better = true
+	for id, combo in Effects.Combos do
+		local parts = Value.effectMultiplier({ combo.recipe[1] })
+			+ Value.effectMultiplier({ combo.recipe[2] })
+			- 1
+		if combo.multiplier <= parts then
+			better = false
+			print(`  {id} is not worth more than its recipe`)
+		end
+	end
+	check("every combo beats its two effects added up", better)
+	local shared = Value.resolveEffects({ "Ghost", "Mummy", "Cursed" })
+	check("a shared ingredient goes to the stronger combo", table.find(shared, "Pharaoh") ~= nil)
+	local rot: any =
+		{ monsterId = "Gloomlet", size = "Normal", effects = { "Moldy", "Fungal" }, familiarity = 0 }
+	check("a critter combo counts in full", near(Value.monsterEffectMultiplier(rot), 6))
+end
+
 -- Critter effects: only on cheap monsters, and they count in full.
 do
 	local cheap: any = { monsterId = "Gloomlet", size = "Normal", effects = {}, familiarity = 0 }
@@ -2609,7 +2630,11 @@ do
 			and table.find(effectIds, "Rifted") ~= nil
 			and table.find(effectIds, "Cobwebbed") ~= nil
 	)
-	check("codex lists every combo", #Codex.comboIds() == 4)
+	local comboCount = 0
+	for _ in Effects.Combos do
+		comboCount += 1
+	end
+	check("codex lists every combo", #Codex.comboIds() == comboCount and comboCount == 16)
 end
 
 -- Settings
