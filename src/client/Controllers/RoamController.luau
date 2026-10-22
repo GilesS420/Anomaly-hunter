@@ -43,6 +43,7 @@ local RAINBOW_EVERY = 3 -- rainbow colours change slowly, so every few frames is
 type Swing = {
 	motor: Motor6D,
 	base: CFrame,
+	baseInverse: CFrame,
 	axis: Vector3,
 	amp: number,
 	speed: number,
@@ -84,7 +85,7 @@ local function track(instance: Instance)
 end
 
 -- The swinging joints the server set up for a block monster (MonsterModel.buildLook).
--- Joints already in `known` keep their entry: their C0 has been moved since.
+-- Joints already in `known` keep their entry, so a rescan doesn't read them again.
 local function findSwings(model: Model, known: { Swing }?): { Swing }
 	local seen: { [Motor6D]: Swing } = {}
 	if known then
@@ -107,6 +108,7 @@ local function findSwings(model: Model, known: { Swing }?): { Swing }
 				table.insert(swings, {
 					motor = motor,
 					base = motor.C0,
+					baseInverse = motor.C0:Inverse(),
 					axis = axis,
 					amp = amp,
 					speed = speed,
@@ -268,10 +270,14 @@ function RoamController.start()
 						else math.sin((state.clock * swing.speed + swing.phase) * TAU)
 							* swing.amp
 							* state.pace
-					swing.motor.C0 = if swing.slide
-						then CFrame.new(swing.axis * angle)
+					-- Transform, not C0: it's the property meant for animating every frame.
+					-- Writing C0 makes the engine redo the joint and every part on the monster,
+					-- for every joint, which is what ate the frame rate.
+					swing.motor.Transform = if swing.slide
+						then swing.baseInverse
+							* CFrame.new(swing.axis * angle)
 							* swing.base -- along the monster's axis, even if tilted
-						else swing.base * CFrame.fromAxisAngle(swing.axis, angle)
+						else CFrame.fromAxisAngle(swing.axis, angle)
 				end
 			end
 
