@@ -4,7 +4,7 @@
 -- before the real models exist. Studs; the ground is at Y = 0 (top of the default baseplate).
 --
 -- The hub is an oval: 4 mansion plots along the top, 4 along the bottom, Collector,
--- Watcher Square and Trading Booth in the middle, Bakery + Workshop at the west end and
+-- Watcher Square and Trading Booth in the middle, Bakery, Vacuum Vault + Workshop at the west end and
 -- the Zone Gates at the east end.
 
 export type Vec = { x: number, y: number, z: number }
@@ -101,6 +101,16 @@ Layout.Landmarks = {
 		x = -380,
 		z = -45,
 		width = 40,
+		depth = 40,
+		height = 20,
+	},
+	-- Between the Bakery and the Workshop: vacuums only, always in stock (Giles 2026-10-22).
+	{
+		name = "VacuumVault",
+		label = "Vacuum Vault",
+		x = -380,
+		z = 0,
+		width = 36,
 		depth = 40,
 		height = 20,
 	},

@@ -104,7 +104,7 @@ local function targetFor(current: string?): Instance?
 	elseif current == "Sell" then
 		return path("Hub", "Landmarks", "Collector")
 	elseif current == "Buy" then
-		return path("Hub", "Landmarks", "Workshop")
+		return path("Hub", "Landmarks", "VacuumVault")
 	end
 	return nil
 end

@@ -7,6 +7,7 @@
 -- Layout.Landmarks is x = z = 0. -Z is the front, the side facing the middle of the hub.
 
 local Rooms = require("./Rooms")
+local ToolLooks = require("./ToolLooks")
 
 type Part = Rooms.Part
 
@@ -946,12 +947,130 @@ function Landmarks.TradingBooth(): { Part }
 	return parts
 end
 
+------------------------------------------------------------------------------------------
+-- Vacuum Vault
+------------------------------------------------------------------------------------------
+
+local Steel = { 70, 76, 92 }
+local SteelDark = { 40, 44, 56 }
+local VaultGlow = { 130, 150, 255 }
+
+-- Copies a hand-held vacuum (Config/ToolLooks) onto the landmark at (x, y, z), scaled up,
+-- with its parts' names prefixed so they stay unique.
+local function showVacuum(parts: { Part }, id: string, x: number, y: number, z: number, scale: number)
+	for _, p in ToolLooks.ById[id]() do
+		local copy: Part = table.clone(p)
+		copy.name = `{id}{p.name}`
+		copy.size = { p.size[1] * scale, p.size[2] * scale, p.size[3] * scale }
+		copy.at = { x + p.at[1] * scale, y + p.at[2] * scale, z + p.at[3] * scale }
+		copy.solid = false
+		table.insert(parts, copy)
+	end
+end
+
+-- The Vacuum Vault: a steel-blue shop under a violet awning. A huge round vault door fills
+-- the back wall, the six vacuums stand on lit pedestals and racks, and a goggled keeper in a
+-- rubber apron minds the counter, with the best vacuum (the Void Vac) in a glass case on it.
+function Landmarks.VacuumVault(): { Part }
+	local parts: { Part } = {}
+	local y = shop(parts, {
+		title = "Vacuum Vault",
+		wall = Steel,
+		trim = Brass,
+		roof = SteelDark,
+		deck = { 50, 48, 56 },
+		sign = { 200, 170, 90 },
+		awning = { { 70, 40, 110 }, { 24, 22, 30 } },
+	})
+
+	-- The vault door on the back wall: a thick steel disc, a glowing ring, bolts and a wheel.
+	local dz, dy = 16.6, y + 6.2 -- low enough to show under the awning
+	local door = part(parts, "VaultDoor", { 0.8, 10, 10 }, { 0, dy, dz }, SteelDark, "Metal")
+	door.shape = "Cylinder"
+	door.rot = { 0, 90, 0 }
+	local ring = part(parts, "VaultRing", { 0.3, 8.4, 8.4 }, { 0, dy, dz - 0.5 }, VaultGlow, "Neon")
+	ring.shape = "Cylinder"
+	ring.rot = { 0, 90, 0 }
+	ring.light = { color = VaultGlow, range = 16, brightness = 0.9 }
+	local face = part(parts, "VaultFace", { 0.3, 7.4, 7.4 }, { 0, dy, dz - 0.65 }, Steel, "Metal")
+	face.shape = "Cylinder"
+	face.rot = { 0, 90, 0 }
+	for i = 1, 8 do
+		local bx, by = polar(4.5, (i - 1) * 45)
+		part(parts, `VaultBolt{i}`, { 0.6, 0.6, 0.4 }, { bx, dy + by, dz - 0.6 }, Brass, "Metal")
+	end
+	part(parts, "VaultHub", { 1.4, 1.4, 0.5 }, { 0, dy, dz - 1 }, Brass, "Metal")
+	for i = 1, 3 do
+		local spoke = part(parts, `VaultSpoke{i}`, { 4.6, 0.35, 0.35 }, { 0, dy, dz - 1.1 }, Brass, "Metal")
+		spoke.rot = { 0, 0, (i - 1) * 60 }
+	end
+
+	-- Two racks on the side walls, two vacuums each.
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		local rx = side * 13.5
+		part(parts, `Rack{tag}`, { 1.6, 0.3, 9 }, { rx, y + 5, 10 }, SteelDark, "Metal", true)
+		part(parts, `Rack{tag}Glow`, { 1.4, 0.1, 8.6 }, { rx, y + 4.82, 10 }, VaultGlow, "Neon")
+	end
+	showVacuum(parts, "DustBuster", -13.5, y + 6, 13, 1.3)
+	showVacuum(parts, "PhantomVac", -13.5, y + 6, 8.5, 1.3)
+	showVacuum(parts, "SpiritSiphon", 13.5, y + 6, 13, 1.3)
+	showVacuum(parts, "BansheeBlower", 13.5, y + 6, 8.5, 1.3)
+
+	-- The Moon Vac on a lit pedestal by the door.
+	part(parts, "Pedestal", { 2.4, 3, 2.4 }, { 9, y + 1.5, 9 }, SteelDark, "Metal", true)
+	part(parts, "PedestalGlow", { 2.6, 0.2, 2.6 }, { 9, y + 3.1, 9 }, VaultGlow, "Neon")
+	showVacuum(parts, "MoonVac", 9, y + 4.05, 9, 1.3)
+
+	-- The keeper: rubber apron, goggles with glowing lenses.
+	local kz = 1.6
+	part(parts, "Keeper", { 3, 4.6, 1.8 }, { -4, y + 2.3, kz }, { 52, 50, 60 }, "Fabric", true)
+	part(parts, "KeeperApron", { 2.4, 3.6, 0.2 }, { -4, y + 2.6, kz - 1 }, { 90, 60, 40 }, "Fabric")
+	part(parts, "KeeperHead", { 2.2, 2.2, 2 }, { -4, y + 5.7, kz }, { 200, 186, 170 }, "SmoothPlastic")
+	part(parts, "KeeperCap", { 2.4, 0.7, 2.2 }, { -4, y + 7.1, kz }, SteelDark, "Fabric")
+	part(parts, "KeeperGoggleBand", { 2.3, 0.4, 2.1 }, { -4, y + 6, kz }, Ink, "Fabric")
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		part(
+			parts,
+			`KeeperLens{tag}`,
+			{ 0.6, 0.6, 0.15 },
+			{ -4 + side * 0.5, y + 6, kz - 1.05 },
+			VaultGlow,
+			"Neon"
+		)
+		part(
+			parts,
+			`KeeperArm{tag}`,
+			{ 0.7, 0.7, 1.4 },
+			{ -4 + side * 1.9, y + 3.85, 0 },
+			{ 52, 50, 60 },
+			"Fabric"
+		)
+	end
+
+	-- The Void Vac in a glass case on the counter.
+	local top = y + 3.5
+	part(parts, "CaseBase", { 3.4, 0.4, 2.4 }, { 5, top + 0.2, -1 }, SteelDark, "Metal")
+	local glass = part(parts, "CaseGlass", { 3.2, 3.6, 2.2 }, { 5, top + 2.2, -1 }, GlassTint, "Glass")
+	glass.transparency = 0.7
+	part(parts, "CaseLid", { 3.4, 0.3, 2.4 }, { 5, top + 4.15, -1 }, Brass, "Metal")
+	showVacuum(parts, "VoidVac", 5, top + 1.1, -0.6, 0.9)
+
+	-- A sign on the deck: always open.
+	part(parts, "StandPost", { 0.3, 3.2, 0.3 }, { -13, y + 1.6, -8 }, Iron, "Metal", true)
+	local board = part(parts, "StandBoard", { 4.4, 2, 0.2 }, { -13, y + 3.6, -8.1 }, BoardWood, "WoodPlanks")
+	board.text = "Always in stock"
+	return parts
+end
+
 -- Recipes by landmark name (Layout.Landmarks), and which of their parts is the model's
 -- PrimaryPart: what Counter puts the prompt on.
 Landmarks.ByName = {
 	WatcherSquare = Landmarks.WatcherSquare,
 	Bakery = Landmarks.Bakery,
 	Workshop = Landmarks.Workshop,
+	VacuumVault = Landmarks.VacuumVault,
 	Collector = Landmarks.Collector,
 	TradingBooth = Landmarks.TradingBooth,
 } :: { [string]: () -> { Part } }
@@ -960,6 +1079,7 @@ Landmarks.Anchor = {
 	WatcherSquare = "Plaza",
 	Bakery = Landmarks.CounterSpot,
 	Workshop = Landmarks.CounterSpot,
+	VacuumVault = Landmarks.CounterSpot,
 	Collector = Landmarks.CounterSpot,
 	TradingBooth = Landmarks.CounterSpot,
 } :: { [string]: string }
