@@ -33,17 +33,20 @@
 -- Monsters can stack every effect, and each skin, band set or tuft set copies the monster's
 -- parts again (one with every effect came to 500+ parts and 40 particle emitters, which tanks
 -- the frame rate). Skins all sit at the same spot, so only the outermost was ever visible
--- anyway. So a monster draws at most one shell, one wrap and one fur (its most valuable
--- effect's), the MaxExtraGroups most valuable groups of extras and MaxAuras particle emitters,
--- so a rare effect always shows. Colours come from the MaxShown most valuable effects too:
--- mixing every effect's tint turned monsters grey. Every effect still counts for value.
+-- anyway. And mixing every effect's tint turned monsters grey. So a monster is drawn with
+-- MaxBest of its most valuable effects (a rare effect always shows) plus MaxPicked of the
+-- others, picked at random but always the same ones for the same monster and effects, so
+-- monsters still look different from each other. Of those it draws at most one shell, one
+-- wrap and one fur (the most valuable one's), MaxExtraGroups groups of extras and MaxAuras
+-- particle emitters. Every effect still counts for value.
 
 local Effects = require("./Effects")
 local Looks = require("./Looks")
 
-local MaxShown = 3 -- effects drawn on a monster, the most valuable ones
+local MaxBest = 2 -- the most valuable effects are always drawn
+local MaxPicked = 2 -- plus this many of the others, picked per monster
 local MaxExtraGroups = 3
-local MaxAuras = 3
+local MaxAuras = 4
 
 export type Extra = {
 	name: string,
@@ -1034,15 +1037,29 @@ local function worth(id: string): number
 end
 
 function EffectLooks.dress(look: Looks.Look, effects: { string }?, variant: string?): DressedLook
-	-- Only the most valuable few are drawn, cheapest first so the most valuable one's skin
-	-- shows (see the top), whatever order the monster got them in.
+	-- The most valuable few plus a few picked others (see the top), in an order where the
+	-- most valuable come last so their skin shows, whatever order the monster got them in.
 	local ordered = table.clone(effects or {})
 	table.sort(ordered, function(a: string, b: string): boolean
 		local wa, wb = worth(a), worth(b)
 		return if wa ~= wb then wa < wb else a < b
 	end)
-	while #ordered > MaxShown do
-		table.remove(ordered, 1)
+	if #ordered > MaxBest + MaxPicked then
+		local best = table.move(ordered, #ordered - MaxBest + 1, #ordered, 1, {})
+		local rest = table.move(ordered, 1, #ordered - MaxBest, 1, {})
+		-- A seed from the monster and its effects, so the same monster keeps the same picks.
+		local seed = #look.pieces * 7919 + math.floor(look.top * 100)
+		for _, id in ordered do
+			for i = 1, #id do
+				seed = (seed * 31 + string.byte(id, i)) % 2147483647
+			end
+		end
+		ordered = {}
+		for _ = 1, MaxPicked do
+			seed = (seed * 48271) % 2147483647
+			table.insert(ordered, (table.remove(rest, seed % #rest + 1) :: any) :: string)
+		end
+		table.move(best, 1, #best, #ordered + 1, ordered)
 	end
 	local styles: { Style } = {}
 	collect(ordered, styles, {})
