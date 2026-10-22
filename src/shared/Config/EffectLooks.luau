@@ -348,6 +348,29 @@ EffectLooks.Styles = {
 		glow = Gold,
 		auras = { { kind = "Sparkle", color = Gold } },
 	},
+	Harvested = {
+		-- Straw-coloured skin bound with bands of dry corn husk, leaves drifting off it.
+		tint = { color = { 200, 160, 70 }, mix = 0.4 },
+		wrap = { colors = { { 185, 145, 65 }, { 150, 110, 40 } }, thickness = 0.08, material = "Fabric" },
+		auras = { { kind = "Sparkle", color = { 240, 150, 50 } } },
+	},
+	Skeletal = {
+		-- Turned to old bone: pale and a little see-through, ribs showing, green grave-glow.
+		tint = { color = { 235, 228, 205 }, mix = 0.7 },
+		seeThrough = 0.15,
+		wrap = { colors = { { 245, 240, 225 } }, thickness = 0.06 },
+		glow = { 170, 255, 170 },
+		auras = { { kind = "Mist", color = { 200, 230, 190 } } },
+	},
+	Bewitched = {
+		-- A witch's curse: dusky purple skin, green eyes, a curl of green cauldron smoke.
+		tint = { color = { 90, 40, 120 }, mix = 0.35 },
+		glow = { 120, 255, 120 },
+		auras = {
+			{ kind = "Mist", color = { 120, 255, 140 } },
+			{ kind = "Sparkle", color = { 190, 120, 255 } },
+		},
+	},
 	Bloodmoon = {
 		tint = { color = { 150, 20, 30 }, mix = 0.45 },
 		glow = { 255, 40, 40 },

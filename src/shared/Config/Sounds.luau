@@ -92,6 +92,37 @@ Sounds.Events = {
 		ambience = "BloodMoon",
 		musicVolume = 0.3,
 	},
+	-- The newer events borrow the closest sounds until they get their own on the sheets.
+	SpiderSeason = {
+		warning = "FlickerWarning",
+		start = "FrostFogStart",
+		ambience = "FrostFog",
+		musicVolume = 0.5,
+	},
+	HarvestMoon = {
+		warning = "BloodMoonWarning",
+		start = "GoldRushStart",
+		ambience = "GoldRush",
+		musicVolume = 0.6,
+	},
+	WitchingHour = {
+		warning = "WatcherAwakensWarning",
+		start = "SugarRushStart",
+		ambience = "BloodMoon",
+		musicVolume = 0.4,
+	},
+	GhostMarket = {
+		warning = "GoldRushWarning",
+		start = "GoldRushStart",
+		ambience = "SugarRush",
+		musicVolume = 0.6,
+	},
+	BoneRattle = {
+		warning = "FlickerWarning",
+		start = "BloodMoonStart",
+		ambience = "Flicker",
+		musicVolume = 0.4,
+	},
 	-- the Watcher's organ and drone take over completely
 	WatcherAwakens = {
 		warning = "WatcherAwakensWarning",

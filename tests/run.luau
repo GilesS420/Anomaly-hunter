@@ -281,22 +281,32 @@ do
 	)
 
 	local repeats, awakenings, counts = 0, 0, {} :: { [string]: number }
-	local last: string? = nil
+	local recent: { string } = {}
 	for _ = 1, 20_000 do
-		local event = Watcher.pick(last, 0, clockRng)
-		if event.id == last then
+		local event = Watcher.pick(recent, 0, clockRng)
+		if table.find(recent, event.id) then
 			repeats += 1
 		end
 		if event.awakening then
 			awakenings += 1
 		end
 		counts[event.id] = (counts[event.id] or 0) + 1
-		last = event.id
+		table.insert(recent, event.id)
+		if #recent > Events.NoRepeat then
+			table.remove(recent, 1)
+		end
 	end
-	check("the same event never plays twice in a row", repeats == 0)
+	check(`an event never comes back within {Events.NoRepeat} others`, repeats == 0)
+	local playedAll = true
+	for _, event in Watcher.pool() do
+		if (counts[event.id] or 0) == 0 then
+			playedAll = false
+		end
+	end
+	check("every event in the pool comes up", playedAll)
 	check("The Watcher Awakens only comes with all eyes open", awakenings == 0)
 	check("events that aren't launched never play", counts.MimicNight == nil and counts.BreachStorm == nil)
-	check("Frost Fog is commoner than Blood Moon", (counts.FrostFog or 0) > (counts.BloodMoon or 0) * 2)
+	check("Frost Fog is commoner than Blood Moon", (counts.FrostFog or 0) > (counts.BloodMoon or 0))
 	check(
 		"every weighted launch event can play",
 		counts.FrostFog ~= nil
@@ -307,7 +317,7 @@ do
 	)
 	check(
 		"all eyes open means The Watcher Awakens",
-		Watcher.pick("Flicker", Events.EyesToAwaken, clockRng).id == "WatcherAwakens"
+		Watcher.pick({ "Flicker" }, Events.EyesToAwaken, clockRng).id == "WatcherAwakens"
 	)
 
 	-- The global schedule: worked out from the clock alone, so every server agrees.
