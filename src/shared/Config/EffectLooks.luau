@@ -416,6 +416,102 @@ EffectLooks.Styles = {
 		glow = { 255, 120, 40 },
 	},
 
+	-- Critter effects (only on cheap monsters).
+	Glowbug = {
+		-- Fireflies circling it, and a warm green-yellow glow.
+		glow = { 220, 255, 90 },
+		extras = {
+			{
+				anchor = "orbit",
+				speed = 0.6,
+				parts = {
+					{
+						name = "Firefly1",
+						size = { 0.2, 0.2, 0.2 },
+						at = { 0, 0.5, 0 },
+						angle = 0,
+						color = { 220, 255, 90 },
+						glow = true,
+						shape = "Ball",
+					},
+					{
+						name = "Firefly2",
+						size = { 0.2, 0.2, 0.2 },
+						at = { 0, -0.1, 0 },
+						angle = 120,
+						color = { 220, 255, 90 },
+						glow = true,
+						shape = "Ball",
+					},
+					{
+						name = "Firefly3",
+						size = { 0.2, 0.2, 0.2 },
+						at = { 0, 0.2, 0 },
+						angle = 240,
+						color = { 220, 255, 90 },
+						glow = true,
+						shape = "Ball",
+					},
+				},
+			},
+		},
+		auras = { { kind = "Sparkle", color = { 220, 255, 90 } } },
+	},
+	Moldy = {
+		-- Grey-green and fuzzy, shedding spores.
+		tint = { color = { 120, 140, 100 }, mix = 0.45 },
+		shell = { color = { 150, 180, 120 }, transparency = 0.6, material = "Fabric" },
+		auras = { { kind = "Mist", color = { 150, 180, 120 } } },
+	},
+	Rusty = {
+		-- Orange-brown corroded metal.
+		tint = { color = { 160, 80, 40 }, mix = 0.6 },
+		material = { name = "CorrodedMetal" },
+		auras = { { kind = "Drip", color = { 150, 70, 30 } } },
+	},
+	Fungal = {
+		-- Red and white mushroom caps sprouting from its skin, puffing spores.
+		tint = { color = { 90, 75, 60 }, mix = 0.3 },
+		fur = { { 210, 50, 45 }, { 240, 232, 214 } },
+		auras = { { kind = "Sparkle", color = { 200, 255, 150 } } },
+	},
+	RatKing = {
+		-- A royal purple skin with golden eyes and a glint of gold.
+		tint = { color = { 80, 50, 110 }, mix = 0.4 },
+		glow = Gold,
+		auras = { { kind = "Sparkle", color = Gold }, { kind = "Mist", color = { 120, 110, 110 } } },
+	},
+
+	-- Round 3 cake effects.
+	Buried = {
+		-- Grave-grey skin with soil caked on from the feet up and pale green eyes.
+		tint = { color = { 150, 145, 130 }, mix = 0.35 },
+		fade = { color = { 70, 52, 35 }, mix = 0.85 },
+		glow = { 180, 255, 170 },
+		auras = { { kind = "Mist", color = { 110, 85, 60 } } },
+	},
+	Spectral = {
+		-- Half see-through, with a cold teal glow round every part.
+		seeThrough = 0.4,
+		tint = { color = { 170, 255, 230 }, mix = 0.5 },
+		shell = { color = { 120, 255, 220 }, transparency = 0.75, glow = true },
+		glow = { 120, 255, 220 },
+		auras = {
+			{ kind = "Mist", color = { 150, 255, 230 } },
+			{ kind = "Sparkle", color = { 200, 255, 245 } },
+		},
+	},
+	Voidtouched = {
+		-- Pitch black under a purple void glow.
+		tint = { color = { 12, 4, 22 }, mix = 0.9 },
+		shell = { color = { 140, 50, 255 }, transparency = 0.6, glow = true },
+		glow = { 210, 130, 255 },
+		auras = {
+			{ kind = "Mist", color = { 90, 20, 160 } },
+			{ kind = "Sparkle", color = { 210, 130, 255 } },
+		},
+	},
+
 	-- Combos: both effects' looks plus a finishing touch.
 	Count = {
 		includes = { "Vampire", "Batty" },

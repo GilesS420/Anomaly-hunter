@@ -45,6 +45,16 @@ Shop.ConfirmSellFrom = "Legendary"
 -- sells for. Event treats (`event`) are only in stock while their Watcher event is live, so
 -- an event's effect can be had after it's over.
 Shop.Bakery = {
+	-- Gives a Critter effect, so only cheap monsters (Config/Effects.CritterMaxValue) can get it.
+	{
+		id = "MoldyMuffin",
+		name = "Moldy Muffin",
+		kind = "Food",
+		price = 5_000,
+		restockChance = 90,
+		rarity = "Common",
+		grantsEffect = "Moldy",
+	},
 	{
 		id = "PumpkinCandy",
 		name = "Pumpkin Candy",
@@ -103,6 +113,15 @@ Shop.Bakery = {
 		event = "GoldRush",
 	},
 	{
+		id = "SpiderStrudel",
+		name = "Spider Strudel",
+		kind = "Food",
+		price = 9_000_000,
+		restockChance = 35,
+		rarity = "Rare",
+		effectChances = { { effect = "Possessed", chance = 40 }, { effect = "Cobwebbed", chance = 100 } },
+	},
+	{
 		id = "StitchCupcake",
 		name = "Stitch Cupcake",
 		kind = "Food",
@@ -140,6 +159,15 @@ Shop.Bakery = {
 		effectChances = { { effect = "Mummy", chance = 25 }, { effect = "Batty", chance = 100 } },
 	},
 	{
+		id = "GraveGateau",
+		name = "Grave Gâteau",
+		kind = "Food",
+		price = 800_000_000,
+		restockChance = 2,
+		rarity = "Legendary",
+		grantsEffect = "Buried",
+	},
+	{
 		id = "WitchsBrewTart",
 		name = "Witch's Brew Tart",
 		kind = "Food",
@@ -149,6 +177,15 @@ Shop.Bakery = {
 		grantsEffect = "Hexed",
 	},
 	{
+		id = "PhantomPavlova",
+		name = "Phantom Pavlova",
+		kind = "Food",
+		price = 5_000_000_000,
+		restockChance = 0.5,
+		rarity = "Mythic",
+		grantsEffect = "Spectral",
+	},
+	{
 		id = "EclipseEclair",
 		name = "Eclipse Éclair",
 		kind = "Food",
@@ -156,6 +193,15 @@ Shop.Bakery = {
 		restockChance = 0.2,
 		rarity = "Divine",
 		grantsEffect = "Eclipsed",
+	},
+	{
+		id = "VoidVelvet",
+		name = "Void Velvet Cake",
+		kind = "Food",
+		price = 60_000_000_000,
+		restockChance = 0.1,
+		rarity = "Divine",
+		grantsEffect = "Voidtouched",
 	},
 } :: { Item }
 

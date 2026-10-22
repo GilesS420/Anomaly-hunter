@@ -65,9 +65,31 @@ function Value.resolveEffects(effectIds: { string }): { string }
 	return resolved
 end
 
--- Whether one more effect fits on a monster: any effect it doesn't have yet (there's no cap).
-function Value.fits(effectIds: { string }, effectId: string): "Ok" | "HasEffect"
-	return if table.find(effectIds, effectId) then "HasEffect" else "Ok"
+-- Whether a Critter effect (Config/Effects) can land on this monster: only cheap ones.
+-- Every other effect can land on any monster. Without a monster id there's nothing to check.
+function Value.critterAllowed(monsterId: string?, effectId: string): boolean
+	local effect = Effects.List[effectId]
+	if not effect or effect.source ~= "Critter" then
+		return true
+	end
+	if not monsterId then
+		return true
+	end
+	local monster = Monsters[monsterId]
+	return monster ~= nil and monster.baseValue <= Effects.CritterMaxValue
+end
+
+-- Whether one more effect fits on a monster: any effect it doesn't have yet (there's no cap),
+-- but Critter effects only on cheap monsters (pass the monster's id).
+function Value.fits(
+	effectIds: { string },
+	effectId: string,
+	monsterId: string?
+): "Ok" | "HasEffect" | "TooPricey"
+	if table.find(effectIds, effectId) then
+		return "HasEffect"
+	end
+	return if Value.critterAllowed(monsterId, effectId) then "Ok" else "TooPricey"
 end
 
 -- The combo that appears in `after` but not in `before` (resolved effect lists), or nil.
@@ -102,11 +124,19 @@ function Value.priceShare(monsterId: string): number?
 end
 
 -- The effects' value multiplier on this monster: the full bonus on pricey monsters, less on
--- cheap ones (Value.CheapEffectShare).
+-- cheap ones (Value.CheapEffectShare). Critter effects always count in full.
 function Value.monsterEffectMultiplier(caught: CaughtMonster): number
 	local share = Value.CheapEffectShare
 		+ (1 - Value.CheapEffectShare) * (Value.priceShare(caught.monsterId) or 1)
-	return 1 + (Value.effectMultiplier(caught.effects) - 1) * share
+	local critter = 0
+	for _, id in caught.effects do
+		local effect = Effects.List[id]
+		if effect and effect.source == "Critter" then
+			critter += effect.multiplier - 1
+		end
+	end
+	local rest = Value.effectMultiplier(caught.effects) - 1 - critter
+	return 1 + rest * share + critter
 end
 
 function Value.sellValue(caught: CaughtMonster, wingsOwned: number): number

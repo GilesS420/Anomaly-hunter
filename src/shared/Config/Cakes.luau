@@ -19,18 +19,23 @@ local Cakes = {}
 Cakes.Minutes = 15
 Cakes.Bites = 3 -- a cake not listed in BitesById
 Cakes.BitesById = {
+	MoldyMuffin = 3,
 	PumpkinCandy = 3,
 	FangFudge = 3,
 	StaticCupcake = 4,
 	EctoplasmPie = 4,
 	FrostTart = 4,
 	GildedTruffle = 5,
+	SpiderStrudel = 5,
 	StitchCupcake = 5,
 	CursedCake = 6,
 	BloodMoonPie = 6,
 	BoneMarrowMousse = 6,
+	GraveGateau = 6,
 	WitchsBrewTart = 7,
+	PhantomPavlova = 7,
 	EclipseEclair = 8,
+	VoidVelvet = 9,
 } :: { [string]: number }
 Cakes.CheckSeconds = 5 -- how often a cake looks whether its next bite is due (online)
 Cakes.PerWing = 5 -- cakes out at once per owned wing (the Foyer counts): 5 to start, 30 with every wing
@@ -40,18 +45,23 @@ Cakes.BiteEffectChance = 30 -- percent a bite rolls for the effect at all (Giles
 -- for a bite first. Better cakes reach further. A wing is 40 x 40 studs. Hover over (or tap)
 -- a placed cake to see its circle.
 Cakes.Reach = {
+	MoldyMuffin = 8,
 	PumpkinCandy = 8,
 	FangFudge = 9,
 	StaticCupcake = 10,
 	EctoplasmPie = 10,
 	FrostTart = 11,
 	GildedTruffle = 12,
+	SpiderStrudel = 12,
 	StitchCupcake = 12,
 	CursedCake = 14,
 	BloodMoonPie = 14,
 	BoneMarrowMousse = 15,
+	GraveGateau = 16,
 	WitchsBrewTart = 18,
+	PhantomPavlova = 20,
 	EclipseEclair = 22,
+	VoidVelvet = 26,
 } :: { [string]: number }
 Cakes.DefaultReach = 8
 
@@ -127,6 +137,43 @@ Cakes.Looks = {
 		topping = "Moon",
 		toppingColor = { 255, 230, 150 },
 		glow = { 255, 180, 80 },
+	},
+	MoldyMuffin = {
+		tiers = 1,
+		sponge = { 150, 130, 90 },
+		icing = { 120, 150, 90 },
+		topping = "Drips",
+		toppingColor = { 160, 200, 110 },
+	},
+	SpiderStrudel = {
+		tiers = 1,
+		sponge = { 200, 160, 100 },
+		icing = { 235, 235, 240 },
+		topping = "Stitches",
+		toppingColor = { 40, 30, 40 },
+	},
+	GraveGateau = {
+		tiers = 2,
+		sponge = { 70, 55, 45 },
+		icing = { 110, 115, 110 },
+		topping = "Bones",
+		toppingColor = { 220, 210, 190 },
+	},
+	PhantomPavlova = {
+		tiers = 3,
+		sponge = { 235, 240, 255 },
+		icing = { 200, 225, 255 },
+		topping = "Bubbles",
+		toppingColor = { 170, 220, 255 },
+		glow = { 170, 220, 255 },
+	},
+	VoidVelvet = {
+		tiers = 3,
+		sponge = { 30, 10, 45 },
+		icing = { 70, 20, 110 },
+		topping = "Moon",
+		toppingColor = { 200, 120, 255 },
+		glow = { 160, 60, 255 },
 	},
 	-- Event treats (only sold while their Watcher event is live).
 	StaticCupcake = {

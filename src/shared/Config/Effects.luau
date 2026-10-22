@@ -2,14 +2,14 @@
 -- Haunted effects. Bonuses add up: total = 1 + sum(multiplier - 1).
 -- A monster can hold every effect at once (no cap, Giles 2026-10-20).
 
-export type Source = "Roam" | "Food" | "Catch" | "Event" | "Survive"
+export type Source = "Roam" | "Critter" | "Food" | "Catch" | "Event" | "Survive"
 
 export type Effect = {
 	id: string,
 	multiplier: number,
 	source: Source,
 	from: string?, -- the food, tool or event that gives it
-	weight: number?, -- Roam effects: how often it's picked when a roll hits (rarer = smaller)
+	weight: number?, -- Roam and Critter effects: how often it's picked when a roll hits (rarer = smaller)
 }
 
 export type Combo = {
@@ -35,6 +35,11 @@ Effects.RoamFamiliarityBonus = 1
 Effects.RoamOddsPerWing = 0.1
 Effects.EventEffectWeight = 25
 
+-- Critter effects (Giles 2026-10-22): only monsters worth up to CritterMaxValue (base value)
+-- can get them. They're picked up roaming like Roam effects (same rolls, their own weights)
+-- and count in full on the price, unlike other effects on cheap monsters (Util/Value).
+Effects.CritterMaxValue = 50_000
+
 Effects.List = {
 	Cobwebbed = { id = "Cobwebbed", multiplier = 1.2, source = "Roam", weight = 40 },
 	PumpkinHead = { id = "PumpkinHead", multiplier = 1.5, source = "Food", from = "PumpkinCandy" },
@@ -50,6 +55,15 @@ Effects.List = {
 	-- x4 (not x3 like Ghost) so the Moon Vac has a perk of its own; set by the balance sheet.
 	Werewolf = { id = "Werewolf", multiplier = 4, source = "Catch", from = "MoonVac" },
 	Mummy = { id = "Mummy", multiplier = 4, source = "Roam", weight = 5 },
+	Glowbug = { id = "Glowbug", multiplier = 1.5, source = "Critter", weight = 30 },
+	Moldy = { id = "Moldy", multiplier = 2, source = "Critter", weight = 25, from = "MoldyMuffin" },
+	Rusty = { id = "Rusty", multiplier = 2, source = "Critter", weight = 25 },
+	Fungal = { id = "Fungal", multiplier = 3, source = "Critter", weight = 12 },
+	RatKing = { id = "RatKing", multiplier = 5, source = "Critter", weight = 4 },
+	-- Round 3 cakes (Giles 2026-10-22).
+	Buried = { id = "Buried", multiplier = 6, source = "Food", from = "GraveGateau" },
+	Spectral = { id = "Spectral", multiplier = 10, source = "Food", from = "PhantomPavlova" },
+	Voidtouched = { id = "Voidtouched", multiplier = 25, source = "Food", from = "VoidVelvet" },
 	Stitched = { id = "Stitched", multiplier = 3, source = "Food", from = "StitchCupcake" },
 	Cursed = { id = "Cursed", multiplier = 5, source = "Food", from = "CursedCake" },
 	Bloodmoon = { id = "Bloodmoon", multiplier = 6, source = "Event", from = "BloodMoon" },

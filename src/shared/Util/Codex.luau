@@ -149,6 +149,8 @@ end
 function Codex.whereFrom(effect: Effects.Effect): string
 	if effect.source == "Roam" then
 		return "Monsters pick it up roaming your mansion"
+	elseif effect.source == "Critter" then
+		return "Cheap monsters (worth up to $50K) pick it up roaming your mansion"
 	elseif effect.source == "Food" then
 		return "From a Bakery cake"
 	elseif effect.source == "Catch" then

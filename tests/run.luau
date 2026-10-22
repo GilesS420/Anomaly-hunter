@@ -1320,7 +1320,8 @@ do
 	check("offline rolls give roaming effects", #gained > 0 and #lucky.effects == #gained)
 	local onlyRoam = true
 	for _, id in gained do
-		onlyRoam = onlyRoam and Effects.List[id] ~= nil and Effects.List[id].source == "Roam"
+		local source = Effects.List[id] and Effects.List[id].source
+		onlyRoam = onlyRoam and (source == "Roam" or source == "Critter")
 	end
 	check("offline rolls only give roaming effects", onlyRoam)
 	check("no time away, no rolls", #Haunting.catchUp(fresh(), 1, 0, Effects.RoamRollSeconds - 1, hit) == 0)
@@ -1343,6 +1344,42 @@ do
 	)
 end
 
+-- Critter effects: only on cheap monsters, and they count in full.
+do
+	local cheap: any = { monsterId = "Gloomlet", size = "Normal", effects = {}, familiarity = 0 }
+	local pricey: any = { monsterId = "TheGroundskeeper", size = "Normal", effects = {}, familiarity = 0 }
+	check(
+		"Critter effects only fit cheap monsters",
+		Value.fits({}, "Moldy", "Gloomlet") == "Ok"
+			and Value.fits({}, "Moldy", "TheGroundskeeper") == "TooPricey"
+	)
+	local rolledCritter = false
+	local rng = fakeRandom(5)
+	for _ = 1, 500 do
+		local id = Haunting.roll(pricey, 1, nil, rng, true)
+		rolledCritter = rolledCritter or (id ~= nil and Effects.List[id].source == "Critter")
+	end
+	check("a pricey monster never rolls a Critter effect", not rolledCritter)
+	local muffin: Shop.Item? = nil
+	for _, item in Shop.Bakery do
+		if item.id == "MoldyMuffin" then
+			muffin = item
+		end
+	end
+	check(
+		"a Moldy Muffin only fits cheap monsters",
+		Cakes.fits(cheap, muffin) == "Ok" and Cakes.fits(pricey, muffin) == "TooPricey"
+	)
+	local rusty = table.clone(cheap)
+	rusty.effects = { "Rusty" }
+	local slimed = table.clone(cheap)
+	slimed.effects = { "Slimed" }
+	check(
+		"a Critter x2 doubles a cheap monster, a normal x2 adds less",
+		near(Value.monsterEffectMultiplier(rusty), 2) and Value.monsterEffectMultiplier(slimed) < 1.5
+	)
+end
+
 -- Roaming effects (Util/Haunting).
 do
 	local function monster(effects: { string }): any
@@ -1362,15 +1399,16 @@ do
 
 	local poolOk = true
 	for _, option in Haunting.pool(nil) do
-		poolOk = poolOk and Effects.List[option.id].source == "Roam" and option.weight > 0
+		local source = Effects.List[option.id].source
+		poolOk = poolOk and (source == "Roam" or source == "Critter") and option.weight > 0
 	end
-	check("the roam pool only holds Roam effects", poolOk and #Haunting.pool(nil) == 5)
+	check("the roam pool only holds Roam and Critter effects", poolOk and #Haunting.pool(nil) == 10)
 	local withEvent = Haunting.pool("Bloodmoon")
 	local hasEvent = false
 	for _, option in withEvent do
 		hasEvent = hasEvent or option.id == "Bloodmoon"
 	end
-	check("a live event adds its effect to the pool", hasEvent and #withEvent == 6)
+	check("a live event adds its effect to the pool", hasEvent and #withEvent == 11)
 
 	local random = fakeRandom(11)
 	local picked = Haunting.roll(monster({}), 1, nil, random, true)
@@ -1659,8 +1697,15 @@ end
 -- materials; head extras stack above the monster and the label clears them.
 do
 	local EffectLooks = require("../src/shared/Config/EffectLooks")
-	local materials =
-		{ Metal = true, SmoothPlastic = true, Fabric = true, Foil = true, Ice = true, Glass = true }
+	local materials = {
+		Metal = true,
+		SmoothPlastic = true,
+		Fabric = true,
+		Foil = true,
+		Ice = true,
+		Glass = true,
+		CorrodedMetal = true,
+	}
 	local missing = {}
 	for id in Effects.List do
 		if not EffectLooks.Styles[id] then
