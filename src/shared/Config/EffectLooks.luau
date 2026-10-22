@@ -29,8 +29,18 @@
 -- Everything added to a part (shells, bands, fur, stitches) copies that part's joint, so it
 -- swings along with the limb it sits on. Variants (Silver, Gold, Shiny, Rainbow) are applied
 -- last, so a gold monster stays gold whatever effects it has; their auras still add up.
+--
+-- Monsters can stack every effect, and each skin, band set or tuft set copies the monster's
+-- parts again (one with every effect came to 500+ parts and 40 particle emitters, which tanks
+-- the frame rate). Skins all sit at the same spot, so only the outermost was ever visible
+-- anyway. So a monster draws at most one shell, one wrap and one fur (the newest effect's),
+-- MaxExtraGroups groups of extras and MaxAuras particle emitters. Colours still mix from every
+-- effect, and every effect still counts for value.
 
 local Looks = require("./Looks")
+
+local MaxExtraGroups = 3
+local MaxAuras = 3
 
 export type Extra = {
 	name: string,
@@ -830,7 +840,7 @@ end
 local function coverings(pieces: { Piece }, style: Style, prefix: string): { Piece }
 	local added = {}
 	for _, piece in pieces do
-		if piece.glow then
+		if piece.glow or not style.shell then
 			continue
 		end
 		local s = piece.size
@@ -1053,8 +1063,20 @@ function EffectLooks.dress(look: Looks.Look, effects: { string }?, variant: stri
 			end
 		end
 	end
+	-- One shell, one wrap and one fur at most: the newest effect's (see the top).
+	local shell: Style?, wrap: Style?, fur: Style? = nil, nil, nil
 	for _, style in effectStyles do
-		for _, piece in coverings(base, style, names[style]) do
+		shell = if style.shell then style else shell
+		wrap = if style.wrap then style else wrap
+		fur = if style.fur then style else fur
+	end
+	for _, style in effectStyles do
+		local only: Style = {
+			shell = if style == shell then style.shell else nil,
+			wrap = if style == wrap then style.wrap else nil,
+			fur = if style == fur then style.fur else nil,
+		}
+		for _, piece in coverings(base, only, names[style]) do
 			table.insert(pieces, piece)
 		end
 	end
@@ -1068,14 +1090,20 @@ function EffectLooks.dress(look: Looks.Look, effects: { string }?, variant: stri
 		end
 		recolor(solid, variantStyle)
 	end
+	-- The newest extras and particles, a few at most (see the top); the variant's come first.
 	local stack: { [string]: number } = {}
 	local auras: { Aura } = {}
-	for _, style in styles do
-		if style.extras then
+	local groups = 0
+	for i = #styles, 1, -1 do
+		local style = styles[i]
+		if style.extras and groups < MaxExtraGroups then
+			groups += 1
 			place(pieces, base, style.extras, stack, names[style])
 		end
 		for _, aura in style.auras or {} do
-			table.insert(auras, aura)
+			if #auras < MaxAuras then
+				table.insert(auras, aura)
+			end
 		end
 	end
 

@@ -2741,6 +2741,26 @@ do
 	)
 end
 
+-- A monster with every effect stays cheap to draw: one skin, a few extras and particles.
+do
+	local EffectLooks = require("../src/shared/Config/EffectLooks")
+	local all = {}
+	for id in Effects.List do
+		table.insert(all, id)
+	end
+	table.sort(all)
+	local worst, auras = 0, 0
+	for _, look in Looks do
+		if type(look) == "table" and (look :: any).pieces then
+			local dressed = EffectLooks.dress(look :: any, all, "Rainbow")
+			worst = math.max(worst, #dressed.pieces - 2 * #(look :: any).pieces)
+			auras = math.max(auras, #(dressed.auras or {}))
+		end
+	end
+	check(`every effect at once adds at most a skin and 80 parts (got {worst})`, worst <= 80)
+	check(`every effect at once gives at most 3 particle emitters (got {auras})`, auras <= 3)
+end
+
 if failures > 0 then
 	error(`{failures} check(s) failed`)
 end
