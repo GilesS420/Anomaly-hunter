@@ -25,12 +25,13 @@
 --                     add a size: /spawn TheBogKing Huge). Only you can catch it and it never
 --                     attacks. /spawn all brings every monster of the zone you're in.
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
--- Any command but /summon, /event and /reset can be run on another player in the server:
--- pick them at the top of the panel, or end a chat command with @name (/money 5m @Biggie).
+-- Any command but /summon, /event and /reset can be run on another player in the server, or
+-- on everyone in it: pick them at the top of the panel, or end a chat command with @name
+-- (/money 5m @Biggie) or @all.
 -- The results come back to the admin, starting with that player's name.
 -- The panel uses one RemoteEvent, made only on the server:
 --   ReplicatedStorage.Remotes.AdminCommand   client -> server: (command: string, argument: string?,
---                                            targetUserId: number?)
+--                                            targetUserId: number?; 0 = everyone)
 -- The server checks the player is an admin and the command exists before running it, so a
 -- player who fires it by hand gets nothing.
 
@@ -355,6 +356,23 @@ local function findPlayer(wanted: string): Player?
 	return nil
 end
 
+-- Runs a command on every player in the server (once, for the server-wide ones).
+local function runForEveryone(admin: Player, name: string, argument: string?)
+	if string.lower(name) == "/reset" then
+		if Admins.isAdmin(admin) then
+			Notify.toast(admin, "Reset only ever wipes your own save.")
+		end
+		return
+	end
+	if untargeted[string.lower(name)] then
+		runCommand(admin, name, argument)
+		return
+	end
+	for _, other in Players:GetPlayers() do
+		runCommand(admin, name, argument, other)
+	end
+end
+
 -- Runs a chat message if it's one of the commands above. "/money 5m @Biggie" runs it on
 -- that player instead of yourself.
 local function run(player: Player, message: string)
@@ -363,7 +381,9 @@ local function run(player: Player, message: string)
 		return
 	end
 	local before, wanted = string.match(rest or "", "^(.-)%s*@(%S+)$")
-	if wanted then
+	if wanted and string.lower(wanted) == "all" then
+		runForEveryone(player, name, before)
+	elseif wanted then
 		local target = findPlayer(wanted)
 		if not target then
 			if Admins.isAdmin(player) then
@@ -386,8 +406,13 @@ local function useAdminRemote()
 		if type(name) ~= "string" or #name > 20 then
 			return
 		end
+		local text = if type(argument) == "string" then argument else nil
+		if targetId == 0 then
+			runForEveryone(player, name, text)
+			return
+		end
 		local target = if type(targetId) == "number" then Players:GetPlayerByUserId(targetId) else nil
-		runCommand(player, name, if type(argument) == "string" then argument else nil, target)
+		runCommand(player, name, text, target)
 	end)
 	remote.Parent = remotes
 end

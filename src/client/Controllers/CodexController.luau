@@ -39,13 +39,13 @@ type Page = { id: string, title: string, progress: Progress, monsters: { Monster
 type EffectCard = { id: string, name: string, multiplier: number, found: boolean, hint: string, combo: boolean }
 type View = { pages: { Page }, effects: { EffectCard }, effectRewards: Rewards?, variants: { string } }
 
--- " · $250K" for a goal still to do, " ✓" once it's paid.
+-- "$250K" for a goal still to do, "✓ paid" once it's paid, "" for no reward.
 local function rewardText(rewards: Rewards?, goal: string): string
 	local reward = rewards and rewards[goal]
 	if not reward or reward.amount <= 0 then
 		return ""
 	end
-	return if reward.claimed then " ✓" else ` · {Format.money(reward.amount)}`
+	return if reward.claimed then "✓ paid" else Format.money(reward.amount)
 end
 
 local EffectsTab = "Effects"
@@ -93,7 +93,7 @@ function CodexController.start()
 	panel.Size = UDim2.fromScale(0.92, 0.8)
 	local small = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	local sideWidth = if small then 110 else 140
-	local stripHeight = 20
+	local stripHeight = 38 -- two lines per goal: the count, then its reward
 	local top = 68 -- under the title and the status line
 	local left = sideWidth + Gap * 2
 	local footerHeight = 52
@@ -122,7 +122,7 @@ function CodexController.start()
 	divider.Size = UDim2.new(0, 1, 1, -top - footerHeight - Gap)
 	divider.Parent = panel
 
-	-- The goals: found, then one swatch per variant, on one line.
+	-- The goals: found, then one per variant, side by side in equal cells so they always fit.
 	local strip = Instance.new("Frame")
 	strip.Name = "Goals"
 	strip.BackgroundTransparency = 1
@@ -132,7 +132,7 @@ function CodexController.start()
 	local stripLayout = Instance.new("UIListLayout")
 	stripLayout.FillDirection = Enum.FillDirection.Horizontal
 	stripLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-	stripLayout.Padding = UDim.new(0, if small then 10 else 16)
+	stripLayout.Padding = UDim.new(0, Gap)
 	stripLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	stripLayout.Parent = strip
 
@@ -191,38 +191,46 @@ function CodexController.start()
 	local tabButtons: { [string]: TextButton } = {}
 
 	-- One goal: a small colour swatch and a count.
-	local function chip(order: number, text: string, color: Color3, isRainbow: boolean)
+	-- One goal: a colour swatch and its count on the top line, its reward under it. `cells` is
+	-- how many goals share the line, so each gets an equal slice of the width.
+	local function chip(
+		order: number,
+		cells: number,
+		text: string,
+		reward: string,
+		color: Color3,
+		isRainbow: boolean
+	)
 		local frame = Instance.new("Frame")
 		frame.LayoutOrder = order
-		frame.Size = UDim2.new(0, 0, 1, 0)
-		frame.AutomaticSize = Enum.AutomaticSize.X
-		frame.BackgroundTransparency = 1
+		frame.Size = UDim2.new(1 / cells, -Gap * (cells - 1) / cells, 1, 0)
+		frame.BackgroundColor3 = CardColor
 		frame.Parent = strip
-		local layout = Instance.new("UIListLayout")
-		layout.FillDirection = Enum.FillDirection.Horizontal
-		layout.VerticalAlignment = Enum.VerticalAlignment.Center
-		layout.Padding = UDim.new(0, 6)
-		layout.SortOrder = Enum.SortOrder.LayoutOrder
-		layout.Parent = frame
+		Ui.corner(frame, 4)
 		local swatch = Instance.new("Frame")
 		swatch.BorderSizePixel = 0
-		swatch.Size = UDim2.fromOffset(10, 10)
+		swatch.AnchorPoint = Vector2.new(0, 0.5)
+		swatch.Position = UDim2.new(0, 6, 0, 10)
+		swatch.Size = UDim2.fromOffset(8, 8)
 		swatch.BackgroundColor3 = if isRainbow then Color3.new(1, 1, 1) else color
 		swatch.Parent = frame
 		Ui.corner(swatch, 2)
 		if isRainbow then
 			rainbow(swatch)
 		end
-		local label = Instance.new("TextLabel")
-		label.LayoutOrder = 2
-		label.BackgroundTransparency = 1
-		label.AutomaticSize = Enum.AutomaticSize.X
-		label.Size = UDim2.new(0, 0, 1, 0)
-		label.Font = Enum.Font.FredokaOne
-		label.TextSize = if small then 13 else 15
-		label.TextColor3 = Ui.Colors.muted
-		label.Text = text
-		label.Parent = frame
+		local count =
+			Ui.text(frame, text, UDim2.new(1, -22, 0, 16), Ui.Colors.text, false, if small then 12 else 14)
+		count.Position = UDim2.fromOffset(18, 2)
+		local paid = string.sub(reward, 1, 1) == "✓"
+		local money = Ui.text(
+			frame,
+			reward,
+			UDim2.new(1, -12, 0, 14),
+			if paid then Ui.Colors.muted else Ui.Colors.money,
+			false,
+			if small then 11 else 13
+		)
+		money.Position = UDim2.fromOffset(6, 20)
 	end
 
 	local function clearStrip()
@@ -335,19 +343,21 @@ function CodexController.start()
 
 	local function monsterPage(page: Page, variants: { string })
 		local progress = page.progress
+		local cells = #variants + 1
 		chip(
 			1,
-			`Found {progress.found}/{progress.total}{rewardText(page.rewards, "Found")}`,
+			cells,
+			`Found {progress.found}/{progress.total}`,
+			rewardText(page.rewards, "Found"),
 			Ui.Colors.lamp,
 			false
 		)
 		for i, variant in variants do
 			chip(
 				i + 1,
-				`{variant} {progress.variants[variant] or 0}/{progress.total}{rewardText(
-					page.rewards,
-					variant
-				)}`,
+				cells,
+				`{variant} {progress.variants[variant] or 0}/{progress.total}`,
+				rewardText(page.rewards, variant),
 				VariantColor[variant] or Ui.Colors.muted,
 				variant == "Rainbow"
 			)
@@ -391,8 +401,15 @@ function CodexController.start()
 				found += if effect.found then 1 else 0
 			end
 		end
-		chip(1, `Effects {found}/{total}{rewardText(rewards, "Effects")}`, Ui.Colors.lamp, false)
-		chip(2, `Secret combos {combos}/{comboTotal}{rewardText(rewards, "Combos")}`, Ui.Colors.equip, false)
+		chip(1, 2, `Effects {found}/{total}`, rewardText(rewards, "Effects"), Ui.Colors.lamp, false)
+		chip(
+			2,
+			2,
+			`Secret combos {combos}/{comboTotal}`,
+			rewardText(rewards, "Combos"),
+			Ui.Colors.equip,
+			false
+		)
 		window.status.Text = "Haunted effects make monsters worth more. Combos are secret until you make one."
 		for i, effect in effects do
 			local key = `e:{effect.id}`
@@ -444,8 +461,11 @@ function CodexController.start()
 				button.BorderSizePixel = 0
 				button.AutoButtonColor = true
 				button.Font = Enum.Font.FredokaOne
-				button.TextSize = if small then 13 else 15
+				button.TextScaled = true -- long zone names shrink instead of spilling out
 				button.TextWrapped = true
+				local fit = Instance.new("UITextSizeConstraint")
+				fit.MaxTextSize = if small then 13 else 15
+				fit.Parent = button
 				button.TextXAlignment = Enum.TextXAlignment.Left
 				button.Text = entry.title
 				button.Parent = side
