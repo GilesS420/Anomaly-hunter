@@ -21,6 +21,7 @@ local UserInputService = game:GetService("UserInputService")
 local Drag = require(script.Parent.Parent:WaitForChild("Drag"))
 local HotbarController = require(script.Parent.HotbarController)
 local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
+local NamePrompt = require(script.Parent.Parent:WaitForChild("NamePrompt"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
 local InventoryController = {}
@@ -28,6 +29,8 @@ local InventoryController = {}
 type MonsterRow = {
 	uid: string,
 	name: string,
+	species: string,
+	nickname: string?,
 	details: string,
 	color: Color3,
 	value: string,
@@ -118,6 +121,17 @@ function InventoryController.start()
 	action.AnchorPoint = Vector2.new(1, 0)
 	action.Position = UDim2.fromScale(1, 0)
 	action.Visible = false
+	-- Next to it for monsters: give it a name with a Name Tag.
+	local nameButton = Ui.button(footer, "Name", Ui.Colors.equip, UDim2.new(0, 90, 1, 0))
+	nameButton.AnchorPoint = Vector2.new(1, 0)
+	nameButton.Position = UDim2.new(1, -128, 0, 0)
+	nameButton.Visible = false
+	local onName: (() -> ())? = nil
+	nameButton.Activated:Connect(function()
+		if onName then
+			onName()
+		end
+	end)
 
 	local tab: Tab = "Monsters"
 	local view: View? = nil
@@ -264,6 +278,24 @@ function InventoryController.start()
 				onAction = function()
 					hold("MonsterUid", uid)
 				end
+				local tags = 0
+				local items: { ItemRow } = if view then view.items else {}
+				for _, item in items do
+					if item.id == "NameTag" then
+						tags = item.count
+					end
+				end
+				nameButton.Visible = tags > 0 or monster.nickname ~= nil
+				local species, nickname = monster.species, monster.nickname
+				onName = function()
+					NamePrompt.open(uid, species, nickname, tags, function(result)
+						if result.view then
+							view = result.view
+						end
+						render()
+						window.status.Text = result.message
+					end)
+				end
 			end
 		end
 	end
@@ -296,6 +328,17 @@ function InventoryController.start()
 					onAction = function()
 						hold("CakeId", id)
 					end
+				elseif item.kind == "Tag" then
+					action.Visible = true
+					action.Text = "Use"
+					Ui.paint(action, Ui.Colors.equip)
+					onAction = function()
+						tab = "Monsters"
+						selected = nil
+						render()
+						window.status.Text =
+							"Tap a monster, then Name. Monsters in your mansion: use the list on the right."
+					end
 				elseif item.tool then
 					action.Visible = true
 					action.Text = if item.equipped then "Using" else "Equip"
@@ -317,6 +360,8 @@ function InventoryController.start()
 		pickDetails.Text = "Tap a card"
 		action.Visible = false
 		onAction = nil
+		nameButton.Visible = false
+		onName = nil
 		local current = view
 		if not current then
 			window.status.Text = "Your save is still loading..."
@@ -355,6 +400,9 @@ function InventoryController.start()
 			end
 			itemCards(rows)
 		end
+		local room = if nameButton.Visible then -226 else -130
+		pickName.Size = UDim2.new(1, room, 0, 26)
+		pickDetails.Size = UDim2.new(1, room, 0, 20)
 	end
 
 	local function toggle()
@@ -373,6 +421,7 @@ function InventoryController.start()
 	end
 
 	window.onClose = function()
+		NamePrompt.close()
 		HotbarController.setOpen(false)
 	end
 	-- Picking a monster up, placing one or using a cake changes the cards: fetch them again.

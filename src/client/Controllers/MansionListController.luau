@@ -3,7 +3,8 @@
 -- monsters in your mansion (Giles 2026-10-22: a sideways hamburger menu, not too big). Each
 -- row has a Pick up button, and the list sorts by price, rarity or name. M toggles it on a
 -- keyboard. Rows come from InventoryRemotes.GetView and picking up uses InventoryRemotes.Move,
--- the same as E on the monster itself (server/Services/InventoryService).
+-- the same as E on the monster itself (server/Services/InventoryService). The ✎ button names
+-- a monster with a Name Tag (NamePrompt).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,6 +13,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local HotbarController = require(script.Parent.HotbarController)
 local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
+local NamePrompt = require(script.Parent.Parent:WaitForChild("NamePrompt"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
 local MansionListController = {}
@@ -19,6 +21,8 @@ local MansionListController = {}
 type MonsterRow = {
 	uid: string,
 	name: string,
+	species: string,
+	nickname: string?,
 	color: Color3,
 	value: string,
 	worth: number,
@@ -27,6 +31,7 @@ type MonsterRow = {
 }
 type View = {
 	monsters: { MonsterRow },
+	items: { { id: string, count: number } },
 	mansionCount: number,
 	mansionCapacity: number,
 }
@@ -168,13 +173,35 @@ function MansionListController.start()
 			frame.BackgroundColor3 = Ui.Colors.row
 			frame.Parent = list
 			Ui.corner(frame, 6)
-			local name = Ui.text(frame, row.name, UDim2.new(1, -78, 0, 20), row.color, true, 16)
+			local name = Ui.text(frame, row.name, UDim2.new(1, -112, 0, 20), row.color, true, 16)
 			name.Position = UDim2.fromOffset(6, 2)
-			local price = Ui.text(frame, row.value, UDim2.new(1, -78, 0, 16), Ui.Colors.money, false, 13)
+			local price = Ui.text(frame, row.value, UDim2.new(1, -112, 0, 16), Ui.Colors.money, false, 13)
 			price.Position = UDim2.fromOffset(6, 22)
 			local pick = Ui.button(frame, "Pick up", Ui.Colors.buy, UDim2.fromOffset(68, ROW_HEIGHT - 8))
 			pick.AnchorPoint = Vector2.new(1, 0.5)
 			pick.Position = UDim2.new(1, -4, 0.5, 0)
+			local rename = Ui.button(frame, "✎", Ui.Colors.equip, UDim2.fromOffset(30, ROW_HEIGHT - 8))
+			rename.AnchorPoint = Vector2.new(1, 0.5)
+			rename.Position = UDim2.new(1, -76, 0.5, 0)
+			local padding = rename:FindFirstChildOfClass("UIPadding")
+			if padding then
+				padding.PaddingLeft = UDim.new(0, 2)
+				padding.PaddingRight = UDim.new(0, 2)
+			end
+			rename.Activated:Connect(function()
+				local tags = 0
+				for _, item in current.items do
+					if item.id == "NameTag" then
+						tags = item.count
+					end
+				end
+				NamePrompt.open(row.uid, row.species, row.nickname, tags, function(result)
+					if result.view then
+						view = result.view
+						render()
+					end
+				end)
+			end)
 			pick.Activated:Connect(function()
 				if busy then
 					return

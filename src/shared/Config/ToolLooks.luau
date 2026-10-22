@@ -1,5 +1,6 @@
 --!strict
--- What the hand-held tools look like: the six vacuums, the Bait Bell and the Return Charm.
+-- What the hand-held tools look like: the six vacuums, the Bait Bells, the Return Charm and
+-- the Name Tag (only a picture in the shop and Backpack: it is never held).
 -- Part data in the same format as Config/Rooms, in Tool-local studs: the hand grips the
 -- origin (the part named "Handle"), +Y is up and the business end points along -Z.
 -- Pure data so the preview page can draw the same models.
@@ -249,6 +250,20 @@ function ToolLooks.ReturnCharm(): { Part }
 	return parts
 end
 
+-- A cream paper luggage tag on a red string, held by the string, with a brass eyelet and two
+-- ink lines where the name goes.
+function ToolLooks.NameTag(): { Part }
+	local parts: { Part } = {}
+	local paper, ink = { 240, 226, 190 }, { 60, 40, 70 }
+	part(parts, "Handle", { 0.15, 0.4, 0.15 }, { 0, 0, 0 }, { 200, 40, 50 }, "Fabric")
+	part(parts, "String", { 0.1, 0.4, 0.1 }, { 0, -0.4, 0 }, { 200, 40, 50 }, "Fabric")
+	part(parts, "Eyelet", { 0.3, 0.3, 0.12 }, { 0, -0.7, 0 }, { 220, 170, 60 }, "Metal")
+	part(parts, "Card", { 1, 1.4, 0.06 }, { 0, -1.45, 0 }, paper, "SmoothPlastic")
+	part(parts, "Line1", { 0.7, 0.08, 0.02 }, { 0, -1.35, -0.04 }, ink, "SmoothPlastic")
+	part(parts, "Line2", { 0.5, 0.08, 0.02 }, { -0.1, -1.65, -0.04 }, ink, "SmoothPlastic")
+	return parts
+end
+
 -- Recipes by Workshop item id.
 ToolLooks.ById = {
 	DustBuster = ToolLooks.DustBuster,
@@ -261,6 +276,7 @@ ToolLooks.ById = {
 	SilverBell = ToolLooks.SilverBell,
 	GoldBell = ToolLooks.GoldBell,
 	ReturnCharm = ToolLooks.ReturnCharm,
+	NameTag = ToolLooks.NameTag,
 } :: { [string]: () -> { Part } }
 
 return ToolLooks

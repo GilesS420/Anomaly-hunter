@@ -36,6 +36,7 @@ export type Info = {
 	value: number?, -- mansion monsters: what the Collector pays right now (Util/Value.sellValue);
 	-- left out, the tag shows base value x size
 	kg: number?, -- mansion monsters: its weight (a Titan is drawn bigger as it grows)
+	nickname: string?, -- mansion monsters: the name its owner gave it (a Name Tag)
 	roamRadius: number?, -- mansion monsters: the width it walks at, if less than its drawn
 	-- radius (MonsterModel.roamRadius); it stands that high above the floor
 }
@@ -163,6 +164,10 @@ function MonsterModel.refresh(model: Model, info: Info)
 		dressModel(model, info)
 	end
 	local billboard = body:FindFirstChild("Label")
+	local name = billboard and billboard:FindFirstChild("Name")
+	if name and name:IsA("TextLabel") then
+		name.Text = Format.monsterName(info)
+	end
 	local details = billboard and billboard:FindFirstChild("Details")
 	if details and details:IsA("TextLabel") then
 		details.Text = detailsText(info)
@@ -433,7 +438,7 @@ function MonsterModel.build(info: Info): Model
 	billboard.StudsOffset = Vector3.new(0, labelHeight, 0)
 	-- The price tag sits above the text lines, which keep their 66 (or 46) pixels.
 	billboard.StudsOffset += Vector3.new(0, 0.4, 0)
-	local name = Format.name(info.monsterId)
+	local name = Format.monsterName(info)
 	local top = TagHeight
 	local height = top + if info.status then 66 else 46
 	billboard.Size = UDim2.fromOffset(220, height)

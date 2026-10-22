@@ -26,7 +26,7 @@ Ui.Colors = {
 }
 
 -- Pictures for the Workshop's items, which have no preview model (Shop.Item kind).
-Ui.Icons = { Vacuum = "🌀", Lure = "🔔", Charm = "🧿" } :: { [string]: string }
+Ui.Icons = { Vacuum = "🌀", Lure = "🔔", Charm = "🧿", Tag = "🏷️" } :: { [string]: string }
 
 export type Window = {
 	gui: ScreenGui,

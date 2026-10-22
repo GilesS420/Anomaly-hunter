@@ -453,6 +453,7 @@ local function infoFor(player: Player, caught: Value.CaughtMonster, rarity: stri
 		owner = player.DisplayName,
 		status = Care.status(caught),
 		value = if ok then value else 0,
+		nickname = caught.nickname,
 	}
 end
 
@@ -1131,10 +1132,10 @@ function MansionService.grow(player: Player, spurts: number?)
 		if newSize and caught.size == "Titan" and not wasTitan then
 			table.insert(
 				news,
-				`Your {Format.name(caught.monsterId)} became a TITAN! It's too big for your mansion now.`
+				`Your {Format.monsterName(caught)} became a TITAN! It's too big for your mansion now.`
 			)
 		elseif newSize then
-			table.insert(news, `Your {Format.name(caught.monsterId)} grew {caught.size}!`)
+			table.insert(news, `Your {Format.monsterName(caught)} grew {caught.size}!`)
 		end
 	end
 	if #news > 2 then

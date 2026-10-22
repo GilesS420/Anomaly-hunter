@@ -107,8 +107,9 @@ function Workshop.limit(item: Shop.Item, slot: number): number
 	if Workshop.isTool(item) then
 		return 1
 	end
-	local spread = Shop.StockMax - Shop.StockMin + 1
-	return Shop.StockMin + hash(`{slot}:{item.id}:count`) % spread
+	local low = item.stockMin or Shop.StockMin
+	local spread = (item.stockMax or Shop.StockMax) - low + 1
+	return low + hash(`{slot}:{item.id}:count`) % spread
 end
 
 -- Whether a player can buy one now. boughtThisSlot is how many they bought since the restock.
@@ -234,6 +235,8 @@ function Workshop.describe(item: Shop.Item): string
 		return `Ring it in a zone: a monster {up} rarer comes to you{cap}`
 	elseif item.kind == "Charm" then
 		return "Takes you home from a zone, with your catch"
+	elseif item.kind == "Tag" then
+		return "Give one of your monsters its own name (in the Backpack)"
 	end
 	return ""
 end

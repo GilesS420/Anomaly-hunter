@@ -6,6 +6,7 @@ local Rarities = require("../src/shared/Config/Rarities")
 local Sizes = require("../src/shared/Config/Sizes")
 local Catching = require("../src/shared/Util/Catching")
 local Format = require("../src/shared/Util/Format")
+local Nickname = require("../src/shared/Util/Nickname")
 local Layout = require("../src/shared/Config/Layout")
 local Mansion = require("../src/shared/Util/Mansion")
 local Roam = require("../src/shared/Util/Roam")
@@ -772,6 +773,21 @@ do
 	check("shop stock is a random amount in range", inRange and seen[Shop.StockMin] and seen[Shop.StockMax])
 	check("shop stock is the same for the same restock", Workshop.limit(charm, 7) == Workshop.limit(charm, 7))
 	check("a tool is always one", Workshop.limit(siphon, 7) == 1)
+	local tag = Workshop.item("NameTag") :: Shop.Item
+	local tagsOk, tagSeen = true, {}
+	for slot = 1, 200 do
+		local limit = Workshop.limit(tag, slot)
+		tagSeen[limit] = true
+		tagsOk = tagsOk and limit >= 2 and limit <= 5
+	end
+	check("Name Tags come 2 to 5 at a time", tagsOk and tagSeen[2] and tagSeen[5])
+	local tagStocked = 0
+	for slot = 1, 1000 do
+		if Workshop.inStock(tag, slot) then
+			tagStocked += 1
+		end
+	end
+	check("Name Tags are only sometimes in stock", tagStocked > 200 and tagStocked < 500)
 	check("can't buy without the money", Workshop.canBuy(charm, inSlot, charm.price - 1, {}, 0) == "TooPoor")
 	check(
 		"a tool you own can't be bought again",
@@ -2784,6 +2800,21 @@ do
 	end
 	check(`every effect at once adds at most a skin and 120 parts (got {worst})`, worst <= 120)
 	check(`every effect at once gives at most 5 particle emitters (got {auras})`, auras <= 5)
+end
+
+-- Monster names (Name Tags).
+do
+	check("a name is trimmed and squeezed", Nickname.clean("  Mr   Bones \t") == "Mr Bones")
+	check("an empty name takes the name off", Nickname.clean("   ") == "")
+	check("a name of 20 letters fits", Nickname.clean(string.rep("a", 20)) == string.rep("a", 20))
+	check("a name of 21 letters doesn't", Nickname.clean(string.rep("a", 21)) == nil)
+	check("control characters are dropped", Nickname.clean("Bo\nb") == "Bob")
+	check("broken text is refused", Nickname.clean("\255\254") == nil)
+	check(
+		"a named monster reads 'Bob the Gravepup'",
+		Format.monsterName({ monsterId = "Gravepup", nickname = "Bob" }) == "Bob the Gravepup"
+	)
+	check("an unnamed one just its species", Format.monsterName({ monsterId = "WispJack" }) == "Wisp Jack")
 end
 
 if failures > 0 then

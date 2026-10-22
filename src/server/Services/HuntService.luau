@@ -208,6 +208,9 @@ local function toolName(data: DataService.Data, item: Shop.Item): string?
 	if Workshop.isTool(item) then
 		return if Workshop.owns(data.inventory, item) then item.name else nil
 	end
+	if item.kind == "Tag" then
+		return nil -- Name Tags are used from the Backpack, not held
+	end
 	local count = itemCount(data, item.id)
 	return if count > 0 then `{item.name} x{count}` else nil
 end
