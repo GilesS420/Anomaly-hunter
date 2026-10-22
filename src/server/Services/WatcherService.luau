@@ -8,6 +8,9 @@
 --   Flicker     the streetlights fail too
 --   Blood Moon  Crimson Wisp and Moonhowler drift between the mansions (an optional bonus
 --               to catch)
+--   Mimic Night  Crate and Barrel Mimics creep about on the ground and bite (knock back)
+--               anyone who walks too close
+--   Breach Storm  zone monsters drop out of rifts that tear open over the hub
 --   The Watcher Awakens  brings one of its monster sets: Phantoms, Nightmares or (rarely)
 --               Eldritch monsters, the same set in every server (workspace attr WatcherMonsterSet)
 -- Event monsters are caught in the main area like any other monster (CatchService) and fly
@@ -28,12 +31,14 @@
 -- fully in), WatcherEyes (how many eyes are open).
 
 local Lighting = game:GetService("Lighting")
+local Debris = game:GetService("Debris")
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Events = require(ReplicatedStorage.Shared.Config.Events)
+local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Rng = require(ReplicatedStorage.Shared.Util.Rng)
 local Roam = require(ReplicatedStorage.Shared.Util.Roam)
@@ -88,10 +93,12 @@ type MeterEye = { white: Frame, iris: Frame, glow: UIStroke }
 local meterEyes: { MeterEye } = {}
 local meterCount: TextLabel? = nil
 
-local function driftRects(): { Roam.Rect }
+-- Where an event's monsters move: hovering over the lanes, or on the ground (grounded).
+local function driftRects(event: Events.WatcherEvent): { Roam.Rect }
+	local height = if event.grounded then GroundTop else GroundTop + Events.HoverHeight
 	local rects = {}
 	for _, area in Events.DriftAreas do
-		table.insert(rects, Roam.rect(area.x, area.z, area.width, area.depth, GroundTop + Events.HoverHeight))
+		table.insert(rects, Roam.rect(area.x, area.z, area.width, area.depth, height))
 	end
 	return rects
 end
@@ -371,6 +378,55 @@ local function eventMonstersFolder(): Folder
 	return folder
 end
 
+-- A rift tears open above `at` and a shaft of light drops to the ground (Breach Storm).
+local function openRift(at: Vector3)
+	local folder = hubFolder()
+	local riftColor = Color3.fromRGB(140, 170, 255)
+	local top = at + Vector3.new(0, 22, 0)
+	local rift = block(
+		"Rift",
+		Vector3.new(0.4, 1, 1),
+		CFrame.new(top) * CFrame.Angles(0, 0, math.rad(90)),
+		riftColor,
+		Enum.Material.Neon
+	)
+	rift.Shape = Enum.PartType.Cylinder
+	rift.CanCollide = false
+	rift.CanQuery = false
+	rift.Parent = folder
+	local core = block(
+		"RiftCore",
+		Vector3.new(0.5, 1, 1),
+		rift.CFrame,
+		Color3.fromRGB(15, 10, 40),
+		Enum.Material.SmoothPlastic
+	)
+	core.Shape = Enum.PartType.Cylinder
+	core.CanCollide = false
+	core.CanQuery = false
+	core.Parent = folder
+	local shaft = block(
+		"RiftShaft",
+		Vector3.new(top.Y - at.Y, 2.5, 2.5),
+		CFrame.new((top + at) / 2) * CFrame.Angles(0, 0, math.rad(90)),
+		Color3.fromRGB(210, 225, 255),
+		Enum.Material.Neon
+	)
+	shaft.Shape = Enum.PartType.Cylinder
+	shaft.CanCollide = false
+	shaft.CanQuery = false
+	shaft.Transparency = 0.3
+	shaft.Parent = folder
+	local open = TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	TweenService:Create(rift, open, { Size = Vector3.new(0.4, 14, 14) }):Play()
+	TweenService:Create(core, open, { Size = Vector3.new(0.5, 11, 11) }):Play()
+	local fade = TweenInfo.new(2.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In, 0, false, 1)
+	for _, part in { rift, core, shaft } do
+		TweenService:Create(part, fade, { Transparency = 1 }):Play()
+		Debris:AddItem(part, 4)
+	end
+end
+
 local function spawnOne(event: Events.WatcherEvent, monster: Monsters.Monster, rects: { Roam.Rect }): boolean
 	local size = Spawning.rollSize(random)
 	local radius = MonsterModel.radius(size.id, monster.id)
@@ -389,11 +445,14 @@ local function spawnOne(event: Events.WatcherEvent, monster: Monsters.Monster, r
 	RoamService.add(model, {
 		rects = rects,
 		radius = radius,
-		speed = Events.DriftSpeed,
+		speed = event.monsterSpeed or Events.DriftSpeed,
 		group = Group,
 		at = Vector3.new(point.x, point.y + radius + 0.5, point.z),
 	})
 	model.Parent = eventMonstersFolder()
+	if event.rifts then
+		openRift(Vector3.new(point.x, GroundTop, point.z))
+	end
 	return true
 end
 
@@ -408,6 +467,60 @@ local function fadeOut(model: Model)
 		live[model] = nil
 		model:Destroy()
 	end
+end
+
+-- Mimic Night: a Mimic that isn't being caught bites anyone in the main area who walks
+-- right up to it. The bite knocks you back (the attack knockback, AttackController); it
+-- never costs you anything.
+local biting = 0 -- bumped to stop the bite loop
+local lastBite: { [Player]: number } = {}
+
+local function startBites(event: Events.WatcherEvent)
+	local bite = event.bite
+	if not bite then
+		return
+	end
+	biting += 1
+	local mine = biting
+	table.clear(lastBite)
+	task.spawn(function()
+		while biting == mine do
+			task.wait(0.2)
+			local remotes = ReplicatedStorage:FindFirstChild("AttackRemotes")
+			local hit = remotes and remotes:FindFirstChild("Hit")
+			for model, spawned in live do
+				local at = RoamService.position(model)
+				if spawned.event ~= event.id or not at or RoamService.isHeld(model) then
+					continue
+				end
+				for _, player in Players:GetPlayers() do
+					local character = player.Character
+					local root = character and character:FindFirstChild("HumanoidRootPart")
+					if not root or not root:IsA("BasePart") or player:GetAttribute("Zone") ~= nil then
+						continue
+					end
+					local away = Vector3.new(root.Position.X - at.X, 0, root.Position.Z - at.Z)
+					local time = os.clock()
+					if
+						away.Magnitude > bite.radius
+						or time - (lastBite[player] or -math.huge) < bite.cooldown
+					then
+						continue
+					end
+					lastBite[player] = time
+					local push = if away.Magnitude > 0.1 then away.Unit else Vector3.new(1, 0, 0)
+					if hit and hit:IsA("RemoteEvent") then
+						hit:FireClient(player, "Bite", 0, push.X, push.Z)
+					end
+					Notify.toast(player, `CHOMP! A {Format.name(spawned.monsterId)} bit you!`)
+				end
+			end
+		end
+	end)
+end
+
+local function stopBites()
+	biting += 1
 end
 
 ------------------------------------------------------------------------------------------
@@ -591,7 +704,7 @@ local function startEvent(
 	local weights, count = Watcher.spawns(event, set, #Players:GetPlayers())
 	respawn = nil
 	if weights then
-		local rects = driftRects()
+		local rects = driftRects(event)
 		for _, monster in Watcher.monsterBatch(weights, count, random) do
 			if not spawnOne(event, monster, rects) then
 				break -- too crowded
@@ -601,6 +714,7 @@ local function startEvent(
 			respawn = { weights = weights, target = count }
 		end
 	end
+	startBites(event)
 	publish()
 end
 
@@ -624,7 +738,7 @@ local function topUp()
 		plan.at = now() + Events.RespawnSeconds
 	elseif now() >= plan.at then
 		plan.at = nil
-		spawnOne(event, Watcher.rollMonster(plan.weights, random), driftRects())
+		spawnOne(event, Watcher.rollMonster(plan.weights, random), driftRects(event))
 	end
 end
 
@@ -635,6 +749,7 @@ local function endEvent()
 	end
 	current = nil
 	respawn = nil
+	stopBites()
 	local handler = handlers[event.id]
 	if handler then
 		xpcall(handler.stop, function(err)
@@ -932,7 +1047,7 @@ end
 
 -- Removes a caught event monster and returns it as a save-ready entry (rolling catch
 -- effects and a variant from the hunter's vacuum, like SpawnService.capture). Nil if someone was faster.
-function WatcherService.capture(model: Model, vacuumId: string): Value.CaughtMonster?
+function WatcherService.capture(model: Model, vacuumId: string, variantBoost: number?): Value.CaughtMonster?
 	local spawned = live[model]
 	if not spawned then
 		return nil
@@ -944,7 +1059,7 @@ function WatcherService.capture(model: Model, vacuumId: string): Value.CaughtMon
 		monsterId = spawned.monsterId,
 		size = spawned.size,
 		effects = Spawning.rollCatchEffects(vacuumId, random),
-		variant = Spawning.rollVariant(vacuumId, random),
+		variant = Spawning.rollVariant(vacuumId, random, variantBoost),
 		familiarity = 0,
 	}
 end

@@ -6,6 +6,10 @@
 --                                  tap anywhere (or press F) while it's in the green zone.
 --                                  Miss and it breaks free, dazed for a moment, so try again
 --                                  (Config/Struggles)
+--   the Lucky Ring (rare and        a ring shrinks onto a gold circle: click or tap (or F) as
+--   event monsters)                it lines up and the catch lands at once, with a better
+--                                  shot at a Silver or Gold variant. Miss and the meter drops
+--                                  back to half
 --   the meter is full              caught! Bring it to the zone's Exit
 --   walk out of reach              it gets away
 -- Only with a vacuum in your hand (or nothing, so the server can say to pick one): a press
@@ -38,7 +42,9 @@ local heldSeconds = 0 -- fallback timing if the model's attributes haven't arriv
 local heldSince = 0
 -- The struggle going on now (server times), or nil.
 local struggle: { startedAt: number, speed: number, centre: number, width: number, timeout: number }? = nil
-local struck = false -- tapped during this struggle, waiting for the server
+local struck = false -- tapped during this struggle (or ring), waiting for the server
+-- The Lucky Ring that's up now (server times), or nil.
+local ring: { startedAt: number }? = nil
 
 -- True unless the hand holds a Tool that isn't a vacuum.
 local function handFree(): boolean
@@ -112,7 +118,38 @@ end
 
 -- The meter near the bottom: "Catching Wisp Jack..." over a bar that fills up.
 -- 320 pixels wide, or half the screen on small phones.
-local function buildUi(): (Frame, TextLabel, Frame, Frame, Frame, Frame)
+type Ui = {
+	meter: Frame,
+	title: TextLabel,
+	fill: Frame,
+	track: Frame,
+	zone: Frame,
+	needle: Frame,
+	ring: Frame, -- the Lucky Ring: the gold circle and the ring shrinking onto it
+	shrinking: Frame,
+}
+
+local RING_SIZE = 90 -- pixels: the gold circle
+
+local function circle(name: string, color: Color3, thickness: number, parent: Instance): Frame
+	local frame = Instance.new("Frame")
+	frame.Name = name
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.Position = UDim2.fromScale(0.5, 0.5)
+	frame.Size = UDim2.fromOffset(RING_SIZE, RING_SIZE)
+	frame.BackgroundTransparency = 1
+	frame.Parent = parent
+	local round = Instance.new("UICorner")
+	round.CornerRadius = UDim.new(0.5, 0)
+	round.Parent = frame
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = color
+	stroke.Thickness = thickness
+	stroke.Parent = frame
+	return frame
+end
+
+local function buildUi(): Ui
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "CatchUi"
 	gui.ResetOnSpawn = false
@@ -210,8 +247,32 @@ local function buildUi(): (Frame, TextLabel, Frame, Frame, Frame, Frame)
 	needleStroke.Thickness = 1.5
 	needleStroke.Parent = needle
 
+	-- The Lucky Ring, above the meter: a gold circle and a white ring shrinking onto it.
+	local ring = Instance.new("Frame")
+	ring.Name = "LuckyRing"
+	ring.AnchorPoint = Vector2.new(0.5, 1)
+	ring.Position = UDim2.new(0.5, 0, 0, -50)
+	ring.Size = UDim2.fromOffset(RING_SIZE, RING_SIZE)
+	ring.BackgroundTransparency = 1
+	ring.Visible = false
+	ring.Parent = meter
+	local gold = circle("Gold", Color3.fromRGB(255, 200, 60), 8, ring)
+	gold.BackgroundColor3 = Color3.fromRGB(255, 200, 60)
+	gold.BackgroundTransparency = 0.75
+	local shrinking = circle("Shrinking", Color3.new(1, 1, 1), 4, ring)
+	shrinking.ZIndex = 2
+
 	gui.Parent = player:WaitForChild("PlayerGui")
-	return meter, title, fill, track, zone, needle
+	return {
+		meter = meter,
+		title = title,
+		fill = fill,
+		track = track,
+		zone = zone,
+		needle = needle,
+		ring = ring,
+		shrinking = shrinking,
+	}
 end
 
 -- 0 to 1: how full the meter is. Uses the server's CatchStart/CatchEnd on the model, or
@@ -241,14 +302,17 @@ function CatchController.start()
 	local State = remotes:WaitForChild("State") :: RemoteEvent
 
 	local Strike = remotes:WaitForChild("Strike") :: RemoteEvent
-	local meter, title, fill, track, zone, needle = buildUi()
+	local ui = buildUi()
+	local meter, title, fill, track, zone, needle = ui.meter, ui.title, ui.fill, ui.track, ui.zone, ui.needle
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	local holdText = ""
 
 	local function endStruggle()
 		struggle = nil
+		ring = nil
 		struck = false
 		track.Visible = false
+		ui.ring.Visible = false
 	end
 
 	local function stopShowing()
@@ -263,7 +327,7 @@ function CatchController.start()
 			-- Catching: the meter fills by itself. Mid-struggle any click or tap (or F) is the
 			-- tap; other clicks do nothing, so they can't start a second catch.
 			local key = input.KeyCode == Enum.KeyCode.F
-			if struggle and not struck and not processed and (key or isPointer(input)) then
+			if (struggle or ring) and not struck and not processed and (key or isPointer(input)) then
 				struck = true
 				Strike:FireServer(workspace:GetServerTimeNow())
 			end
@@ -318,7 +382,18 @@ function CatchController.start()
 			title.Text = if touch
 				then "It's struggling! TAP when the needle is in the green!"
 				else "It's struggling! CLICK (or F) when the needle is in the green!"
-		elseif kind == "Struggled" then
+		elseif kind == "Ring" then
+			local data = if typeof(info) == "table" then info :: any else nil
+			if not data or data.model ~= held then
+				return
+			end
+			ring = { startedAt = tonumber(data.startedAt) or workspace:GetServerTimeNow() }
+			struck = false
+			ui.ring.Visible = true
+			title.Text = if touch
+				then "LUCKY RING! TAP when the rings line up!"
+				else "LUCKY RING! CLICK (or F) when the rings line up!"
+		elseif kind == "Struggled" or kind == "Ringed" then
 			local data = if typeof(info) == "table" then info :: any else nil
 			if not data or data.model ~= held then
 				return
@@ -351,6 +426,11 @@ function CatchController.start()
 		if current then
 			local seconds = workspace:GetServerTimeNow() - current.startedAt
 			needle.Position = UDim2.fromScale(Catching.needle(seconds, current.speed), 0.5)
+		end
+		local lucky = ring
+		if lucky then
+			local scale = Catching.ringScale(workspace:GetServerTimeNow() - lucky.startedAt)
+			ui.shrinking.Size = UDim2.fromOffset(RING_SIZE * scale, RING_SIZE * scale)
 		end
 		local amount = progress(model)
 		fill.Size = UDim2.fromScale(amount, 1)

@@ -8,7 +8,9 @@ local Effects = require("../Config/Effects")
 local Events = require("../Config/Events")
 local Format = require("./Format")
 local Monsters = require("../Config/Monsters")
+local Rarities = require("../Config/Rarities")
 local Rng = require("./Rng")
+local Zones = require("../Config/Zones")
 
 local Watcher = {}
 
@@ -153,6 +155,27 @@ function Watcher.pickSet(event: Events.WatcherEvent, random: Random?): Events.Mo
 	end, random)
 end
 
+-- Breach Storm's monsters: every monster of the launch zones by its zone spawn weight, with
+-- Legendary and rarer `rareMultiplier` times as likely.
+function Watcher.zoneWeights(rareMultiplier: number): { [string]: number }
+	local open: { [number]: boolean } = {}
+	for _, zone in Zones.List do
+		if zone.launch then
+			open[zone.index] = true
+		end
+	end
+	local legendary = Rarities.Legendary.order
+	local weights: { [string]: number } = {}
+	for id, monster in Monsters do
+		if monster.zone and open[monster.zone] and monster.spawnWeight then
+			local rarity = Rarities[monster.rarity]
+			local rare = rarity ~= nil and rarity.order >= legendary
+			weights[id] = monster.spawnWeight * (if rare then rareMultiplier else 1)
+		end
+	end
+	return weights
+end
+
 -- The monsters an event brings this time, as weights and a count (nil: none).
 function Watcher.spawns(
 	event: Events.WatcherEvent,
@@ -161,6 +184,9 @@ function Watcher.spawns(
 ): ({ [string]: number }?, number)
 	if set then
 		return set.monsters, set.count or Watcher.monsterCount(players)
+	end
+	if event.zoneMonsters then
+		return Watcher.zoneWeights(event.zoneMonsters.rareMultiplier), Watcher.monsterCount(players)
 	end
 	return event.monsters, Watcher.monsterCount(players)
 end
@@ -247,6 +273,9 @@ end
 
 -- One line for the event icon's tooltip on the monsters the event brings (nil: none).
 function Watcher.monsterLine(event: Events.WatcherEvent, setId: string?): string?
+	if event.zoneMonsters then
+		return `Monsters: any from the zones, Legendary and up {event.zoneMonsters.rareMultiplier}x as likely`
+	end
 	local weights, prefix = shownMonsters(event, setId)
 	if not weights then
 		return nil

@@ -218,6 +218,33 @@ do
 		end
 	end
 	check("the zone always fits on the bar, away from the start", fits)
+
+	-- The Lucky Ring (quick time event A): rare and event monsters only, after the struggles.
+	local epic = Catching.strugglePlan("Epic", "Normal")
+	check(
+		"the Lucky Ring comes for Epic and event monsters, after their struggles",
+		Catching.strugglePlan("Rare", "Normal").ring == nil
+			and epic.ring ~= nil
+			and (epic.ring :: number) > epic.marks[#epic.marks]
+			and (epic.ring :: number) < 1
+			and Catching.strugglePlan("Phantom", "Normal").ring ~= nil
+	)
+	local lineUp = 1.5 * (1 - 1 / 3) -- Struggles.Ring: 1.5 seconds, starting 3x the circle
+	check(
+		"the ring hits only as it lines up with the circle",
+		Catching.ringHit(lineUp)
+			and not Catching.ringHit(0)
+			and not Catching.ringHit(1.5)
+			and Catching.ringScale(0) == 3
+			and Catching.ringScale(5) == 0
+	)
+	local plain, boosted = 0, 0
+	local variantRng = fakeRandom(21)
+	for _ = 1, 20_000 do
+		plain += if Spawning.rollVariant("MoonVac", variantRng) then 1 else 0
+		boosted += if Spawning.rollVariant("MoonVac", variantRng, 3) then 1 else 0
+	end
+	check("a Lucky Ring catch gets a variant more often", boosted > plain * 2)
 end
 check(
 	"rarer monsters take longer to catch",
@@ -305,7 +332,7 @@ do
 	end
 	check("every event in the pool comes up", playedAll)
 	check("The Watcher Awakens only comes with all eyes open", awakenings == 0)
-	check("events that aren't launched never play", counts.MimicNight == nil and counts.BreachStorm == nil)
+	check("the rare new events play too", counts.MimicNight ~= nil and counts.BreachStorm ~= nil)
 	check("Frost Fog is commoner than Blood Moon", (counts.FrostFog or 0) > (counts.BloodMoon or 0))
 	check(
 		"every weighted launch event can play",
@@ -418,7 +445,7 @@ do
 			for _, set in event.monsterSets or {} do
 				table.insert(lists, set.monsters)
 			end
-			if #lists > 0 then
+			if #lists > 0 or event.zoneMonsters then
 				table.insert(withMonsters, event.id)
 			end
 			for _, list in lists do
@@ -431,7 +458,7 @@ do
 	table.sort(withMonsters)
 	check(
 		"only the rare events bring monsters",
-		table.concat(withMonsters, ",") == "BloodMoon,WatcherAwakens"
+		table.concat(withMonsters, ",") == "BloodMoon,BreachStorm,MimicNight,WatcherAwakens"
 	)
 	local unused = {}
 	for id, m in Monsters do
@@ -440,6 +467,33 @@ do
 		end
 	end
 	check(`every event monster can spawn ({table.concat(unused, ", ")})`, #unused == 0)
+
+	-- Breach Storm: monsters from the launch zones, Legendary and up 5x as likely.
+	local breach = Events.find("BreachStorm") :: Events.WatcherEvent
+	local breachWeights, breachCount = Watcher.spawns(breach, nil, 8)
+	local zonesOk = breachWeights ~= nil and breachCount == Watcher.monsterCount(8)
+	for id, weight in breachWeights or {} do
+		local m = Monsters[id]
+		local rarity = Rarities[m.rarity]
+		local boost = if rarity.order >= Rarities.Legendary.order then 5 else 1
+		zonesOk = zonesOk and m.zone ~= nil and m.zone <= 3 and weight == (m.spawnWeight :: number) * boost
+	end
+	check(
+		"Breach Storm brings launch-zone monsters, Legendary and up 5x as likely",
+		zonesOk and (breachWeights :: any).TheBogKing == 12.5 and (breachWeights :: any).Chalkling == nil
+	)
+	check(
+		"the Breach Storm tooltip says where its monsters come from",
+		Watcher.monsterLine(breach) == "Monsters: any from the zones, Legendary and up 5x as likely"
+	)
+	local mimic = Events.find("MimicNight") :: Events.WatcherEvent
+	check(
+		"Mimic Night brings its Mimics, on the ground, and they bite",
+		Watcher.monsterLine(mimic) == "Monsters: Barrel Mimic, Crate Mimic"
+			and mimic.grounded == true
+			and mimic.bite ~= nil
+			and Watcher.vacuumLine(mimic) == "Catch with the Banshee Blower or better"
+	)
 
 	local bloodBatch = Watcher.monsterBatch(blood.monsters :: any, 4, eventRng)
 	local kindsSeen: { [string]: boolean } = {}
@@ -542,7 +596,7 @@ do
 	)
 	check(
 		"the Workshop says which events a vacuum opens up",
-		table.concat(Workshop.unlocksEvents("BansheeBlower"), ",") == "Blood Moon"
+		table.concat(Workshop.unlocksEvents("BansheeBlower"), ",") == "Blood Moon,Mimic Night"
 			and table.concat(Workshop.unlocksEvents("VoidVac"), ",") == "Eldritch Gaze,Nightmare Parade"
 			and #Workshop.unlocksEvents("PhantomVac") == 0
 	)
@@ -2489,7 +2543,7 @@ do
 		"codex leaves out zones that aren't in the game yet",
 		zoneIds.SpookySchool == nil and zoneIds.GhostShip == nil
 	)
-	check("codex lists every event monster", zoneIds.Events == 10)
+	check("codex lists every event monster", zoneIds.Events == 12)
 	check("codex pages start with the commonest monster", sections[1].monsters[1] == "Gloomlet")
 	check(
 		"codex variant goals are Silver, Gold, Shiny, Rainbow",
@@ -2550,8 +2604,10 @@ do
 	)
 	local effectIds = Codex.effectIds()
 	check(
-		"codex leaves out effects from events not in the game",
-		not table.find(effectIds, "Mimic") and table.find(effectIds, "Cobwebbed") ~= nil
+		"codex lists the effects of every event in the game",
+		table.find(effectIds, "Mimic") ~= nil
+			and table.find(effectIds, "Rifted") ~= nil
+			and table.find(effectIds, "Cobwebbed") ~= nil
 	)
 	check("codex lists every combo", #Codex.comboIds() == 4)
 end
@@ -2654,6 +2710,35 @@ do
 	check("portals: two wings go to the second zone", Hunt.newestZone(2).index == 2)
 	local last = Hunt.newestZone(99)
 	check("portals: never a zone that isn't in the game yet", last ~= nil and last.launch)
+end
+
+-- The Golden Ghost (quick time event B): the prize grows with the mansion.
+do
+	local GoldenGhost = require("../src/shared/Util/GoldenGhost")
+	local GhostConfig = require("../src/shared/Config/GoldenGhost")
+	check(
+		"golden ghost: cash grows with the mansion, never below the minimum",
+		GoldenGhost.cash(0) == GhostConfig.MinCash and GoldenGhost.cash(100_000_000) == 3_000_000
+	)
+	local cakesOk = true
+	for _, item in GoldenGhost.cakeChoices(1_000_000) do
+		cakesOk = cakesOk and item.event == nil and item.price <= 5_000_000
+	end
+	local poor = GoldenGhost.cakeChoices(1)
+	local cheapest = math.huge
+	for _, item in Shop.Bakery do
+		if not item.event then
+			cheapest = math.min(cheapest, item.price)
+		end
+	end
+	check(
+		"golden ghost: cakes are Bakery cakes it can afford, never event treats",
+		cakesOk and #GoldenGhost.cakeChoices(1_000_000) > 0 and #poor == 1 and poor[1].price == cheapest
+	)
+	check(
+		"golden ghost: it's gone before the next warning",
+		GhostConfig.LatestSeconds + GhostConfig.Seconds < Events.GapMinSeconds
+	)
 end
 
 if failures > 0 then

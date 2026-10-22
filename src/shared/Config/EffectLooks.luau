@@ -376,6 +376,13 @@ EffectLooks.Styles = {
 		glow = { 255, 40, 40 },
 		auras = { { kind = "Mist", color = { 200, 20, 30 } }, { kind = "Sparkle", color = { 255, 40, 40 } } },
 	},
+	Rifted = {
+		-- Torn by a rift: a darkened body with thin cracks of blue-white light running through it.
+		tint = { color = { 35, 30, 70 }, mix = 0.4 },
+		wrap = { colors = { { 150, 190, 255 }, { 230, 240, 255 } }, thickness = 0.04, material = "Glass" },
+		glow = { 140, 180, 255 },
+		auras = { { kind = "Sparkle", color = { 170, 200, 255 } } },
+	},
 	Mimic = {
 		tint = { color = { 120, 78, 40 }, mix = 0.5 },
 		wrap = { colors = { Gold }, thickness = 0.18, material = "Metal" },

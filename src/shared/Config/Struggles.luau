@@ -44,4 +44,25 @@ Struggles.TimeoutSeconds = 4
 -- How far a tap's time may be from the server's clock (lag) and still count, in seconds.
 Struggles.LagAllowance = 0.35
 
+-- The Lucky Ring (quick time event A): Epic and rarer monsters, and every event monster, have
+-- one last chance after their struggles. A ring shrinks onto a gold circle; tap as it lines up
+-- and the catch lands at once, with variantBoost times the vacuum's chance of a Silver, Gold
+-- or better variant. Miss (or don't tap) and the monster jerks the meter back to fallBack.
+Struggles.Ring = {
+	rarities = {
+		Epic = true,
+		Legendary = true,
+		Mythic = true,
+		Divine = true,
+		Phantom = true,
+		Nightmare = true,
+		Eldritch = true,
+	} :: { [string]: boolean },
+	seconds = 1.5, -- the ring shrinks from startScale to nothing in this long
+	startScale = 3, -- the ring starts this many times the gold circle's size
+	window = 0.22, -- a tap counts while the ring is within this much of the circle's size
+	variantBoost = 3,
+	fallBack = 0.5, -- share of the meter left after a miss
+}
+
 return Struggles

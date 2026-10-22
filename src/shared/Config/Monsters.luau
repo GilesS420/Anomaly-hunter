@@ -85,8 +85,8 @@ add({ id = "SeraphOfTheDeep", rarity = "Divine", baseValue = 4_000_000_000, zone
 -- Watcher event monsters (main area only). Phantoms are sized so events are about 20% of a
 -- player's income (one Flicker phantom is about 4 zone-1 trips). Nightmare and Eldritch
 -- monsters are gated by vacuum tier instead (Rarities.luau). Only the rare events bring
--- monsters: Blood Moon its own two, and The Watcher Awakens one of its monster sets
--- (Config/Events monsterSets).
+-- monsters: Blood Moon its own two, Mimic Night its two Mimics, Breach Storm zone monsters,
+-- and The Watcher Awakens one of its monster sets (Config/Events monsterSets).
 add({
 	id = "Flickerwick",
 	rarity = "Phantom",
@@ -113,6 +113,20 @@ add({
 	rarity = "Phantom",
 	baseValue = 400_000,
 	event = "BloodMoon",
+	vacuum = "BansheeBlower",
+})
+add({
+	id = "CrateMimic",
+	rarity = "Phantom",
+	baseValue = 1_200_000,
+	event = "MimicNight",
+	vacuum = "BansheeBlower",
+})
+add({
+	id = "BarrelMimic",
+	rarity = "Phantom",
+	baseValue = 2_000_000,
+	event = "MimicNight",
 	vacuum = "BansheeBlower",
 })
 add({

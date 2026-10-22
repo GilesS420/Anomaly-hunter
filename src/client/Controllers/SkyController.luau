@@ -62,10 +62,10 @@ type Bit = {
 -- How a kind of bit moves:
 --   fall    from the sky past you (coins, candy, leaves)
 --   float   hovering round you (eyes)
---   circle  round the hub (ghosts, lanterns, witches)
+--   circle  round the hub (ghosts, lanterns, witches, rifts)
 --   rise    up from the ground into the sky (paper lanterns)
 --   hang    dangling round you on a thread (spiders)
---   ground  pushing up out of the ground round you and sinking back (skeleton hands)
+--   ground  pushing up out of the ground round you and sinking back (skeleton hands, crates)
 type Mode = "fall" | "float" | "circle" | "rise" | "hang" | "ground"
 
 type Weather = {
@@ -83,6 +83,8 @@ local Modes: { [string]: Mode } = {
 	SkyLanterns = "rise",
 	Spiders = "hang",
 	Hands = "ground",
+	Crates = "ground",
+	Rifts = "circle",
 }
 
 type Set = {
@@ -582,6 +584,68 @@ local function addBits(set: Set, kind: string, count: number)
 				CFrame.new(1, 0.3, 0) * CFrame.Angles(0, 0, math.rad(-45)),
 				true
 			)
+		elseif kind == "Crates" then
+			-- A little crate with a gaping row of teeth and two yellow eyes, rising out of the
+			-- ground round you to have a look, then sinking back.
+			local wood = Color3.fromRGB(150, 105, 60)
+			add("Crate", Enum.PartType.Block, Vector3.new(2, 1.6, 1.8), wood, CFrame.identity, true)
+			add(
+				"CrateMouth",
+				Enum.PartType.Block,
+				Vector3.new(1.6, 0.35, 0.1),
+				Color3.fromRGB(15, 10, 10),
+				CFrame.new(0, 0.2, -0.92),
+				true
+			)
+			for tooth = -2, 2 do
+				add(
+					"CrateTooth",
+					Enum.PartType.Block,
+					Vector3.new(0.16, 0.2, 0.08),
+					Color3.fromRGB(245, 245, 255),
+					CFrame.new(tooth * 0.3, 0.32, -0.96),
+					true
+				)
+			end
+			for side = -1, 1, 2 do
+				add(
+					"CrateEye",
+					Enum.PartType.Block,
+					Vector3.new(0.35, 0.25, 0.08),
+					Color3.fromRGB(255, 220, 80),
+					CFrame.new(side * 0.5, 0.6, -0.92)
+				)
+			end
+		elseif kind == "Rifts" then
+			-- A rift torn in the sky: a dark hole ringed with blue-white light, drifting slowly
+			-- round high over the hub and always facing its middle.
+			add(
+				"RiftRing",
+				Enum.PartType.Cylinder,
+				Vector3.new(0.3, 26, 16),
+				Color3.fromRGB(150, 180, 255),
+				CFrame.identity
+			)
+			add(
+				"RiftHole",
+				Enum.PartType.Cylinder,
+				Vector3.new(0.5, 22, 12),
+				Color3.fromRGB(10, 8, 30),
+				CFrame.identity,
+				true
+			)
+			add(
+				"RiftSpark",
+				Enum.PartType.Cylinder,
+				Vector3.new(0.6, 4, 4),
+				Color3.fromRGB(235, 240, 255),
+				CFrame.identity
+			)
+			orbit = Vector3.new(
+				random:NextNumber(40, 150),
+				random:NextNumber(55, 95),
+				random:NextNumber(0.02, 0.05) * (if random:NextNumber() < 0.5 then 1 else -1)
+			)
 		elseif kind == "SkyLanterns" then
 			-- A glowing paper lantern drifting up into the sky.
 			add(
@@ -776,6 +840,11 @@ local function addWeather(set: Set, weather: Events.Weather, scale: number)
 		bits("SkyLanterns", 70)
 	elseif weather.kind == "Leaves" then
 		bits("Leaves", 120)
+	elseif weather.kind == "Crates" then
+		bits("Crates", 14)
+	elseif weather.kind == "Rifts" then
+		bits("Rifts", 9)
+		addSparkles(set, { 170, 200, 255 })
 	end
 	for index = before + 1, #set.emitters do
 		set.emitters[index].rate *= scale

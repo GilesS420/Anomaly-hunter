@@ -28,7 +28,9 @@ export type Weather = {
 		| "Spiders"
 		| "Hands"
 		| "SkyLanterns"
-		| "Leaves",
+		| "Leaves"
+		| "Crates"
+		| "Rifts",
 	color: Rgb?,
 }
 
@@ -58,6 +60,8 @@ export type Sky = {
 	--   Hands        skeleton hands pushing up out of the ground round you (Bone Rattle)
 	--   SkyLanterns  glowing paper lanterns drifting up into the sky (Ghost Market)
 	--   Leaves       autumn leaves see-sawing down (Harvest Moon)
+	--   Crates       crates with teeth popping up out of the ground round you (Mimic Night)
+	--   Rifts        glowing rifts torn open high over the hub (Breach Storm)
 	weather: Weather?,
 	edge: Rgb?, -- the event's colour: its icon, its banner and the screen frame
 	frame: boolean?, -- a glow round the edges of the screen in the edge colour (only the scariest)
@@ -89,6 +93,16 @@ export type WatcherEvent = {
 	-- The Watcher Awakens instead picks one of these sets each time, by weight: usually the
 	-- small Phantoms, sometimes Nightmares, rarely the Eldritch ones.
 	monsterSets: { MonsterSet }?,
+	-- Breach Storm: monsters from every launch zone fall into the hub instead (by their zone
+	-- spawn weights), with Legendary and rarer rareMultiplier times as likely. Normal vacuum
+	-- rules apply.
+	zoneMonsters: { rareMultiplier: number }?,
+	grounded: boolean?, -- its monsters walk on the ground instead of hovering
+	monsterSpeed: number?, -- studs per second its monsters move (nil: DriftSpeed)
+	-- Mimic Night: a monster that isn't being caught bites anyone in the main area who walks
+	-- within radius studs, knocking them back (no damage; once per cooldown seconds per player).
+	bite: { radius: number, cooldown: number }?,
+	rifts: boolean?, -- each of its monsters drops out of a rift that opens above it
 	effectOddsMultiplier: number?, -- mansion effect odds while live (Blood Moon doubles them)
 	growthMultiplier: number?, -- extra growth spurt rolls while live (Config/Weight.EventSpurtChance)
 	cakeEffectMultiplier: number?, -- a cake bite's effect chance (Config/Cakes.BiteEffectChance) x this
@@ -110,8 +124,8 @@ Events.EyesToAwaken = 5
 -- for the event's effect this often (Util/Haunting.eventRoll).
 Events.EffectRollSeconds = 30
 
--- How many event monsters (an optional bonus to catch, only in the rare events: Blood Moon
--- and The Watcher Awakens) are out during an event (caught ones come back, RespawnSeconds): this many per player in the
+-- How many event monsters (an optional bonus to catch, only in the rare events: Blood Moon,
+-- Mimic Night, Breach Storm and The Watcher Awakens) are out during an event (caught ones come back, RespawnSeconds): this many per player in the
 -- server, clamped between Min and Max, so everyone gets a chance. Each kind appears at least
 -- once. A monster set with a count brings just that many.
 Events.MonstersPerPlayer = 1
@@ -373,8 +387,57 @@ Events.List = {
 		warning = "The moon is turning red...",
 		announce = "A Blood Moon rises! Haunted effects are twice as likely, monsters grow, Phantoms roam and the Bakery sells Blood Moon Pies.",
 	},
-	{ id = "MimicNight", name = "Mimic Night", launch = false, effect = "Mimic" },
-	{ id = "BreachStorm", name = "Breach Storm", launch = false },
+	{
+		id = "MimicNight",
+		name = "Mimic Night",
+		icon = "📦",
+		launch = true,
+		weight = 4,
+		effect = "Mimic",
+		effectChance = 1.5,
+		durationSeconds = 240,
+		monsters = { CrateMimic = 65, BarrelMimic = 35 },
+		grounded = true,
+		monsterSpeed = 1.5, -- they creep: did that crate just move?
+		bite = { radius = 6, cooldown = 4 },
+		sky = {
+			ambient = { 40, 55, 50 },
+			outdoorAmbient = { 70, 95, 85 },
+			tint = { 220, 255, 235 },
+			saturation = -0.15,
+			atmosphere = { color = { 60, 95, 85 }, decay = { 20, 45, 40 }, density = 0.45, haze = 2 },
+			mist = { 150, 230, 200 },
+			weather = { kind = "Crates" },
+			edge = { 120, 230, 190 },
+		},
+		warning = "The crates around the hub are... breathing?",
+		announce = "Mimic Night! Some crates and barrels are Mimics. Watch your step, they bite!",
+	},
+	{
+		id = "BreachStorm",
+		name = "Breach Storm",
+		icon = "🌀",
+		launch = true,
+		weight = 4.5,
+		effect = "Rifted",
+		effectChance = 2,
+		durationSeconds = 240,
+		zoneMonsters = { rareMultiplier = 5 },
+		grounded = true,
+		rifts = true,
+		sky = {
+			ambient = { 40, 40, 85 },
+			outdoorAmbient = { 70, 70, 140 },
+			tint = { 210, 215, 255 },
+			saturation = 0.1,
+			atmosphere = { color = { 60, 50, 125 }, decay = { 20, 10, 60 }, density = 0.4, haze = 2 },
+			flashes = true,
+			weather = { kind = "Rifts" },
+			edge = { 130, 160, 255 },
+		},
+		warning = "The sky over the hub is starting to crack...",
+		announce = "Breach Storm! Zone monsters are falling through the rifts. Legendaries and up are 5x as likely!",
+	},
 	{
 		id = "WatcherAwakens",
 		name = "The Watcher Awakens",
