@@ -22,9 +22,12 @@
 --   Move     client -> server (uid) -> Result      mansion -> Storage, or Storage -> mansion
 --   Lock     client -> server (uid) -> Result      locks or unlocks a monster
 --   Equip    client -> server (itemId) -> Result   puts an owned tool into use
+--   Rename   client -> server (uid, name) -> Result uses a Name Tag to name a monster ("" takes
+--            the name off, free)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextService = game:GetService("TextService")
 
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Care = require(ReplicatedStorage.Shared.Util.Care)
@@ -32,6 +35,7 @@ local Format = require(ReplicatedStorage.Shared.Util.Format)
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.Inventory)
 local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
+local Nickname = require(ReplicatedStorage.Shared.Util.Nickname)
 local Rarities = require(ReplicatedStorage.Shared.Config.Rarities)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
@@ -50,7 +54,9 @@ local InventoryService = {}
 
 export type MonsterRow = {
 	uid: string,
-	name: string,
+	name: string, -- "Gravepup", or "Bob the Gravepup" once named
+	species: string, -- "Gravepup"
+	nickname: string?, -- the name given with a Name Tag
 	details: string, -- "Big Rare · Ghost · $1.2M"
 	color: Color3, -- rarity colour
 	value: string, -- "$1.2M"
@@ -93,8 +99,9 @@ local GetView = remote("GetView")
 local Move = remote("Move")
 local Lock = remote("Lock")
 local Equip = remote("Equip")
+local Rename = remote("Rename")
 
-local kindOrder = { Vacuum = 1, Food = 2, Lure = 3, Charm = 4 }
+local kindOrder = { Vacuum = 1, Food = 2, Lure = 3, Charm = 4, Tag = 5 }
 
 local function price(caught: Value.CaughtMonster, wingsOwned: number): number
 	local ok, value = pcall(Value.sellValue, caught, wingsOwned)
@@ -154,7 +161,9 @@ local function monsterRow(caught: Value.CaughtMonster, stored: boolean, value: n
 	table.insert(parts, Format.money(value))
 	return {
 		uid = caught.uid,
-		name = Format.name(caught.monsterId),
+		name = Format.monsterName(caught),
+		species = Format.name(caught.monsterId),
+		nickname = caught.nickname,
 		details = table.concat(parts, " · "),
 		color = MonsterModel.color(monster.rarity),
 		value = Format.money(value),
@@ -274,7 +283,7 @@ Move.OnServerInvoke = function(player: Player, uid: unknown): Result
 		return { ok = false, message = "That monster is gone.", view = viewFor(data) }
 	end
 	local result, caught = MansionService.move(player, uid)
-	local name = if caught then Format.name(caught.monsterId) else "That monster"
+	local name = if caught then Format.monsterName(caught) else "That monster"
 	local message
 	if result == "Ok" then
 		message = if caught and caught.storedAt
@@ -303,11 +312,77 @@ Lock.OnServerInvoke = function(player: Player, uid: unknown): Result
 		return { ok = false, message = "That monster is gone.", view = viewFor(data) }
 	end
 	caught.locked = if caught.locked then nil else true
-	local name = Format.name(caught.monsterId)
+	local name = Format.monsterName(caught)
 	local message = if caught.locked
 		then `Locked {name}. The Collector won't sell it.`
 		else `Unlocked {name}.`
 	return { ok = true, message = message, view = viewFor(data) }
+end
+
+-- Roblox's filter for text other players see (names show over monsters in the mansion).
+-- nil when the filter can't be reached; then nothing is saved.
+local function filtered(player: Player, text: string): string?
+	local ok, result = pcall(function()
+		local filter = TextService:FilterStringAsync(text, player.UserId, Enum.TextFilterContext.PublicChat)
+		return filter:GetNonChatStringForBroadcastAsync()
+	end)
+	return if ok and typeof(result) == "string" then result else nil
+end
+
+local renaming: { [Player]: boolean } = {}
+
+Rename.OnServerInvoke = function(player: Player, uid: unknown, text: unknown): Result
+	local data = DataService.get(player)
+	if not data then
+		return Loading
+	end
+	local caught = if typeof(uid) == "string" then find(data, uid) else nil
+	if not caught then
+		return { ok = false, message = "That monster is gone.", view = viewFor(data) }
+	end
+	local name = if typeof(text) == "string" then Nickname.clean(text) else nil
+	if not name then
+		return {
+			ok = false,
+			message = `A name can be up to {Nickname.MaxLength} letters.`,
+			view = viewFor(data),
+		}
+	end
+	if name == "" then
+		local had = caught.nickname ~= nil
+		caught.nickname = nil
+		MansionService.refreshMonsters(player)
+		local message = if had
+			then `Took the name off your {Format.name(caught.monsterId)}.`
+			else "It has no name."
+		return { ok = had, message = message, view = viewFor(data) }
+	end
+	if (data.inventory.NameTag or 0) <= 0 then
+		return { ok = false, message = "You need a Name Tag from the Workshop.", view = viewFor(data) }
+	end
+	if renaming[player] then
+		return { ok = false, message = "One moment...", view = viewFor(data) }
+	end
+	renaming[player] = true
+	local clean = filtered(player, name) -- yields
+	renaming[player] = nil
+	if not clean then
+		return {
+			ok = false,
+			message = "Couldn't check that name. Try again in a moment.",
+			view = viewFor(data),
+		}
+	end
+	-- The filter yields: make sure the tag and the monster are still there.
+	local count = data.inventory.NameTag or 0
+	if count <= 0 or find(data, caught.uid or "") ~= caught then
+		return { ok = false, message = "That monster is gone.", view = viewFor(data) }
+	end
+	local inventory: { [string]: number? } = data.inventory
+	inventory.NameTag = if count <= 1 then nil else count - 1
+	caught.nickname = clean
+	MansionService.refreshMonsters(player) -- the hotbar Tool follows within a second
+	return { ok = true, message = `Say hi to {Format.monsterName(caught)}!`, view = viewFor(data) }
 end
 
 Equip.OnServerInvoke = function(player: Player, itemId: unknown): Result
@@ -440,7 +515,9 @@ function InventoryService.syncMonsterTools(player: Player)
 		if monster then
 			local tool = have[uid] or monsterTool(player, caught, monster.rarity)
 			local variant = if caught.variant then `{caught.variant} ` else ""
-			tool.Name = `{variant}{caught.size} {Format.name(caught.monsterId)}`
+			tool.Name = if caught.nickname
+				then Format.monsterName(caught)
+				else `{variant}{caught.size} {Format.name(caught.monsterId)}`
 			tool:SetAttribute("Order", -price(caught, data.wingsOwned))
 			if not tool.Parent then
 				tool.Parent = backpack
@@ -463,7 +540,7 @@ local function tryPlace(player: Player, uid: string): string
 		return "Stand inside your mansion to place it."
 	end
 	local result, caught = MansionService.move(player, uid)
-	local name = if caught then Format.name(caught.monsterId) else "That monster"
+	local name = if caught then Format.monsterName(caught) else "That monster"
 	if result == "MansionFull" then
 		return "Your mansion is full. Store or sell a monster first, or buy a new wing."
 	elseif result ~= "Ok" then

@@ -9,7 +9,7 @@
 export type Item = {
 	id: string,
 	name: string,
-	kind: "Food" | "Vacuum" | "Lure" | "Charm",
+	kind: "Food" | "Vacuum" | "Lure" | "Charm" | "Tag",
 	price: number,
 	restockChance: number,
 	rarity: string, -- the tag in the shop window: a Config/Rarities id, or "Event" for event treats
@@ -22,6 +22,8 @@ export type Item = {
 	-- Bakery chance cakes: tried in order, the first that hits (and fits) is the effect.
 	effectChances: { EffectChance }?,
 	event: string?, -- Bakery event treat: only sold while this Watcher event is live
+	stockMin: number?, -- how many a player can buy per restock, instead of StockMin..StockMax
+	stockMax: number?,
 }
 export type EffectChance = { effect: string, chance: number } -- chance in percent
 
@@ -362,6 +364,19 @@ Shop.Workshop = {
 		restockChance = 60,
 		rarity = "Uncommon",
 		singleUse = true,
+	},
+	-- Gives one of your monsters a name of your own (Giles 2026-10-22: for more attachment).
+	-- Only sometimes in stock, 2 to 5 at a time. Naming gives no bonus.
+	{
+		id = "NameTag",
+		name = "Name Tag",
+		kind = "Tag",
+		price = 100_000,
+		restockChance = 35,
+		rarity = "Rare",
+		singleUse = true,
+		stockMin = 2,
+		stockMax = 5,
 	},
 } :: { Item }
 

@@ -31,4 +31,10 @@ function Format.name(id: string): string
 	return spaced
 end
 
+-- A monster's name in messages: "Bob the Gravepup" once it has a Name Tag name, else "Gravepup".
+function Format.monsterName(caught: { monsterId: string, nickname: string? }): string
+	local species = Format.name(caught.monsterId)
+	return if caught.nickname then `{caught.nickname} the {species}` else species
+end
+
 return Format

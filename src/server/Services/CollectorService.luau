@@ -114,7 +114,7 @@ local function offerFor(data: DataService.Data): Offer
 		table.insert(rows, {
 			uid = caught.uid,
 			monsterId = caught.monsterId,
-			name = Format.name(caught.monsterId),
+			name = Format.monsterName(caught),
 			details = details,
 			kind = kind,
 			effects = names,

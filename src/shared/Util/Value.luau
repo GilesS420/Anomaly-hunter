@@ -34,6 +34,7 @@ export type CaughtMonster = {
 	kg: number?, -- weight, kept up to date by Util/Weight.settle (its size follows it)
 	kgAt: number?, -- os.time() of its last growth check
 	gene: string?, -- hidden growth gene (Config/Weight.Genes)
+	nickname: string?, -- the name its owner gave it with a Name Tag (already filtered)
 }
 
 local variantMultipliers: { [string]: number } = {}

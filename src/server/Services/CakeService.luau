@@ -272,7 +272,7 @@ local function bite(player: Player, cake: Live, uid: string)
 	local event = Events.find(workspace:GetAttribute("WatcherEvent"))
 	local b = Cakes.bite(cake.saved, caught, random, if event then event.cakeEffectMultiplier else nil)
 	MansionService.refreshMonsters(player)
-	local name = Format.name(caught.monsterId)
+	local name = Format.monsterName(caught)
 	if cake.saved.bitesLeft <= 0 then
 		Notify.toast(player, `{name} ate the last of your {cake.item.name}{result(data, b)}`)
 		remove(player, cake)
@@ -352,7 +352,7 @@ local function restore(player: Player)
 				CareService.discoverCombo(data, b.combo)
 			end
 			if caught and b.effect then
-				table.insert(lines, `{Format.name(caught.monsterId)} got {Format.name(b.combo or b.effect)}`)
+				table.insert(lines, `{Format.monsterName(caught)} got {Format.name(b.combo or b.effect)}`)
 			end
 		end
 		if not item or Cakes.isDone(saved, now) then

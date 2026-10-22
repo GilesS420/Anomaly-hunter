@@ -40,7 +40,7 @@ local function gain(data: any, caught: Value.CaughtMonster, effectId: string, af
 		end
 	end
 	caught.effects = after
-	local name = Format.name(caught.monsterId)
+	local name = Format.monsterName(caught)
 	local combo = Value.newCombo(before, Value.resolveEffects(caught.effects))
 	if combo then
 		CareService.discoverCombo(data, combo)

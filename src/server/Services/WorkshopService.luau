@@ -64,7 +64,7 @@ Equip.Parent = remotes
 
 local counter: Attachment? = nil -- where the Workshop's prompt is (nil if there's no Workshop)
 
-local kindOrder = { Vacuum = 1, Lure = 2, Charm = 3 }
+local kindOrder = { Vacuum = 1, Lure = 2, Charm = 3, Tag = 4 }
 
 local function currentSlot(): number
 	return Workshop.slotAt(os.time())
