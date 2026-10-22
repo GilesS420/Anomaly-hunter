@@ -979,12 +979,12 @@ do
 	local tripSeconds = 55 -- a full trip with selling takes 51-56 s in the sheet's simulation
 
 	check(
-		"a zone keeps 12 monsters for 1-3 hunters",
-		Spawning.aliveTarget(1) == 12 and Spawning.aliveTarget(3) == 12
+		"a zone keeps 18 monsters for 1-4 hunters",
+		Spawning.aliveTarget(1) == 18 and Spawning.aliveTarget(4) == 18
 	)
 	check(
 		"a crowded zone keeps more monsters",
-		Spawning.aliveTarget(8) == 22 and Spawning.aliveTarget(30) == 24
+		Spawning.aliveTarget(8) == 26 and Spawning.aliveTarget(30) == 30
 	)
 
 	-- Zone 1 with the Dust Buster: the best of 12 is worth tens of thousands, not hundreds.

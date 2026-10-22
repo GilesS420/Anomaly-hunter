@@ -251,7 +251,7 @@ function Cakes.describe(item: Shop.Item): string
 		critter = critter or (effect ~= nil and effect.source == "Critter")
 	end
 	local only = if critter
-		then ` · Only for monsters worth up to {Format.money(Effects.CritterMaxValue)}`
+		then ` · Only for monsters with a base value up to {Format.money(Effects.CritterMaxValue)}`
 		else ""
 	return `{Cakes.bites(item.id)} bites, at least one effect · Each bite: {table.concat(odds, ", ")}{only}`
 end
