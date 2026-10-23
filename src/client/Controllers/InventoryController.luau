@@ -328,7 +328,7 @@ function InventoryController.start()
 					onAction = function()
 						hold("CakeId", id)
 					end
-				elseif item.kind == "Tag" then
+				elseif item.kind == "Tag" or item.kind == "Potion" then
 					action.Visible = true
 					action.Text = "Hold"
 					Ui.paint(action, Ui.Colors.equip)
@@ -443,7 +443,8 @@ function InventoryController.start()
 		end
 	end)
 
-	local hud = player:WaitForChild("PlayerGui"):WaitForChild("HuntUi"):WaitForChild("Hud")
+	local hud =
+		player:WaitForChild("PlayerGui"):WaitForChild("HuntUi"):WaitForChild("Canvas"):WaitForChild("Hud")
 	local button = hud:WaitForChild("Backpack") :: TextButton
 	button.Activated:Connect(toggle)
 	Locks.guard(button, "Backpack") -- greyed out until the tutorial gets there

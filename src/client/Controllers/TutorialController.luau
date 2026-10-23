@@ -9,6 +9,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local Tutorial =
 	require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"):WaitForChild("Tutorial"))
@@ -21,13 +22,14 @@ local TutorialController = {}
 local player = Players.LocalPlayer
 
 local TargetCheckSeconds = 0.5
+local EdgeGap = 12 -- pixels between the card and the mansion list's tab (or open list)
 local TrailColor = Color3.fromRGB(255, 176, 84) -- lantern orange, like the shop titles
 
 -- The button that pulses during each step (the tour picks its own).
 local StepGlow = {
 	Gate = "Portals",
 	Catch = "Hotbar",
-	Pickup = "Backpack",
+	Pickup = "MansionList",
 	Sell = "Sell",
 	Buy = "Shops",
 } :: { [string]: string }
@@ -119,11 +121,12 @@ local function buildCard(): (ScreenGui, TextLabel, TextLabel, TextLabel, TextBut
 	gui.Enabled = false
 
 	-- On the right, halfway down: clear of the HUD column on the left, the top bar, the
-	-- toasts, the hotbar and the event icon.
+	-- toasts, the hotbar and the event icon. Left of the mansion list's tab, and further left
+	-- while that list is open (see follow below).
 	local card = Instance.new("Frame")
 	card.Name = "Card"
 	card.AnchorPoint = Vector2.new(1, 0.5)
-	card.Position = UDim2.new(1, -12, 0.45, 0)
+	card.Position = UDim2.new(1, -EdgeGap, 0.45, 0)
 	card.Size = UDim2.new(0.3, 0, 0, 0)
 	card.AutomaticSize = Enum.AutomaticSize.Y
 	card.BackgroundColor3 = Ui.Colors.panel
@@ -202,6 +205,20 @@ function TutorialController.start()
 
 	local tourIndex = 1
 
+	-- Keeps the card left of the mansion list on the right edge (MansionListController): just
+	-- past its tab when shut, past the whole list when open. The drawer says how wide it
+	-- sticks out with its Reach attribute, in canvas pixels.
+	local card = gui:FindFirstChild("Card", true) :: Frame
+	local function follow()
+		local tabUi = player.PlayerGui:FindFirstChild("MansionTabUi")
+		local drawer = tabUi and tabUi:FindFirstChild("Drawer", true)
+		local reach = drawer and drawer:GetAttribute("Reach")
+		local offset = -EdgeGap - (if typeof(reach) == "number" then reach else 0)
+		if card.Position.X.Offset ~= offset then
+			card.Position = UDim2.new(1, offset, 0.45, 0)
+		end
+	end
+
 	local function hideTrail()
 		trail.Parent = nil
 		toAttachment.Parent = nil
@@ -255,7 +272,9 @@ function TutorialController.start()
 			return
 		end
 		nextButton.Visible = false
-		body.Text = Tutorial.Text[current :: Tutorial.Step] or ""
+		-- A phone or tablet without a keyboard gets "tap" words instead of keys.
+		local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+		body.Text = Tutorial.textFor(current, touch)
 		local since = player:GetAttribute("TutorialSince")
 		local stuck = typeof(since) == "number"
 			and workspace:GetServerTimeNow() - since >= Tutorial.HintSeconds
@@ -291,6 +310,7 @@ function TutorialController.start()
 		waited = 0
 		local current = step()
 		if current then
+			follow()
 			pointAt(targetFor(current))
 			if current ~= "Tour" and hint.Text == "" then
 				render() -- the 2 minute hint

@@ -74,7 +74,7 @@ local function storeOf(item: Shop.Item): Store
 	return if item.kind == "Vacuum" then "VacuumVault" else "Workshop"
 end
 
-local kindOrder = { Vacuum = 1, Lure = 2, Charm = 3, Tag = 4 }
+local kindOrder = { Vacuum = 1, Lure = 2, Charm = 3, Potion = 4, Tag = 5 }
 
 local function currentSlot(): number
 	return Workshop.slotAt(os.time())

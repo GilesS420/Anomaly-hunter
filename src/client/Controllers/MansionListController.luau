@@ -253,6 +253,8 @@ function MansionListController.start()
 	local function place(animate: boolean)
 		local target = UDim2.new(1, if isOpen then -8 else PANEL_WIDTH, 0.5, 0)
 		tab.Text = if isOpen then "▶" else "◀"
+		-- How far it sticks out from the right edge, so the tutorial card can stay clear.
+		drawer:SetAttribute("Reach", if isOpen then PANEL_WIDTH + TAB_WIDTH + 8 else TAB_WIDTH)
 		if animate then
 			TweenService:Create(drawer, TweenInfo.new(0.2, Enum.EasingStyle.Quad), { Position = target })
 				:Play()
@@ -263,7 +265,7 @@ function MansionListController.start()
 	place(false)
 
 	local function toggle()
-		if Locks.isLocked("Backpack") then
+		if Locks.isLocked("MansionList") then
 			return
 		end
 		isOpen = not isOpen
@@ -275,7 +277,7 @@ function MansionListController.start()
 	end
 
 	tab.Activated:Connect(toggle)
-	Locks.guard(tab, "Backpack") -- unlocks together with the Backpack
+	Locks.guard(tab, "MansionList") -- unlocks together with the Backpack (Util/Tutorial)
 
 	-- Placing or picking up a monster elsewhere changes the list: fetch it again.
 	local refetching = false

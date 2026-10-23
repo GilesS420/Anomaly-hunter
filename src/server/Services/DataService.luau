@@ -31,6 +31,7 @@ export type Data = {
 	tutorial: string, -- "New" until TutorialService looks, then the step, then "Done"
 	settings: { [string]: any }, -- music, sounds, weather... (Util/Settings, SettingsService)
 	seenAt: number, -- os.time() the player was last online (0: never); the "while you were away" book
+	potion: { id: string, secondsLeft: number }, -- the luck potion going (Util/Potions), "" for none
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -54,6 +55,7 @@ DataService.Template = {
 	tutorial = "New", -- older saves get this too; TutorialService marks those "Done"
 	settings = {}, -- empty means the defaults (Util/Settings)
 	seenAt = 0,
+	potion = { id = "", secondsLeft = 0 },
 } :: Data
 
 local store = ProfileStore.New(

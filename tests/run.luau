@@ -147,6 +147,14 @@ local neverHit = {
 check("the Dust Buster never rolls a variant", Spawning.rollVariant("DustBuster", alwaysHit :: any) == nil)
 check("a lucky Void Vac catch is Rainbow", Spawning.rollVariant("VoidVac", alwaysHit :: any) == "Rainbow")
 check("an unlucky catch has no variant", Spawning.rollVariant("VoidVac", neverHit :: any) == nil)
+check(
+	"a potion gives the Dust Buster a Rainbow chance",
+	Spawning.rollVariant("DustBuster", alwaysHit :: any, 1, true) == "Rainbow"
+)
+check(
+	"a potion's Rainbow can still miss",
+	Spawning.rollVariant("DustBuster", neverHit :: any, 1, true) == nil
+)
 -- The little stand-in above is too streaky for several rolls in a row; math.random isn't.
 math.randomseed(5)
 local variantRng = {
@@ -2505,6 +2513,23 @@ do
 			return true
 		end)()
 	)
+	check(
+		"tutorial: touch words only for real steps, keyboard words otherwise",
+		(function()
+			for step in Tutorial.TouchText do
+				if Tutorial.index(step) == 0 then
+					return false
+				end
+			end
+			return Tutorial.textFor("Catch", true) == Tutorial.TouchText.Catch
+				and Tutorial.textFor("Catch", false) == Tutorial.Text.Catch
+				and Tutorial.textFor("Tour", true) == Tutorial.Text.Tour
+		end)()
+	)
+	check(
+		"tutorial: the mansion list opens with the Backpack",
+		Tutorial.Unlocks.MansionList == Tutorial.Unlocks.Backpack
+	)
 	check("tutorial: buttons locked at the start", not Tutorial.isUnlocked("Gate", "Sell"))
 	check("tutorial: Portals works from the first step", Tutorial.isUnlocked("Gate", "Portals"))
 	check(
@@ -2851,6 +2876,50 @@ do
 		Format.monsterName({ monsterId = "Gravepup", nickname = "Bob" }) == "Bob the Gravepup"
 	)
 	check("an unnamed one just its species", Format.monsterName({ monsterId = "WispJack" }) == "Wisp Jack")
+end
+
+-- Luck potions (Util/Potions).
+do
+	local Potions = require("../src/shared/Util/Potions")
+	local state: Potions.State = { id = "", secondsLeft = 0 }
+	check("no potion, no boost", Potions.boost(state) == 1)
+	check(
+		"drinking a Lucky Tonic starts it",
+		Potions.drink(state, "LuckyTonic") == "Ok" and Potions.boost(state) == 2
+	)
+	check("the same potion again tops it up", Potions.drink(state, "LuckyTonic") == "Refreshed")
+	check(
+		"a stronger one replaces it",
+		Potions.drink(state, "PrismDraught") == "Ok" and Potions.boost(state) == 5
+	)
+	check(
+		"a weaker one is refused while a stronger one goes",
+		Potions.drink(state, "GildedElixir") == "Weaker" and state.id == "PrismDraught"
+	)
+	Potions.tick(state, 15 * 60 - 1)
+	check("it still works with a second left", Potions.boost(state) == 5)
+	Potions.tick(state, 5)
+	check("it wears off", Potions.boost(state) == 1 and state.id == "" and state.secondsLeft == 0)
+	check("unknown potions do nothing", Potions.drink(state, "Bogus") == "Unknown")
+	local sold = 0
+	for _, item in Shop.Workshop do
+		if item.kind == "Potion" then
+			sold += 1
+			local stocked = 0
+			for slot = 1, 2000 do
+				if Workshop.inStock(item, slot) then
+					stocked += 1
+				end
+			end
+			local share = stocked / 2000 * 100
+			check(
+				`{item.name} is in stock about {item.restockChance}% of restocks`,
+				math.abs(share - item.restockChance) < item.restockChance * 0.5 + 0.5
+			)
+			check(`{item.name} sells one per restock`, Workshop.limit(item, 7) == 1)
+		end
+	end
+	check("three potions in the Workshop", sold == 3)
 end
 
 if failures > 0 then
