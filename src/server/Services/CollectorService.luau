@@ -203,7 +203,7 @@ end
 
 function CollectorService.start()
 	remotes.Parent = ReplicatedStorage
-	counter = Counter.prompt("Collector", "Sell monsters", "The Collector", function(player)
+	counter = Counter.prompt("Collector", "The Collector", function(player)
 		local at = counter
 		if at and DataService.isLoaded(player) then
 			Open:FireClient(player, at.WorldPosition)

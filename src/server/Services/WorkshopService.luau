@@ -251,7 +251,7 @@ function WorkshopService.start()
 	remotes.Parent = ReplicatedStorage
 	DataService.onLoaded(refundRetired)
 	for store, name in StoreNames do
-		counters[store] = Counter.prompt(store, "Shop", name, function(player)
+		counters[store] = Counter.prompt(store, name, function(player)
 			local at = counters[store]
 			if at and DataService.isLoaded(player) then
 				Open:FireClient(player, at.WorldPosition, store)

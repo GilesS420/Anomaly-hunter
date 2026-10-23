@@ -21,6 +21,7 @@
 --
 -- World pieces (built as grey placeholders if missing, never moved or changed if there):
 --   Workspace.Hub.WatcherMeter   a Part (or Model) in Watcher Square; the Watcher's eyes float above it
+--                                and players can talk to it (press E) to hear what's going on
 --   Workspace.Hub.WatcherSign    a Part; a noticeboard explaining the Watcher is painted on both faces
 --   Workspace.Hub.Streetlights   a Folder; every light inside fails during Flicker
 -- Event monsters appear in Workspace.Hub.EventMonsters.
@@ -45,6 +46,7 @@ local Roam = require(ReplicatedStorage.Shared.Util.Roam)
 local Spawning = require(ReplicatedStorage.Shared.Util.Spawning)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Watcher = require(ReplicatedStorage.Shared.Util.Watcher)
+local Counter = require(script.Parent.Parent.Counter)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
 local RoamService = require(script.Parent.RoamService)
@@ -1104,6 +1106,15 @@ function WatcherService.start()
 	findLamps(hub)
 	buildMeter(hub)
 	buildSign(hub)
+	-- Players can talk to the Watcher at the foot of its meter (lines in Config/Stands).
+	local meter = World.part(World.find(hub, "WatcherMeter"))
+	if meter then
+		local anchor = Instance.new("Attachment")
+		anchor.Name = "TalkPrompt"
+		anchor.Position = Vector3.new(0, -meter.Size.Y / 2 + 3, 0)
+		anchor.Parent = meter
+		Counter.stand("Watcher", anchor, "The Watcher")
+	end
 	findWorldEyes(hub)
 	-- Walks the schedule from its start, once; tick steps it on from here, and joins an
 	-- event or warning that is already under way.
