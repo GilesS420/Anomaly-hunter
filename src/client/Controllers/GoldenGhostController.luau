@@ -7,6 +7,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
+local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
+
 local GoldenGhostController = {}
 
 local TAP_SLACK = 50 -- pixels around the ghost that still count as tapping it
@@ -40,6 +42,7 @@ function GoldenGhostController.start()
 	local Progress = remotes:WaitForChild("Progress") :: RemoteEvent
 
 	local gui = Instance.new("ScreenGui")
+	local canvas = Scale.canvas(gui) -- shrinks everything to fit a phone (client/Scale)
 	gui.Name = "GoldenGhostUi"
 	gui.ResetOnSpawn = false
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
@@ -54,7 +57,7 @@ function GoldenGhostController.start()
 	counter.TextColor3 = Color3.fromRGB(255, 205, 60)
 	counter.TextStrokeTransparency = 0
 	counter.Visible = false
-	counter.Parent = gui
+	counter.Parent = canvas
 
 	UserInputService.InputBegan:Connect(function(input, processed)
 		local pointer = input.UserInputType == Enum.UserInputType.MouseButton1

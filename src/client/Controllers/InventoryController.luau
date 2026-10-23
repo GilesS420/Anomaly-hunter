@@ -70,7 +70,7 @@ function InventoryController.start()
 	local Equip = remotes:WaitForChild("Equip") :: RemoteFunction
 
 	local window = Ui.window("BackpackUi", "Backpack")
-	local panel = window.gui:FindFirstChild("Panel") :: Frame
+	local panel = window.panel
 	local limit = panel:FindFirstChildOfClass("UISizeConstraint")
 	if limit then
 		limit.MaxSize = Vector2.new(780, 600)
@@ -79,9 +79,9 @@ function InventoryController.start()
 	panel.AnchorPoint = Vector2.new(0.5, 1)
 	panel.Position = UDim2.new(0.5, 0, 1, -80)
 	panel.Size = UDim2.new(0.92, 0, 1, -130)
-	local small = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	local sideWidth = if small then 96 else 116
-	local cell = if small then Vector2.new(84, 96) else Vector2.new(100, 112)
+	-- Pixel sizes for a computer screen; the window's Scale canvas shrinks them on a phone.
+	local sideWidth = 116
+	local cell = Vector2.new(100, 112)
 
 	-- Tabs down the left; the cards fill the rest.
 	local side = Instance.new("Frame")

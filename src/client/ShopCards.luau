@@ -8,7 +8,6 @@
 -- in a later sprint, so that button only says "soon" for now and does nothing.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
@@ -34,8 +33,7 @@ export type Card = {
 ShopCards.InStock = Color3.fromRGB(140, 230, 140)
 ShopCards.NoStock = Color3.fromRGB(230, 110, 110)
 
-local small = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-local Height = if small then 96 else 112 -- a closed card
+local Height = 112 -- a closed card (the window's Scale canvas shrinks it on a phone)
 local ActionsHeight = 52 -- the Buy / Robux strip an open card adds
 ShopCards.Padding = 12 -- inside a card, all round
 
@@ -46,7 +44,7 @@ local shown: { [ScrollingFrame]: { Card } } = {} -- what each window shows, to r
 -- the list so a card's outline isn't cut off at the edges (or under the scrollbar). Without a
 -- footer (the shops) the list runs to the bottom of the window.
 function ShopCards.prepare(window: Ui.Window, hasFooter: boolean)
-	local panel = window.gui:FindFirstChild("Panel")
+	local panel = window.panel
 	local limit = panel and panel:FindFirstChildOfClass("UISizeConstraint")
 	if limit then
 		limit.MaxSize = Vector2.new(760, 620)

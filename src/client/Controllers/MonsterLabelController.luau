@@ -18,6 +18,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
+local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 
 local MonsterLabelController = {}
 
@@ -89,6 +90,7 @@ function MonsterLabelController.start()
 
 	-- The card.
 	local gui = Instance.new("ScreenGui")
+	local canvas = Scale.canvas(gui) -- shrinks everything to fit a phone (client/Scale)
 	gui.Name = "MonsterInfoUi"
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = true -- placed in the same space as GetMouseLocation
@@ -101,7 +103,7 @@ function MonsterLabelController.start()
 	card.Size = UDim2.fromOffset(0, 0)
 	card.BackgroundColor3 = Ui.Colors.panel
 	card.BackgroundTransparency = 0.08
-	card.Parent = gui
+	card.Parent = canvas
 	Ui.corner(card, 10)
 	local rim = Ui.rim(card, Ui.Colors.rim, 2)
 	local padding = Instance.new("UIPadding")
@@ -272,7 +274,7 @@ function MonsterLabelController.start()
 			-- beside the pointer, kept on screen
 			local x = math.clamp(at.X + 18, 4, math.max(4, view.X - size.X - 4))
 			local y = math.clamp(at.Y + 18, 4, math.max(4, view.Y - size.Y - 4))
-			card.Position = UDim2.fromOffset(x, y)
+			card.Position = UDim2.fromOffset(x / Scale.factor(), y / Scale.factor()) -- inside the canvas
 			card.Visible = true
 		elseif card.Visible then
 			card.Visible = false

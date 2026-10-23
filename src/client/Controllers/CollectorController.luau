@@ -8,7 +8,6 @@
 -- The server works out every price and does the selling (server/Services/CollectorService).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
@@ -32,9 +31,9 @@ type Row = {
 }
 type Offer = { monsters: { Row }, total: number }
 
-local small = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-local Height = if small then 96 else 112
-local SellWidth = if small then 84 else 120
+-- Pixel sizes for a computer screen; the window's Scale canvas shrinks them on a phone.
+local Height = 112
+local SellWidth = 120
 
 -- One monster: picture, name, kind, price and weight, its effects in a box, and Sell.
 local function card(list: ScrollingFrame, order: number, monster: Row, sell: () -> ())

@@ -15,6 +15,7 @@ local HotbarController = require(script.Parent.HotbarController)
 local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
 local NamePrompt = require(script.Parent.Parent:WaitForChild("NamePrompt"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
+local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 
 local MansionListController = {}
 
@@ -70,6 +71,7 @@ function MansionListController.start()
 	local Move = remotes:WaitForChild("Move") :: RemoteFunction
 
 	local gui = Instance.new("ScreenGui")
+	local canvas = Scale.canvas(gui) -- shrinks everything to fit a phone (client/Scale)
 	gui.Name = "MansionTabUi"
 	gui.ResetOnSpawn = false
 	gui.DisplayOrder = 4 -- over the HUD, under the shop windows
@@ -80,7 +82,7 @@ function MansionListController.start()
 	drawer.AnchorPoint = Vector2.new(1, 0.5) -- on the right edge: the left one holds the HUD
 	drawer.Size = UDim2.new(0, PANEL_WIDTH + TAB_WIDTH, 0.55, 0)
 	drawer.BackgroundTransparency = 1
-	drawer.Parent = gui
+	drawer.Parent = canvas
 	local limit = Instance.new("UISizeConstraint")
 	limit.MinSize = Vector2.new(0, 200)
 	limit.MaxSize = Vector2.new(math.huge, 420)
