@@ -1,7 +1,12 @@
 --!strict
--- Shop counters in the hub: a "hold E" prompt on one of the landmarks
+-- Shop counters in the hub: a "Talk" prompt on one of the landmarks
 -- (Workspace.Hub.Landmarks.<Name>), on the side that faces the middle of the hub so it's
 -- easy to walk up to. Works the same with a placeholder block or Giles's own build.
+-- Using the prompt opens the stand's dialogue on the client (DialogueController, lines in
+-- Shared.Config.Stands): info, enter or quit. Enter comes back here and opens the stand's
+-- window through onEnter, only while the player still stands at the counter.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local World = require(script.Parent.World)
 
@@ -11,14 +16,49 @@ local PromptHeight = 3 -- studs above the bottom of the landmark
 local PromptReach = 12 -- studs from the counter's front
 local UseReach = 30 -- studs: buying and selling only work this close (the window closes at 22)
 
--- Adds the prompt and returns where it sits (for the client to close the window when the
--- player walks away). Nil, with a warning in Output, if the landmark doesn't exist.
-function Counter.prompt(
-	landmark: string,
-	actionText: string,
-	objectText: string,
-	onTriggered: (Player) -> ()
-): Attachment?
+-- Talk (server to client: stand id, counter position) opens the dialogue; Enter (client to
+-- server: stand id) is the "enter" choice.
+local remotes = Instance.new("Folder")
+remotes.Name = "StandRemotes"
+local Talk = Instance.new("RemoteEvent")
+Talk.Name = "Talk"
+Talk.Parent = remotes
+local Enter = Instance.new("RemoteEvent")
+Enter.Name = "Enter"
+Enter.Parent = remotes
+
+local stands: { [string]: { anchor: Attachment, onEnter: ((Player) -> ())? } } = {}
+
+-- Adds the stand's prompt to anchor. id names the stand's lines in Config/Stands; onEnter
+-- opens its window (nil for a stand that only talks, like the Watcher).
+function Counter.stand(id: string, anchor: Attachment, objectText: string, onEnter: ((Player) -> ())?)
+	if not remotes.Parent then
+		remotes.Parent = ReplicatedStorage
+		Enter.OnServerEvent:Connect(function(player, which)
+			local stand = if typeof(which) == "string" then stands[which] else nil
+			if stand and stand.onEnter and Counter.isNear(player, stand.anchor) then
+				stand.onEnter(player)
+			end
+		end)
+	end
+	stands[id] = { anchor = anchor, onEnter = onEnter }
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Talk"
+	prompt.ObjectText = objectText
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = PromptReach
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = anchor
+	prompt.Triggered:Connect(function(player)
+		Talk:FireClient(player, id, anchor.WorldPosition)
+	end)
+end
+
+-- Adds the prompt at a hub landmark and returns where it sits (for the client to close the
+-- window when the player walks away). onTriggered opens the window once the player picks
+-- "enter" in the dialogue. Nil, with a warning in Output, if the landmark doesn't exist.
+function Counter.prompt(landmark: string, objectText: string, onTriggered: (Player) -> ()): Attachment?
 	-- A built landmark is a Model whose PrimaryPart is the spot in front of its counter.
 	local found = World.find(World.find(World.find(workspace, "Hub"), "Landmarks"), landmark)
 	local part = if found
@@ -44,15 +84,7 @@ function Counter.prompt(
 	anchor.Name = "CounterPrompt"
 	anchor.Position = front
 	anchor.Parent = part
-
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = actionText
-	prompt.ObjectText = objectText
-	prompt.HoldDuration = 0
-	prompt.MaxActivationDistance = PromptReach
-	prompt.RequiresLineOfSight = false
-	prompt.Parent = anchor
-	prompt.Triggered:Connect(onTriggered)
+	Counter.stand(landmark, anchor, objectText, onTriggered)
 	return anchor
 end
 

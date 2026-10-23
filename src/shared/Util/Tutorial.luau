@@ -53,8 +53,8 @@ Tutorial.Hints = {
 	Catch = "When it struggles, click or tap as the needle crosses the green zone. Stay close until the meter is full.",
 	Home = "Walk back through the exit arch you came in by.",
 	Pickup = "Go into your mansion and stand right next to the Gloomlet, then press E or tap the prompt.",
-	Sell = "Hold the Collector's prompt to open the sell window, then tap Sell.",
-	Buy = "Hold the Vacuum Vault's prompt (between the other two shops), tap the Phantom Vac card, then Buy.",
+	Sell = "Press E at the Collector (or tap the prompt), pick \"I want to sell my monsters.\", then tap Sell.",
+	Buy = "Press E at the Vacuum Vault (between the other two shops), pick \"Show me the vacuums.\", tap the Phantom Vac card, then Buy.",
 	Tour = "Tap Next to see the next button.",
 } :: { [Step]: string }
 

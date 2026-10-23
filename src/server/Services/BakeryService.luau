@@ -165,7 +165,7 @@ end
 
 function BakeryService.start()
 	remotes.Parent = ReplicatedStorage
-	counter = Counter.prompt("Bakery", "Shop", "Haunted Bakery", function(player)
+	counter = Counter.prompt("Bakery", "Haunted Bakery", function(player)
 		local at = counter
 		if at and DataService.isLoaded(player) then
 			Open:FireClient(player, at.WorldPosition)
