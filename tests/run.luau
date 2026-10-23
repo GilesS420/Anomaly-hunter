@@ -147,6 +147,14 @@ local neverHit = {
 check("the Dust Buster never rolls a variant", Spawning.rollVariant("DustBuster", alwaysHit :: any) == nil)
 check("a lucky Void Vac catch is Rainbow", Spawning.rollVariant("VoidVac", alwaysHit :: any) == "Rainbow")
 check("an unlucky catch has no variant", Spawning.rollVariant("VoidVac", neverHit :: any) == nil)
+check(
+	"a potion gives the Dust Buster a Rainbow chance",
+	Spawning.rollVariant("DustBuster", alwaysHit :: any, 1, true) == "Rainbow"
+)
+check(
+	"a potion's Rainbow can still miss",
+	Spawning.rollVariant("DustBuster", neverHit :: any, 1, true) == nil
+)
 -- The little stand-in above is too streaky for several rolls in a row; math.random isn't.
 math.randomseed(5)
 local variantRng = {

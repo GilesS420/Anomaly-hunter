@@ -194,9 +194,11 @@ local function finish(player: Player, lucky: boolean?)
 	-- A lucky ring and a luck potion both multiply the chance of a Silver, Gold, Shiny or Rainbow.
 	local boost = (if lucky then Struggles.Ring.variantBoost else 1) * HuntService.potionBoost(player)
 	local effectBoost = if lucky then Struggles.Ring.effectBoost else nil
+	-- A potion also gives vacuums without a Rainbow of their own a small Rainbow chance.
+	local potion = HuntService.potionBoost(player) > 1
 	local caught = if inHub
-		then WatcherService.capture(model, vacuumId, boost, effectBoost)
-		else SpawnService.capture(model, vacuumId, boost, effectBoost)
+		then WatcherService.capture(model, vacuumId, boost, potion, effectBoost)
+		else SpawnService.capture(model, vacuumId, boost, potion, effectBoost)
 	if not caught then
 		State:FireClient(player, "Ended", { result = "Gone", model = model })
 		return

@@ -161,9 +161,16 @@ end
 
 -- The catch variant a monster gets (nil for none): rarest first, each with the vacuum's
 -- chance for it (times boost: a Lucky Ring catch, Config/Struggles), so a catch never gets two.
-function Spawning.rollVariant(vacuumId: string, random: Random?, boost: number?): string?
+-- With a luck potion going (`potion`), any vacuum also has Tools.PotionRainbowChance of a
+-- Rainbow if it has none of its own (Giles 2026-10-23), times the boost like the rest.
+function Spawning.rollVariant(vacuumId: string, random: Random?, boost: number?, potion: boolean?): string?
 	local vacuum = Tools.Vacuums[vacuumId]
 	local chances = if vacuum then vacuum.variants else nil
+	if potion and not (chances and chances.Rainbow) then
+		local withRainbow: { [string]: number } = table.clone(chances or {})
+		withRainbow.Rainbow = Tools.PotionRainbowChance
+		chances = withRainbow
+	end
 	if not chances then
 		return nil
 	end
