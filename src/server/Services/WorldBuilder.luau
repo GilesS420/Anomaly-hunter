@@ -33,7 +33,7 @@ local World = require(script.Parent.Parent.World)
 
 local WorldBuilder = {}
 
-local GroundTop = 0.1 -- a little above a default baseplate (top at 0) so the two don't flicker
+local GroundTop = 0.1 -- top of the hub floor (a little above where Studio's Baseplate used to be)
 local GroundColor = Color3.fromRGB(42, 39, 48)
 local PlotColor = Color3.fromRGB(86, 96, 82)
 local LabelColor = Color3.fromRGB(235, 235, 235)
@@ -583,6 +583,13 @@ end
 
 function WorldBuilder.start()
 	table.clear(built)
+	-- The hub floor and the zone islands are the ground now. Studio's starting Baseplate (with
+	-- its grid texture) would only peek through, so it goes; FallService catches anyone who
+	-- drops off the edge.
+	local baseplate = workspace:FindFirstChild("Baseplate")
+	if baseplate and baseplate:IsA("BasePart") then
+		baseplate:Destroy()
+	end
 	local hub = folderAt(workspace, "Hub", "Hub")
 	local ground = World.find(hub, "Ground")
 	if ground and ground:GetAttribute("GroundVersion") ~= GroundVersion then
