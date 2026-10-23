@@ -101,7 +101,7 @@ local Lock = remote("Lock")
 local Equip = remote("Equip")
 local Rename = remote("Rename")
 
-local kindOrder = { Vacuum = 1, Food = 2, Lure = 3, Charm = 4, Tag = 5 }
+local kindOrder = { Vacuum = 1, Food = 2, Lure = 3, Charm = 4, Potion = 5, Tag = 6 }
 
 local function price(caught: Value.CaughtMonster, wingsOwned: number): number
 	local ok, value = pcall(Value.sellValue, caught, wingsOwned)

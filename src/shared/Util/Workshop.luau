@@ -235,6 +235,9 @@ function Workshop.describe(item: Shop.Item): string
 		return `Ring it in a zone: a monster {up} rarer comes to you{cap}`
 	elseif item.kind == "Charm" then
 		return "Takes you home from a zone, with your catch"
+	elseif item.kind == "Potion" then
+		local minutes = math.floor((item.potionSeconds or 0) / 60)
+		return `Drink it: Silver, Gold, Shiny and Rainbow catches x{item.potionBoost or 1} for {minutes} min`
 	elseif item.kind == "Tag" then
 		return "Give one of your monsters its own name (in the Backpack)"
 	end

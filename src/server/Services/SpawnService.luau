@@ -236,6 +236,7 @@ function SpawnService.capture(
 	model: Model,
 	vacuumId: string,
 	variantBoost: number?,
+	potion: boolean?, -- a luck potion is going: any vacuum can roll a Rainbow
 	effectBoost: number?
 ): Value.CaughtMonster?
 	local spawned = live[model]
@@ -249,7 +250,7 @@ function SpawnService.capture(
 		monsterId = spawned.monsterId,
 		size = spawned.size,
 		effects = Spawning.rollCatchEffects(vacuumId, random, effectBoost),
-		variant = Spawning.rollVariant(vacuumId, random, variantBoost),
+		variant = Spawning.rollVariant(vacuumId, random, variantBoost, potion),
 		familiarity = 0,
 	}
 end

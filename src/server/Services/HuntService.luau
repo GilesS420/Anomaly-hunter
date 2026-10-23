@@ -27,6 +27,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Catching = require(ReplicatedStorage.Shared.Util.Catching)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
+local Potions = require(ReplicatedStorage.Shared.Util.Potions)
 local Layout = require(ReplicatedStorage.Shared.Config.Layout)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
@@ -204,6 +205,51 @@ local function holdVacuum(player: Player, itemId: string)
 end
 
 -- The hotbar Tool an item should be right now (its name carries the count), or nil for none.
+-- Shows the potion going as player attributes Potion (id) and PotionLeft (seconds), for the
+-- timer next to the event icon (PotionController).
+local function showPotion(player: Player, data: DataService.Data?)
+	local going = if data then Potions.active(data.potion) else nil
+	player:SetAttribute("Potion", if going then going.id else nil)
+	player:SetAttribute("PotionLeft", if going and data then math.ceil(data.potion.secondsLeft) else nil)
+end
+
+-- Drinks one luck potion from the inventory (its hotbar Tool).
+function HuntService.drinkPotion(player: Player, itemId: string)
+	local data = DataService.get(player)
+	local item = Potions.item(itemId)
+	if not data or not item then
+		return
+	end
+	if itemCount(data, item.id) <= 0 then
+		Notify.toast(player, `You don't have a {item.name}. The Hunter's Workshop sells them.`)
+		return
+	end
+	local going = Potions.active(data.potion)
+	local result = Potions.drink(data.potion, item.id)
+	if result == "Weaker" and going then
+		Notify.toast(player, `Your {going.name} is stronger. Drink this one when it runs out.`)
+		return
+	elseif result == "Unknown" then
+		return
+	end
+	useItem(data, item.id)
+	local minutes = math.floor((item.potionSeconds or 0) / 60)
+	Notify.toast(
+		player,
+		if result == "Refreshed"
+			then `{item.name} topped up: {minutes} min of luck again!`
+			else `You drank a {item.name}: rare colours x{item.potionBoost} for {minutes} min!`
+	)
+	showPotion(player, data)
+	HuntService.refreshItems(player)
+end
+
+-- What catch variant chances are multiplied by for this player right now (1: no potion).
+function HuntService.potionBoost(player: Player): number
+	local data = DataService.get(player)
+	return if data then Potions.boost(data.potion) else 1
+end
+
 local function toolName(data: DataService.Data, item: Shop.Item): string?
 	if Workshop.isTool(item) then
 		return if Workshop.owns(data.inventory, item) then item.name else nil
@@ -262,6 +308,11 @@ local function syncTools(player: Player)
 			tool.ToolTip = "Click in a zone to ring it: a rarer monster comes to you"
 			tool.Activated:Connect(function()
 				HuntService.useBaitBell(player, item.id)
+			end)
+		elseif item.kind == "Potion" then
+			tool.ToolTip = "Click to drink it: rare colours are more likely for a while"
+			tool.Activated:Connect(function()
+				HuntService.drinkPotion(player, item.id)
 			end)
 		elseif item.kind == "Tag" then
 			-- The client opens the name box for the monster you click (NameTagController).
@@ -520,8 +571,26 @@ function HuntService.start()
 	for _, player in Players:GetPlayers() do
 		onPlayer(player)
 	end
-	DataService.onLoaded(function(player)
+	DataService.onLoaded(function(player, data)
 		HuntService.refreshItems(player)
+		showPotion(player, data)
+	end)
+	-- Potions only count down while their drinker is online.
+	task.spawn(function()
+		while true do
+			task.wait(1)
+			for _, player in Players:GetPlayers() do
+				local data = DataService.get(player)
+				if data and data.potion.secondsLeft > 0 then
+					local before = Potions.active(data.potion)
+					Potions.tick(data.potion, 1)
+					showPotion(player, data)
+					if before and not Potions.active(data.potion) then
+						Notify.toast(player, `Your {before.name} wore off.`)
+					end
+				end
+			end
+		end
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		-- Leaving mid-run loses the bag, so quitting can't be used as a free teleport home.

@@ -264,6 +264,48 @@ function ToolLooks.NameTag(): { Part }
 	return parts
 end
 
+-- A round glass flask held by its neck: glowing liquid inside, a cork, a wax seal and a paper
+-- label. `liquid` is the potion's colour, `seal` its wax.
+local function potion(liquid: { number }, seal: { number }, sparkle: boolean): { Part }
+	local parts: { Part } = {}
+	part(parts, "Handle", { 0.4, 0.6, 0.4 }, { 0, 0, 0 }, { 200, 230, 240 }, "Glass").transparency = 0.4
+	part(parts, "Cork", { 0.45, 0.35, 0.45 }, { 0, 0.45, 0 }, { 150, 110, 70 }, "Wood")
+	part(parts, "Seal", { 0.55, 0.15, 0.55 }, { 0, 0.68, 0 }, seal, "SmoothPlastic")
+	local flask = part(parts, "Flask", { 1.3, 1.3, 1.3 }, { 0, -0.9, 0 }, { 200, 230, 240 }, "Glass")
+	flask.shape = "Ball"
+	flask.transparency = 0.5
+	local brew = part(parts, "Brew", { 1.05, 1.05, 1.05 }, { 0, -0.98, 0 }, liquid, "Neon")
+	brew.shape = "Ball"
+	brew.light = glow(liquid)
+	part(parts, "Label", { 0.6, 0.4, 0.05 }, { 0, -0.85, -0.66 }, { 236, 222, 190 }, "SmoothPlastic")
+	if sparkle then
+		for i, at in { { 0.25, -0.7 }, { -0.2, -1.15 }, { 0.1, -1.3 } } do
+			local fleck = part(
+				parts,
+				`Fleck{i}`,
+				{ 0.12, 0.12, 0.12 },
+				{ at[1], at[2], -0.3 },
+				{ 255, 255, 255 },
+				"Neon"
+			)
+			fleck.shape = "Ball"
+		end
+	end
+	return parts
+end
+
+function ToolLooks.LuckyTonic(): { Part }
+	return potion({ 90, 230, 120 }, { 40, 120, 60 }, false)
+end
+
+function ToolLooks.GildedElixir(): { Part }
+	return potion({ 255, 200, 50 }, { 160, 110, 20 }, true)
+end
+
+function ToolLooks.PrismDraught(): { Part }
+	return potion({ 200, 120, 255 }, { 90, 40, 140 }, true)
+end
+
 -- Recipes by Workshop item id.
 ToolLooks.ById = {
 	DustBuster = ToolLooks.DustBuster,
@@ -277,6 +319,9 @@ ToolLooks.ById = {
 	GoldBell = ToolLooks.GoldBell,
 	ReturnCharm = ToolLooks.ReturnCharm,
 	NameTag = ToolLooks.NameTag,
+	LuckyTonic = ToolLooks.LuckyTonic,
+	GildedElixir = ToolLooks.GildedElixir,
+	PrismDraught = ToolLooks.PrismDraught,
 } :: { [string]: () -> { Part } }
 
 return ToolLooks
