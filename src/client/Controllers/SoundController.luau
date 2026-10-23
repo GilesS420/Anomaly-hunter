@@ -128,27 +128,27 @@ end
 
 -- Which song plays right now and how far into it, from the shared server clock: the
 -- playlist repeats forever from time 0, with a short pause after each song, so everyone in
--- every server hears the same moment of the same song. In a pause: nil and the number of
--- the song that just ended.
-local function nowPlaying(list: { { file: string, length: number } }): (string?, number)
+-- every server hears the same moment of the same song (and the song's length). In a pause:
+-- nil and the number of the song that just ended.
+local function nowPlaying(list: { { file: string, length: number } }): (string?, number, number)
 	local cycle = 0
 	for _, song in list do
 		cycle += song.length + Sounds.PlaylistGapSeconds
 	end
 	if cycle <= 0 then
-		return nil, 0
+		return nil, 0, 0
 	end
 	local at = workspace:GetServerTimeNow() % cycle
 	for index, song in list do
 		if at < song.length then
-			return song.file, at
+			return song.file, at, song.length
 		end
 		at -= song.length + Sounds.PlaylistGapSeconds
 		if at < 0 then
-			return nil, index
+			return nil, index, 0
 		end
 	end
-	return nil, 0
+	return nil, 0, 0
 end
 
 local function track(file: string): Sound
@@ -172,8 +172,10 @@ local function fadeOut(sound: Sound)
 	end)
 end
 
+local fadingOut = false -- the playing song has started its fade at the end
+
 local function updateMusic(list: { { file: string, length: number } })
-	local file, at = nowPlaying(list)
+	local file, at, length = nowPlaying(list)
 	local nextTrack = if file then track(file) else nil
 	if nextTrack ~= playingMusic then
 		if playingMusic then
@@ -189,12 +191,19 @@ local function updateMusic(list: { { file: string, length: number } })
 			end
 		end
 		playingMusic = nextTrack
+		fadingOut = false
 		if nextTrack then
 			nextTrack.TimePosition = at
 			nextTrack:Play()
-			-- a song that starts on time comes in at full volume; joining halfway fades it in
-			tweenVolume(nextTrack, 1, if at < 0.5 then 0.05 else Sounds.MusicFadeSeconds)
+			-- every song builds up from silence over its first seconds (or, joining halfway,
+			-- over the usual fade)
+			local rest = Sounds.MusicFadeInSeconds - at
+			tweenVolume(nextTrack, 1, if rest > 0.5 then rest else Sounds.MusicFadeSeconds)
 		end
+	elseif nextTrack and not fadingOut and length - at <= Sounds.MusicFadeOutSeconds then
+		-- and dies away over its last seconds, so it's silent by the time it ends
+		fadingOut = true
+		tweenVolume(nextTrack, 0, math.max(length - at, 0.1))
 	elseif
 		nextTrack
 		and nextTrack.IsLoaded

@@ -863,35 +863,316 @@ def syllables(buf, count, at, every, make):
         place(buf, stereo(make(i)), at + i * every * rng.uniform(0.9, 1.1))
 
 
-def voice_giggle():
-    """A small ghost giggling: 'hee-hee-hee-hee', high and breathy, falling away."""
-    buf = silence(1.6)
+def glottal(f0, jitter=0.01, breath=0.15):
+    """A throat: one soft pulse per period along the pitch curve f0 (Hz per sample), with a
+    little pitch jitter and breath riding on each pulse, like a real voice."""
+    n = len(f0)
+    wobble = lowpass(rng.standard_normal(n), 30) * 8
+    phase = np.cumsum(f0 * (1 + jitter * wobble)) / RATE % 1.0
+    open_ = 0.6
+    pulse = np.where(phase < open_, np.sin(np.pi * phase / open_) ** 2, 0.0)
+    src = np.diff(pulse, prepend=0) * RATE / (f0 + 1)  # the flow's slope is what we hear
+    air = highpass(rng.standard_normal(n), 400) * (0.3 + pulse) * breath
+    return src + air
 
-    def hee(i):
-        d = 0.09
-        f = curve(d, [(0, 760 - i * 35), (0.5, 820 - i * 35), (1, 700 - i * 40)])
-        tone = shape(vocal(f, 20, 1.3), EE) * envelope(samples(d), 0.01, release=0.05)
-        breath = bandpass(noise(d), 2000, 6000) * envelope(samples(d), 0.005, release=0.06) * 0.15
-        return tone + breath
 
-    syllables(buf, 6, 0.05, 0.15, hee)
-    return finish(buf, 1.6, 0.35, -20)
+def resonate(x, freq, bandwidth):
+    """One formant: a two-pole resonance at freq."""
+    r = np.exp(-np.pi * bandwidth / RATE)
+    a = [1, -2 * r * np.cos(2 * np.pi * freq / RATE), r * r]
+    return signal.lfilter([1 - r], a, x)
+
+
+def mouth(src, formants):
+    """A vocal tract: the source through each formant (centre, gain, bandwidth) in parallel."""
+    return sum(resonate(src, f, bw) * g for f, g, bw in formants)
+
+
+EH = [(560, 1.0, 70), (1800, 0.55, 110), (2500, 0.35, 160), (3500, 0.12, 250)]
+UH = [(450, 1.0, 70), (900, 0.45, 100), (2400, 0.12, 160)]
 
 
 def voice_cackle():
-    """A witch or jester cackling: 'ah-ha-ha-ha-ha', harsh and mocking, rising then falling."""
+    """A witch cackling: a rising 'aaah' then a fast, nasal 'heh-heh-heh-heh' tumbling down."""
+    buf = silence(2.2)
+    d = 0.42
+    f = curve(d, [(0, 300), (0.7, 470), (1, 520)])
+    f *= 1 + 0.03 * np.sin(2 * np.pi * 7 * times(d))
+    ah = mouth(glottal(f, 0.02, 0.25), [(750, 1.0, 90), (1250, 0.6, 110), (2700, 0.3, 180)])
+    place(buf, stereo(ah * envelope(samples(d), 0.05, release=0.08)), 0.05)
+    at = 0.05 + d + 0.04
+    for i in range(8):
+        h = 0.085
+        top = 520 - i * 22
+        f = curve(h, [(0, top), (0.4, top * 1.04), (1, top * 0.86)])
+        f *= 1 + 0.04 * np.sin(2 * np.pi * 18 * times(h))  # the shaky, wicked vibrato
+        heh = mouth(glottal(f, 0.03, 0.35), EH)
+        heh *= np.interp(times(h), [0, 0.012, 0.03, h * 0.7, h], [0, 0.4, 1, 0.8, 0])
+        aspir = mouth(highpass(noise(0.03), 600), EH) * np.interp(times(0.03), [0, 0.01, 0.03], [0, 1, 0]) * 0.8
+        place(buf, stereo(aspir), at)
+        place(buf, stereo(heh), at + 0.015)
+        at += 0.118 + i * 0.006
+    return finish(buf, 1.3, 0.3, -19)
+
+
+def voice_boo():
+    """A little ghost: the classic airy 'wooOOOooo', swelling up and fading away."""
+    d = 1.9
+    f = curve(d, [(0, 260), (0.45, 400), (1, 230)])
+    f *= 1 + 0.025 * np.sin(2 * np.pi * 5 * times(d))
+    tone = mouth(glottal(f, 0.01, 0.9), [(320, 1.0, 60), (760, 0.35, 90), (2300, 0.05, 200)])
+    whistle = np.sin(2 * np.pi * np.cumsum(f * 2) / RATE) * 0.08  # the hollow whistle in it
+    sig = (tone + whistle) * np.interp(times(d), [0, 0.5, 1.0, d], [0, 0.8, 1, 0]) ** 1.3
+    buf = silence(d + 0.1)
+    place(buf, stereo(sig), 0.05)
+    return finish(buf, 2.6, 0.5, -21)
+
+
+def voice_wail():
+    """A ghost lady wailing: a high 'ooo-aaah' that breaks into a sob."""
+    buf = silence(2.6)
+    d = 1.5
+    f = curve(d, [(0, 480), (0.3, 660), (0.75, 600), (1, 430)])
+    f *= 1 + 0.03 * np.sin(2 * np.pi * 6 * times(d))
+    oo = mouth(glottal(f, 0.015, 0.5), [(350, 1.0, 70), (800, 0.4, 100), (2600, 0.1, 200)])
+    aa = mouth(glottal(f, 0.015, 0.5), [(800, 1.0, 90), (1200, 0.55, 110), (2800, 0.25, 180)])
+    mix = np.clip(times(d) / (d * 0.5), 0, 1)
+    sig = (oo * (1 - mix) + aa * mix) * envelope(samples(d), 0.2, release=0.4)
+    place(buf, stereo(sig), 0.05)
+    for i in range(2):  # two catching sobs
+        h = 0.16
+        fs = curve(h, [(0, 520 - i * 40), (1, 400 - i * 40)])
+        sob = mouth(glottal(fs, 0.03, 0.7), UH) * np.interp(times(h), [0, 0.02, h], [0, 1, 0])
+        place(buf, stereo(sob * 0.8), 1.65 + i * 0.28)
+    return finish(buf, 2.4, 0.45, -21)
+
+
+def voice_gremlin():
+    """A gremlin snickering: quick, high, wheezy 'hih-hih-hih-hih' through its teeth."""
+    buf = silence(1.4)
+    at = 0.05
+    for i in range(9):
+        h = 0.06
+        top = 700 + 40 * np.sin(i * 1.3)
+        f = curve(h, [(0, top), (1, top * 0.85)])
+        hih = mouth(glottal(f, 0.03, 0.6), [(400, 0.7, 70), (2200, 1.0, 130), (3200, 0.5, 200)])
+        hih *= np.interp(times(h), [0, 0.01, h * 0.6, h], [0, 1, 0.6, 0])
+        hiss = bandpass(noise(0.05), 3500, 8000) * np.interp(times(0.05), [0, 0.01, 0.05], [0, 1, 0]) * 0.25
+        place(buf, stereo(hiss), at)
+        place(buf, stereo(hih), at + 0.01)
+        at += 0.085
+    return finish(buf, 1.0, 0.25, -20)
+
+
+def voice_bell():
+    """A drowned church bell: two slow tolls, a little muffled, with bubbles rising."""
+    buf = silence(6.5)
+    for i, at in enumerate((0.05, 2.2)):
+        place(buf, stereo(lowpass(bell(note("C4"), 4.0, 0.8), 3500) * (1.0 - i * 0.25)), at)
+    for _ in range(6):
+        start = rng.uniform(200, 400)
+        place(buf, stereo(pop(start, start * 3, 0.08) * 0.15), rng.uniform(0.3, 3.0))
+    return finish(buf, 3.0, 0.4, -20)
+
+
+def voice_flame():
+    """Fire: a soft roar that flares up, with wood crackling and popping in it."""
+    d = 2.0
+    t = times(d)
+    roar = lowpass(noise(d), 700) * (0.7 + 0.3 * lfo(d, 5, rng.uniform(0, 6)))
+    roar *= np.interp(t, [0, 0.3, 0.8, d], [0, 1, 0.8, 0])
+    buf = silence(d + 0.2)
+    place(buf, stereo(roar * 0.5), 0.05)
+    place(buf, stereo(whoosh(0.9, 200, 2500) * 0.6), 0.1)
+    for _ in range(22):
+        size = rng.uniform(0.002, 0.01)
+        snap = highpass(noise(size), 1500) * np.exp(-times(size) * 400) * rng.uniform(0.3, 1.0)
+        place(buf, stereo(snap), rng.uniform(0.1, d))
+    return finish(buf, 0.8, 0.2, -21)
+
+
+def voice_stone():
+    """A headstone shuffling along: stone grinding on stone, then a heavy thud."""
+    d = 1.0
+    t = times(d)
+    grind = bandpass(noise(d), 150, 1400) * rough(d, 25, 0.9)
+    grind *= np.interp(t, [0, 0.1, 0.8, d], [0, 1, 0.8, 0])
+    buf = silence(d + 0.8)
+    place(buf, stereo(grind * 0.8), 0.05)
+    thud = lowpass(noise(0.4), 220) * np.exp(-times(0.4) * 14) * 1.5
+    thud += np.sin(2 * np.pi * 60 * times(0.4)) * np.exp(-times(0.4) * 10)
+    place(buf, stereo(thud), d + 0.1)
+    return finish(buf, 1.0, 0.25, -19)
+
+
+def voice_shovel():
+    """The groundskeeper digging: the shovel scrapes into the earth and dirt is tossed aside."""
+    buf = silence(2.6)
+    for i, at in enumerate((0.05, 1.3)):
+        d = 0.35
+        scrape = bandpass(noise(d), 1800, 6000) * np.interp(times(d), [0, 0.05, 0.25, d], [0, 1, 0.7, 0])
+        ring = sum(np.sin(2 * np.pi * f * times(d)) * np.exp(-times(d) * 9) for f in (1730, 2940, 4410)) * 0.06
+        place(buf, stereo(scrape * 0.5 + ring), at)
+        place(buf, stereo(lowpass(noise(0.15), 300) * np.exp(-times(0.15) * 30) * 0.8), at + 0.3)
+        for _ in range(30):  # the dirt landing
+            g = rng.uniform(0.002, 0.006)
+            grain = bandpass(noise(g), 400, 3000) * np.exp(-times(g) * 500) * rng.uniform(0.1, 0.5)
+            place(buf, stereo(grain), at + 0.65 + abs(rng.normal(0, 0.12)))
+    return finish(buf, 0.9, 0.2, -21)
+
+
+def voice_popcorn():
+    """Popcorn popping: a few kernels, then more and more, then it dies down."""
     buf = silence(1.8)
-    pitches = [420, 470, 500, 480, 440, 390, 330]
+    times_ = sorted(rng.uniform(0.05, 1.5, 26) ** 0.9)
+    for at in times_:
+        d = 0.012
+        kernel = highpass(noise(d), 800) * np.exp(-times(d) * 350)
+        body = np.sin(2 * np.pi * rng.uniform(700, 1500) * times(0.02)) * np.exp(-times(0.02) * 180) * 0.6
+        place(buf, stereo(kernel * rng.uniform(0.4, 1.0)), at)
+        place(buf, stereo(body * rng.uniform(0.3, 0.8)), at)
+    return finish(buf, 0.6, 0.15, -20)
 
-    def ha(i):
-        d = 0.12
-        p = pitches[i]
-        f = curve(d, [(0, p * 0.9), (0.4, p * 1.05), (1, p * 0.8)])
-        tone = shape(vocal(f, 30, 0.9), [(800, 1.0, 120), (1250, 0.6, 150), (2600, 0.35, 250)])
-        tone *= rough(d, 45, 0.35) * envelope(samples(d), 0.006, release=0.06)
-        return tone + highpass(noise(d), 3000) * np.exp(-times(d) * 40) * 0.2
 
-    syllables(buf, 7, 0.05, 0.16, ha)
+def voice_balloon():
+    """A sad balloon: its rubber squeaking 'eeee-ee', then a little sobbing whine of air."""
+    buf = silence(1.8)
+    for i, (at, d, low, high) in enumerate([(0.05, 0.45, 520, 700), (0.6, 0.25, 600, 480)]):
+        f = curve(d, [(0, low), (0.6, high), (1, (low + high) / 2)])
+        squeak = vocal(f, 12, 0.6) * rough(d, 60, 0.6)
+        squeak = bandpass(squeak, 400, 4000) * envelope(samples(d), 0.02, release=0.08)
+        place(buf, stereo(squeak * 0.6), at)
+    d = 0.7
+    f = curve(d, [(0, 900), (1, 650)])
+    whine = np.sin(2 * np.pi * np.cumsum(f) / RATE) * 0.15 + bandpass(noise(d), 1500, 5000) * 0.1
+    place(buf, stereo(whine * envelope(samples(d), 0.05, release=0.3)), 1.0)
+    return finish(buf, 1.0, 0.25, -21)
+
+
+def voice_jingle():
+    """A jester's hat bells: a bright shake of little jingle bells."""
+    buf = silence(1.6)
+    for shake, start in enumerate((0.05, 0.5)):
+        at = start
+        for _ in range(9):
+            place(buf, stereo(clink(rng.uniform(3200, 5200), 0.35) * rng.uniform(0.4, 1.0)), at)
+            at += rng.uniform(0.015, 0.04)
+    return finish(buf, 1.0, 0.3, -21)
+
+
+def voice_glass():
+    """A funhouse mirror: glass creaking and cracking, then a cold glassy ring."""
+    buf = silence(2.6)
+    place(buf, stereo(crack(0.6) * 0.8), 0.05)
+    place(buf, stereo(crack(0.5) * 0.5), 0.35)
+    ring = additive(rng.uniform(1900, 2300), 2.0, [(1, 1.0, 2.5), (2.32, 0.6, 3.5), (4.25, 0.4, 5), (6.63, 0.25, 7)])
+    place(buf, stereo(ring * 0.25 * envelope(samples(2.0), 0.002, release=0.3)), 0.1)
+    return finish(buf, 2.0, 0.4, -21)
+
+
+def voice_tent():
+    """The big top: heavy canvas flapping, and a deep rumble from inside."""
+    d = 1.5
+    t = times(d)
+    flap = lowpass(noise(d), 1400) * (0.5 + 0.5 * np.abs(np.sin(2 * np.pi * 7 * t)) ** 3)
+    flap *= np.interp(t, [0, 0.1, 1.1, d], [0, 1, 0.7, 0])
+    snaps = np.zeros_like(t)
+    for at in (0.2, 0.55, 0.9):
+        snaps[samples(at) : samples(at) + samples(0.04)] += lowpass(noise(0.04), 2000) * np.exp(-times(0.04) * 60) * 2
+    rumble = lowpass(vocal(curve(d, [(0, 55), (0.5, 65), (1, 50)]), 30, 0.8) * rough(d, 20, 0.6), 500) * 0.4
+    buf = silence(d + 0.1)
+    place(buf, stereo((flap * 0.5 + snaps + rumble) * envelope(len(t), 0.05, release=0.3)), 0.05)
+    return finish(buf, 1.2, 0.25, -20)
+
+
+def voice_carousel():
+    """A carousel's tune winding down: five music-box notes that slow and sag out of tune."""
+    buf = silence(3.4)
+    at = 0.05
+    for i, n in enumerate(["G5", "E5", "C5", "E5", "D5"]):
+        sag = 1 - i * 0.025
+        place(buf, stereo(music_box(note(n) * sag, 2.0, 0.01 + i * 0.004) * 0.5), at)
+        at += 0.28 + i * 0.07
+    return finish(buf, 2.0, 0.4, -22)
+
+
+def voice_static():
+    """A haunted TV: a burst of static, the mains hum, a ghostly voice in the noise, then off."""
+    d = 1.4
+    t = times(d)
+    hiss = bandpass(noise(d), 1000, 9000) * (0.6 + 0.4 * (rng.uniform(size=len(t)) > 0.3))
+    gate = np.interp(t, [0, 0.02, 1.15, 1.17, d], [0, 1, 1, 0, 0])
+    buzz = hum(60, d, 0.8) * 0.8
+    ghost = mouth(glottal(curve(d, [(0, 200), (0.5, 260), (1, 180)]), 0.02, 0.8), OO) * 0.5
+    ghost *= np.interp(t, [0, 0.3, 0.7, 1.1, d], [0, 0, 1, 0, 0])
+    buf = silence(d + 0.1)
+    place(buf, stereo((hiss * 0.35 + buzz + ghost) * gate), 0.05)
+    return finish(buf, 0.6, 0.15, -21)
+
+
+def metal_clank(freq=420, duration=0.8):
+    """Iron hitting iron: a few clashing inharmonic partials."""
+    parts = [(1, 1.0, 6), (2.76, 0.7, 9), (5.4, 0.5, 14), (8.9, 0.3, 20)]
+    hit = additive(freq, duration, parts) * envelope(samples(duration), 0.001, release=0.1)
+    return hit * 0.4 + highpass(noise(duration), 2000) * np.exp(-times(duration) * 60) * 0.5
+
+
+def voice_clank():
+    """A metal mimic: a rusty lid creaking open, then snapping shut with a clank."""
+    buf = silence(2.0)
+    lid = highpass(creak(0.9), 600) * 1.4
+    place(buf, stereo(lid), 0.05)
+    place(buf, stereo(metal_clank(380)), 1.0)
+    place(buf, stereo(lowpass(noise(0.2), 400) * np.exp(-times(0.2) * 25)), 1.0)
+    return finish(buf, 1.0, 0.25, -20)
+
+
+def voice_buzz():
+    """A street lamp: its bulb buzzing and stuttering on and off, and iron creaking."""
+    d = 1.6
+    t = times(d)
+    on = np.ones_like(t)
+    for start, length in [(0.3, 0.06), (0.5, 0.03), (0.9, 0.12), (1.25, 0.04)]:
+        on[samples(start) : samples(start + length)] = 0.05
+    on = lowpass(on, 200)
+    buf = silence(d + 0.6)
+    place(buf, stereo(hum(120, d, 0.9) * on * 1.6 * envelope(len(t), 0.02, release=0.1)), 0.05)
+    place(buf, stereo(highpass(creak(0.6), 400) * 0.7), d - 0.2)
+    return finish(buf, 0.9, 0.2, -21)
+
+
+def voice_storm():
+    """A storm gremlin's cloud: a crackle of lightning and a short roll of thunder."""
+    buf = silence(3.2)
+    d = 0.35
+    zap = highpass(noise(d), 1200) * (rng.uniform(size=samples(d)) > 0.55) * np.exp(-times(d) * 8)
+    place(buf, stereo(zap * 0.6), 0.05)
+    place(buf, stereo(thunder(2.6, near=False) * 0.8), 0.25)
+    return finish(buf, 1.5, 0.3, -20)
+
+
+def voice_knock():
+    """A door that walks: three heavy knocks on old wood, and its brass knocker rattling."""
+    buf = silence(2.0)
+    for i in range(3):
+        d = 0.25
+        t = times(d)
+        wood = sum(np.sin(2 * np.pi * f * t) * np.exp(-t * k) for f, k in [(110, 25), (240, 35), (520, 55)])
+        wood += lowpass(noise(d), 1500) * np.exp(-t * 90) * 1.5
+        place(buf, stereo(wood * (1.0 if i < 2 else 1.2)), 0.05 + i * 0.28 + (0.08 if i == 2 else 0))
+    place(buf, stereo(metal_clank(900, 0.5) * 0.4), 1.05)
+    place(buf, stereo(metal_clank(950, 0.4) * 0.25), 1.18)
+    return finish(buf, 1.0, 0.25, -19)
+
+
+def voice_squawk():
+    """A heron's (or gull's) harsh croaking squawk: 'fraaank'."""
+    buf = silence(1.4)
+    d = 0.5
+    f = curve(d, [(0, 330), (0.15, 400), (1, 260)])
+    src = vocal(f, 40, 0.6) * rough(d, 55, 1.0)
+    tone = shape(src, [(900, 1.0, 180), (1600, 0.8, 240), (2700, 0.4, 320)])
+    place(buf, stereo(tone * envelope(samples(d), 0.01, release=0.15)), 0.05)
     return finish(buf, 1.4, 0.3, -20)
 
 
@@ -1088,22 +1369,40 @@ def voice_gurgle():
 
 
 VOICES = [
-    ("Giggle", voice_giggle),
+    ("Boo", voice_boo),
     ("Cackle", voice_cackle),
+    ("Wail", voice_wail),
     ("Moan", voice_moan),
     ("Growl", voice_growl),
     ("Howl", voice_howl),
     ("Bark", voice_bark),
     ("Caw", voice_caw),
+    ("Squawk", voice_squawk),
     ("Croak", voice_croak),
     ("Rattle", voice_rattle),
     ("Hiss", voice_hiss),
     ("Whinny", voice_whinny),
+    ("Bell", voice_bell),
     ("Chime", voice_chime),
     ("Squeak", voice_squeak),
     ("Creak", voice_creak),
+    ("Clank", voice_clank),
+    ("Knock", voice_knock),
     ("Whisper", voice_whisper),
     ("Gurgle", voice_gurgle),
+    ("Flame", voice_flame),
+    ("Stone", voice_stone),
+    ("Shovel", voice_shovel),
+    ("Popcorn", voice_popcorn),
+    ("Balloon", voice_balloon),
+    ("Gremlin", voice_gremlin),
+    ("Jingle", voice_jingle),
+    ("Glass", voice_glass),
+    ("Tent", voice_tent),
+    ("Carousel", voice_carousel),
+    ("Static", voice_static),
+    ("Buzz", voice_buzz),
+    ("Storm", voice_storm),
 ]
 
 

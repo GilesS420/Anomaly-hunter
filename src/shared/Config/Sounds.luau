@@ -44,7 +44,9 @@ Sounds.WorldVolume = 0.6 -- the night under the music (WorldAmbience)
 Sounds.WorldDuringEvents = 0.35 -- the night is turned down to this while an event is live
 Sounds.MonsterVolume = 0.8 -- monster calls (MonsterVoices), heard from where the monster is
 
-Sounds.MusicFadeSeconds = 2.5 -- fade out at the end of a song, or in when you join halfway
+Sounds.MusicFadeSeconds = 2.5 -- fade in when you join halfway through a song
+Sounds.MusicFadeInSeconds = 4 -- every song builds up from silence over its first seconds...
+Sounds.MusicFadeOutSeconds = 6 -- ...and dies away over its last seconds
 Sounds.AmbienceFadeSeconds = 3
 
 -- The music is one playlist for the whole server: every player hears the same song at the
@@ -74,70 +76,71 @@ Sounds.MonsterCalls = {
 	pitchPerSize = 0.35, -- bigger is lower: a Huge (1.7x) calls at 1.7^-0.35 = 0.83x
 }
 
--- Which call (a MonsterVoices slice) each monster makes. A monster not listed uses
+-- Which call (a MonsterVoices slice) each monster makes, matching what it is: the bell tolls,
+-- the skeleton rattles, the crow caws, the candle crackles. A monster not listed uses
 -- DefaultCall for how it moves (the model's Gait: walkers growl, floaters moan).
 Sounds.MonsterVoices = {
 	-- Zone 1: Pumpkin Graveyard
-	Gloomlet = "Giggle",
+	Gloomlet = "Boo",
 	Skittercrow = "Caw",
 	Mossbones = "Rattle",
-	WispJack = "Giggle",
+	WispJack = "Flame",
 	Gravepup = "Bark",
-	Tombgrin = "Cackle",
-	TheGroundskeeper = "Growl",
+	Tombgrin = "Stone",
+	TheGroundskeeper = "Shovel",
 	TheHeadlessRider = "Whinny",
-	LadyOfLanterns = "Moan",
+	LadyOfLanterns = "Wail",
 	-- Zone 2: Murky Bayou
 	Bogbub = "Gurgle",
 	Croakling = "Croak",
-	WillowWisp = "Moan",
+	WillowWisp = "Chime",
 	Reedwitch = "Cackle",
 	Gatorghast = "Growl",
-	SunkenBell = "Chime",
-	TheBogKing = "Croak",
+	SunkenBell = "Bell",
+	TheBogKing = "Gurgle",
 	MireSerpent = "Hiss",
-	MoonlitHeron = "Caw",
+	MoonlitHeron = "Squawk",
 	-- Zone 3: Abandoned Carnival
-	Poplet = "Giggle",
-	BalloonBoo = "Giggle",
-	TicketGremlin = "Cackle",
+	Poplet = "Popcorn",
+	BalloonBoo = "Balloon",
+	TicketGremlin = "Gremlin",
 	CarouselColt = "Whinny",
-	JesterJinx = "Cackle",
-	MirrorGrin = "Whisper",
+	JesterJinx = "Jingle",
+	MirrorGrin = "Glass",
 	TheRingmaster = "Cackle",
-	BigTopTerror = "Growl",
-	GoldenCarousel = "Chime",
+	BigTopTerror = "Tent",
+	GoldenCarousel = "Carousel",
 	-- Zone 4: Spooky School
-	Chalkling = "Giggle",
+	Chalkling = "Boo",
 	Paperbat = "Squeak",
 	LunchGhoul = "Growl",
-	LockerLurker = "Creak",
+	LockerLurker = "Clank",
 	HallMonitor = "Moan",
 	DetentionShade = "Moan",
 	ThePrincipal = "Growl",
-	BellTowerBat = "Squeak",
+	BellTowerBat = "Bell",
 	StarlightScholar = "Chime",
 	-- Zone 5: Ghost Ship
 	BarnacleBoo = "Gurgle",
-	Gullghast = "Caw",
+	Gullghast = "Squawk",
 	BottleSpirit = "Gurgle",
 	AnchorCrab = "Rattle",
 	Kraklet = "Gurgle",
-	SirenShade = "Moan",
+	SirenShade = "Wail",
 	CaptainDreadwake = "Growl",
 	TheKraken = "Gurgle",
 	SeraphOfTheDeep = "Chime",
 	-- Watcher event monsters
-	Flickerwick = "Giggle",
-	StaticShade = "Whisper",
-	CrimsonWisp = "Moan",
+	Flickerwick = "Flame",
+	StaticShade = "Static",
+	CrimsonWisp = "Flame",
 	Moonhowler = "Howl",
 	CrateMimic = "Creak",
 	BarrelMimic = "Creak",
-	MailboxMimic = "Creak",
-	LamppostLurker = "Creak",
-	StormGremlin = "Cackle",
-	Doorknocker = "Creak",
+	MailboxMimic = "Clank",
+	LamppostLurker = "Buzz",
+	StormGremlin = "Storm",
+	Doorknocker = "Knock",
 	Watcherling = "Whisper",
 	EyeOfTheWatcher = "Whisper",
 } :: { [string]: string }
