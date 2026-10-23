@@ -5,11 +5,11 @@
 -- audio moderation (Gymnopedie and Fur Elise were, 2026-10-21), so don't add those.
 -- client/Controllers/SoundController plays it all.
 --
--- Roblox can't read sound files from this repo: each of the seven files in Files has to be
+-- Roblox can't read sound files from this repo: each of the eight files in Files has to be
 -- uploaded to Roblox once (Creator Hub > Development Items > Audio), and its asset id goes
 -- here. A file without an id is simply silent, and Studio's Output says which ones are missing.
 --
--- The two event files and WorldAmbience are "sound sheets": one upload holds many sounds one after another,
+-- The two event files, WorldAmbience and MonsterVoices are "sound sheets": one upload holds many sounds one after another,
 -- and the game plays just the slice it needs (Config/SoundSheets says where each one sits).
 
 local SoundSheets = require("./SoundSheets")
@@ -33,6 +33,7 @@ Sounds.Files = {
 	MusicLullaby = "rbxassetid://129818520848497",
 	MusicMoonlight = "rbxassetid://124222698146635",
 	WorldAmbience = "rbxassetid://99157796020232",
+	MonsterVoices = "",
 }
 
 -- Overall loudness of each kind of sound, 0 to 1.
@@ -41,6 +42,7 @@ Sounds.StingerVolume = 0.8
 Sounds.AmbienceVolume = 0.55
 Sounds.WorldVolume = 0.6 -- the night under the music (WorldAmbience)
 Sounds.WorldDuringEvents = 0.35 -- the night is turned down to this while an event is live
+Sounds.MonsterVolume = 0.8 -- monster calls (MonsterVoices), heard from where the monster is
 
 Sounds.MusicFadeSeconds = 2.5 -- fade out at the end of a song, or in when you join halfway
 Sounds.AmbienceFadeSeconds = 3
@@ -58,6 +60,89 @@ Sounds.MusicDriftSeconds = 1.5 -- a song this far off the server clock jumps bac
 -- WorldAmbience slices played in the pause after each song, taking turns: a music box being
 -- wound up, a far-off bell, creaking floorboards and an owl.
 Sounds.BetweenSongs = { "WindUp", "Toll", "Creaks" }
+
+-- Monsters call out now and then: every so often one monster near you (picked at random)
+-- makes its call, from where it stands, so it never turns into a constant noise.
+-- client/Controllers/MonsterVoiceController plays them.
+Sounds.MonsterCalls = {
+	gapMin = 6, -- seconds between two calls, at least...
+	gapMax = 14, -- ...and at most (when a monster is near)
+	cooldown = 30, -- the same monster calls again after this long at the soonest
+	reach = 60, -- studs: only monsters this close call out (you hear them fade with distance)
+	fullVolumeWithin = 10, -- studs: as loud as it gets this close
+	pitchSpread = 0.08, -- each call is up to 8% higher or lower, so a family doesn't sound copied
+	pitchPerSize = 0.35, -- bigger is lower: a Huge (1.7x) calls at 1.7^-0.35 = 0.83x
+}
+
+-- Which call (a MonsterVoices slice) each monster makes. A monster not listed uses
+-- DefaultCall for how it moves (the model's Gait: walkers growl, floaters moan).
+Sounds.MonsterVoices = {
+	-- Zone 1: Pumpkin Graveyard
+	Gloomlet = "Giggle",
+	Skittercrow = "Caw",
+	Mossbones = "Rattle",
+	WispJack = "Giggle",
+	Gravepup = "Bark",
+	Tombgrin = "Cackle",
+	TheGroundskeeper = "Growl",
+	TheHeadlessRider = "Whinny",
+	LadyOfLanterns = "Moan",
+	-- Zone 2: Murky Bayou
+	Bogbub = "Gurgle",
+	Croakling = "Croak",
+	WillowWisp = "Moan",
+	Reedwitch = "Cackle",
+	Gatorghast = "Growl",
+	SunkenBell = "Chime",
+	TheBogKing = "Croak",
+	MireSerpent = "Hiss",
+	MoonlitHeron = "Caw",
+	-- Zone 3: Abandoned Carnival
+	Poplet = "Giggle",
+	BalloonBoo = "Giggle",
+	TicketGremlin = "Cackle",
+	CarouselColt = "Whinny",
+	JesterJinx = "Cackle",
+	MirrorGrin = "Whisper",
+	TheRingmaster = "Cackle",
+	BigTopTerror = "Growl",
+	GoldenCarousel = "Chime",
+	-- Zone 4: Spooky School
+	Chalkling = "Giggle",
+	Paperbat = "Squeak",
+	LunchGhoul = "Growl",
+	LockerLurker = "Creak",
+	HallMonitor = "Moan",
+	DetentionShade = "Moan",
+	ThePrincipal = "Growl",
+	BellTowerBat = "Squeak",
+	StarlightScholar = "Chime",
+	-- Zone 5: Ghost Ship
+	BarnacleBoo = "Gurgle",
+	Gullghast = "Caw",
+	BottleSpirit = "Gurgle",
+	AnchorCrab = "Rattle",
+	Kraklet = "Gurgle",
+	SirenShade = "Moan",
+	CaptainDreadwake = "Growl",
+	TheKraken = "Gurgle",
+	SeraphOfTheDeep = "Chime",
+	-- Watcher event monsters
+	Flickerwick = "Giggle",
+	StaticShade = "Whisper",
+	CrimsonWisp = "Moan",
+	Moonhowler = "Howl",
+	CrateMimic = "Creak",
+	BarrelMimic = "Creak",
+	MailboxMimic = "Creak",
+	LamppostLurker = "Creak",
+	StormGremlin = "Cackle",
+	Doorknocker = "Creak",
+	Watcherling = "Whisper",
+	EyeOfTheWatcher = "Whisper",
+} :: { [string]: string }
+
+Sounds.DefaultCall = { walk = "Growl", float = "Moan" } :: { [string]: string }
 
 -- The sounds of each Watcher event (Config/Events ids).
 Sounds.Events = {

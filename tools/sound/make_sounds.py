@@ -11,7 +11,8 @@ Writes, into out_dir (default: tools/sound/out):
   MusicMoonlight.ogg     after Beethoven, Moonlight Sonata, first movement (1801)
   preview/*.mp3       each sound on its own, for the preview page
   WorldAmbience.ogg   the night under the music, and the little sounds between songs
-  regions.json        where each sound sits inside the two event files
+  MonsterVoices.ogg   the monsters' calls (giggles, growls, moans...), one after another
+  regions.json        where each sound sits inside the sound sheets
 
 It also rewrites src/shared/Config/SoundSheets.luau with those positions, so the game plays
 the right slices after a re-render (upload the new files and keep the ids in Config/Sounds).
@@ -817,6 +818,295 @@ WORLD = [
 ]
 
 
+# ================================================================ monster voices
+# One short call per kind of monster. A monster near you makes its call now and then, from
+# where it is (client/Controllers/MonsterVoiceController); Config/Sounds.MonsterVoices says
+# which monster uses which call. The game plays it a little higher or lower each time, and
+# lower for a bigger monster, so one call covers a whole family.
+
+
+def vocal(f0, partials=40, tilt=1.0):
+    """A voice-like buzz following the pitch curve f0 (one value per sample)."""
+    phase = 2 * np.pi * np.cumsum(f0) / RATE
+    out = np.zeros_like(f0)
+    for k in range(1, partials + 1):
+        out += np.sin(phase * k) / k**tilt * (f0 * k < RATE * 0.45)
+    return out
+
+
+def shape(src, formants):
+    """Colour a buzz into a vowel: formants are (centre, gain, width) like synth.FORMANTS."""
+    return sum(bandpass(src, max(40, f - w), f + w) * a for f, a, w in formants)
+
+
+def curve(duration, points):
+    """A pitch curve through (fraction of the way, Hz) points."""
+    t = np.linspace(0, 1, samples(duration))
+    xs, ys = zip(*points)
+    return np.interp(t, xs, ys)
+
+
+def rough(duration, rate, depth):
+    """A throaty flutter: loudness shaken by low noise around `rate` Hz."""
+    wobble = bandpass(noise(duration), rate * 0.6, rate * 1.6)
+    return 1 + depth * wobble / (np.std(wobble) + 1e-9)
+
+
+EE = [(300, 1.0, 80), (2300, 0.6, 250), (3000, 0.3, 300)]
+AH = FORMANTS["ah"]
+OO = FORMANTS["oo"]
+OH = FORMANTS["oh"]
+
+
+def syllables(buf, count, at, every, make):
+    for i in range(count):
+        place(buf, stereo(make(i)), at + i * every * rng.uniform(0.9, 1.1))
+
+
+def voice_giggle():
+    """A small ghost giggling: 'hee-hee-hee-hee', high and breathy, falling away."""
+    buf = silence(1.6)
+
+    def hee(i):
+        d = 0.09
+        f = curve(d, [(0, 760 - i * 35), (0.5, 820 - i * 35), (1, 700 - i * 40)])
+        tone = shape(vocal(f, 20, 1.3), EE) * envelope(samples(d), 0.01, release=0.05)
+        breath = bandpass(noise(d), 2000, 6000) * envelope(samples(d), 0.005, release=0.06) * 0.15
+        return tone + breath
+
+    syllables(buf, 6, 0.05, 0.15, hee)
+    return finish(buf, 1.6, 0.35, -20)
+
+
+def voice_cackle():
+    """A witch or jester cackling: 'ah-ha-ha-ha-ha', harsh and mocking, rising then falling."""
+    buf = silence(1.8)
+    pitches = [420, 470, 500, 480, 440, 390, 330]
+
+    def ha(i):
+        d = 0.12
+        p = pitches[i]
+        f = curve(d, [(0, p * 0.9), (0.4, p * 1.05), (1, p * 0.8)])
+        tone = shape(vocal(f, 30, 0.9), [(800, 1.0, 120), (1250, 0.6, 150), (2600, 0.35, 250)])
+        tone *= rough(d, 45, 0.35) * envelope(samples(d), 0.006, release=0.06)
+        return tone + highpass(noise(d), 3000) * np.exp(-times(d) * 40) * 0.2
+
+    syllables(buf, 7, 0.05, 0.16, ha)
+    return finish(buf, 1.4, 0.3, -20)
+
+
+def voice_moan():
+    """A ghost's long low 'ooooh', bending up and sagging away, with breath in it."""
+    d = 2.2
+    f = curve(d, [(0, 190), (0.3, 245), (0.65, 225), (1, 160)])
+    f = f * (1 + 0.012 * np.sin(2 * np.pi * 4.3 * times(d)))
+    tone = shape(vocal(f, 25, 1.2), OO) * 0.7 + shape(vocal(f * 1.005, 25, 1.2), OH) * 0.3
+    breath = bandpass(noise(d), 300, 1800) * 0.08
+    sig = (tone + breath) * envelope(samples(d), 0.35, release=0.8)
+    buf = silence(d + 0.2)
+    place(buf, stereo(sig), 0.05)
+    return finish(buf, 2.6, 0.45, -21)
+
+
+def voice_growl():
+    """A beast's low throaty growl that swells and fades."""
+    d = 1.4
+    f = curve(d, [(0, 75), (0.4, 92), (1, 70)])
+    src = vocal(f, 60, 0.8) * rough(d, 32, 0.7)
+    tone = shape(src, [(400, 1.0, 120), (850, 0.7, 160), (2000, 0.2, 300)])
+    tone += lowpass(noise(d), 300) * rough(d, 30, 0.8) * 0.15
+    sig = tone * envelope(samples(d), 0.15, release=0.45) * np.interp(times(d), [0, 0.5, d], [0.7, 1, 0.8])
+    buf = silence(d + 0.1)
+    place(buf, stereo(sig), 0.05)
+    return finish(buf, 1.2, 0.2, -19)
+
+
+def voice_howl():
+    """A ghostly wolf howl, far off."""
+    buf = silence(2.8)
+    place(buf, stereo(howl(2.4, 430)), 0.05)
+    place(buf, stereo(howl(2.0, 437) * 0.25), 0.2)  # a thin double, like an echo across a valley
+    return finish(buf, 2.4, 0.45, -21)
+
+
+def voice_bark():
+    """Two hollow ghost-dog barks: 'rowf, rowf'."""
+    buf = silence(1.2)
+
+    def rowf(i):
+        d = 0.2
+        f = curve(d, [(0, 330), (0.25, 420), (1, 230)])
+        tone = shape(vocal(f, 40, 0.9) * rough(d, 40, 0.3), [(600, 1.0, 150), (1100, 0.6, 200), (2400, 0.2, 300)])
+        burst = bandpass(noise(d), 500, 2500) * np.exp(-times(d) * 25) * 0.4
+        return (tone + burst) * envelope(samples(d), 0.004, release=0.08)
+
+    syllables(buf, 2, 0.05, 0.32, rowf)
+    return finish(buf, 1.3, 0.3, -19)
+
+
+def voice_caw():
+    """A crow (or gull) cawing twice: 'kraa, kraa', raspy and nasal."""
+    buf = silence(1.3)
+
+    def kraa(i):
+        d = 0.32 - i * 0.06
+        f = curve(d, [(0, 560), (0.2, 640), (1, 470)])
+        src = vocal(f, 30, 0.7) * rough(d, 80, 0.8)
+        tone = shape(src, [(1200, 1.0, 200), (2100, 0.8, 250), (3300, 0.4, 350)])
+        return tone * envelope(samples(d), 0.01, release=0.08)
+
+    syllables(buf, 2, 0.05, 0.45, kraa)
+    return finish(buf, 1.4, 0.3, -20)
+
+
+def voice_croak():
+    """A big bog frog: two slow 'rrribbit' croaks, a rattle of wet pulses."""
+    buf = silence(1.3)
+
+    def ribbit(i):
+        d = 0.38
+        rate = 22 if i == 0 else 26
+        out = np.zeros(samples(d))
+        at = 0.0
+        while at < d - 0.03:
+            p = 0.025
+            f = 320 * (1 + 0.15 * at / d)
+            pulse = np.sin(2 * np.pi * f * times(p)) + 0.5 * np.sin(2 * np.pi * 2.6 * f * times(p))
+            out[samples(at) : samples(at) + samples(p)] += pulse * np.exp(-times(p) * 120)
+            at += 1 / rate
+        return lowpass(out, 2500) * np.interp(times(d), [0, 0.05, d], [0.4, 1, 0.5]) * 0.8
+
+    syllables(buf, 2, 0.05, 0.55, ribbit)
+    return finish(buf, 1.0, 0.2, -20)
+
+
+def voice_rattle():
+    """Old bones rattling: a dry clatter of little wooden knocks, shaken twice."""
+    buf = silence(1.4)
+
+    def knock():
+        d = 0.03
+        f = rng.uniform(1400, 3200)
+        tone = np.sin(2 * np.pi * f * times(d)) + 0.6 * np.sin(2 * np.pi * f * 1.7 * times(d))
+        return (tone * 0.6 + bandpass(noise(d), 1500, 5000)) * np.exp(-times(d) * rng.uniform(120, 220))
+
+    for shake, start in enumerate((0.05, 0.6)):
+        at = start
+        for _ in range(16 - shake * 4):
+            place(buf, stereo(knock() * rng.uniform(0.3, 1.0)), at)
+            at += rng.uniform(0.012, 0.035)
+    return finish(buf, 1.0, 0.25, -21)
+
+
+def voice_hiss():
+    """A serpent's hiss with a flick of the tongue."""
+    d = 1.3
+    t = times(d)
+    hiss = bandpass(noise(d), 3500, 9500) * envelope(samples(d), 0.12, release=0.5)
+    hiss *= 1 + 0.25 * np.sin(2 * np.pi * 9 * t) * (t > 0.6)
+    buf = silence(d + 0.4)
+    place(buf, stereo(hiss), 0.05)
+    for i in range(3):  # the tongue flicking: three tiny ticks
+        tick = highpass(noise(0.01), 4000) * np.exp(-times(0.01) * 500)
+        place(buf, stereo(tick * 0.6), d + 0.05 + i * 0.07)
+    return finish(buf, 1.0, 0.25, -21)
+
+
+def voice_whinny():
+    """A ghost horse whinnying: a high shaking cry that falls, then a snort."""
+    d = 1.3
+    t = times(d)
+    f = curve(d, [(0, 700), (0.15, 1050), (0.6, 800), (1, 450)])
+    f = f * (1 + 0.06 * np.sin(2 * np.pi * 13 * t) * np.clip(t / 0.2, 0, 1))
+    tone = shape(vocal(f, 25, 1.0), [(900, 1.0, 200), (1600, 0.7, 250), (2900, 0.3, 350)])
+    sig = tone * envelope(samples(d), 0.04, release=0.4)
+    buf = silence(d + 0.7)
+    place(buf, stereo(sig), 0.05)
+    snort = bandpass(noise(0.25), 300, 2000) * envelope(samples(0.25), 0.01, release=0.15) * 0.6
+    place(buf, stereo(snort), d + 0.15)
+    return finish(buf, 2.0, 0.4, -21)
+
+
+def voice_chime():
+    """Something precious calling: three soft glassy notes falling, with a shimmer."""
+    buf = silence(3.0)
+    for i, n in enumerate(["E6", "B5", "G#5"]):
+        place(buf, stereo(bell(note(n), 2.2, 0.6) * 0.5), 0.05 + i * 0.28)
+    shimmer = sum(clink(rng.uniform(4000, 6500), 0.6) for _ in range(4)) * 0.15
+    place(buf, stereo(shimmer), 0.1)
+    return finish(buf, 2.5, 0.45, -22)
+
+
+def voice_squeak():
+    """A bat squeaking: a few tiny high chirps."""
+    buf = silence(1.0)
+
+    def chirp(i):
+        d = 0.045
+        f = curve(d, [(0, 4200 - i * 200), (1, 2600 - i * 150)])
+        return np.sin(2 * np.pi * np.cumsum(f) / RATE) * envelope(samples(d), 0.003, release=0.02)
+
+    syllables(buf, 4, 0.05, 0.11, chirp)
+    place(buf, stereo(whoosh(0.4, 600, 3000) * 0.3), 0.45)  # a flap of leathery wings
+    return finish(buf, 0.9, 0.25, -21)
+
+
+def voice_creak():
+    """A mimic: a lid creaking open... and snapping shut."""
+    buf = silence(2.0)
+    place(buf, stereo(creak(1.0) * 1.2), 0.05)
+    d = 0.3
+    chomp = lowpass(noise(d), 400) * np.exp(-times(d) * 25) * 1.5
+    chomp += np.sin(2 * np.pi * 90 * times(d)) * np.exp(-times(d) * 18)
+    chomp[: samples(0.006)] += highpass(noise(0.006), 1500) * 1.2
+    place(buf, stereo(chomp), 1.15)
+    return finish(buf, 1.2, 0.25, -19)
+
+
+def voice_whisper():
+    """The Watcher's children: two overlapping whispers over a deep hum."""
+    buf = silence(2.4)
+    place(buf, stereo(whisper(1.1)), 0.05)
+    place(buf, stereo(whisper(0.9) * 0.8), 0.8)
+    d = 2.2
+    f = curve(d, [(0, 82), (1, 74)])
+    hm = shape(vocal(f, 30, 1.2), OO) * envelope(samples(d), 0.6, release=0.8) * 0.5
+    place(buf, stereo(hm), 0.05)
+    return finish(buf, 2.8, 0.5, -21)
+
+
+def voice_gurgle():
+    """Something under the water: a burble of rising bubbles."""
+    buf = silence(1.5)
+    at = 0.05
+    for i in range(14):
+        start = rng.uniform(150, 350)
+        place(buf, stereo(pop(start, start * rng.uniform(2.5, 4), rng.uniform(0.05, 0.1)) * rng.uniform(0.4, 1)), at)
+        at += rng.uniform(0.04, 0.11)
+    place(buf, stereo(lowpass(noise(1.2), 250) * envelope(samples(1.2), 0.2, release=0.5) * 0.2), 0.05)
+    return finish(buf, 1.0, 0.25, -21)
+
+
+VOICES = [
+    ("Giggle", voice_giggle),
+    ("Cackle", voice_cackle),
+    ("Moan", voice_moan),
+    ("Growl", voice_growl),
+    ("Howl", voice_howl),
+    ("Bark", voice_bark),
+    ("Caw", voice_caw),
+    ("Croak", voice_croak),
+    ("Rattle", voice_rattle),
+    ("Hiss", voice_hiss),
+    ("Whinny", voice_whinny),
+    ("Chime", voice_chime),
+    ("Squeak", voice_squeak),
+    ("Creak", voice_creak),
+    ("Whisper", voice_whisper),
+    ("Gurgle", voice_gurgle),
+]
+
+
 # ================================================================ sheets
 
 
@@ -846,6 +1136,8 @@ def main():
     ambience = build_sheet(AMBIENCE, "EventAmbience", out)
     print("world")
     world = build_sheet(WORLD, "WorldAmbience", out)
+    print("monsters")
+    voices = build_sheet(VOICES, "MonsterVoices", out)
     print("music")
     music = {}
     for key, make in MUSIC:
@@ -856,17 +1148,17 @@ def main():
         encode(sig, os.path.join(out, "preview", key), ogg=False)
         music[key] = round(len(sig) / RATE, 3)
     with open(os.path.join(out, "regions.json"), "w") as f:
-        json.dump({"stingers": stingers, "ambience": ambience, "world": world, "music": music}, f, indent=2)
-    write_luau(stingers, ambience, world, music)
+        json.dump({"stingers": stingers, "ambience": ambience, "world": world, "voices": voices, "music": music}, f, indent=2)
+    write_luau(stingers, ambience, world, voices, music)
     print("done:", out)
 
 
-def write_luau(stingers, ambience, world, music):
+def write_luau(stingers, ambience, world, voices, music):
     path = os.path.join(os.path.dirname(__file__), "..", "..", "src", "shared", "Config", "SoundSheets.luau")
     lines = [
         "--!strict",
         "-- GENERATED by tools/sound/make_sounds.py: don't edit by hand, re-run the script.",
-        "-- Where each sound sits inside the two event sound sheets (seconds from the start of the",
+        "-- Where each sound sits inside the sound sheets (seconds from the start of the",
         "-- file). Config/Sounds says which uploaded file is which.",
         "",
         "export type Region = { start: number, length: number }",
@@ -874,7 +1166,7 @@ def write_luau(stingers, ambience, world, music):
         "local SoundSheets = {}",
         "",
     ]
-    for name, regions in [("EventStingers", stingers), ("EventAmbience", ambience), ("WorldAmbience", world)]:
+    for name, regions in [("EventStingers", stingers), ("EventAmbience", ambience), ("WorldAmbience", world), ("MonsterVoices", voices)]:
         lines.append(f"SoundSheets.{name} = {{")
         for key, r in regions.items():
             lines.append(f"\t{key} = {{ start = {r['start']}, length = {r['length']} }},")

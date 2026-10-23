@@ -232,6 +232,7 @@ local function applySettings()
 	groups.Events.Volume = Sounds.StingerVolume * Settings.volume("sounds")
 	groups.Ambience.Volume = Sounds.AmbienceVolume * Settings.volume("sounds")
 	groups.World.Volume = Sounds.WorldVolume * worldDuck * Settings.volume("music") -- part of the music
+	groups.Monsters.Volume = Sounds.MonsterVolume * Settings.volume("sounds")
 end
 
 -- ------------------------------------------------------------------ events
@@ -355,6 +356,7 @@ function SoundController.start()
 	group("Events", Sounds.StingerVolume)
 	group("Ambience", Sounds.AmbienceVolume)
 	group("World", Sounds.WorldVolume)
+	group("Monsters", Sounds.MonsterVolume) -- MonsterVoiceController plays into it
 	applySettings()
 	Settings.changed(function(key)
 		if key == "music" or key == "sounds" then

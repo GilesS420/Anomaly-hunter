@@ -2482,6 +2482,24 @@ do
 		ok = ok and (Sounds.Files :: any)[song.file] ~= nil and song.length > 0
 	end
 	check("every launch event has sounds that exist on the sound sheets", ok)
+	local calls = true
+	for id, m in Monsters :: { [string]: any } do
+		local call = Sounds.MonsterVoices[id]
+		if not call or not Sounds.Sheets.MonsterVoices[call] then
+			calls = false
+			print(`  {id} has no call on the MonsterVoices sheet`)
+		end
+	end
+	for monsterId in Sounds.MonsterVoices do
+		if not (Monsters :: any)[monsterId] then
+			calls = false
+			print(`  Sounds.MonsterVoices names an unknown monster {monsterId}`)
+		end
+	end
+	for _, call in Sounds.DefaultCall do
+		calls = calls and Sounds.Sheets.MonsterVoices[call] ~= nil
+	end
+	check("every monster has a call on the MonsterVoices sheet", calls)
 	check(
 		"asset ids get their prefix",
 		Sounds.assetId("123") == "rbxassetid://123" and Sounds.assetId("") == ""

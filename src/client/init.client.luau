@@ -24,6 +24,7 @@ local EventIconController = require(script.Controllers.EventIconController)
 local GoldenGhostController = require(script.Controllers.GoldenGhostController)
 local AdminController = require(script.Controllers.AdminController)
 local SoundController = require(script.Controllers.SoundController)
+local MonsterVoiceController = require(script.Controllers.MonsterVoiceController)
 local TutorialController = require(script.Controllers.TutorialController)
 local CodexController = require(script.Controllers.CodexController)
 local SettingsController = require(script.Controllers.SettingsController)
@@ -54,6 +55,7 @@ local controllers: { { start: () -> () } } = {
 	GoldenGhostController,
 	AdminController,
 	SoundController,
+	MonsterVoiceController,
 	TutorialController,
 	CodexController,
 	SettingsController,
