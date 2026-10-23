@@ -45,10 +45,20 @@ local HuntService = {}
 
 local PortalCooldown = 1 -- seconds between two trips through a gate or exit
 local LockedCooldown = 4 -- seconds between two "this zone is locked" messages
+-- Touched alone sometimes misses a hunter walking through a gate (the server can drop a touch
+-- the player's computer reported), so a check also looks where each hunter walked since the last one.
+local WalkCheckSeconds = 0.1
+local WalkPadding = 1.5 -- studs added round a portal: the body is wider than the point we follow
+local MaxWalkStep = 20 -- studs; a bigger jump between two checks is a teleport, not a walk
 
 local carrying: { [Player]: { Value.CaughtMonster } } = {} -- the bag, oldest catch first
 local lastPortal: { [Player]: number } = {}
 local lastLocked: { [Player]: number } = {}
+local lastSpot: { [Player]: Vector3 } = {} -- where each hunter stood at the last walk check
+
+-- Every gate and exit part, with what walking through it does.
+type Portal = { part: BasePart, use: (Player) -> () }
+local portals: { Portal } = {}
 
 local remotes = Instance.new("Folder")
 remotes.Name = "HuntRemotes"
@@ -61,17 +71,13 @@ UseBaitBell.Parent = remotes
 
 local function playerFromHit(hit: BasePart): Player?
 	local character = hit:FindFirstAncestorOfClass("Model")
-	local player = character and Players:GetPlayerFromCharacter(character)
-	if not player then
-		return nil
-	end
-	-- Touched fires many times while standing on a portal; one trip per second is plenty.
-	local now = os.clock()
-	if now - (lastPortal[player] or 0) < PortalCooldown then
-		return nil
-	end
-	lastPortal[player] = now
-	return player
+	return character and Players:GetPlayerFromCharacter(character)
+end
+
+-- Touched fires many times while standing on a portal; one trip per second is plenty. Only a
+-- trip that really happens starts the wait, so a touch that did nothing never blocks the next.
+local function portalReady(player: Player): boolean
+	return os.clock() - (lastPortal[player] or -math.huge) >= PortalCooldown
 end
 
 -- Standing spot just above a part, looking toward `lookAt` (kept level).
@@ -174,6 +180,8 @@ local function goHome(player: Player, deliver: boolean)
 	setCarrying(player, nil)
 	player:SetAttribute("Zone", nil)
 	player:SetAttribute("Hearts", Zones.MaxHearts)
+	lastPortal[player] = os.clock()
+	lastSpot[player] = nil
 
 	-- Home is the player's own plot; the hub's ReturnPoint if they have none.
 	local home = PlotService.spawnCFrame(player)
@@ -400,28 +408,35 @@ end
 
 local function enterZone(player: Player, zone: Zones.Zone, arrival: BasePart, facing: Vector3?)
 	local data = DataService.get(player)
-	if not data then
-		Notify.toast(player, "Your save is still loading. Try again in a moment!")
-		return
-	end
-	local reason = Hunt.lockedReason(zone.index, data.wingsOwned)
-	if reason then
+	local reason = if data
+		then Hunt.lockedReason(zone.index, data.wingsOwned)
+		else "Your save is still loading. Try again in a moment!"
+	if reason or not data then
 		-- Standing in a gate touches it over and over; don't repeat the message every second.
 		local now = os.clock()
-		if now - (lastLocked[player] or 0) >= LockedCooldown then
+		if now - (lastLocked[player] or -math.huge) >= LockedCooldown then
 			lastLocked[player] = now
-			Notify.toast(player, reason)
+			Notify.toast(player, reason :: string)
 		end
 		return
 	end
 	player:SetAttribute("Zone", zone.id)
 	player:SetAttribute("Hearts", Zones.MaxHearts)
+	lastPortal[player] = os.clock()
+	lastSpot[player] = nil
 	Notify.toast(player, `Entering {zone.name}`)
 	Notify.toast(player, "Hold your vacuum (hotbar), then click or tap a monster to catch it!")
 	PlotService.teleport(player, standAbove(arrival, facing))
 end
 
 local function onCharacter(player: Player, character: Model)
+	-- A new body always starts at home. If the old one went without dying (so Died never
+	-- fired), the player would still count as in a zone and every gate would ignore them.
+	if player:GetAttribute("Zone") ~= nil then
+		drop(player)
+		player:SetAttribute("Zone", nil)
+	end
+	lastSpot[player] = nil
 	player:SetAttribute("Hearts", Zones.MaxHearts)
 	local humanoid = character:WaitForChild("Humanoid", 10)
 	if not humanoid or not humanoid:IsA("Humanoid") then
@@ -524,26 +539,68 @@ local function wireZone(zone: Zones.Zone)
 	end
 
 	-- A gate or exit built as a Model or Folder works when any part of it is touched.
-	if gate and arrival then
-		local facing = zoneMiddle(zone, zoneFolder)
-		for _, part in World.parts(gateInstance) do
+	local function wire(instance: Instance?, use: (Player) -> ())
+		for _, part in World.parts(instance) do
+			table.insert(portals, { part = part, use = use })
 			part.Touched:Connect(function(hit)
 				local player = playerFromHit(hit)
-				if player and player:GetAttribute("Zone") == nil then
-					enterZone(player, zone, arrival, facing)
+				if player then
+					use(player)
 				end
 			end)
 		end
 	end
+	if gate and arrival then
+		local facing = zoneMiddle(zone, zoneFolder)
+		wire(gateInstance, function(player)
+			if player:GetAttribute("Zone") == nil and portalReady(player) then
+				enterZone(player, zone, arrival, facing)
+			end
+		end)
+	end
 	if exit then
-		for _, part in World.parts(exitInstance) do
-			part.Touched:Connect(function(hit)
-				local player = playerFromHit(hit)
-				-- Only hunters who came in through this zone's gate can leave (and deliver) here.
-				if player and player:GetAttribute("Zone") == zone.id then
-					goHome(player, true)
+		wire(exitInstance, function(player)
+			-- Only hunters who came in through this zone's gate can leave (and deliver) here.
+			if player:GetAttribute("Zone") == zone.id and portalReady(player) then
+				goHome(player, true)
+			end
+		end)
+	end
+end
+
+-- The backup for Touched: did anyone walk through a gate or exit since the last check?
+local function checkWalks()
+	for _, player in Players:GetPlayers() do
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if not root or not root:IsA("BasePart") then
+			lastSpot[player] = nil
+			continue
+		end
+		local now = root.Position
+		local before = lastSpot[player]
+		lastSpot[player] = now
+		if before and (now - before).Magnitude <= MaxWalkStep then
+			for _, portal in portals do
+				local part = portal.part
+				if part.Parent then
+					local from = part.CFrame:PointToObjectSpace(before)
+					local to = part.CFrame:PointToObjectSpace(now)
+					local half = part.Size / 2 + Vector3.one * WalkPadding
+					if
+						Hunt.walkCrossesBox(
+							{ x = from.X, y = from.Y, z = from.Z },
+							{ x = to.X, y = to.Y, z = to.Z },
+							{ x = half.X, y = half.Y, z = half.Z }
+						)
+					then
+						task.spawn(portal.use, player) -- a teleport can wait for the zone to stream in
+						if lastSpot[player] == nil then
+							break -- that took them somewhere else
+						end
+					end
 				end
-			end)
+			end
 		end
 	end
 end
@@ -557,6 +614,12 @@ function HuntService.start()
 	if not returnPoint() then
 		warn("HuntService: no Workspace > Hub > ReturnPoint part (or SpawnLocation) to send hunters home to")
 	end
+	task.spawn(function()
+		while true do
+			task.wait(WalkCheckSeconds)
+			checkWalks()
+		end
+	end)
 
 	local function onPlayer(player: Player)
 		player.CharacterAdded:Connect(function(character)
@@ -597,6 +660,7 @@ function HuntService.start()
 		carrying[player] = nil
 		lastPortal[player] = nil
 		lastLocked[player] = nil
+		lastSpot[player] = nil
 	end)
 end
 

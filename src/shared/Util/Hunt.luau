@@ -68,6 +68,36 @@ function Hunt.lockedReason(zoneIndex: number, wingsOwned: number): string?
 	return nil
 end
 
+export type Point = { x: number, y: number, z: number }
+
+-- Did a walk from `from` to `to` pass through (or end in) a box centred on 0,0,0 with these
+-- half sizes? Both points are in the box's own space (part.CFrame:PointToObjectSpace). Used
+-- for portals: a hunter walking fast through a thin gate can be past it between two checks,
+-- so checking only where they stand now would miss them.
+function Hunt.walkCrossesBox(from: Point, to: Point, half: Point): boolean
+	local enter, leave = 0, 1
+	for _, axis in { "x", "y", "z" } do
+		local a: number, b: number, h: number = (from :: any)[axis], (to :: any)[axis], (half :: any)[axis]
+		local step = b - a
+		if math.abs(step) < 1e-9 then
+			if a < -h or a > h then
+				return false -- moving alongside the box, outside it
+			end
+		else
+			local t1, t2 = (-h - a) / step, (h - a) / step
+			if t1 > t2 then
+				t1, t2 = t2, t1
+			end
+			enter = math.max(enter, t1)
+			leave = math.min(leave, t2)
+			if enter > leave then
+				return false
+			end
+		end
+	end
+	return true
+end
+
 -- Hearts after taking damage; at 0 the carried monster is dropped.
 function Hunt.afterDamage(hearts: number, damage: number): number
 	return math.max(0, hearts - math.max(0, damage))

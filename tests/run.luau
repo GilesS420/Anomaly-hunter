@@ -300,6 +300,21 @@ check("Pumpkin Graveyard is open from the start", Hunt.isZoneUnlocked(1, 1))
 check("Murky Bayou needs the Library", not Hunt.isZoneUnlocked(2, 1) and Hunt.isZoneUnlocked(2, 2))
 check("Abandoned Carnival needs the Ballroom", not Hunt.isZoneUnlocked(3, 2) and Hunt.isZoneUnlocked(3, 3))
 check("zones 4 and 5 stay shut at launch", not Hunt.isZoneUnlocked(4, 6) and not Hunt.isZoneUnlocked(5, 6))
+do
+	-- Walking through a portal (Util/Hunt.walkCrossesBox): a 14 x 16 x 2 gate, in its own space.
+	local half = { x = 7, y = 8, z = 1 }
+	local function walk(a: { number }, b: { number }): boolean
+		return Hunt.walkCrossesBox({ x = a[1], y = a[2], z = a[3] }, { x = b[1], y = b[2], z = b[3] }, half)
+	end
+	check("portals: walking straight through a thin gate counts", walk({ 0, 0, -5 }, { 0, 0, 5 }))
+	check("portals: standing inside a gate counts", walk({ 1, 0, 0 }, { 1, 0, 0 }))
+	check("portals: ending inside a gate counts", walk({ 0, 0, -5 }, { 0, 0, 0.5 }))
+	check("portals: walking past beside a gate doesn't", not walk({ 9, 0, -5 }, { 9, 0, 5 }))
+	check("portals: stopping short of a gate doesn't", not walk({ 0, 0, -5 }, { 0, 0, -1.5 }))
+	check("portals: walking along in front of it doesn't", not walk({ -10, 0, -3 }, { 10, 0, -3 }))
+	check("portals: jumping over it doesn't", not walk({ 0, 10, -5 }, { 0, 10, 5 }))
+	check("portals: cutting a corner counts", walk({ 9, 0, -3 }, { 5, 0, 3 }))
+end
 check("hearts never go below 0", Hunt.afterDamage(1, 5) == 0 and Hunt.afterDamage(3, 1) == 2)
 check("open zones have no locked message", Hunt.lockedReason(1, 1) == nil)
 check("locked zones name the wing to buy", string.find(Hunt.lockedReason(2, 1) or "", "Library") ~= nil)
