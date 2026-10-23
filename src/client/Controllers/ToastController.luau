@@ -162,8 +162,18 @@ local function show(holder: Frame, text: string)
 	scheduleFade(toast)
 end
 
+local built: Frame? = nil
+
+-- A toast from the client itself (a hint that needs no server).
+function ToastController.show(text: string)
+	if built then
+		show(built, text)
+	end
+end
+
 function ToastController.start()
 	local holder = buildUi()
+	built = holder
 	Scale.changed:Connect(function()
 		place(holder)
 	end)
