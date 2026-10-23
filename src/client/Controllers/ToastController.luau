@@ -7,6 +7,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
+local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
+
 local ToastController = {}
 
 local player = Players.LocalPlayer
@@ -25,20 +27,21 @@ local order = 0 -- LayoutOrder for the next toast, so new ones go to the bottom
 
 local function buildUi(): Frame
 	local gui = Instance.new("ScreenGui")
+	local canvas = Scale.canvas(gui) -- shrinks everything to fit a phone (client/Scale)
 	gui.Name = "ToastUi"
 	gui.ResetOnSpawn = false
 	gui.DisplayOrder = 10 -- above the other HUD pieces
 	gui.IgnoreGuiInset = true -- measured from the very top, like the fast-travel buttons
 
-	-- Centred near the top, just below the fast-travel buttons (TravelController); 60% of the
-	-- screen wide but never narrower than 280 pixels.
+	-- Centred near the top, just below the fast-travel buttons (TravelController, see place);
+	-- 60% of the screen wide but never narrower than 280 pixels.
 	local holder = Instance.new("Frame")
 	holder.Name = "Toasts"
 	holder.AnchorPoint = Vector2.new(0.5, 0)
 	holder.Position = UDim2.new(0.5, 0, 0, 62)
 	holder.Size = UDim2.new(0.6, 0, 0, (ROW_HEIGHT + 6) * MAX_TOASTS)
 	holder.BackgroundTransparency = 1
-	holder.Parent = gui
+	holder.Parent = canvas
 
 	local limit = Instance.new("UISizeConstraint")
 	limit.MinSize = Vector2.new(280, 0)
@@ -53,6 +56,19 @@ local function buildUi(): Frame
 
 	gui.Parent = player:WaitForChild("PlayerGui")
 	return holder
+end
+
+-- Just under the fast-travel buttons, or under Roblox's top bar when they're hidden (in a zone).
+local function place(holder: Frame)
+	local top = Scale.topBar().Max.Y
+	local playerGui = player:FindFirstChildOfClass("PlayerGui")
+	local travel = playerGui and playerGui:FindFirstChild("TravelUi")
+	local bar = travel and travel:FindFirstChild("FastTravel", true)
+	if bar and bar:IsA("GuiObject") and bar.Visible then
+		top = math.max(top, bar.AbsolutePosition.Y + bar.AbsoluteSize.Y)
+	end
+	local canvas = holder.Parent :: GuiObject
+	holder.Position = UDim2.new(0.5, 0, 0, Scale.toCanvas(canvas, Vector2.new(0, top)).Y + 6)
 end
 
 local function remove(toast: Toast)
@@ -90,6 +106,7 @@ local function scheduleFade(toast: Toast)
 end
 
 local function show(holder: Frame, text: string)
+	place(holder)
 	-- The same message again (e.g. tapping a locked gate twice): keep the one on screen.
 	local newest = shown[#shown]
 	if newest and newest.text == text then
@@ -147,6 +164,10 @@ end
 
 function ToastController.start()
 	local holder = buildUi()
+	Scale.changed:Connect(function()
+		place(holder)
+	end)
+	place(holder)
 	local remotes = ReplicatedStorage:WaitForChild("Remotes")
 	local Toast = remotes:WaitForChild("Toast") :: RemoteEvent
 	Toast.OnClientEvent:Connect(function(text: unknown)

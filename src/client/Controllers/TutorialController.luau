@@ -14,6 +14,7 @@ local Tutorial =
 	require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"):WaitForChild("Tutorial"))
 local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
+local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 
 local TutorialController = {}
 
@@ -111,6 +112,7 @@ end
 
 local function buildCard(): (ScreenGui, TextLabel, TextLabel, TextLabel, TextButton)
 	local gui = Instance.new("ScreenGui")
+	local canvas = Scale.canvas(gui) -- shrinks everything to fit a phone (client/Scale)
 	gui.Name = "TutorialUi"
 	gui.ResetOnSpawn = false
 	gui.DisplayOrder = 8 -- over the HUD, under the toasts
@@ -126,7 +128,7 @@ local function buildCard(): (ScreenGui, TextLabel, TextLabel, TextLabel, TextBut
 	card.AutomaticSize = Enum.AutomaticSize.Y
 	card.BackgroundColor3 = Ui.Colors.panel
 	card.BackgroundTransparency = 0.08
-	card.Parent = gui
+	card.Parent = canvas
 	Ui.corner(card, 12)
 	Ui.rim(card, Ui.Colors.lamp, 2)
 	local limit = Instance.new("UISizeConstraint")

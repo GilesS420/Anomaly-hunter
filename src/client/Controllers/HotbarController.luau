@@ -17,6 +17,7 @@ local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
 local Drag = require(script.Parent.Parent:WaitForChild("Drag"))
 local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
+local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 
 local HotbarController = {}
 
@@ -166,14 +167,17 @@ function HotbarController.start()
 	local player = Players.LocalPlayer
 
 	local gui = Instance.new("ScreenGui")
+	local canvas = Scale.canvas(gui) -- shrinks everything to fit a phone (client/Scale)
 	gui.Name = "HotbarUi"
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = false
 	gui.DisplayOrder = 6 -- over the Backpack window, which it is the bottom row of
 	gui.Parent = player:WaitForChild("PlayerGui")
 
-	local small = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	local size = if small then 46 else 60
+	-- Sized for a computer screen; the Scale canvas shrinks it on a phone. The slot numbers
+	-- are the keys 1 to 9, so only show them with a keyboard.
+	local keys = UserInputService.KeyboardEnabled
+	local size = 60
 	local gap = 6
 	local bar = Instance.new("Frame")
 	bar.Name = "Bar"
@@ -181,7 +185,7 @@ function HotbarController.start()
 	bar.AnchorPoint = Vector2.new(0.5, 1)
 	bar.Position = UDim2.new(0.5, 0, 1, -8)
 	bar.Size = UDim2.fromOffset(Slots * size + (Slots - 1) * gap, size)
-	bar.Parent = gui
+	bar.Parent = canvas
 	-- A shop, the Collector or the Admin panel is open: the bar would cover its bottom
 	-- buttons, so it hides until that window closes. It stays with the Backpack window.
 	local function stepAside()
@@ -205,7 +209,7 @@ function HotbarController.start()
 		button.TextWrapped = true
 		local limit = button:FindFirstChildOfClass("UITextSizeConstraint") :: UITextSizeConstraint
 		limit.MaxTextSize = 13
-		if not small then
+		if keys then
 			local number = Ui.text(button, tostring(i), UDim2.fromOffset(14, 14), Ui.Colors.muted, true, 12)
 			number.Position = UDim2.fromOffset(-6, -5)
 		end

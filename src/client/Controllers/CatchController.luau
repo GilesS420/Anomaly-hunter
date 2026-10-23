@@ -27,6 +27,7 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Catching = require(Shared:WaitForChild("Util"):WaitForChild("Catching"))
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
+local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 
 local CatchController = {}
 
@@ -151,6 +152,7 @@ end
 
 local function buildUi(): Ui
 	local gui = Instance.new("ScreenGui")
+	local canvas = Scale.canvas(gui) -- shrinks everything to fit a phone (client/Scale)
 	gui.Name = "CatchUi"
 	gui.ResetOnSpawn = false
 
@@ -161,7 +163,7 @@ local function buildUi(): Ui
 	meter.Size = UDim2.new(0.5, 0, 0, 62)
 	meter.BackgroundTransparency = 1
 	meter.Visible = false
-	meter.Parent = gui
+	meter.Parent = canvas
 	local limit = Instance.new("UISizeConstraint")
 	limit.MaxSize = Vector2.new(BAR_MAX_WIDTH, math.huge)
 	limit.Parent = meter

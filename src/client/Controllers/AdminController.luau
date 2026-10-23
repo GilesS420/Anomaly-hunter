@@ -25,6 +25,7 @@ local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Sizes = require(ReplicatedStorage.Shared.Config.Sizes)
 local Wings = require(ReplicatedStorage.Shared.Config.Wings)
 local Zones = require(ReplicatedStorage.Shared.Config.Zones)
+local Scale = require(script.Parent.Parent.Scale)
 local Ui = require(script.Parent.Parent.Ui)
 
 local AdminController = {}
@@ -123,7 +124,7 @@ local function closePopup()
 	cover.Visible = false
 end
 
-local function buildPopup(gui: ScreenGui)
+local function buildPopup(gui: Frame)
 	cover = Instance.new("TextButton")
 	cover.Text = ""
 	cover.BackgroundTransparency = 1
@@ -215,10 +216,11 @@ local function dropdown(
 				pick(option.value)
 			end)
 		end
-		local at = made.AbsolutePosition
+		-- From screen pixels to offsets in the window's Scale canvas.
+		local at = Scale.toCanvas(popup.Parent :: GuiObject, made.AbsolutePosition)
 		local height = math.min(#list * 30 + 4, PopupMaxHeight)
 		popup.Size = UDim2.fromOffset(math.max(width, 180), height)
-		popup.Position = UDim2.fromOffset(at.X, at.Y + made.AbsoluteSize.Y + 2)
+		popup.Position = UDim2.fromOffset(at.X, at.Y + made.AbsoluteSize.Y / Scale.factor() + 2)
 		popup.CanvasPosition = Vector2.zero
 		cover.Visible = true
 		popup.Visible = true
@@ -295,12 +297,12 @@ end
 
 local function build()
 	window = Ui.window("AdminPanel", "Admin panel")
-	local panel = window.gui:FindFirstChild("Panel") :: Frame
+	local panel = window.panel
 	local limit = panel:FindFirstChildOfClass("UISizeConstraint")
 	if limit then
 		limit.MaxSize = Vector2.new(720, 520)
 	end
-	buildPopup(window.gui)
+	buildPopup(window.canvas)
 	window.onClose = closePopup
 
 	-- "Works on" across the top.

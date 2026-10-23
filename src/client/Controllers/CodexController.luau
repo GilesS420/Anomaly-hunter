@@ -20,6 +20,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Format = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"):WaitForChild("Format"))
 local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
+local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
 local CodexController = {}
@@ -82,17 +83,22 @@ function CodexController.start()
 	local GetView = remotes:WaitForChild("GetView") :: RemoteFunction
 
 	local window = Ui.window("CodexUi", "Codex")
-	local panel = window.gui:FindFirstChild("Panel") :: Frame
+	local panel = window.panel
 	local limit = panel:FindFirstChildOfClass("UISizeConstraint")
 	if limit then
 		limit.MaxSize = Vector2.new(780, 540)
 	end
 	-- A little lower and shorter than other windows, so the messages along the top of the
-	-- screen don't sit over the title.
-	panel.Position = UDim2.fromScale(0.5, 0.54)
-	panel.Size = UDim2.fromScale(0.92, 0.8)
-	local small = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	local sideWidth = if small then 110 else 140
+	-- screen don't sit over the title. A phone needs all the height it has for the cards.
+	local function fitPanel()
+		local small = Scale.isSmall()
+		panel.Position = UDim2.fromScale(0.5, if small then 0.5 else 0.54)
+		panel.Size = UDim2.fromScale(0.92, if small then 0.94 else 0.8)
+	end
+	Scale.changed:Connect(fitPanel)
+	fitPanel()
+	-- Pixel sizes for a computer screen; the window's Scale canvas shrinks them on a phone.
+	local sideWidth = 140
 	local stripHeight = 38 -- two lines per goal: the count, then its reward
 	local top = 68 -- under the title and the status line
 	local left = sideWidth + Gap * 2
@@ -158,7 +164,8 @@ function CodexController.start()
 
 	-- Square cards that fill the row exactly, however wide the window is.
 	local function fitCards()
-		local width = list.AbsoluteSize.X - list.ScrollBarThickness - 2
+		-- AbsoluteSize is in screen pixels; the cards are sized inside the Scale canvas.
+		local width = list.AbsoluteSize.X / Scale.factor() - list.ScrollBarThickness - 2
 		if width <= 0 then
 			return
 		end
@@ -218,8 +225,7 @@ function CodexController.start()
 		if isRainbow then
 			rainbow(swatch)
 		end
-		local count =
-			Ui.text(frame, text, UDim2.new(1, -22, 0, 16), Ui.Colors.text, false, if small then 12 else 14)
+		local count = Ui.text(frame, text, UDim2.new(1, -22, 0, 16), Ui.Colors.text, false, 14)
 		count.Position = UDim2.fromOffset(18, 2)
 		local paid = string.sub(reward, 1, 1) == "✓"
 		local money = Ui.text(
@@ -228,7 +234,7 @@ function CodexController.start()
 			UDim2.new(1, -12, 0, 14),
 			if paid then Ui.Colors.muted else Ui.Colors.money,
 			false,
-			if small then 11 else 13
+			13
 		)
 		money.Position = UDim2.fromOffset(6, 20)
 	end
@@ -456,7 +462,7 @@ function CodexController.start()
 			for i, entry in names do
 				local button = Instance.new("TextButton")
 				button.LayoutOrder = i
-				button.Size = UDim2.new(1, 0, 0, if small then 34 else 38)
+				button.Size = UDim2.new(1, 0, 0, 38)
 				button.BackgroundColor3 = Color3.fromRGB(40, 32, 54)
 				button.BorderSizePixel = 0
 				button.AutoButtonColor = true
@@ -464,7 +470,7 @@ function CodexController.start()
 				button.TextScaled = true -- long zone names shrink instead of spilling out
 				button.TextWrapped = true
 				local fit = Instance.new("UITextSizeConstraint")
-				fit.MaxTextSize = if small then 13 else 15
+				fit.MaxTextSize = 15
 				fit.Parent = button
 				button.TextXAlignment = Enum.TextXAlignment.Left
 				button.Text = entry.title

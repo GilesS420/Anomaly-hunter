@@ -6,6 +6,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Scale = require(script.Parent:WaitForChild("Scale"))
 local Ui = require(script.Parent:WaitForChild("Ui"))
 
 local NamePrompt = {}
@@ -31,13 +32,14 @@ function NamePrompt.open(uid: string, species: string, current: string?, tags: n
 	screen.ResetOnSpawn = false
 	screen.DisplayOrder = 8 -- over the Backpack and the mansion list
 	gui = screen
+	local canvas = Scale.canvas(screen) -- shrinks the box to fit a phone
 
 	local box = Instance.new("Frame")
 	box.AnchorPoint = Vector2.new(0.5, 0.5)
 	box.Position = UDim2.fromScale(0.5, 0.45)
 	box.Size = UDim2.fromOffset(320, if current then 196 else 156)
 	box.BackgroundColor3 = Ui.Colors.panel
-	box.Parent = screen
+	box.Parent = canvas
 	Ui.corner(box, 12)
 	Ui.rim(box, Ui.Colors.lamp, 2)
 	local padding = Instance.new("UIPadding")

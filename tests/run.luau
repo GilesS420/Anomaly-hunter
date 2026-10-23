@@ -2709,6 +2709,26 @@ do
 			and Settings.weatherScale("Full") == 1
 	)
 	check("settings work during the tutorial", TutorialUtil.isUnlocked("Gate", "Settings"))
+	check("settings ui size is normal by default", Settings.value("uiSize", nil) == "Normal")
+end
+
+-- How big the HUD is drawn (Util/UiScale, client/Scale).
+do
+	local UiScale = require("../src/shared/Util/UiScale")
+	check("a computer screen draws at full size", UiScale.fit(1920, 1080) == 1)
+	check("a tablet sideways draws at full size", UiScale.fit(1133, 744) == 1)
+	local phone = UiScale.fit(844, 390)
+	check(`a phone sideways draws smaller (got {phone})`, phone > 0.6 and phone < 0.7)
+	check("a tiny screen never goes under the smallest", UiScale.fit(400, 200) == UiScale.Smallest)
+	check("an unknown screen size draws at full size", UiScale.fit(0, 0) == 1)
+	check("a phone counts as small", UiScale.isSmall(844, 390) and not UiScale.isSmall(1920, 1080))
+	check(
+		"the ui size setting scales on top",
+		UiScale.factor(1920, 1080, "Small") < 1
+			and UiScale.factor(1920, 1080, "Large") > 1
+			and UiScale.factor(844, 390, "Normal") == phone
+			and UiScale.factor(844, 390, "Huge") == phone
+	)
 end
 
 -- The worth sign and trophy stand outside each mansion (Util/Mansion.worth).

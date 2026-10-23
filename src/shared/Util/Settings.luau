@@ -56,6 +56,14 @@ Settings.List = {
 		kind = "Toggle",
 		default = false,
 	},
+	{
+		key = "uiSize",
+		name = "UI size",
+		detail = "How big buttons and windows are. Phones already draw them smaller to fit.",
+		kind = "Choice",
+		options = { "Small", "Normal", "Large" },
+		default = "Normal",
+	},
 } :: { Setting }
 
 function Settings.find(key: string): Setting?
