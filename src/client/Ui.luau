@@ -2,11 +2,13 @@
 -- Building blocks for the shop windows (Workshop, Bakery, Collector) and the other buttons:
 -- a window in the middle of the screen with a title, a status line, a scrolling list, a
 -- footer and a close button. The look matches the haunted hub: near-black purple panels,
--- lantern-orange spooky titles and dark buttons rimmed in their colour. Sizes scale down on
--- phones; every button works with a mouse click or a tap.
+-- lantern-orange spooky titles and dark buttons rimmed in their colour. Each window is drawn
+-- in a Scale canvas, so it shrinks to fit a phone; every button works with a click or a tap.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+
+local Scale = require(script.Parent:WaitForChild("Scale"))
 
 local Ui = {}
 
@@ -30,6 +32,8 @@ Ui.Icons = { Vacuum = "🌀", Lure = "🔔", Charm = "🧿", Tag = "🏷️" } :
 
 export type Window = {
 	gui: ScreenGui,
+	canvas: Frame, -- the gui's Scale canvas, which holds the panel
+	panel: Frame,
 	title: TextLabel,
 	status: TextLabel,
 	list: ScrollingFrame,
@@ -238,6 +242,7 @@ function Ui.window(name: string, titleText: string): Window
 	gui.ResetOnSpawn = false
 	gui.Enabled = false
 	gui.DisplayOrder = 5
+	local canvas = Scale.canvas(gui)
 
 	local panel = Instance.new("Frame")
 	panel.Name = "Panel"
@@ -246,7 +251,7 @@ function Ui.window(name: string, titleText: string): Window
 	panel.Size = UDim2.fromScale(0.92, 0.9) -- tall, so a landscape phone still shows a few rows
 	panel.BackgroundColor3 = Ui.Colors.panel
 	panel.BackgroundTransparency = 0.04
-	panel.Parent = gui
+	panel.Parent = canvas
 	Ui.corner(panel, 14)
 	Ui.rim(panel, Ui.Colors.rim, 2)
 	-- A faint purple mist rising from the bottom, like the hub at night.
@@ -352,6 +357,8 @@ function Ui.window(name: string, titleText: string): Window
 
 	window = {
 		gui = gui,
+		canvas = canvas,
+		panel = panel,
 		title = title,
 		status = status,
 		list = list,

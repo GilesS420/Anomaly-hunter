@@ -15,6 +15,7 @@ local UserInputService = game:GetService("UserInputService")
 local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Watcher = require(ReplicatedStorage.Shared.Util.Watcher)
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
+local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 
 local EventIconController = {}
 
@@ -27,16 +28,18 @@ end
 
 function EventIconController.start()
 	local gui = Instance.new("ScreenGui")
+	local canvas = Scale.canvas(gui) -- shrinks everything to fit a phone (client/Scale)
 	gui.Name = "EventIconUi"
 	gui.ResetOnSpawn = false
 	gui.DisplayOrder = 6
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-	local small = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	local size = if small then 44 else 54
-	local lift = if small then 150 else 16 -- phones keep the jump button in that corner
+	-- Sized for a computer screen; the Scale canvas shrinks it on a phone.
+	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	local size = 54
+	local lift = if touch then 170 else 16 -- phones keep the jump button in that corner
 
-	local icon = Ui.button(gui, "", Ui.Colors.equip, UDim2.fromOffset(size, size))
+	local icon = Ui.button(canvas, "", Ui.Colors.equip, UDim2.fromOffset(size, size))
 	icon.Name = "EventIcon"
 	icon.AnchorPoint = Vector2.new(1, 1)
 	icon.Position = UDim2.new(1, -16, 1, -lift)

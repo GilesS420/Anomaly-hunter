@@ -18,6 +18,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
+local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 
 local HuntController = {}
 
@@ -55,6 +56,7 @@ local Bells = {
 
 local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextButton })
 	local gui = Instance.new("ScreenGui")
+	local canvas = Scale.canvas(gui) -- shrinks everything to fit a phone (client/Scale)
 	gui.Name = "HuntUi"
 	gui.ResetOnSpawn = false
 
@@ -66,7 +68,7 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 	column.Size = UDim2.fromOffset(HUD_WIDTH, 0)
 	column.AutomaticSize = Enum.AutomaticSize.Y
 	column.BackgroundTransparency = 1
-	column.Parent = gui
+	column.Parent = canvas
 	local list = Instance.new("UIListLayout")
 	list.SortOrder = Enum.SortOrder.LayoutOrder
 	list.Padding = UDim.new(0, 4)
