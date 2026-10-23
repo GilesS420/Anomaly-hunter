@@ -29,6 +29,7 @@ local TutorialService = require(script.Services.TutorialService)
 local CodexService = require(script.Services.CodexService)
 local SettingsService = require(script.Services.SettingsService)
 local DevService = require(script.Services.DevService)
+local FallService = require(script.Services.FallService)
 
 local services: { { name: string, start: () -> ...any } } = {
 	{ name = "DataService", start = DataService.start },
@@ -54,6 +55,7 @@ local services: { { name: string, start: () -> ...any } } = {
 	{ name = "CodexService", start = CodexService.start },
 	{ name = "SettingsService", start = SettingsService.start },
 	{ name = "DevService", start = DevService.start },
+	{ name = "FallService", start = FallService.start },
 }
 
 -- One service failing to start shows its error in Output but doesn't stop the others.
