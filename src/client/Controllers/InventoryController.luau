@@ -328,7 +328,7 @@ function InventoryController.start()
 					onAction = function()
 						hold("CakeId", id)
 					end
-				elseif item.kind == "Tag" then
+				elseif item.kind == "Tag" or item.kind == "Potion" then
 					action.Visible = true
 					action.Text = "Hold"
 					Ui.paint(action, Ui.Colors.equip)

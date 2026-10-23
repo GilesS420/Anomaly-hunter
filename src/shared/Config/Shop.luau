@@ -9,7 +9,7 @@
 export type Item = {
 	id: string,
 	name: string,
-	kind: "Food" | "Vacuum" | "Lure" | "Charm" | "Tag",
+	kind: "Food" | "Vacuum" | "Lure" | "Charm" | "Tag" | "Potion",
 	price: number,
 	restockChance: number,
 	rarity: string, -- the tag in the shop window: a Config/Rarities id, or "Event" for event treats
@@ -24,6 +24,8 @@ export type Item = {
 	event: string?, -- Bakery event treat: only sold while this Watcher event is live
 	stockMin: number?, -- how many a player can buy per restock, instead of StockMin..StockMax
 	stockMax: number?,
+	potionBoost: number?, -- luck potion: multiplies the vacuum's variant chances
+	potionSeconds: number?, -- luck potion: how long it lasts (only counts down while online)
 }
 export type EffectChance = { effect: string, chance: number } -- chance in percent
 
@@ -377,6 +379,48 @@ Shop.Workshop = {
 		singleUse = true,
 		stockMin = 2,
 		stockMax = 5,
+	},
+	-- Luck potions (Giles 2026-10-23): drink one from the hotbar and your vacuum's chances of
+	-- Silver, Gold, Shiny and Rainbow are multiplied while it lasts (Util/Potions). Super rare
+	-- in the restock, one at a time. They don't stack: a stronger one replaces a weaker one.
+	{
+		id = "LuckyTonic",
+		name = "Lucky Tonic",
+		kind = "Potion",
+		price = 2_000_000,
+		restockChance = 15,
+		rarity = "Epic",
+		singleUse = true,
+		stockMin = 1,
+		stockMax = 1,
+		potionBoost = 2,
+		potionSeconds = 10 * 60,
+	},
+	{
+		id = "GildedElixir",
+		name = "Gilded Elixir",
+		kind = "Potion",
+		price = 50_000_000,
+		restockChance = 5,
+		rarity = "Legendary",
+		singleUse = true,
+		stockMin = 1,
+		stockMax = 1,
+		potionBoost = 3,
+		potionSeconds = 10 * 60,
+	},
+	{
+		id = "PrismDraught",
+		name = "Prism Draught",
+		kind = "Potion",
+		price = 1_000_000_000,
+		restockChance = 1.5,
+		rarity = "Mythic",
+		singleUse = true,
+		stockMin = 1,
+		stockMax = 1,
+		potionBoost = 5,
+		potionSeconds = 15 * 60,
 	},
 } :: { Item }
 
