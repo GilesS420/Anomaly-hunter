@@ -63,6 +63,10 @@ Tools.Vacuums = {
 	},
 } :: { [string]: Vacuum }
 
+-- With a luck potion going, a vacuum without a Rainbow chance of its own gets this one
+-- (percent, before the potion's boost): the Void Vac's base chance.
+Tools.PotionRainbowChance = 0.3
+
 -- Each rarity step above Common makes catching take this much longer (0.15 = +15%).
 Tools.ResistPerRarity = 0.15
 

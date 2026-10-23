@@ -30,43 +30,62 @@ Tutorial.Unlocks = {
 	Portals = "Gate",
 	Hotbar = "Catch",
 	Backpack = "Pickup",
+	MansionList = "Pickup", -- the arrow tab on the right edge, with a Pick up button per monster
 	Sell = "Sell",
 	Shops = "Buy",
 	Codex = "Tour",
 	Settings = "Gate", -- sound and weather settings always work
 } :: { [string]: Step }
 
--- What the guide card says for each step.
+-- What the guide card says for each step, with a keyboard (Text) or on a phone or tablet
+-- without one (TouchText, where it differs).
 Tutorial.Text = {
-	Gate = "Follow the glowing trail to the Pumpkin Graveyard gate, or tap Portals at the top.",
-	Catch = "Press 1 to hold your vacuum, then click the Gloomlet to catch it.",
-	Home = "Got it! Follow the trail to the exit, or use your free Return Charm (R).",
-	Pickup = "Your Gloomlet turned Cobwebbed: effects make monsters worth more! Press E next to it to put it in your Backpack.",
-	Sell = "The Collector buys monsters from your Backpack. Tap Sell at the top and sell your Gloomlet.",
-	Buy = "The Collector gave you a welcome gift! Tap Shops and buy the Phantom Vac at the Vacuum Vault.",
+	Gate = "Follow the glowing trail to the Pumpkin Graveyard gate, or press Portals at the top.",
+	Catch = "Press 1 to hold your vacuum, then click the Gloomlet. When it struggles, click or press F while the needle is in the green.",
+	Home = "Got it! Follow the trail back to the exit, or press R to use your free Return Charm.",
+	Pickup = "Your Gloomlet is home and turned Cobwebbed: effects make monsters worth more! Press E next to it, or open the mansion list (the arrow on the right edge) and press Pick up.",
+	Sell = "The Collector only buys monsters from your Backpack. Press Sell at the top, then press E at the Collector, pick \"I want to sell my monsters.\" and sell your Gloomlet.",
+	Buy = "The Collector gave you a welcome gift! Press Shops and buy the Phantom Vac at the Vacuum Vault, the middle shop.",
 	Tour = "You're ready! Here's what the buttons do.",
+} :: { [Step]: string }
+
+Tutorial.TouchText = {
+	Gate = "Follow the glowing trail to the Pumpkin Graveyard gate, or tap Portals at the top.",
+	Catch = "Tap the first hotbar slot to hold your vacuum, then tap the Gloomlet. When it struggles, tap while the needle is in the green.",
+	Home = "Got it! Follow the trail back to the exit, or tap Return Charm to jump home.",
+	Pickup = "Your Gloomlet is home and turned Cobwebbed: effects make monsters worth more! Tap the prompt next to it, or open the mansion list (the arrow on the right edge) and tap Pick up.",
+	Sell = "The Collector only buys monsters from your Backpack. Tap Sell at the top, then tap Talk at the Collector, pick \"I want to sell my monsters.\" and sell your Gloomlet.",
+	Buy = "The Collector gave you a welcome gift! Tap Shops and buy the Phantom Vac at the Vacuum Vault, the middle shop.",
 } :: { [Step]: string }
 
 -- Shown under the guide card after HintSeconds on one step.
 Tutorial.Hints = {
-	Gate = "The Zone Gates are at the far end of the hub. Tap Portals to jump there.",
-	Catch = "When it struggles, click or tap as the needle crosses the green zone. Stay close until the meter is full.",
+	Gate = "The Zone Gates are at the far end of the hub. Press Portals to jump there.",
+	Catch = "Hold your vacuum (the first hotbar slot) and stay close. Each struggle is one click, tap or F while the needle crosses the green zone; miss and it breaks free for a moment, so just try again.",
 	Home = "Walk back through the exit arch you came in by.",
-	Pickup = "Go into your mansion and stand right next to the Gloomlet, then press E or tap the prompt.",
-	Sell = "Hold the Collector's prompt to open the sell window, then tap Sell.",
-	Buy = "Hold the Vacuum Vault's prompt (between the other two shops), tap the Phantom Vac card, then Buy.",
-	Tour = "Tap Next to see the next button.",
+	Pickup = "Press Mansion at the top to go home, then stand next to the Gloomlet and press E (or tap the prompt).",
+	Sell = "Talk to the Collector (E or tap Talk) and pick \"I want to sell my monsters.\", then press Sell on your Gloomlet.",
+	Buy = "Talk to the Vacuum Vault (between the Bakery and the Workshop) and pick \"Show me the vacuums.\", then press the Phantom Vac card and Buy.",
+	Tour = "Press Next to see the next button.",
 } :: { [Step]: string }
 
 -- The tour at the end: one card per button, in this order. `feature` makes that button glow.
 Tutorial.Tour = {
 	{
+		feature = "Home",
+		text = "Mansion takes you straight home. Your monsters roam every wing, and each wing you buy opens a new zone.",
+	},
+	{
 		feature = "Portals",
-		text = "Portals takes you to the Zone Gates. Each wing you buy opens a new zone.",
+		text = "Portals takes you to the gate of the newest zone you've opened.",
 	},
 	{
 		feature = "Shops",
-		text = "Shops takes you to the Haunted Bakery (cakes that give effects), the Vacuum Vault (vacuums) and the Hunter's Workshop (bells, charms and more).",
+		text = "Shops takes you to the Haunted Bakery (cakes), the Vacuum Vault (vacuums) and the Hunter's Workshop (Bait Bells, Return Charms, Name Tags and more).",
+	},
+	{
+		feature = "Hotbar",
+		text = "Cakes give effects. Hold one from your hotbar and click (or tap) the floor in one of your wings: monsters come over for bites and change, even while you're offline.",
 	},
 	{
 		feature = "Sell",
@@ -74,17 +93,31 @@ Tutorial.Tour = {
 	},
 	{
 		feature = "Backpack",
-		text = "Your Backpack (G) holds your monsters, cakes and tools. Tap the heart on a monster to keep it safe.",
+		text = "Your Backpack holds your monsters, cakes and tools. Drag a card onto the hotbar to hold it, and tap the heart on a monster to keep it safe.",
+	},
+	{
+		feature = "MansionList",
+		text = "The arrow on the right edge lists the monsters in your mansion, sorted by price, rarity or name, each with a Pick up button.",
 	},
 	{
 		feature = "Codex",
-		text = "Your Codex (C) lists every monster you've caught. Then catch each one in Silver, Gold, Shiny and Rainbow too!",
+		text = "Your Codex lists every monster you've caught. Catch each one in Silver, Gold, Shiny and Rainbow too, for money rewards!",
 	},
 	{
 		feature = "Events",
-		text = "Every few minutes the Watcher wakes an event. Its icon shows bottom right, and some events bring rare Phantoms to the hub!",
+		text = "Every few minutes the Watcher wakes an event for the whole game: the sky changes and monsters get its effect. Its icon shows bottom right.",
+	},
+	{
+		feature = "Settings",
+		text = "Settings has music and sound volume, weather, and UI size if the buttons look too big or small on your screen.",
 	},
 } :: { { feature: string, text: string } }
+
+-- The words for a step on this device: the touch version when there's no keyboard.
+function Tutorial.textFor(step: string, touch: boolean): string
+	local text = if touch then Tutorial.TouchText[step :: Step] else nil
+	return text or Tutorial.Text[step :: Step] or ""
+end
 
 -- Where a step is in the list (0 for an unknown step).
 function Tutorial.index(step: string?): number
