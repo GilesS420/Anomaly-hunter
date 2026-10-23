@@ -34,7 +34,7 @@ local World = require(script.Parent.Parent.World)
 local WorldBuilder = {}
 
 local GroundTop = 0.1 -- a little above a default baseplate (top at 0) so the two don't flicker
-local GroundColor = Color3.fromRGB(56, 52, 62)
+local GroundColor = Color3.fromRGB(42, 39, 48)
 local PlotColor = Color3.fromRGB(86, 96, 82)
 local LabelColor = Color3.fromRGB(235, 235, 235)
 
@@ -162,37 +162,49 @@ local function portalLabel(part: BasePart, title: string, subtitle: string?, hei
 	billboard.AlwaysOnTop = true
 end
 
--- The hub floor: an oval made of a long middle slab and a round end on each side
--- (Roblox cylinders are always round, so one part can't be an oval).
+-- The hub floor: an oval of dark studded plastic, the classic brick look. A long middle slab
+-- plus a half-round end on each side, built from strips (studs only show on block faces, so a
+-- cylinder end would be bare). The strips meet edge to edge, so no tops overlap and flicker.
+-- Raise GroundVersion to rebuild a floor an older version built.
+local GroundVersion = 2
+local GroundStrips = 14 -- strips per round end
+local function groundPart(name: string, size: Vector3, cframe: CFrame, parent: Instance)
+	local part = block(name, size, cframe, GroundColor, Enum.Material.Plastic)
+	part.TopSurface = Enum.SurfaceType.Studs
+	part.Parent = parent
+end
+
 local function buildGround(hub: Instance)
 	local size = Layout.Hub.GroundSize
 	local center = Layout.Hub.Center
 	local long, short = math.max(size.x, size.z), math.min(size.x, size.z)
+	local radius = short / 2
 	local ground = Instance.new("Model")
 	ground.Name = "Ground"
-	local middle = block(
+	ground:SetAttribute("GroundVersion", GroundVersion)
+	groundPart(
 		"Middle",
 		Vector3.new(long - short, 1, short),
 		CFrame.new(center.x, GroundTop - 0.5, center.z),
-		GroundColor,
-		Enum.Material.Slate
+		ground
 	)
-	middle.Parent = ground
+	local step = radius / GroundStrips
 	for _, side in { -1, 1 } do
-		-- Cylinder height runs along its X axis; turning it 90 degrees about Z lays it flat.
-		-- The round ends sit 0.01 lower than the middle so the overlapping tops don't flicker.
-		local cap = block(
-			if side < 0 then "WestEnd" else "EastEnd",
-			Vector3.new(1, short, short),
-			CFrame.new(center.x + side * (long - short) / 2, GroundTop - 0.51, center.z)
-				* CFrame.Angles(0, 0, math.pi / 2),
-			GroundColor,
-			Enum.Material.Slate
-		)
-		cap.Shape = Enum.PartType.Cylinder
-		cap.Parent = ground
+		local edge = center.x + side * (long - short) / 2
+		for i = 1, GroundStrips do
+			-- Each strip is as deep as the circle at its inner edge, so the round end steps in
+			-- like a brick build and never pokes past the oval.
+			local inner = (i - 1) * step
+			local depth = 2 * math.sqrt(radius * radius - inner * inner)
+			groundPart(
+				`{if side < 0 then "West" else "East"}End{i}`,
+				Vector3.new(step, 1, depth),
+				CFrame.new(edge + side * (inner + step / 2), GroundTop - 0.5, center.z),
+				ground
+			)
+		end
 	end
-	ground.PrimaryPart = middle
+	ground.PrimaryPart = ground:FindFirstChild("Middle") :: BasePart
 	ground.Parent = hub
 	table.insert(built, "Hub.Ground")
 end
@@ -572,7 +584,12 @@ end
 function WorldBuilder.start()
 	table.clear(built)
 	local hub = folderAt(workspace, "Hub", "Hub")
-	if not World.find(hub, "Ground") then
+	local ground = World.find(hub, "Ground")
+	if ground and ground:GetAttribute("GroundVersion") ~= GroundVersion then
+		ground:Destroy() -- an older floor (smooth slate); swap it for the studded one
+		ground = nil
+	end
+	if not ground then
 		buildGround(hub)
 	end
 	buildPlots(hub)
