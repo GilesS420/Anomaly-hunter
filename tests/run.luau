@@ -2513,6 +2513,23 @@ do
 			return true
 		end)()
 	)
+	check(
+		"tutorial: touch words only for real steps, keyboard words otherwise",
+		(function()
+			for step in Tutorial.TouchText do
+				if Tutorial.index(step) == 0 then
+					return false
+				end
+			end
+			return Tutorial.textFor("Catch", true) == Tutorial.TouchText.Catch
+				and Tutorial.textFor("Catch", false) == Tutorial.Text.Catch
+				and Tutorial.textFor("Tour", true) == Tutorial.Text.Tour
+		end)()
+	)
+	check(
+		"tutorial: the mansion list opens with the Backpack",
+		Tutorial.Unlocks.MansionList == Tutorial.Unlocks.Backpack
+	)
 	check("tutorial: buttons locked at the start", not Tutorial.isUnlocked("Gate", "Sell"))
 	check("tutorial: Portals works from the first step", Tutorial.isUnlocked("Gate", "Portals"))
 	check(
