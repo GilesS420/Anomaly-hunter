@@ -162,15 +162,14 @@ local function portalLabel(part: BasePart, title: string, subtitle: string?, hei
 	billboard.AlwaysOnTop = true
 end
 
--- The hub floor: an oval of dark studded plastic, the classic brick look. A long middle slab
--- plus a half-round end on each side, built from strips (studs only show on block faces, so a
--- cylinder end would be bare). The strips meet edge to edge, so no tops overlap and flicker.
+-- The hub floor: an oval of dark slate, the same stone family as the cobbled paths and a shade
+-- darker so they stand out. A long middle slab plus a half-round end on each side, built from
+-- strips that meet edge to edge, so no tops overlap and flicker.
 -- Raise GroundVersion to rebuild a floor an older version built.
-local GroundVersion = 2
+local GroundVersion = 3
 local GroundStrips = 14 -- strips per round end
 local function groundPart(name: string, size: Vector3, cframe: CFrame, parent: Instance)
-	local part = block(name, size, cframe, GroundColor, Enum.Material.Plastic)
-	part.TopSurface = Enum.SurfaceType.Studs
+	local part = block(name, size, cframe, GroundColor, Enum.Material.Slate)
 	part.Parent = parent
 end
 
@@ -593,7 +592,7 @@ function WorldBuilder.start()
 	local hub = folderAt(workspace, "Hub", "Hub")
 	local ground = World.find(hub, "Ground")
 	if ground and ground:GetAttribute("GroundVersion") ~= GroundVersion then
-		ground:Destroy() -- an older floor (smooth slate); swap it for the studded one
+		ground:Destroy() -- a floor an older version built; swap it for the current one
 		ground = nil
 	end
 	if not ground then
