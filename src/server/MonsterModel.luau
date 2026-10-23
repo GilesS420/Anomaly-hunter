@@ -163,6 +163,7 @@ function MonsterModel.refresh(model: Model, info: Info)
 	if model:GetAttribute("LookKey") ~= lookKey(info) then
 		dressModel(model, info)
 	end
+	model:SetAttribute("Nickname", info.nickname) -- the Name Tag box shows it (NameTagController)
 	local billboard = body:FindFirstChild("Label")
 	local name = billboard and billboard:FindFirstChild("Name")
 	if name and name:IsA("TextLabel") then

@@ -330,14 +330,10 @@ function InventoryController.start()
 					end
 				elseif item.kind == "Tag" then
 					action.Visible = true
-					action.Text = "Use"
+					action.Text = "Hold"
 					Ui.paint(action, Ui.Colors.equip)
 					onAction = function()
-						tab = "Monsters"
-						selected = nil
-						render()
-						window.status.Text =
-							"Tap a monster, then Name. Monsters in your mansion: use the list on the right."
+						hold("ToolId", id) -- then click a monster in your mansion (NameTagController)
 					end
 				elseif item.tool then
 					action.Visible = true

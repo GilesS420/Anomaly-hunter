@@ -208,9 +208,6 @@ local function toolName(data: DataService.Data, item: Shop.Item): string?
 	if Workshop.isTool(item) then
 		return if Workshop.owns(data.inventory, item) then item.name else nil
 	end
-	if item.kind == "Tag" then
-		return nil -- Name Tags are used from the Backpack, not held
-	end
 	local count = itemCount(data, item.id)
 	return if count > 0 then `{item.name} x{count}` else nil
 end
@@ -266,6 +263,9 @@ local function syncTools(player: Player)
 			tool.Activated:Connect(function()
 				HuntService.useBaitBell(player, item.id)
 			end)
+		elseif item.kind == "Tag" then
+			-- The client opens the name box for the monster you click (NameTagController).
+			tool.ToolTip = "Click one of your monsters to give it a name"
 		elseif item.id == "ReturnCharm" then
 			tool.ToolTip = "Click to go home with your catch"
 			tool.Activated:Connect(function()

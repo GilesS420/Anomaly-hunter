@@ -381,7 +381,8 @@ Rename.OnServerInvoke = function(player: Player, uid: unknown, text: unknown): R
 	local inventory: { [string]: number? } = data.inventory
 	inventory.NameTag = if count <= 1 then nil else count - 1
 	caught.nickname = clean
-	MansionService.refreshMonsters(player) -- the hotbar Tool follows within a second
+	MansionService.refreshMonsters(player) -- the monster's hotbar Tool follows within a second
+	HuntService.refreshItems(player) -- the Name Tag count in the hotbar
 	return { ok = true, message = `Say hi to {Format.monsterName(caught)}!`, view = viewFor(data) }
 end
 
