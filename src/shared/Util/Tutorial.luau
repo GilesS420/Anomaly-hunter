@@ -43,7 +43,7 @@ Tutorial.Text = {
 	Home = "Got it! Follow the trail to the exit, or use your free Return Charm (R).",
 	Pickup = "Your Gloomlet turned Cobwebbed: effects make monsters worth more! Press E next to it to put it in your Backpack.",
 	Sell = "The Collector buys monsters from your Backpack. Tap Sell at the top and sell your Gloomlet.",
-	Buy = "The Collector gave you a welcome gift! Tap Shops and buy the Phantom Vac at the Hunter's Workshop.",
+	Buy = "The Collector gave you a welcome gift! Tap Shops and buy the Phantom Vac at the Vacuum Vault.",
 	Tour = "You're ready! Here's what the buttons do.",
 } :: { [Step]: string }
 
@@ -54,7 +54,7 @@ Tutorial.Hints = {
 	Home = "Walk back through the exit arch you came in by.",
 	Pickup = "Go into your mansion and stand right next to the Gloomlet, then press E or tap the prompt.",
 	Sell = "Hold the Collector's prompt to open the sell window, then tap Sell.",
-	Buy = "Hold the Workshop's prompt, tap the Phantom Vac card, then Buy.",
+	Buy = "Hold the Vacuum Vault's prompt (between the other two shops), tap the Phantom Vac card, then Buy.",
 	Tour = "Tap Next to see the next button.",
 } :: { [Step]: string }
 
@@ -66,7 +66,7 @@ Tutorial.Tour = {
 	},
 	{
 		feature = "Shops",
-		text = "Shops takes you to the Haunted Bakery (cakes that give effects) and the Hunter's Workshop (vacuums and tools).",
+		text = "Shops takes you to the Haunted Bakery (cakes that give effects), the Vacuum Vault (vacuums) and the Hunter's Workshop (bells, charms and more).",
 	},
 	{
 		feature = "Sell",

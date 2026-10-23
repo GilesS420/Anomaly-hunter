@@ -4,7 +4,7 @@
 --     Config/Travel.HubWalkSpeed; everywhere else at the normal StarterPlayer speed.
 --     A Slow attack (player attribute Slowed, MonsterAiService) always wins.
 --   * Fast travel: the buttons at the top of the screen jump you to your own mansion, the
---     Zone Gates, between the Haunted Bakery and the Hunter's Workshop, or the Collector. Only from the hub and with nothing in your
+--     Zone Gates, in front of the Vacuum Vault between the Haunted Bakery and the Hunter's Workshop, or the Collector. Only from the hub and with nothing in your
 --     vacuum, so it never replaces the Return Charm (which gets you OUT of a zone).
 --
 -- Remotes in ReplicatedStorage.TravelRemotes:

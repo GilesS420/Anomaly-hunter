@@ -1,5 +1,6 @@
 --!strict
--- The Hunter's Workshop window. Opens when you use the prompt at the Workshop. One card per
+-- The Hunter's Workshop and Vacuum Vault window: one window, filled with the shop whose
+-- prompt you used (the Vault sells the vacuums, the Workshop the rest). One card per
 -- item (ShopCards): its icon, stock, price, rarity and what it does; tap a card for its
 -- button: Buy, Equip, Using or No stock.
 -- A countdown shows when the stock changes; the window refreshes by itself when it does.
@@ -49,13 +50,15 @@ function WorkshopController.start()
 	ShopCards.prepare(window, false)
 	local restockAt = 0 -- os.clock() when the stock changes
 	local money = 0
+	local store = "Workshop" -- which shop is open: "Workshop" or "VacuumVault"
 	local waiting = false -- a request is on its way; ignore more taps until it answers
 	local generation = 0 -- bumps each time the window opens, so an old countdown loop stops
 	local render: (view: View?) -> ()
 
 	local function updateStatus()
-		window.status.Text =
-			`New stock in {countdown(restockAt - os.clock())} · You have {Format.money(money)}`
+		window.status.Text = if store == "VacuumVault"
+			then `Vacuums are always in stock · You have {Format.money(money)}`
+			else `New stock in {countdown(restockAt - os.clock())} · You have {Format.money(money)}`
 	end
 
 	local function ask(remote: RemoteFunction, itemId: string)
@@ -133,16 +136,19 @@ function WorkshopController.start()
 	end
 
 	local function refresh()
-		local ok, view = pcall(GetShop.InvokeServer, GetShop)
+		local ok, view = pcall(GetShop.InvokeServer, GetShop, store)
 		if window.isOpen() then
 			render(if ok then view else nil)
 		end
 	end
 
-	Open.OnClientEvent:Connect(function(counter: unknown)
+	Open.OnClientEvent:Connect(function(counter: unknown, which: unknown)
 		if typeof(counter) ~= "Vector3" then
 			return
 		end
+		store = if which == "VacuumVault" then "VacuumVault" else "Workshop"
+		window.title.Text = if store == "VacuumVault" then "Vacuum Vault" else "Hunter's Workshop"
+		Ui.clear(window.list)
 		window.status.Text = "Loading..."
 		window.open(counter)
 		generation += 1
