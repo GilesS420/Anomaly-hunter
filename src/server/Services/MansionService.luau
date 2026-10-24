@@ -532,8 +532,13 @@ function updateShowcase(state: State)
 
 	local caught = if best then data.monsters[best] else nil
 	local monster = if caught then Monsters[caught.monsterId] else nil
+	-- Not the weight itself: it changes every growth tick, and rebuilding the stand that often
+	-- made a hitch. The drawn size (drawScale) only changes when it visibly grows.
 	local key = if caught and monster
-		then `{caught.uid}|{caught.size}|{caught.kg}|{caught.variant}|{table.concat(caught.effects, ",")}`
+		then `{caught.uid}|{caught.size}|{Weight.drawScale(caught.size, caught.kg)}|{caught.variant}|{table.concat(
+			caught.effects,
+			","
+		)}`
 		else nil
 	local old = state.trophy.Parent and state.trophy.Parent:FindFirstChild("BestMonster")
 	if key == state.trophyKey and old then

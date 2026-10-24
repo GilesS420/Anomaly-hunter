@@ -14,6 +14,7 @@
 -- but walks the floors at a capped width, so it sticks out through the walls.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local EffectLooks = require(ReplicatedStorage.Shared.Config.EffectLooks)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
@@ -154,6 +155,47 @@ local function lookKey(info: Info): string
 	return `{table.concat(info.effects or {}, ",")}|{info.variant or ""}|{scale}`
 end
 
+-- Rebuilding a monster's blocks makes and sends a hundred-odd parts. When many monsters change
+-- at once (a Watcher event's effect roll, cakes, a growth tick) doing them all in one frame
+-- froze the game for a moment, so rebuilds of monsters already in the world wait in a queue
+-- and RebuildsPerFrame of them are done each frame.
+local RebuildsPerFrame = 2
+local pending: { [Model]: Info } = {}
+local queue: { Model } = {}
+local worker: RBXScriptConnection? = nil
+
+local function queueDress(model: Model, info: Info)
+	if not pending[model] then
+		table.insert(queue, model)
+	end
+	pending[model] = info -- the newest info wins
+	if worker then
+		return
+	end
+	worker = RunService.Heartbeat:Connect(function()
+		for _ = 1, RebuildsPerFrame do
+			local next = table.remove(queue, 1)
+			if not next then
+				break
+			end
+			local latest = pending[next]
+			pending[next] = nil
+			if
+				latest
+				and next.Parent
+				and next.PrimaryPart
+				and next:GetAttribute("LookKey") ~= lookKey(latest)
+			then
+				dressModel(next, latest)
+			end
+		end
+		if #queue == 0 and worker then
+			worker:Disconnect()
+			worker = nil
+		end
+	end)
+end
+
 -- Updates the label after a mansion monster got more familiar or got an effect.
 function MonsterModel.refresh(model: Model, info: Info)
 	local body = model.PrimaryPart
@@ -161,7 +203,11 @@ function MonsterModel.refresh(model: Model, info: Info)
 		return
 	end
 	if model:GetAttribute("LookKey") ~= lookKey(info) then
-		dressModel(model, info)
+		if model.Parent and model:GetAttribute("LookKey") ~= nil then
+			queueDress(model, info) -- already in the world: a rebuild, spread over frames
+		else
+			dressModel(model, info) -- being built: dressed straight away
+		end
 	end
 	model:SetAttribute("Nickname", info.nickname) -- the Name Tag box shows it (NameTagController)
 	local billboard = body:FindFirstChild("Label")
