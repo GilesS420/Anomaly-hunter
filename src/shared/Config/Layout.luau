@@ -35,6 +35,7 @@ export type Landmark = {
 	width: number,
 	depth: number,
 	height: number,
+	faceOut: boolean?, -- its front faces away from the middle of the hub instead of toward it
 }
 
 local Layout = {}
@@ -96,8 +97,18 @@ Layout.Landmarks = {
 		height = 16,
 	},
 	-- Either side of the middle row (Giles 2026-10-24): the Merger next to the Trading Booth,
-	-- the Growth Chamber mirrored next to the Collector.
-	{ name = "Merger", label = "The Merger", x = 165, z = 0, width = 40, depth = 40, height = 20 },
+	-- the Growth Chamber mirrored next to the Collector. They stand behind those, so they face
+	-- out toward the ends of the hub (Giles 2026-10-24: turned 180°).
+	{
+		name = "Merger",
+		label = "The Merger",
+		x = 165,
+		z = 0,
+		width = 40,
+		depth = 40,
+		height = 20,
+		faceOut = true,
+	},
 	{
 		name = "GrowthChamber",
 		label = "Growth Chamber",
@@ -106,6 +117,7 @@ Layout.Landmarks = {
 		width = 40,
 		depth = 40,
 		height = 20,
+		faceOut = true,
 	},
 	{
 		name = "Bakery",
