@@ -321,4 +321,19 @@ function Codex.newRewards(codex: { [string]: any }, sections: { Section }): { Re
 	return paid
 end
 
+-- How many of a combo's two recipe effects are in the Codex (0, 1 or 2): the clue the Codex
+-- shows for a combo you haven't made yet, without naming which effects they are.
+function Codex.recipeKnown(codex: { [string]: any }, comboId: string): number
+	local combo = Effects.Combos[comboId]
+	local effects = codex.effects
+	if not combo or typeof(effects) ~= "table" then
+		return 0
+	end
+	local known = 0
+	for _, part in combo.recipe do
+		known += if effects[part] then 1 else 0
+	end
+	return known
+end
+
 return Codex

@@ -1,14 +1,18 @@
 --!strict
 -- The Codex window. Opens from the HUD's Codex button (or C on a keyboard). One tab per zone,
--- one for the Watcher event monsters and one for haunted effects and secret combos:
+-- one for the Watcher event monsters, one for haunted effects and one for secret combos:
 --   Monster pages  every monster of that zone as a card, Common first. Ones you haven't caught
 --                  yet are a "?" with no name. Four dots on each card are the catch variants
 --                  (Silver, Gold, Shiny, Rainbow): each one lights up once you've caught that
 --                  monster in that colour. The strip above the cards counts how many you've
 --                  found and how many of each variant, the extra goals for every page, with
 --                  the money each goal pays once it's done (a tick once it's paid).
---   Effects        every effect (unfound ones say where they come from) and the secret combos
---                  (the recipe shows once you've made one).
+--   Effects        every effect (unfound ones say where they come from, found ones which
+--                  combos you've made with them).
+--   Combos         the secret combos, kept apart from the effects (Giles 2026-10-24): two
+--                  effects on one monster merge into one stronger combo. A made combo shows
+--                  its recipe ("Vampire + Batty"); a secret one only says how many of its two
+--                  effects you've found, as a clue.
 -- The look is a plain field journal: square numbered cards, flat tabs, and the goals as a
 -- line of colour swatches rather than glowing pills. Tap a card to see it along the bottom. Everything comes from the server
 -- (CodexRemotes.GetView, server/Services/CodexService); the pictures are preview models in
@@ -37,7 +41,17 @@ type MonsterCard = {
 }
 type Rewards = { [string]: { amount: number, claimed: boolean } }
 type Page = { id: string, title: string, progress: Progress, monsters: { MonsterCard }, rewards: Rewards? }
-type EffectCard = { id: string, name: string, multiplier: number, found: boolean, hint: string, combo: boolean }
+type EffectCard = {
+	id: string,
+	name: string,
+	multiplier: number,
+	found: boolean,
+	hint: string,
+	combo: boolean,
+	recipe: { string }?,
+	known: number?,
+	usedIn: { string }?,
+}
 type View = { pages: { Page }, effects: { EffectCard }, effectRewards: Rewards?, variants: { string } }
 
 -- "$250K" for a goal still to do, "✓ paid" once it's paid, "" for no reward.
@@ -50,6 +64,8 @@ local function rewardText(rewards: Rewards?, goal: string): string
 end
 
 local EffectsTab = "Effects"
+local CombosTab = "Combos"
+local ComboColor = Color3.fromRGB(190, 120, 255) -- combos are purple, effects lantern orange
 
 -- What each catch variant looks like on the cards (dots) and the goal strip.
 local VariantColor = {
@@ -397,47 +413,89 @@ function CodexController.start()
 	end
 
 	local function effectsPage(effects: { EffectCard }, rewards: Rewards?)
-		local found, total, combos, comboTotal = 0, 0, 0, 0
+		local found, total = 0, 0
 		for _, effect in effects do
-			if effect.combo then
-				comboTotal += 1
-				combos += if effect.found then 1 else 0
-			else
+			if not effect.combo then
 				total += 1
 				found += if effect.found then 1 else 0
 			end
 		end
-		chip(1, 2, `Effects {found}/{total}`, rewardText(rewards, "Effects"), Ui.Colors.lamp, false)
-		chip(
-			2,
-			2,
-			`Secret combos {combos}/{comboTotal}`,
-			rewardText(rewards, "Combos"),
-			Ui.Colors.equip,
-			false
-		)
-		window.status.Text = "Haunted effects make monsters worth more. Combos are secret until you make one."
-		for i, effect in effects do
+		chip(1, 1, `Effects found {found}/{total}`, rewardText(rewards, "Effects"), Ui.Colors.lamp, false)
+		window.status.Text =
+			"Effects make a monster worth more. Two of the right ones on one monster make a combo."
+		local order = 0
+		for _, effect in effects do
+			if effect.combo then
+				continue
+			end
+			order += 1
 			local key = `e:{effect.id}`
-			local caption = if effect.found then effect.name elseif effect.combo then "Secret" else "???"
 			card(
-				i,
+				order,
 				key,
-				if effect.found then (if effect.combo then Ui.Colors.equip else Ui.Colors.lamp) else nil,
+				if effect.found then Ui.Colors.lamp else nil,
 				nil,
 				if effect.found then string.sub(effect.name, 1, 1) else "?",
-				caption
+				if effect.found then effect.name else "???"
 			)
 			if selected == key then
-				pickName.Text = if effect.found or not effect.combo
-					then `{if effect.found then effect.name else "???"} · x{effect.multiplier}`
-					else `Secret combo · x{effect.multiplier}`
-				pickName.TextColor3 = Ui.Colors.text
-				pickDetails.Text = if effect.combo
-					then (if effect.found
-						then `Recipe: {effect.hint}`
-						else "Mix the right two effects on one monster")
+				pickName.Text = `{if effect.found then effect.name else "???"} · x{effect.multiplier}`
+				pickName.TextColor3 = Ui.Colors.lamp
+				local usedIn = effect.usedIn or {}
+				pickDetails.Text = if #usedIn > 0
+					then `{effect.hint}. In your combos: {table.concat(usedIn, ", ")}`
 					else effect.hint
+			end
+		end
+	end
+
+	-- The secret combos, apart from the effects: what each one is made of once you've made it,
+	-- and a clue (how many of its effects you've found) while it's still secret.
+	local function combosPage(effects: { EffectCard }, rewards: Rewards?)
+		local made, total = 0, 0
+		for _, effect in effects do
+			if effect.combo then
+				total += 1
+				made += if effect.found then 1 else 0
+			end
+		end
+		chip(1, 1, `Combos made {made}/{total}`, rewardText(rewards, "Combos"), ComboColor, false)
+		window.status.Text =
+			"A combo forms when one monster has both of its effects at once. The two merge into one stronger effect."
+		local order = 0
+		for _, effect in effects do
+			if not effect.combo then
+				continue
+			end
+			order += 1
+			local key = `c:{effect.id}`
+			local recipe = effect.recipe
+			-- The mark shows the recipe's first letters ("V+B"), or "?+?" while it's secret.
+			local mark = if recipe and #recipe == 2
+				then `{string.sub(recipe[1], 1, 1)}+{string.sub(recipe[2], 1, 1)}`
+				else "?+?"
+			card(
+				order,
+				key,
+				if effect.found then ComboColor else nil,
+				nil,
+				mark,
+				if effect.found then effect.name else "Secret"
+			)
+			if selected == key then
+				pickName.TextColor3 = ComboColor
+				if effect.found and recipe then
+					pickName.Text = `{effect.name} · x{effect.multiplier}`
+					pickDetails.Text =
+						`{recipe[1]} + {recipe[2]} on one monster turns into {effect.name} (x{effect.multiplier})`
+				else
+					local known = effect.known or 0
+					pickName.Text = `Secret combo · x{effect.multiplier}`
+					pickDetails.Text = if known >= 2
+						then "You've found both of its effects! Get them onto the same monster."
+						elseif known == 1 then "Two effects make it. You've found 1 of them so far."
+						else "Two effects make it. You haven't found either of them yet."
+				end
 			end
 		end
 	end
@@ -459,6 +517,7 @@ function CodexController.start()
 				table.insert(names, { id = page.id, title = page.title })
 			end
 			table.insert(names, { id = EffectsTab, title = EffectsTab })
+			table.insert(names, { id = CombosTab, title = CombosTab })
 			for i, entry in names do
 				local button = Instance.new("TextButton")
 				button.LayoutOrder = i
@@ -509,6 +568,9 @@ function CodexController.start()
 		end
 		if shown == EffectsTab then
 			effectsPage(current.effects, current.effectRewards)
+			return
+		elseif shown == CombosTab then
+			combosPage(current.effects, current.effectRewards)
 			return
 		end
 		for _, page in current.pages do
