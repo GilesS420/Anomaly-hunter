@@ -3,8 +3,8 @@
 -- anything that isn't already in the place (see WorldBuilder), so the game is playable
 -- before the real models exist. Studs; the ground is at Y = 0 (top of the default baseplate).
 --
--- The hub is an oval: 4 mansion plots along the top, 4 along the bottom, Collector,
--- Watcher Square and Trading Booth in the middle, Bakery, Vacuum Vault + Workshop at the west end and
+-- The hub is an oval: 4 mansion plots along the top, 4 along the bottom, Growth Chamber,
+-- Collector, Watcher Square, Trading Booth and Merger in the middle, Bakery, Vacuum Vault + Workshop at the west end and
 -- the Zone Gates at the east end.
 
 export type Vec = { x: number, y: number, z: number }
@@ -94,6 +94,18 @@ Layout.Landmarks = {
 		width = 40,
 		depth = 40,
 		height = 16,
+	},
+	-- Either side of the middle row (Giles 2026-10-24): the Merger next to the Trading Booth,
+	-- the Growth Chamber mirrored next to the Collector.
+	{ name = "Merger", label = "The Merger", x = 165, z = 0, width = 40, depth = 40, height = 20 },
+	{
+		name = "GrowthChamber",
+		label = "Growth Chamber",
+		x = -165,
+		z = 0,
+		width = 40,
+		depth = 40,
+		height = 20,
 	},
 	{
 		name = "Bakery",

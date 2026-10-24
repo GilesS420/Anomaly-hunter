@@ -8,6 +8,8 @@ local RoamController = require(script.Controllers.RoamController)
 local CatchController = require(script.Controllers.CatchController)
 local HuntController = require(script.Controllers.HuntController)
 local CollectorController = require(script.Controllers.CollectorController)
+local MergerController = require(script.Controllers.MergerController)
+local GrowthController = require(script.Controllers.GrowthController)
 local WorkshopController = require(script.Controllers.WorkshopController)
 local BakeryController = require(script.Controllers.BakeryController)
 local AttackController = require(script.Controllers.AttackController)
@@ -41,6 +43,8 @@ local controllers: { { start: () -> () } } = {
 	CatchController,
 	HuntController,
 	CollectorController,
+	MergerController,
+	GrowthController,
 	WorkshopController,
 	BakeryController,
 	AttackController,

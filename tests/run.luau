@@ -3017,6 +3017,106 @@ do
 	check("combo clue: unknown combo is 0", Codex.recipeKnown(codex, "Nothing") == 0)
 end
 
+-- Merger (Util/Merge) and Growth Chamber (Util/Growth).
+do
+	local Merge = require("../src/shared/Util/Merge")
+	local Growth = require("../src/shared/Util/Growth")
+	local GrowthConfig = require("../src/shared/Config/Growth")
+	local MergerConfig = require("../src/shared/Config/Merger")
+	local function pup(uid: string, kg: number, effects: { string }): any
+		return {
+			uid = uid,
+			monsterId = "Gravepup",
+			size = Weight.sizeFor(kg),
+			kg = kg,
+			effects = effects,
+			familiarity = 0.2,
+			gene = "Sturdy",
+		}
+	end
+	local main, donor = pup("a", 22, { "Ghost", "Vampire" }), pup("b", 30, { "Cursed", "Batty", "Ghost" })
+	main.variant = "Silver"
+	donor.gene = "Titanic"
+	donor.familiarity = 0.9
+	donor.growUsed = 3
+	check("merge: same kind is fine", Merge.problem(main, donor) == nil)
+	check("merge: not with itself", Merge.problem(main, main) == "Same")
+	local other = pup("c", 20, {})
+	other.monsterId = "Gloomlet"
+	check("merge: only the same kind", Merge.problem(main, other) == "Different")
+	donor.locked = true
+	check("merge: a hearted donor is refused", Merge.problem(main, donor) == "Locked")
+	check("merge: a hearted main is fine", Merge.problem(donor, main) == nil)
+	donor.locked = nil
+	check("merge: Rare odds", Merge.chance("Gravepup") == MergerConfig.Success.Rare)
+	local everyRarity = true
+	for id in Rarities do
+		everyRarity = everyRarity and (MergerConfig.Success[id] or 0) > 0 and MergerConfig.Success[id] < 100
+	end
+	check("merge: every rarity has odds", everyRarity)
+	check("merge: fee is a share of the donor", Merge.fee(1000) == math.floor(1000 * MergerConfig.FeeShare))
+
+	local result = Merge.preview(main, donor)
+	check("merge: preview leaves the main alone", main.kg == 22 and #main.effects == 2)
+	check("merge: gains half the donor's weight", near(result.kg, 22 + 30 * MergerConfig.DonorKgShare))
+	check("merge: size follows the weight", result.size == Weight.sizeFor(result.kg))
+	check("merge: keeps every effect once", #result.effects == 4)
+	check(
+		"merge: combos form",
+		table.find(Value.resolveEffects(result.effects), "Banshee") ~= nil
+			and table.find(Value.resolveEffects(result.effects), "Count") ~= nil
+	)
+	check("merge: better variant kept", result.variant == "Silver")
+	check("merge: better gene kept", result.gene == "Titanic")
+	check("merge: higher Familiarity kept", result.familiarity == 0.9)
+	check("merge: more used charges kept", result.growUsed == 3)
+	check("merge: main's uid kept", result.uid == "a")
+	local gold = pup("d", 20, {})
+	gold.variant = "Gold"
+	check("merge: donor's better variant wins", Merge.preview(main, gold).variant == "Gold")
+	-- Critter effects still only land on cheap monsters.
+	local pricey: any = {
+		uid = "e",
+		monsterId = "LadyOfLanterns",
+		size = "Normal",
+		kg = 20,
+		effects = {},
+		familiarity = 0,
+	}
+	local pricey2 = table.clone(pricey)
+	pricey2.uid = "f"
+	pricey2.effects = { "Moldy" }
+	check("merge: no Critter effects on pricey monsters", #Merge.preview(pricey, pricey2).effects == 0)
+
+	local gentle = Growth.mode("Gentle") :: GrowthConfig.Mode
+	local reckless = Growth.mode("Reckless") :: GrowthConfig.Mode
+	check("growth: modes found", gentle ~= nil and reckless ~= nil and Growth.mode("Nope") == nil)
+	local g = pup("g", 20, {})
+	g.gene = "Stunted"
+	check("growth: full charges", Growth.chargesLeft(g) == GrowthConfig.Charges)
+	local before, after = Growth.apply(g, reckless, true)
+	check("growth: a win ignores a Stunted gene", before == 20 and near(after, 40) and g.size == "Huge")
+	check("growth: a go uses a charge", Growth.chargesLeft(g) == GrowthConfig.Charges - 1)
+	Growth.apply(g, reckless, false)
+	check("growth: a hard loss shrinks it", near(g.kg, 30) and g.size == "Big")
+	local kg = g.kg
+	Growth.apply(g, gentle, false)
+	check("growth: a gentle loss does nothing", g.kg == kg)
+	check("growth: fee is a share of its value", Growth.fee(1000, reckless) == 250)
+	local ordered = true
+	for i = 2, #GrowthConfig.Modes do
+		local a, b = GrowthConfig.Modes[i - 1], GrowthConfig.Modes[i]
+		ordered = ordered and b.chance < a.chance and b.win > a.win and b.lose <= a.lose
+	end
+	check("growth: harder modes risk more for more", ordered)
+	-- Five Reckless wins from a Normal makes a Titan.
+	local lucky = pup("h", 20, {})
+	for _ = 1, GrowthConfig.Charges do
+		Growth.apply(lucky, reckless, true)
+	end
+	check("growth: five Reckless wins make a Titan", lucky.size == "Titan" and Growth.chargesLeft(lucky) == 0)
+end
+
 if failures > 0 then
 	error(`{failures} check(s) failed`)
 end

@@ -1064,6 +1064,254 @@ function Landmarks.VacuumVault(): { Part }
 	return parts
 end
 
+-- The Merger, next to the Trading Booth (Giles 2026-10-24): a violet lab shop under a violet
+-- and slime-green awning. A glass tank at each end of the counter holds a wisp (teal and
+-- pink), pipes run from both tanks into a bubbling cauldron of green goo in the middle, and a
+-- goggled ghost doctor stirs it from behind. Two monsters go in, one comes out.
+local Violet = { 64, 40, 96 }
+local Slime = { 140, 255, 90 }
+
+function Landmarks.Merger(): { Part }
+	local parts: { Part } = {}
+	local y = shop(parts, {
+		title = "The Merger",
+		wall = Violet,
+		trim = { 150, 140, 170 },
+		roof = { 34, 26, 48 },
+		deck = { 48, 42, 58 },
+		sign = { 200, 255, 170 },
+		awning = { { 90, 50, 140 }, { 70, 150, 60 } },
+	})
+	local top = y + 3.5 -- the counter top
+
+	-- A tank at each end of the counter, each with a wisp waiting to be merged, and a pipe
+	-- from its lid to the cauldron.
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		local x = side * 7
+		local color = if side < 0 then SwapTeal else SwapPink
+		local base = part(parts, `TankBase{tag}`, { 0.4, 2, 2 }, { x, top + 0.2, -1 }, Iron, "Metal")
+		base.shape = "Cylinder"
+		base.rot = { 0, 0, 90 }
+		local glass = part(
+			parts,
+			`TankGlass{tag}`,
+			{ 2.6, 1.6, 1.6 },
+			{ x, top + 1.7, -1 },
+			GlassTint,
+			"Glass"
+		)
+		glass.shape = "Cylinder"
+		glass.rot = { 0, 0, 90 }
+		glass.transparency = 0.6
+		local wisp = part(parts, `TankWisp{tag}`, { 0.9, 0.9, 0.9 }, { x, top + 1.6, -1 }, color, "Neon")
+		wisp.shape = "Ball"
+		wisp.light = { color = color, range = 10, brightness = 0.8 }
+		part(parts, `TankLid{tag}`, { 1.8, 0.3, 1.8 }, { x, top + 3.15, -1 }, Brass, "Metal")
+		part(parts, `PipeUp{tag}`, { 0.4, 1.6, 0.4 }, { x, top + 4.1, -1 }, Brass, "Metal")
+		part(parts, `PipeAcross{tag}`, { 5.6, 0.4, 0.4 }, { side * 4.4, top + 4.9, -1 }, Brass, "Metal")
+	end
+
+	-- The cauldron in the middle of the counter, full of glowing goo.
+	local pot = part(parts, "Cauldron", { 2.4, 3.2, 3.2 }, { 0, top + 1.2, -1 }, Soot, "Metal")
+	pot.shape = "Cylinder"
+	pot.rot = { 0, 0, 90 }
+	part(parts, "PipeDown", { 0.4, 1.4, 0.4 }, { 0, top + 4, -1 }, Brass, "Metal")
+	local goo = part(parts, "Goo", { 0.3, 2.8, 2.8 }, { 0, top + 2.45, -1 }, Slime, "Neon")
+	goo.shape = "Cylinder"
+	goo.rot = { 0, 0, 90 }
+	goo.light = { color = Slime, range = 14, brightness = 1 }
+	for i, at in { { -0.6, -1.4 }, { 0.7, -0.6 }, { 0.1, -1.9 } } do
+		local bubble = part(
+			parts,
+			`Bubble{i}`,
+			{ 0.5, 0.5, 0.5 },
+			{ at[1], top + 2.8 + i * 0.25, at[2] },
+			Slime,
+			"Neon"
+		)
+		bubble.shape = "Ball"
+		bubble.transparency = 0.3
+	end
+
+	-- The doctor: a ghost in a lab coat and brass goggles, behind the counter.
+	local hz = 1.6
+	local coat = part(parts, "DoctorCoat", { 2.4, 4.8, 1.6 }, { 0, y + 2.4, hz }, Ghostly, "Fabric", true)
+	coat.transparency = 0.2
+	local head = part(parts, "DoctorHead", { 2, 2, 2 }, { 0, y + 6.2, hz }, Ghostly, "SmoothPlastic", true)
+	head.shape = "Ball"
+	head.transparency = 0.2
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		local lens = part(
+			parts,
+			`GoggleLens{tag}`,
+			{ 0.2, 0.7, 0.7 },
+			{ side * 0.45, y + 6.4, hz - 1 },
+			Slime,
+			"Neon"
+		)
+		lens.shape = "Cylinder"
+		lens.rot = { 0, 90, 0 }
+	end
+	part(parts, "GoggleStrap", { 2.1, 0.25, 2.1 }, { 0, y + 6.4, hz }, Brass, "Metal")
+
+	-- Shelves of jars with half-merged wisps behind him.
+	for s, x in { -9.5, 9.5 } do
+		for i, shelfTop in shelves(parts, `FlaskShelf{s}`, x, { 56, 44, 70 }) do
+			for j, dx in { -2, 0, 2 } do
+				local name = `Flask{s}{i}{j}`
+				local glass = part(
+					parts,
+					name,
+					{ 0.9, 1.3, 0.9 },
+					{ x + dx, shelfTop + 0.65, 16 },
+					GlassTint,
+					"Glass"
+				)
+				glass.transparency = 0.55
+				local color = if (s + i + j) % 2 == 0 then SwapTeal else SwapPink
+				part(
+					parts,
+					name .. "Wisp",
+					{ 0.45, 0.45, 0.45 },
+					{ x + dx, shelfTop + 0.55, 16 },
+					color,
+					"Neon"
+				).shape =
+					"Ball"
+			end
+		end
+	end
+
+	-- A sign on the deck.
+	part(parts, "StandPost", { 0.3, 3.2, 0.3 }, { -13, y + 1.6, -8 }, Iron, "Metal", true)
+	local board = part(parts, "StandBoard", { 4.4, 2, 0.2 }, { -13, y + 3.6, -8.1 }, BoardWood, "WoodPlanks")
+	board.text = "2 in, 1 out"
+	return parts
+end
+
+-- The Growth Chamber, next to the Collector (Giles 2026-10-24): a moss-green lab under a
+-- green and black awning. A tall glass tube on the deck holds a big glowing monster blob,
+-- a height chart in kg stands beside it, and a ghost in a lab coat works the dials on the
+-- counter.
+local LabGreen = { 40, 72, 50 }
+
+function Landmarks.GrowthChamber(): { Part }
+	local parts: { Part } = {}
+	local y = shop(parts, {
+		title = "Growth Chamber",
+		wall = LabGreen,
+		trim = { 160, 170, 150 },
+		roof = { 26, 40, 30 },
+		deck = { 44, 50, 44 },
+		sign = { 210, 240, 200 },
+		awning = { { 60, 150, 80 }, Soot },
+	})
+	local top = y + 3.5
+
+	-- The tube, on the deck in front of the counter, to the right.
+	local tx, tz = 11, -5
+	local base = part(parts, "TubeBase", { 0.8, 4, 4 }, { tx, y + 0.4, tz }, Iron, "Metal", true)
+	base.shape = "Cylinder"
+	base.rot = { 0, 0, 90 }
+	local glass = part(parts, "TubeGlass", { 8, 3.4, 3.4 }, { tx, y + 4.8, tz }, GlassTint, "Glass", true)
+	glass.shape = "Cylinder"
+	glass.rot = { 0, 0, 90 }
+	glass.transparency = 0.65
+	local lid = part(parts, "TubeLid", { 0.8, 4, 4 }, { tx, y + 9.2, tz }, Iron, "Metal", true)
+	lid.shape = "Cylinder"
+	lid.rot = { 0, 0, 90 }
+	local blob = part(parts, "TubeBlob", { 2.6, 3.4, 2.6 }, { tx, y + 3.6, tz }, Ecto, "Neon")
+	blob.shape = "Ball"
+	blob.transparency = 0.15
+	blob.light = { color = Ecto, range = 16, brightness = 1 }
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		part(
+			parts,
+			`BlobEye{tag}`,
+			{ 0.4, 0.4, 0.1 },
+			{ tx + side * 0.5, y + 4.2, tz - 1.3 },
+			Ink,
+			"SmoothPlastic"
+		)
+	end
+
+	-- A height chart beside the tube, marked in kg.
+	part(parts, "ChartPost", { 0.3, 8, 0.3 }, { 15, y + 4, -8 }, Iron, "Metal", true)
+	local chart = part(parts, "Chart", { 2.6, 6, 0.2 }, { 15, y + 5, -8.1 }, BoardWood, "WoodPlanks")
+	chart.text = "500 kg\n100 kg\n40 kg\n20 kg"
+	for i = 1, 4 do
+		part(
+			parts,
+			`ChartMark{i}`,
+			{ 2.6, 0.12, 0.25 },
+			{ 15, y + 2.2 + i * 1.3, -8.25 },
+			Ink,
+			"SmoothPlastic"
+		)
+	end
+
+	-- Dials and a big lever on the counter.
+	for i, x in { -6, -4, -2 } do
+		local dial = part(parts, `Dial{i}`, { 0.3, 1, 1 }, { x, top + 0.15, -1.4 }, Brass, "Metal")
+		dial.shape = "Cylinder"
+		dial.rot = { 0, 0, 90 }
+		part(
+			parts,
+			`DialLight{i}`,
+			{ 0.3, 0.3, 0.3 },
+			{ x, top + 0.95, -1 },
+			if i == 3 then Crimson else Ecto,
+			"Neon"
+		).shape =
+			"Ball"
+	end
+	part(parts, "LeverBase", { 1.2, 0.4, 1.2 }, { 3, top + 0.2, -1 }, Iron, "Metal")
+	part(parts, "Lever", { 0.25, 2.2, 0.25 }, { 3, top + 1.3, -1.2 }, Iron, "Metal").rot = { -20, 0, 0 }
+	part(parts, "LeverKnob", { 0.6, 0.6, 0.6 }, { 3, top + 2.4, -1.6 }, Crimson, "SmoothPlastic").shape =
+		"Ball"
+
+	-- The scientist: a ghost in a lab coat.
+	local hz = 1.6
+	local coat = part(parts, "ScientistCoat", { 2.4, 4.8, 1.6 }, { 0, y + 2.4, hz }, Ghostly, "Fabric", true)
+	coat.transparency = 0.2
+	local head = part(parts, "ScientistHead", { 2, 2, 2 }, { 0, y + 6.2, hz }, Ghostly, "SmoothPlastic", true)
+	head.shape = "Ball"
+	head.transparency = 0.2
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		part(
+			parts,
+			`ScientistEye{tag}`,
+			{ 0.35, 0.35, 0.05 },
+			{ side * 0.4, y + 6.4, hz - 1.02 },
+			Ink,
+			"SmoothPlastic"
+		)
+	end
+
+	-- Shelves of growth tonics behind.
+	for s, x in { -9.5, 9.5 } do
+		for i, shelfTop in shelves(parts, `TonicShelf{s}`, x, { 40, 56, 44 }) do
+			for j, dx in { -2, 0, 2 } do
+				local tall = 0.8 + j * 0.3
+				part(
+					parts,
+					`Tonic{s}{i}{j}`,
+					{ 0.7, tall, 0.7 },
+					{ x + dx, shelfTop + tall / 2, 16 },
+					if (s + i + j) % 3 == 0 then Ecto else { 90, 200, 120 },
+					"Neon"
+				).transparency =
+					0.2
+			end
+		end
+	end
+	return parts
+end
+
 -- Recipes by landmark name (Layout.Landmarks), and which of their parts is the model's
 -- PrimaryPart: what Counter puts the prompt on.
 Landmarks.ByName = {
@@ -1073,6 +1321,8 @@ Landmarks.ByName = {
 	VacuumVault = Landmarks.VacuumVault,
 	Collector = Landmarks.Collector,
 	TradingBooth = Landmarks.TradingBooth,
+	Merger = Landmarks.Merger,
+	GrowthChamber = Landmarks.GrowthChamber,
 } :: { [string]: () -> { Part } }
 
 Landmarks.Anchor = {
@@ -1082,6 +1332,8 @@ Landmarks.Anchor = {
 	VacuumVault = Landmarks.CounterSpot,
 	Collector = Landmarks.CounterSpot,
 	TradingBooth = Landmarks.CounterSpot,
+	Merger = Landmarks.CounterSpot,
+	GrowthChamber = Landmarks.CounterSpot,
 } :: { [string]: string }
 
 return Landmarks

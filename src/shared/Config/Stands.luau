@@ -56,6 +56,26 @@ local Stands: { [string]: Stand } = {
 		enter = { ask = "I want to sell my monsters." },
 		quit = "Never mind",
 	},
+	Merger = {
+		name = "The Merger",
+		greeting = "Two in, one out! Hehehe... usually.",
+		info = {
+			ask = "What does the Merger do?",
+			answer = "Bring me two of the same monster from your Backpack: one to keep and one to give. If it works, the one you keep gets heavier and takes every effect of the other, and combos can form! If it fails, the one you gave is gone. Rarer monsters are harder to merge. I show you the odds and my fee first.",
+		},
+		enter = { ask = "Let's merge!" },
+		quit = "Never mind",
+	},
+	GrowthChamber = {
+		name = "Growth Chamber",
+		greeting = "Step right up! Bigger monsters, bigger prices.",
+		info = {
+			ask = "How does the chamber work?",
+			answer = "Put a monster from your Backpack in and pick how hard to push it. Gentle is safe but grows a little. Strong and Reckless grow a lot more, but fail more often, and then your monster shrinks. Every monster can go in 5 times. You see the odds and the fee first.",
+		},
+		enter = { ask = "Let's grow a monster!" },
+		quit = "Never mind",
+	},
 	Watcher = {
 		name = "The Watcher",
 		greeting = "...I see you.",
