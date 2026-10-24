@@ -6,6 +6,7 @@
 -- Shared.Config.Stands): info, enter or quit. Enter comes back here and opens the stand's
 -- window through onEnter, only while the player still stands at the counter.
 
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local World = require(script.Parent.World)
@@ -50,6 +51,8 @@ function Counter.stand(id: string, anchor: Attachment, objectText: string, onEnt
 	prompt.MaxActivationDistance = PromptReach
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = anchor
+	-- The client hides these while a stand's dialogue or window is open (DialogueController).
+	CollectionService:AddTag(prompt, "StandPrompt")
 	prompt.Triggered:Connect(function(player)
 		Talk:FireClient(player, id, anchor.WorldPosition)
 	end)
