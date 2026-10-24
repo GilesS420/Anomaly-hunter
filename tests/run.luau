@@ -1960,31 +1960,21 @@ do
 	check("rainbow parts carry where they start in the colour cycle", rainbow.pieces[1].rainbow ~= nil)
 	check("an undressed look is the look itself", EffectLooks.dress(look, {}, nil) == look)
 	-- Roaming effects rank under the rest: a cobwebbed, slimed monster wears the slime skin.
+	-- A shell coats the monster's own parts and adds no see-through parts (they flickered,
+	-- Giles 2026-10-24).
 	local slimed = EffectLooks.dress(look, { "Slimed", "PhantomWeaver" })
-	local slimeShell, webShell = false, false
+	local slimy = false
 	for _, p in slimed.pieces do
-		slimeShell = slimeShell or string.sub(p.name, 1, 11) == "SlimedShell"
-		webShell = webShell or string.find(p.name, "CobwebbedShell", 1, true) ~= nil
+		slimy = slimy or p.material == "SmoothPlastic"
 	end
-	check("a roaming effect's skin gives way to another effect's", slimeShell and not webShell)
-	-- Shells only go on the biggest parts, each a different size, so none share a face (they
-	-- flickered, Giles 2026-10-24).
-	local base: { [string]: any } = {}
-	for _, p in look.pieces do
-		base[p.name] = p
-	end
-	local grows: { [number]: boolean } = {}
-	local shells, clash = 0, false
-	for _, p in EffectLooks.dress(look, { "Slimed" }).pieces do
-		local part = base[string.sub(p.name, 12)]
-		if string.sub(p.name, 1, 11) == "SlimedShell" and part then
-			shells += 1
-			local grow = math.floor((p.size[1] - part.size[1]) * 1000 + 0.5)
-			clash = clash or grows[grow] == true
-			grows[grow] = true
+	check("a roaming effect's skin gives way to another effect's", slimy)
+	local shellCount = 0
+	for _, id in { "Cobwebbed", "Slimed", "Frostbitten", "Sugarcoated", "Bloodmoon" } do
+		for _, p in EffectLooks.dress(look, { id }).pieces do
+			shellCount += if string.find(p.name, "Shell", 1, true) then 1 else 0
 		end
 	end
-	check("shells go on a few big parts, each a different size", shells > 0 and shells <= 8 and not clash)
+	check("no effect draws shell parts", shellCount == 0)
 end
 
 -- Hub landmarks: every part is sized, uses a real material and stays on the landmark's spot,
