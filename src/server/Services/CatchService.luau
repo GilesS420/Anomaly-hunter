@@ -350,9 +350,9 @@ local function onStartCatch(player: Player, model: unknown)
 
 	local glow = Instance.new("Highlight")
 	glow.Name = "CatchGlow"
-	glow.FillColor = Color3.fromRGB(255, 250, 200)
-	glow.FillTransparency = 0.5
-	glow.OutlineColor = Color3.fromRGB(255, 255, 255)
+	glow.FillColor = Color3.fromRGB(30, 10, 45) -- a dark shroud, not a white flash
+	glow.FillTransparency = 0.45
+	glow.OutlineColor = Color3.fromRGB(150, 90, 220)
 	glow.DepthMode = Enum.HighlightDepthMode.Occluded
 	glow.Parent = model
 

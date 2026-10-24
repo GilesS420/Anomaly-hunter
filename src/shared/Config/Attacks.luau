@@ -10,7 +10,7 @@
 --   Shockwave  hits everyone in a ring around itself and knocks them back
 --   Throw      lobs something at the spot you stood on (a circle at your feet)
 --   Slow       like Throw, but it slows you instead of costing a heart
---   Blind      a flash around itself that whites out your screen for a moment
+--   Blind      a burst of darkness around itself that blacks out your screen for a moment
 --   Blink      vanishes and pops up somewhere close by (harmless, but it breaks your aim)
 -- Any hit that costs a heart also breaks a catch you are in the middle of.
 
@@ -44,7 +44,7 @@ local Monsters: { [string]: MonsterAttack } = {
 	Gloomlet = { kind = "Blink", text = "vanished for a second" },
 	Skittercrow = { kind = "Blind", text = "flapped a dust cloud in your face" },
 	Mossbones = { kind = "Throw", text = "threw a bone at you" },
-	WispJack = { kind = "Blind", text = "blinded you with a bright flash" },
+	WispJack = { kind = "Blind", text = "blinded you with a burst of darkness" },
 	Gravepup = { kind = "Charge", text = "charged at you" },
 	Tombgrin = { kind = "Shockwave", text = "stopped pretending to be a tombstone and bit you" },
 	TheGroundskeeper = { kind = "Shockwave", text = "screamed you backwards" },

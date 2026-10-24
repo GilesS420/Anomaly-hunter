@@ -3,7 +3,7 @@
 --   a warning shape on the ground while a monster winds up (red: costs a heart, blue: slows,
 --   yellow: blinds, purple: it's about to vanish) and a "!" over the monster. Step out of
 --   the shape before it disappears and the attack misses.
---   when you get hit: Charge and Shockwave knock you back, Blind whites out the screen.
+--   when you get hit: Charge and Shockwave knock you back, Blind blacks out the screen.
 --   when a monster that was after you misses: a quick green "Dodged!".
 
 local Players = game:GetService("Players")
@@ -33,7 +33,7 @@ type Warning = {
 local Colors = {
 	harmful = Color3.fromRGB(255, 60, 60),
 	Slow = Color3.fromRGB(80, 140, 255),
-	Blind = Color3.fromRGB(255, 240, 150),
+	Blind = Color3.fromRGB(80, 35, 130), -- a dark purple pool, like the blackout it brings
 	Blink = Color3.fromRGB(190, 120, 255),
 }
 
@@ -181,7 +181,7 @@ local function blind(seconds: number)
 		gui.DisplayOrder = 5 -- under the toasts, so you can still read what hit you
 		local created = Instance.new("Frame")
 		created.Size = UDim2.fromScale(1, 1)
-		created.BackgroundColor3 = Color3.fromRGB(255, 252, 235)
+		created.BackgroundColor3 = Color3.fromRGB(14, 8, 22) -- a dark blackout, not a white flash
 		created.BorderSizePixel = 0
 		created.BackgroundTransparency = 1
 		created.Parent = gui
