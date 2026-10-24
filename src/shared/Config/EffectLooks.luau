@@ -26,9 +26,13 @@
 --   auras      particles coming off the monster (kind Sparkle, Mist or Drip)
 --   includes   the styles of other effects first (a combo builds on its two effects)
 --
--- Everything added to a part (shells, bands, fur, stitches) copies that part's joint, so it
+-- Everything added to a part (bands, fur, stitches) copies that part's joint, so it
 -- swings along with the limb it sits on. Variants (Silver, Gold, Shiny, Rainbow) are applied
 -- last, so a gold monster stays gold whatever effects it has; their auras still add up.
+--
+-- A shell is not an extra part: it coats the monster's own parts (colour and material).
+-- See-through shells round each part overlapped their neighbours, and Roblox can't sort
+-- overlapping see-through parts, so they flickered (Giles 2026-10-24, twice).
 --
 -- Monsters can stack every effect, and each skin, band set or tuft set copies the monster's
 -- parts again (one with every effect came to 500+ parts and 40 particle emitters, which tanks
@@ -47,8 +51,6 @@ local MaxBest = 3 -- the most valuable effects are always drawn
 local MaxPicked = 3 -- plus this many of the others, picked per monster
 local MaxExtraGroups = 4
 local MaxAuras = 5
-local MaxShells = 8 -- only the biggest parts get a shell (body, head, limbs)
-local ShellGap = 0.2 -- how much bigger than its part a shell is, at least
 
 export type Extra = {
 	name: string,
@@ -351,7 +353,7 @@ EffectLooks.Styles = {
 	Sugarcoated = {
 		-- A glossy pink candy shell with sprinkles glinting on it.
 		tint = { color = { 255, 170, 210 }, mix = 0.3 },
-		shell = { color = { 255, 150, 200 }, transparency = 0.45, material = "Glass" },
+		shell = { color = { 255, 150, 200 }, transparency = 0.45, material = "SmoothPlastic" },
 		auras = {
 			{ kind = "Sparkle", color = { 255, 120, 190 } },
 			{ kind = "Sparkle", color = { 140, 230, 255 } },
@@ -910,27 +912,6 @@ end
 
 local function coverings(pieces: { Piece }, style: Style, prefix: string): { Piece }
 	local added = {}
-	-- Shells sit outside bands and stitches (0.05 and 0.08 out), each one a little further out
-	-- than the last so two never share a face, and only on the bigger parts: shells meeting
-	-- on the same spot flickered (Giles 2026-10-24).
-	local shellStyle = style.shell
-	if shellStyle then
-		for i, piece in biggest(pieces, MaxShells) do
-			local s = piece.size
-			local grow = ShellGap + (i - 1) * 0.02
-			local shell = attach(
-				piece,
-				`{prefix}Shell{piece.name}`,
-				{ s[1] + grow, s[2] + grow, s[3] + grow },
-				shellStyle.color,
-				{ 0, 0, 0 }
-			)
-			shell.transparency = shellStyle.transparency
-			shell.material = shellStyle.material
-			shell.glow = shellStyle.glow
-			table.insert(added, shell)
-		end
-	end
 	if style.wrap then
 		-- Bands round the middle of each part (two on long parts), along its height.
 		local wrap = style.wrap
@@ -1197,9 +1178,19 @@ function EffectLooks.dress(look: Looks.Look, effects: { string }?, variant: stri
 		wrap = if style.wrap then style else wrap
 		fur = if style.fur then style else fur
 	end
+	local coat = if shell then shell.shell else nil
+	if coat then
+		-- The shell's colour, more of it the less see-through the shell was meant to be.
+		local mix = math.clamp(1 - coat.transparency, 0.2, 0.55)
+		for _, piece in base do
+			if not piece.glow then
+				piece.color = mixColor(piece.color, coat.color, mix)
+				piece.material = coat.material or piece.material
+			end
+		end
+	end
 	for _, style in effectStyles do
 		local only: Style = {
-			shell = if style == shell then style.shell else nil,
 			wrap = if style == wrap then style.wrap else nil,
 			fur = if style == fur then style.fur else nil,
 		}
