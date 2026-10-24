@@ -252,6 +252,7 @@ function Ui.window(name: string, titleText: string): Window
 	panel.Size = UDim2.fromScale(0.92, 0.9) -- tall, so a landscape phone still shows a few rows
 	panel.BackgroundColor3 = Ui.Colors.panel
 	panel.BackgroundTransparency = 0.04
+	panel.Active = true -- clicks in the gaps between rows stop here, not in the world behind
 	panel.Parent = canvas
 	Ui.corner(panel, 14)
 	Ui.rim(panel, Ui.Colors.rim, 2)

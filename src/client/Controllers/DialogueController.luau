@@ -5,7 +5,10 @@
 -- letter by letter (click or tap the box to skip), then three choices: ask about the stand,
 -- enter it (opens its shop or sell window) or quit. Walking away closes it.
 -- The lines are in Shared.Config.Stands; the prompts and the Enter check in server/Counter.
+-- While the dialogue or a shop window is open the stands' Talk prompts are hidden, so a click
+-- that falls between the shop's cards can't hit the prompt behind the window and talk again.
 
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -14,6 +17,7 @@ local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Stands = require(ReplicatedStorage.Shared.Config.Stands)
 local Watcher = require(ReplicatedStorage.Shared.Util.Watcher)
 local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
+local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
 local DialogueController = {}
 
@@ -216,7 +220,7 @@ function DialogueController.start()
 			return
 		end
 		local stand = Stands[id]
-		if not stand then
+		if not stand or Ui.anyWindowOpen("BackpackUi") then
 			return
 		end
 		standId = id
@@ -225,6 +229,25 @@ function DialogueController.start()
 		gui.Enabled = true
 		say(stand.greeting)
 	end)
+
+	-- Hide the stands' prompts (on this screen only) while talking or shopping.
+	local function busy(): boolean
+		return gui.Enabled or Ui.anyWindowOpen("BackpackUi")
+	end
+	local function showPrompt(prompt: Instance)
+		if prompt:IsA("ProximityPrompt") then
+			prompt.Enabled = not busy()
+		end
+	end
+	local function showPrompts()
+		for _, prompt in CollectionService:GetTagged("StandPrompt") do
+			showPrompt(prompt)
+		end
+	end
+	CollectionService:GetInstanceAddedSignal("StandPrompt"):Connect(showPrompt)
+	gui:GetPropertyChangedSignal("Enabled"):Connect(showPrompts)
+	Ui.windowsChanged:Connect(showPrompts)
+	showPrompts()
 
 	-- Walking away (or travelling) closes it.
 	RunService.Heartbeat:Connect(function()
