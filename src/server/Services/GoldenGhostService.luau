@@ -2,7 +2,8 @@
 -- The Golden Ghost (quick time event B, Config/GoldenGhost): once in the calm between two
 -- Watcher events it zips through the main area for a few seconds. The first player to tap
 -- it Taps times wins a prize (Util/GoldenGhost). It never shows up during a warning or an
--- event, and when it gets away nobody loses anything.
+-- event, but one that's already out keeps flying when an event starts, until it's caught or
+-- its time is up. When it gets away nobody loses anything.
 --
 -- It's a golden ghost built from a few parts in Workspace.Hub.GoldenGhost, flown by the
 -- server's physics (AlignPosition), so it moves smoothly for everyone.
@@ -285,11 +286,10 @@ local function tick()
 	local model = ghost
 	if model then
 		local head = model.PrimaryPart
-		if not calm or os.clock() >= endsAt then
+		-- It stays out its full time even if an event starts meanwhile (Giles 2026-10-24).
+		if os.clock() >= endsAt then
 			remove()
-			if calm then
-				Notify.toastAll("The Golden Ghost got away...")
-			end
+			Notify.toastAll("The Golden Ghost got away...")
 		elseif head and (head.Position - (mover :: AlignPosition).Position).Magnitude < 4 then
 			flyOn()
 		end
