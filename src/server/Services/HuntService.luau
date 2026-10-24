@@ -50,11 +50,17 @@ local LockedCooldown = 4 -- seconds between two "this zone is locked" messages
 local WalkCheckSeconds = 0.1
 local WalkPadding = 1.5 -- studs added round a portal: the body is wider than the point we follow
 local MaxWalkStep = 20 -- studs; a bigger jump between two checks is a teleport, not a walk
+-- A hunter who counts as in a zone but stands this far from its Arrival for this long isn't
+-- really there (their trip in bounced back): they count as home again so the gates work.
+local StrayDistance = 500
+local StraySeconds = 10 -- longer than a trip can take (streaming in waits up to 5 s)
 
 local carrying: { [Player]: { Value.CaughtMonster } } = {} -- the bag, oldest catch first
 local lastPortal: { [Player]: number } = {}
 local lastLocked: { [Player]: number } = {}
 local lastSpot: { [Player]: Vector3 } = {} -- where each hunter stood at the last walk check
+local strayingSince: { [Player]: number } = {}
+local arrivals: { [string]: BasePart } = {} -- each wired zone's Arrival, by zone id
 
 -- Every gate and exit part, with what walking through it does.
 type Portal = { part: BasePart, use: (Player) -> () }
@@ -551,6 +557,7 @@ local function wireZone(zone: Zones.Zone)
 		end
 	end
 	if gate and arrival then
+		arrivals[zone.id] = arrival
 		local facing = zoneMiddle(zone, zoneFolder)
 		wire(gateInstance, function(player)
 			if player:GetAttribute("Zone") == nil and portalReady(player) then
@@ -568,6 +575,26 @@ local function wireZone(zone: Zones.Zone)
 	end
 end
 
+-- Clears the zone of a hunter who isn't anywhere near it (see StrayDistance).
+local function checkStray(player: Player, position: Vector3)
+	local zoneId = player:GetAttribute("Zone")
+	local arrival = if typeof(zoneId) == "string" then arrivals[zoneId] else nil
+	if not arrival or (position - arrival.Position).Magnitude <= StrayDistance then
+		strayingSince[player] = nil
+		return
+	end
+	local since = strayingSince[player]
+	if not since then
+		strayingSince[player] = os.clock()
+	elseif os.clock() - since >= StraySeconds then
+		strayingSince[player] = nil
+		warn(`HuntService: {player.Name} counted as in {zoneId} but wasn't there; reset so the gates work`)
+		drop(player)
+		player:SetAttribute("Zone", nil)
+		player:SetAttribute("Hearts", Zones.MaxHearts)
+	end
+end
+
 -- The backup for Touched: did anyone walk through a gate or exit since the last check?
 local function checkWalks()
 	for _, player in Players:GetPlayers() do
@@ -578,6 +605,7 @@ local function checkWalks()
 			continue
 		end
 		local now = root.Position
+		checkStray(player, now)
 		local before = lastSpot[player]
 		lastSpot[player] = now
 		if before and (now - before).Magnitude <= MaxWalkStep then
@@ -661,6 +689,7 @@ function HuntService.start()
 		lastPortal[player] = nil
 		lastLocked[player] = nil
 		lastSpot[player] = nil
+		strayingSince[player] = nil
 	end)
 end
 

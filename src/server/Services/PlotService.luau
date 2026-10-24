@@ -122,23 +122,50 @@ function PlotService.ownerOf(plotName: string): Player?
 	return nil
 end
 
--- Moves a player's character, asking the server to stream the destination in first so they
--- don't land in empty space. Yields briefly when StreamingEnabled is on.
-function PlotService.teleport(player: Player, cframe: CFrame)
-	if workspace.StreamingEnabled then
-		pcall(player.RequestStreamAroundAsync, player, cframe.Position, 5)
-	end
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if not character or not root or not root:IsA("BasePart") then
-		return
-	end
+-- A teleport can bounce: the player's own computer moves their character, and if it sends
+-- its old spot after the server's move, the character snaps back to where it was. So each
+-- trip is checked a moment later and redone if the player isn't near where they were sent.
+local CheckAfter = 0.4 -- seconds
+local MissedBy = 60 -- studs; further than this from the destination means the move bounced
+local Retries = 3
+local trips: { [Player]: number } = setmetatable({}, { __mode = "k" }) :: any
+
+local function move(character: Model, root: BasePart, cframe: CFrame)
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		humanoid.Sit = false -- otherwise the seat comes along
 	end
 	character:PivotTo(cframe)
 	root.AssemblyLinearVelocity = Vector3.zero -- no leftover falling speed
+end
+
+-- Moves a player's character, asking the server to stream the destination in first so they
+-- don't land in empty space. Yields briefly when StreamingEnabled is on.
+function PlotService.teleport(player: Player, cframe: CFrame)
+	local trip = (trips[player] or 0) + 1
+	trips[player] = trip
+	if workspace.StreamingEnabled then
+		pcall(player.RequestStreamAroundAsync, player, cframe.Position, 5)
+	end
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not character or not root or not root:IsA("BasePart") or trips[player] ~= trip then
+		return -- no body, or a newer trip started while the zone streamed in
+	end
+	move(character, root, cframe)
+	task.spawn(function()
+		for _ = 1, Retries do
+			task.wait(CheckAfter)
+			if trips[player] ~= trip or player.Character ~= character or not root.Parent then
+				return -- a newer trip, or a new body
+			end
+			if (root.Position - cframe.Position).Magnitude <= MissedBy then
+				return
+			end
+			warn(`PlotService: {player.Name}'s teleport bounced back, sending them again`)
+			move(character, root, cframe)
+		end
+	end)
 end
 
 local function onCharacter(player: Player, character: Model)
