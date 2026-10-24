@@ -4,10 +4,12 @@
 -- an "Admin" attribute on them (see server/Admins.luau). Press F2 to open and close it
 -- (there's no button on screen, Giles 2026-10-20).
 --
--- Laid out to need little scrolling (Giles 2026-10-22): a "Works on" dropdown at the top
--- (Me, Everyone, or any player in the server), tabs down the left (Player, Mansion, Items,
--- Spawn, Server; Server also shows a timeline of the next events) and one short page per tab, with dropdowns for long lists such as items,
--- monsters and events. Events and "Reset my save" ignore "Works on".
+-- Laid out to need little scrolling and few taps (Giles 2026-10-22, 2026-10-24): a "Works on"
+-- dropdown at the top (Me, Everyone, or any player in the server), tabs down the left (Player,
+-- Mansion, Items, Spawn, Events) and one short page per tab. Most things are one tap: quick
+-- amounts, a button per wing and per size, and a button per Watcher event (the Awakening once
+-- per monster set) with Stop next to them. Dropdowns only for long lists (items, monsters).
+-- Events and "Reset my save" ignore "Works on".
 --
 -- Each button sends
 --   ReplicatedStorage.Remotes.AdminCommand   client -> server: (command, argument?, targetUserId?)
@@ -38,7 +40,7 @@ local RowHeight = 34
 local Gap = 8
 local SideWidth = 110
 local PopupMaxHeight = 240
-local TimelineLength = 10 -- events shown on the Server tab's timeline
+local TimelineLength = 5 -- events shown on the Events tab's timeline
 
 local remote: RemoteEvent
 local window: Ui.Window
@@ -82,6 +84,23 @@ local function row(page: Frame, name: string): Frame
 	return line
 end
 
+-- A wrapping block of buttons with no name in front (the Events tab's event buttons).
+local function grid(page: Frame): Frame
+	local block = Instance.new("Frame")
+	block.LayoutOrder = nextOrder()
+	block.BackgroundTransparency = 1
+	block.Size = UDim2.new(1, 0, 0, RowHeight)
+	block.AutomaticSize = Enum.AutomaticSize.Y
+	block.Parent = page
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.Wraps = true
+	layout.Padding = UDim.new(0, 6)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = block
+	return block
+end
+
 local function button(line: Frame, text: string, color: Color3, width: number, action: () -> ()): TextButton
 	local made = Ui.button(line, text, color, UDim2.fromOffset(width, RowHeight))
 	made.LayoutOrder = nextOrder()
@@ -90,7 +109,14 @@ local function button(line: Frame, text: string, color: Color3, width: number, a
 end
 
 -- A box to type a number or word into; returns a function that reads it (nil when empty).
-local function input(line: Frame, placeholder: string, start: string?, width: number): () -> string?
+-- Pressing Enter in it runs `onEnter` (the row's main button), if given.
+local function input(
+	line: Frame,
+	placeholder: string,
+	start: string?,
+	width: number,
+	onEnter: ((text: string?) -> ())?
+): () -> string?
 	local box = Instance.new("TextBox")
 	box.LayoutOrder = nextOrder()
 	box.Size = UDim2.fromOffset(width, RowHeight)
@@ -108,10 +134,18 @@ local function input(line: Frame, placeholder: string, start: string?, width: nu
 	Ui.corner(box, 8)
 	Ui.rim(box, Ui.Colors.rim, 1)
 	box.Parent = line
-	return function()
+	local function read(): string?
 		local text = string.match(box.Text, "^%s*(.-)%s*$")
 		return if text and text ~= "" then text else nil
 	end
+	if onEnter then
+		box.FocusLost:Connect(function(enterPressed)
+			if enterPressed then
+				onEnter(read())
+			end
+		end)
+	end
+	return read
 end
 
 -- The one list that drops down under whichever dropdown was tapped, and a see-through cover
@@ -246,7 +280,7 @@ end
 local function wingOptions(): { Option }
 	local list: { Option } = {}
 	for index, wing in Wings.List do
-		table.insert(list, { label = `{index}: {wing.id}`, value = tostring(index) })
+		table.insert(list, { label = wing.id, value = tostring(index) })
 	end
 	return list
 end
@@ -280,10 +314,22 @@ for _, size in Sizes do
 	table.insert(sizeList, { label = size.id, value = size.id })
 end
 
-local eventList: { Option } = {}
+-- One button per launch event; The Watcher Awakens once per monster set (its argument says
+-- which: "WatcherAwakens Eldritch").
+local eventButtons: { Option } = {}
 for _, event in Events.List do
 	if event.launch then
-		table.insert(eventList, { label = event.name, value = event.id })
+		local icon = if event.icon then `{event.icon} ` else ""
+		if event.monsterSets then
+			for _, set in event.monsterSets do
+				table.insert(
+					eventButtons,
+					{ label = `{icon}Awakens: {set.name}`, value = `{event.id} {set.id}` }
+				)
+			end
+		else
+			table.insert(eventButtons, { label = `{icon}{event.name}`, value = event.id })
+		end
 	end
 end
 
@@ -300,7 +346,7 @@ local function build()
 	local panel = window.panel
 	local limit = panel:FindFirstChildOfClass("UISizeConstraint")
 	if limit then
-		limit.MaxSize = Vector2.new(720, 520)
+		limit.MaxSize = Vector2.new(820, 560)
 	end
 	buildPopup(window.canvas)
 	window.onClose = closePopup
@@ -392,7 +438,9 @@ local function build()
 	-- Player
 	local you = page("Player")
 	local moneyRow = row(you, "Money")
-	local amount = input(moneyRow, "5m, 1b, -1k", "1m", 90)
+	local amount = input(moneyRow, "5m, 1b, -1k", "1m", 90, function(text)
+		send("/money", text)
+	end)
 	button(moneyRow, "Add", Ui.Colors.buy, 60, function()
 		send("/money", amount())
 	end)
@@ -402,10 +450,11 @@ local function build()
 		end)
 	end
 	local wingRow = row(you, "Wings")
-	local wing = dropdown(wingRow, 150, wingOptions, "1")
-	button(wingRow, "Set", Ui.Colors.equip, 60, function()
-		send("/wings", wing())
-	end)
+	for _, option in wingOptions() do
+		button(wingRow, option.value, Ui.Colors.equip, 40, function()
+			send("/wings", option.value)
+		end)
+	end
 	local tutorialRow = row(you, "Tutorial")
 	button(tutorialRow, "Skip", Ui.Colors.off, 80, function()
 		send("/tutorial", "skip")
@@ -430,13 +479,29 @@ local function build()
 
 	-- Mansion
 	local mansion = page("Mansion")
-	local numberRow = row(mansion, "Number")
-	local number = input(numberRow, "5", "5", 60)
-	button(numberRow, "Grow (spurts)", Ui.Colors.equip, 120, function()
-		send("/grow", number())
+	local growRow = row(mansion, "Grow spurts")
+	for _, spurts in { "1", "5", "25" } do
+		button(growRow, spurts, Ui.Colors.equip, 50, function()
+			send("/grow", spurts)
+		end)
+	end
+	local spurtsBox = input(growRow, "#", nil, 50, function(text)
+		send("/grow", text)
 	end)
-	button(numberRow, "Skip (hours)", Ui.Colors.equip, 110, function()
-		send("/skip", number())
+	button(growRow, "Go", Ui.Colors.equip, 50, function()
+		send("/grow", spurtsBox())
+	end)
+	local skipRow = row(mansion, "Skip hours")
+	for _, hours in { "1", "12", "48" } do
+		button(skipRow, `{hours}h`, Ui.Colors.equip, 50, function()
+			send("/skip", hours)
+		end)
+	end
+	local hoursBox = input(skipRow, "#", nil, 50, function(text)
+		send("/skip", text)
+	end)
+	button(skipRow, "Go", Ui.Colors.equip, 50, function()
+		send("/skip", hoursBox())
 	end)
 	local allRow = row(mansion, "All monsters")
 	button(allRow, "Haunt all", Ui.Colors.equip, 100, function()
@@ -454,51 +519,65 @@ local function build()
 	-- Items
 	local items = page("Items")
 	local itemRow = row(items, "Item")
-	local item = dropdown(itemRow, 190, fixed(itemList), itemList[1] and itemList[1].value)
-	local countRow = row(items, "How many")
-	local count = input(countRow, "1", "1", 60)
-	button(countRow, "Give", Ui.Colors.buy, 80, function()
+	local item = dropdown(itemRow, 230, fixed(itemList), itemList[1] and itemList[1].value)
+	local countRow = row(items, "Give")
+	local function give(count: string?)
 		local id = item()
 		if id then
-			send("/give", `{id} {count() or "1"}`)
+			send("/give", `{id} {count or "1"}`)
 		end
+	end
+	for _, count in { "1", "5", "25" } do
+		button(countRow, `x{count}`, Ui.Colors.buy, 54, function()
+			give(count)
+		end)
+	end
+	local countBox = input(countRow, "#", nil, 50, give)
+	button(countRow, "Go", Ui.Colors.buy, 50, function()
+		give(countBox())
 	end)
 
 	-- Spawn (in the zone the player is standing in)
 	local spawn = page("Spawn")
 	local monsterRow = row(spawn, "Monster")
 	local monster = dropdown(monsterRow, 230, fixed(monsterList), monsterList[1] and monsterList[1].value)
-	local sizeRow = row(spawn, "Size")
-	local size = dropdown(sizeRow, 120, fixed(sizeList), "Normal")
-	local spawnRow = row(spawn, "In my zone")
-	button(spawnRow, "Spawn", Ui.Colors.sell, 80, function()
-		local id = monster()
-		if id then
-			send("/spawn", `{id} {size() or "Normal"}`)
-		end
-	end)
-	button(spawnRow, "All of the zone", Ui.Colors.sell, 130, function()
-		send("/spawn", `all {size() or "Normal"}`)
+	-- One tap spawns the picked monster at that size, in the zone you're standing in.
+	local sizeRow = row(spawn, "Spawn as")
+	for _, option in sizeList do
+		button(sizeRow, option.label, Ui.Colors.sell, 78, function()
+			local id = monster()
+			if id then
+				send("/spawn", `{id} {option.value}`)
+			end
+		end)
+	end
+	local zoneRow = row(spawn, "Whole zone")
+	button(zoneRow, "Every monster of my zone", Ui.Colors.sell, 210, function()
+		send("/spawn", "all Normal")
 	end)
 
-	-- Server (Watcher events reach everyone)
-	local server = page("Server")
-	local eventRow = row(server, "Event")
-	local event = dropdown(eventRow, 180, fixed(eventList), eventList[1] and eventList[1].value)
-	button(eventRow, "Start", Ui.Colors.sell, 70, function()
-		local id = event()
-		if id then
-			send("/event", id)
-		end
+	-- Events (Watcher events reach everyone). Tapping one starts it now, ending one that's
+	-- playing.
+	local server = page("Events")
+	local live = Ui.text(server, "", UDim2.new(1, 0, 0, 24), Ui.Colors.lamp, true, 18)
+	live.LayoutOrder = nextOrder()
+	live.TextXAlignment = Enum.TextXAlignment.Left
+	local controlRow = row(server, "Now")
+	button(controlRow, "Stop event", Ui.Colors.confirm, 110, function()
+		send("/stopevent")
 	end)
-	local nextRow = row(server, "Next event")
-	button(nextRow, "Start next now", Ui.Colors.sell, 140, function()
+	button(controlRow, "Next one now", Ui.Colors.sell, 120, function()
 		send("/summon")
 	end)
-	local ghostRow = row(server, "Golden Ghost")
-	button(ghostRow, "Send it now", Ui.Colors.sell, 120, function()
+	button(controlRow, "Golden Ghost", Ui.Colors.sell, 120, function()
 		send("/ghost")
 	end)
+	local events = grid(server)
+	for _, option in eventButtons do
+		button(events, option.label, Ui.Colors.off, 184, function()
+			send("/event", option.value)
+		end)
+	end
 
 	-- The global schedule (the same in every server; a started event doesn't change it).
 	local timeline = Ui.text(server, "", UDim2.new(1, 0, 0, 0), Ui.Colors.text, false, 16)
@@ -513,7 +592,14 @@ local function build()
 		while timeline.Parent do
 			if window.isOpen() and server.Visible then
 				local now = workspace:GetServerTimeNow()
-				local lines = { "Upcoming events (every server):" }
+				local playing = Events.find(workspace:GetAttribute("WatcherEvent") :: string?)
+				local ends = workspace:GetAttribute("WatcherEventEnd")
+				live.Text = if playing and type(ends) == "number"
+					then `Playing: {playing.icon or ""} {playing.name} ({Watcher.clock(
+						math.max(ends - now, 0)
+					)} left)`
+					else "No event playing"
+				local lines = { "Coming up (every server):" }
 				for _, slot in Watcher.upcoming(now, TimelineLength) do
 					local when = if now >= slot.startAt
 						then `live, {Watcher.clock(slot.endAt - now)} left`
