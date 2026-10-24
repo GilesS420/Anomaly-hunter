@@ -32,6 +32,7 @@ export type Data = {
 	settings: { [string]: any }, -- music, sounds, weather... (Util/Settings, SettingsService)
 	seenAt: number, -- os.time() the player was last online (0: never); the "while you were away" book
 	potion: { id: string, secondsLeft: number }, -- the luck potion going (Util/Potions), "" for none
+	hotbar: { slots: { [string]: number }, benched: { string } }, -- Util/HotbarLayout, HotbarService
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -56,6 +57,7 @@ DataService.Template = {
 	settings = {}, -- empty means the defaults (Util/Settings)
 	seenAt = 0,
 	potion = { id = "", secondsLeft = 0 },
+	hotbar = { slots = {}, benched = {} },
 } :: Data
 
 local store = ProfileStore.New(

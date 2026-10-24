@@ -3107,6 +3107,43 @@ do
 	check("growth: five Reckless wins make a Titan", lucky.size == "Titan" and Growth.chargesLeft(lucky) == 0)
 end
 
+-- Hotbar layout (Util/HotbarLayout): each Tool keeps its slot across respawns and rejoins.
+do
+	local HotbarLayout = require("../src/shared/Util/HotbarLayout")
+	check(
+		"tools, cakes and monsters get their own keys",
+		HotbarLayout.key("DustBuster", nil, nil) == "T:DustBuster"
+			and HotbarLayout.key(nil, "MoldyMuffin", nil) == "C:MoldyMuffin"
+			and HotbarLayout.key(nil, nil, "abc") == "M:abc"
+			and HotbarLayout.key(nil, nil, nil) == nil
+	)
+	local layout = HotbarLayout.new()
+	HotbarLayout.remember(layout, "T:DustBuster", 3)
+	HotbarLayout.remember(layout, "C:MoldyMuffin", 3)
+	check("one key per slot", layout.slots["C:MoldyMuffin"] == 3 and layout.slots["T:DustBuster"] == nil)
+	HotbarLayout.bench(layout, "C:MoldyMuffin")
+	check(
+		"a benched key leaves its slot",
+		layout.slots["C:MoldyMuffin"] == nil and HotbarLayout.isBenched(layout, "C:MoldyMuffin")
+	)
+	HotbarLayout.remember(layout, "C:MoldyMuffin", 1)
+	check("putting it back un-benches it", not HotbarLayout.isBenched(layout, "C:MoldyMuffin"))
+	local cleaned = HotbarLayout.clean({
+		slots = { ["T:A"] = 1, ["T:B"] = 1, ["T:C"] = 10, ["T:D"] = 2.5, [5] = 3, ["T:E"] = "4" },
+		benched = { "M:x", "M:x", 7, "T:A" },
+	})
+	local count = 0
+	for _ in cleaned.slots do
+		count += 1
+	end
+	check("cleaning drops bad and clashing slots", count == 1 and cleaned.slots["T:A"] == 1)
+	check(
+		"cleaning drops bad and repeated benched keys",
+		#cleaned.benched == 1 and cleaned.benched[1] == "M:x"
+	)
+	check("cleaning anything else gives an empty layout", next(HotbarLayout.clean("junk").slots) == nil)
+end
+
 if failures > 0 then
 	error(`{failures} check(s) failed`)
 end
