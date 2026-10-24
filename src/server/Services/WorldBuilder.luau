@@ -307,7 +307,8 @@ local function buildReturnPoint(hub: Instance)
 end
 
 -- Where a landmark stands, turned so its front (-Z) faces the middle of the hub along
--- whichever axis points there most directly (the shops at the west end face due east).
+-- whichever axis points there most directly (the shops at the west end face due east). One
+-- with faceOut is turned the other way, toward the nearest end of the hub.
 local function landmarkFrame(spot: Layout.Landmark): CFrame
 	local at = Vector3.new(spot.x, GroundTop, spot.z)
 	local facing = if math.abs(spot.x) >= math.abs(spot.z)
@@ -315,6 +316,9 @@ local function landmarkFrame(spot: Layout.Landmark): CFrame
 		else Vector3.new(0, 0, -math.sign(spot.z))
 	if facing.Magnitude < 0.5 then
 		return CFrame.new(at)
+	end
+	if spot.faceOut then
+		facing = -facing
 	end
 	return CFrame.lookAt(at, at + facing)
 end

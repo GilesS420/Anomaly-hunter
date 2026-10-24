@@ -112,6 +112,7 @@ end
 local Avenue = 50 -- the avenues run along z = -50 and z = 50
 local GatePlaza = { x0 = 330, x1 = 372 }
 local ShopPlaza = { x0 = -360, x1 = -330 } -- the shops stand just west of it
+local FrontPath = 26 -- studs of path in front of a stand that faces out
 local function paths(parts: { Part })
 	for i, z in { -Avenue, Avenue } do
 		path(parts, `Avenue{i}`, ShopPlaza.x1, z, GatePlaza.x0, z, 12, 0.12)
@@ -129,20 +130,16 @@ local function paths(parts: { Part })
 	local square = 30
 	path(parts, "SquarePathNorth", 0, -Avenue + 8, 0, -square, 10, 0.08)
 	path(parts, "SquarePathSouth", 0, square, 0, Avenue - 8, 10, 0.08)
-	-- The Growth Chamber and the Merger stand one further out, past the Collector and the
-	-- Trading Booth: their paths start at the back of those.
-	local after = { GrowthChamber = "Collector", Merger = "TradingBooth" }
-	local spots: { [string]: Layout.Landmark } = {}
 	for _, spot in Layout.Landmarks do
-		spots[spot.name] = spot
-	end
-	for _, spot in Layout.Landmarks do
-		local inner = spots[after[spot.name] or ""]
-		if spot.name == "Collector" or spot.name == "TradingBooth" or inner then
-			local side = math.sign(spot.x)
+		local side = math.sign(spot.x)
+		if spot.name == "Collector" or spot.name == "TradingBooth" then
 			local near = math.abs(spot.x) - spot.depth / 2 - 2
-			local from = if inner then math.abs(inner.x) + inner.depth / 2 + 2 else square
-			path(parts, `{spot.name}Path`, side * from, 0, side * near, 0, 10, 0.08)
+			path(parts, `{spot.name}Path`, side * square, 0, side * near, 0, 10, 0.08)
+		elseif spot.faceOut then
+			-- The Growth Chamber and the Merger face out toward the ends of the hub: a short
+			-- path leads up to their fronts.
+			local front = math.abs(spot.x) + spot.depth / 2 + 2
+			path(parts, `{spot.name}Path`, side * front, 0, side * (front + FrontPath), 0, 10, 0.08)
 		end
 	end
 	-- Worn edges along the avenues: a darker cobble strip each side.
