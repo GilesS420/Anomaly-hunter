@@ -2955,6 +2955,18 @@ do
 	check("three potions in the Workshop", sold == 3)
 end
 
+-- Codex combo clue (Util/Codex.recipeKnown): how many of a combo's two effects you've found.
+do
+	local Codex = require("../src/shared/Util/Codex")
+	local codex: { [string]: any } = {}
+	check("combo clue: nothing found yet", Codex.recipeKnown(codex, "Count") == 0)
+	codex.effects = { Vampire = true }
+	check("combo clue: one of the two found", Codex.recipeKnown(codex, "Count") == 1)
+	codex.effects.Batty = true
+	check("combo clue: both found", Codex.recipeKnown(codex, "Count") == 2)
+	check("combo clue: unknown combo is 0", Codex.recipeKnown(codex, "Nothing") == 0)
+end
+
 if failures > 0 then
 	error(`{failures} check(s) failed`)
 end

@@ -49,6 +49,9 @@ export type EffectCard = {
 	found: boolean,
 	hint: string, -- where it comes from (effects), or the recipe once found (combos)
 	combo: boolean,
+	recipe: { string }?, -- combos you've made: the two effect names
+	known: number?, -- combos: how many of its two effects you've found (the clue for secret ones)
+	usedIn: { string }?, -- effects: the combos you've made with it
 }
 export type View = { pages: { Page }, effects: { EffectCard }, effectRewards: Rewards, variants: { string } }
 
@@ -164,8 +167,15 @@ local function viewFor(data: DataService.Data): View
 
 	local effects: { EffectCard } = {}
 	local foundEffects = if typeof(codex.effects) == "table" then codex.effects else {}
+	local foundCombos = if typeof(codex.combos) == "table" then codex.combos else {}
 	for _, id in Codex.effectIds() do
 		local effect = Effects.List[id]
+		local usedIn = {}
+		for _, comboId in Codex.comboIds() do
+			if foundCombos[comboId] and table.find(Effects.Combos[comboId].recipe, id) then
+				table.insert(usedIn, Format.name(comboId))
+			end
+		end
 		table.insert(effects, {
 			id = id,
 			name = Format.name(id),
@@ -173,9 +183,9 @@ local function viewFor(data: DataService.Data): View
 			found = foundEffects[id] == true,
 			hint = Codex.whereFrom(effect),
 			combo = false,
+			usedIn = usedIn,
 		})
 	end
-	local foundCombos = if typeof(codex.combos) == "table" then codex.combos else {}
 	for _, id in Codex.comboIds() do
 		local combo = Effects.Combos[id]
 		local found = foundCombos[id] == true
@@ -191,6 +201,8 @@ local function viewFor(data: DataService.Data): View
 			-- The recipe stays secret until you've made it.
 			hint = if found then table.concat(parts, " + ") else "??? + ???",
 			combo = true,
+			recipe = if found then parts else nil,
+			known = Codex.recipeKnown(codex, id),
 		})
 	end
 	return {
