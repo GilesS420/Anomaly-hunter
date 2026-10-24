@@ -10,8 +10,10 @@
 --   /reset confirm    wipes YOUR save back to a brand-new player's and kicks you; rejoin to
 --                     start fresh (replay the tutorial and early game). Nobody else is touched.
 --   /summon           starts the next Watcher event right away (skipping its warning)
---   /event BloodMoon  starts that Watcher event right away (/event alone lists them;
---                     any capitals: /event frostfog works too)
+--   /event BloodMoon  starts that Watcher event right away, ending one that's playing
+--                     (/event alone lists them; any capitals: /event frostfog works too;
+--                     /event WatcherAwakens Eldritch picks the Awakening's monster set)
+--   /stopevent        ends the event playing right now
 --   /ghost            the Golden Ghost zips through the hub right now
 --   /give VoidVac     gives a Workshop item or Bakery cake for free (tools are equipped;
 --                     /give BaitBell 5 or /give PumpkinCandy 3 gives several)
@@ -27,7 +29,7 @@
 --                     add a size: /spawn TheBogKing Huge). Only you can catch it and it never
 --                     attacks. /spawn all brings every monster of the zone you're in.
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
--- Any command but /summon, /event, /ghost and /reset can be run on another player in the server, or
+-- Any command but /summon, /event, /stopevent, /ghost and /reset can be run on another player in the server, or
 -- on everyone in it: pick them at the top of the panel, or end a chat command with @name
 -- (/money 5m @Biggie) or @all.
 -- The results come back to the admin, starting with that player's name.
@@ -160,7 +162,13 @@ end
 
 commands["/summon"] = function(_, _, tell)
 	if not WatcherService.summon() then
-		tell("An event is already playing. Wait for it to end first.")
+		tell("Couldn't start the next event.")
+	end
+end
+
+commands["/stopevent"] = function(_, _, tell)
+	if not WatcherService.stop() then
+		tell("No event is playing.")
 	end
 end
 
@@ -171,14 +179,25 @@ commands["/ghost"] = function(_, _, tell)
 end
 
 commands["/event"] = function(_, argument, tell)
-	local wanted = string.lower((string.gsub(argument or "", "%s", "")))
+	local wantedEvent, wantedSet = string.match(argument or "", "^(%S*)%s*(%S*)")
+	local wanted, setWanted = string.lower(wantedEvent or ""), string.lower(wantedSet or "")
 	local ids: { string } = {}
 	for _, event in Events.List do
 		if event.launch then
 			table.insert(ids, event.id)
 			if string.lower(event.id) == wanted then
-				if not WatcherService.summon(event.id) then
-					tell("An event is already playing. Wait for it to end first.")
+				local setId: string? = nil
+				local setIds: { string } = {}
+				for _, set in event.monsterSets or ({} :: { Events.MonsterSet }) do
+					table.insert(setIds, set.id)
+					if string.lower(set.id) == setWanted then
+						setId = set.id
+					end
+				end
+				if setWanted ~= "" and not setId then
+					tell(`{event.name} has these: {table.concat(setIds, ", ")}`)
+				elseif not WatcherService.summon(event.id, setId) then
+					tell("Couldn't start that event.")
 				end
 				return
 			end
@@ -338,7 +357,7 @@ local MaxArgumentLength = 60
 
 -- Commands that act on the whole server or only ever on yourself: a picked player is ignored.
 local untargeted: { [string]: boolean } =
-	{ ["/summon"] = true, ["/event"] = true, ["/ghost"] = true, ["/reset"] = true }
+	{ ["/summon"] = true, ["/event"] = true, ["/stopevent"] = true, ["/ghost"] = true, ["/reset"] = true }
 
 -- Runs one command for an admin, on `target` (another player in the server) or on the admin.
 -- Anything else (not an admin, unknown command, odd argument) is ignored.
@@ -499,7 +518,7 @@ function DevService.start()
 		return
 	end
 	print(
-		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /reset confirm, /give <item> [count], /summon, /event <name>, /skip <hours>, /haunt, /calm, /attack`
+		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /calm, /attack`
 	)
 end
 

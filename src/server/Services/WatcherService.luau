@@ -86,6 +86,7 @@ local eyes = 0
 -- the same times. Set in start.
 local schedule: Watcher.Slot? = nil
 local summoned = false -- the live event was summoned in this server only (Studio /event)
+local stoppedSlot: number? = nil -- an admin stopped this schedule slot's event: don't restart it
 -- Topping up the live event's monsters as they're caught (Events.RespawnSeconds).
 local respawn: { weights: { [string]: number }, target: number, at: number? }? = nil
 
@@ -803,7 +804,9 @@ local function tick()
 	if not summoned then
 		-- The set is rolled from the slot too, so every server gets the same monsters and sky.
 		local set = Watcher.pickSet(slot.event, Rng.seeded(`watcher-set:{slot.index}`))
-		if time >= slot.startAt then
+		if stoppedSlot == slot.index then
+			-- Stopped by an admin: wait for the next slot.
+		elseif time >= slot.startAt then
 			if phase ~= "Live" then
 				-- Straight from the warning the sky is already in; joining late, it comes in fast.
 				local skySeconds = if phase == "Warning" and upcoming == slot.event
@@ -1078,26 +1081,62 @@ function WatcherService.current(): Events.WatcherEvent?
 	return current
 end
 
+-- Once an admin cuts or stops an event, the schedule's own event in this slot (warning or
+-- live) stays away; a slot that hasn't begun warning yet still plays.
+local function skipSlot(slot: Watcher.Slot)
+	if now() >= slot.warnAt then
+		stoppedSlot = slot.index
+	end
+end
+
 -- Starts an event right away in this server only, skipping the warning: the one named `id`
--- (Studio /event), or else the schedule's next one (/summon). It opens no eye, and when it
--- ends the server goes back to the global schedule. False if an event is already playing or
--- `id` isn't a launch event.
-function WatcherService.summon(id: string?): boolean
+-- (admin panel, /event), or else the schedule's next one (/summon). `setId` picks one of The
+-- Watcher Awakens' monster sets (Phantoms, Nightmares, Eldritch) instead of rolling it. An
+-- event that's already playing ends first. It opens no eye, and when it ends the server goes
+-- back to the global schedule. False if `id` or `setId` isn't a launch event or its set.
+function WatcherService.summon(id: string?, setId: string?): boolean
 	local slot = schedule
-	if phase == "Live" or not slot then
+	if not slot then
 		return false
 	end
 	local event = if id then Events.find(id) else slot.event
 	if not event or not event.launch then
 		return false
 	end
+	local set = Watcher.pickSet(event, random)
+	if setId then
+		set = nil
+		for _, candidate in event.monsterSets or ({} :: { Events.MonsterSet }) do
+			if candidate.id == setId then
+				set = candidate
+			end
+		end
+		if not set then
+			return false
+		end
+	end
+	if phase == "Live" then
+		endEvent()
+	elseif phase == "Warning" then
+		clearSky()
+		phase = "Calm"
+		upcoming = nil
+	end
+	skipSlot(slot :: Watcher.Slot)
 	summoned = true
-	startEvent(
-		event,
-		now() + (event.durationSeconds or 180),
-		Watcher.pickSet(event, random),
-		SummonSkySeconds
-	)
+	startEvent(event, now() + (event.durationSeconds or 180), set, SummonSkySeconds)
+	return true
+end
+
+-- Ends the event playing right now (admin panel). The schedule's next event comes as usual.
+-- False if nothing is playing.
+function WatcherService.stop(): boolean
+	local slot = schedule
+	if phase ~= "Live" or not slot then
+		return false
+	end
+	endEvent()
+	skipSlot(slot :: Watcher.Slot)
 	return true
 end
 
