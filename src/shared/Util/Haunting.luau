@@ -41,8 +41,8 @@ function Haunting.pool(eventEffect: string?): { Option }
 	return options
 end
 
--- One roll for a monster: the effect it picks up, or nil. It only picks effects the monster doesn't have yet that still fit. force skips the
--- chance (Studio /haunt). Doesn't change the monster.
+-- One roll for a monster: the effect it picks up, or nil (also when it lands on one the
+-- monster already has). force skips the chance (Studio /haunt). Doesn't change the monster.
 function Haunting.roll(
 	caught: Value.CaughtMonster,
 	wingsOwned: number,
@@ -54,18 +54,25 @@ function Haunting.roll(
 	if not force and not Rng.chance(Haunting.chance(caught.familiarity, wingsOwned, odds), random) then
 		return nil
 	end
+	-- Picks from every effect the monster could ever get, including ones it already has (a
+	-- roll that lands on one of those gives nothing). Picking only from what's left made the
+	-- last, rarest effect a sure thing once the common ones were taken, so every monster had
+	-- Mummy within a day (Giles 2026-10-24). A forced roll (Studio /haunt) still always gives
+	-- a new one.
 	local options = {}
 	for _, option in Haunting.pool(if event then event.effect else nil) do
-		if Value.fits(caught.effects, option.id, caught.monsterId) == "Ok" then
+		local fit = Value.fits(caught.effects, option.id, caught.monsterId)
+		if fit == "Ok" or (fit == "HasEffect" and not force) then
 			table.insert(options, option)
 		end
 	end
 	if #options == 0 then
 		return nil
 	end
-	return Rng.pickWeighted(options, function(option: Option)
+	local picked = Rng.pickWeighted(options, function(option: Option)
 		return option.weight
 	end, random).id
+	return if table.find(caught.effects, picked) then nil else picked
 end
 
 -- Plays back the roaming rolls a monster had while its owner was away, from `from` to `to`

@@ -1563,6 +1563,30 @@ do
 		"a monster with every Roam effect picks up nothing",
 		Haunting.roll(monster(allRoam), 1, nil, random, true) == nil
 	)
+	-- The rarest effect stays rare when it's the only one left (Giles 2026-10-24).
+	local allButMummy: { string } = {}
+	for _, id in allRoam do
+		if id ~= "Mummy" and Effects.List[id].source == "Roam" then
+			table.insert(allButMummy, id)
+		end
+	end
+	local mummies, forced = 0, 20_000
+	local mummyRandom = fakeRandom(5)
+	for _ = 1, forced do
+		mummies += if Haunting.roll(monster(allButMummy), 1, { effectOddsMultiplier = 1000 }, mummyRandom)
+				== "Mummy"
+			then 1
+			else 0
+	end
+	local roamWeight = 0
+	for _, option in Haunting.pool(nil) do
+		local fit = Value.fits({}, option.id, monster({}).monsterId)
+		roamWeight += if fit == "Ok" then option.weight else 0
+	end
+	check(
+		"Mummy is as rare as its weight, even as the last effect left",
+		math.abs(mummies / forced - Effects.List.Mummy.weight :: number / roamWeight) < 0.01
+	)
 	-- Event effects: every launch event with an effect has a chance, and its effect exists.
 	local eventsOk = true
 	for _, event in Events.List do
@@ -1935,6 +1959,32 @@ do
 	local rainbow = EffectLooks.dress(look, {}, "Rainbow")
 	check("rainbow parts carry where they start in the colour cycle", rainbow.pieces[1].rainbow ~= nil)
 	check("an undressed look is the look itself", EffectLooks.dress(look, {}, nil) == look)
+	-- Roaming effects rank under the rest: a cobwebbed, slimed monster wears the slime skin.
+	local slimed = EffectLooks.dress(look, { "Slimed", "PhantomWeaver" })
+	local slimeShell, webShell = false, false
+	for _, p in slimed.pieces do
+		slimeShell = slimeShell or string.sub(p.name, 1, 11) == "SlimedShell"
+		webShell = webShell or string.find(p.name, "CobwebbedShell", 1, true) ~= nil
+	end
+	check("a roaming effect's skin gives way to another effect's", slimeShell and not webShell)
+	-- Shells only go on the biggest parts, each a different size, so none share a face (they
+	-- flickered, Giles 2026-10-24).
+	local base: { [string]: any } = {}
+	for _, p in look.pieces do
+		base[p.name] = p
+	end
+	local grows: { [number]: boolean } = {}
+	local shells, clash = 0, false
+	for _, p in EffectLooks.dress(look, { "Slimed" }).pieces do
+		local part = base[string.sub(p.name, 12)]
+		if string.sub(p.name, 1, 11) == "SlimedShell" and part then
+			shells += 1
+			local grow = math.floor((p.size[1] - part.size[1]) * 1000 + 0.5)
+			clash = clash or grows[grow] == true
+			grows[grow] = true
+		end
+	end
+	check("shells go on a few big parts, each a different size", shells > 0 and shells <= 8 and not clash)
 end
 
 -- Hub landmarks: every part is sized, uses a real material and stays on the landmark's spot,
