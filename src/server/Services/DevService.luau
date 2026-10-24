@@ -20,6 +20,7 @@
 --   /skip 12          your monsters live 12 hours ahead: they grow Familiarity
 --   /grow 5           every monster in your mansion has 5 growth spurts right now, ignoring
 --                     luck and growth genes (/grow 25 makes Titans)
+--   /charges          every monster you own gets all its Growth Chamber goes back
 --   /calm             zone monsters leave you alone (type it again to let them attack)
 --   /attack           the closest monster in your zone attacks you right now
 --   /spawn Gravepup   brings that monster to you in the zone you're in (any monster, any zone;
@@ -253,6 +254,20 @@ commands["/grow"] = function(player, argument, tell)
 	end
 	MansionService.grow(player, math.floor(spurts))
 	tell(`Your monsters had {math.floor(spurts)} growth spurts.`)
+end
+
+commands["/charges"] = function(player, _, tell)
+	local data = DataService.get(player)
+	if not data then
+		tell("Your save is still loading.")
+		return
+	end
+	for _, list in { data.monsters, data.storage, data.vault } do
+		for _, caught in list do
+			caught.growUsed = nil
+		end
+	end
+	tell("Every monster has all its Growth Chamber goes back.")
 end
 
 commands["/calm"] = function(player, _, tell)

@@ -144,13 +144,14 @@ Events.HoverHeight = 3
 Events.DriftSpeed = 5 -- studs per second
 
 -- Where event monsters drift: the lanes between the two rows of mansions, keeping clear of
--- the Collector (x -130..-90) and the Trading Booth (x 90..130). Hub coordinates, studs.
+-- the stands in the middle row: Growth Chamber (x -185..-145), Collector (x -130..-90), Trading
+-- Booth (x 90..130) and Merger (x 145..185). Hub coordinates, studs.
 Events.DriftAreas = {
 	{ x = 0, z = -47.5, width = 580, depth = 45 }, -- north lane, in front of plots 1-4
 	{ x = 0, z = 47.5, width = 580, depth = 45 }, -- south lane, in front of plots 5-8
-	{ x = -220, z = 0, width = 140, depth = 50 }, -- west middle
+	{ x = -245, z = 0, width = 100, depth = 50 }, -- west middle
 	{ x = 0, z = 0, width = 140, depth = 50 }, -- around Watcher Square
-	{ x = 220, z = 0, width = 140, depth = 50 }, -- east middle
+	{ x = 245, z = 0, width = 100, depth = 50 }, -- east middle
 }
 
 Events.List = {
