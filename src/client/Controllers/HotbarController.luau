@@ -8,10 +8,18 @@
 -- drag one off the bar to keep it in the Backpack only (InventoryController).
 -- The server tags each Tool with Section ("Tool", "Cake" or "Monster") and Order
 -- (HuntService, CakeService, InventoryService).
+-- Where things sit is saved (Util/HotbarLayout, server HotbarService), so after a respawn or
+-- rejoin every Tool goes back to its own slot, and a new one takes the first slot nothing
+-- is remembered in (Giles 2026-10-24).
 
+local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
+
+local HotbarLayout =
+	require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"):WaitForChild("HotbarLayout"))
 
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
@@ -101,6 +109,41 @@ local benched: { [Tool]: boolean } = {} -- dragged off the bar: Backpack only
 local open = false
 local buttons: { TextButton } = {}
 local refresh: () -> () = function() end
+local saved = HotbarLayout.new() -- the saved layout, read in start()
+local loaded = false -- Tools wait for it, so they don't fill in at random first
+
+local function keyOf(tool: Tool): string?
+	return HotbarLayout.key(
+		tool:GetAttribute("ToolId"),
+		tool:GetAttribute("CakeId"),
+		tool:GetAttribute("MonsterUid")
+	)
+end
+
+-- Sends the layout to the server a moment after the last change (dragging fires many).
+local saveQueued = false
+local function saveSoon()
+	if saveQueued or not loaded then
+		return
+	end
+	saveQueued = true
+	task.delay(2, function()
+		saveQueued = false
+		local remotes = ReplicatedStorage:FindFirstChild("HotbarRemotes")
+		local set = remotes and remotes:FindFirstChild("Set")
+		if set and set:IsA("RemoteEvent") then
+			set:FireServer(saved)
+		end
+	end)
+end
+
+local function remember(tool: Tool, slot: number)
+	local key = keyOf(tool)
+	if key then
+		HotbarLayout.remember(saved, key, slot)
+		saveSoon()
+	end
+end
 
 local function slotOf(tool: Tool): number?
 	for i = 1, Slots do
@@ -132,11 +175,17 @@ function HotbarController.put(tool: Tool, slot: number)
 	if other and other ~= tool then
 		if from then
 			slots[from] = other
+			remember(other, from)
 		else
 			benched[other] = true
+			local key = keyOf(other)
+			if key then
+				HotbarLayout.bench(saved, key)
+			end
 		end
 	end
 	slots[slot] = tool
+	remember(tool, slot)
 	refresh()
 end
 
@@ -147,6 +196,11 @@ function HotbarController.bench(tool: Tool)
 		slots[from] = nil
 	end
 	benched[tool] = true
+	local key = keyOf(tool)
+	if key then
+		HotbarLayout.bench(saved, key)
+		saveSoon()
+	end
 	refresh()
 end
 
@@ -259,14 +313,51 @@ function HotbarController.start()
 				benched[tool] = nil
 			end
 		end
+		if not loaded then
+			return -- the saved layout first
+		end
+		-- Tools with a remembered slot go back to it, benched ones stay off the bar.
+		local placing: { Tool } = {}
 		for _, tool in have do
-			if not slotOf(tool) and not benched[tool] then
+			if slotOf(tool) or benched[tool] then
+				continue
+			end
+			local key = keyOf(tool)
+			local home = if key then saved.slots[key] else nil
+			if key and HotbarLayout.isBenched(saved, key) then
+				benched[tool] = true
+			elseif home and not slots[home] then
+				slots[home] = tool
+			else
+				table.insert(placing, tool)
+			end
+		end
+		-- New ones take the first empty slot that isn't kept for a Tool that's away (a used-up
+		-- cake), or else any empty slot.
+		local kept: { [number]: boolean } = {}
+		for _, slot in saved.slots do
+			kept[slot] = true
+		end
+		for _, tool in placing do
+			local free: number? = nil
+			for i = 1, Slots do
+				if not slots[i] and not kept[i] then
+					free = i
+					break
+				end
+			end
+			if not free then
 				for i = 1, Slots do
 					if not slots[i] then
-						slots[i] = tool
+						free = i
 						break
 					end
 				end
+			end
+			if free then
+				slots[free] = tool
+				kept[free] = true
+				remember(tool, free)
 			end
 		end
 	end
@@ -370,6 +461,24 @@ function HotbarController.start()
 		watch(player.Character)
 	end
 	player.CharacterAdded:Connect(watch)
+
+	-- The saved layout (HotbarService sets it once the save has loaded). Without one after a
+	-- while (an old server), Tools fill in as before.
+	task.spawn(function()
+		local deadline = os.clock() + 15
+		while player:GetAttribute("HotbarLayout") == nil and os.clock() < deadline do
+			task.wait(0.25)
+		end
+		local raw = player:GetAttribute("HotbarLayout")
+		if typeof(raw) == "string" then
+			local ok, decoded = pcall(HttpService.JSONDecode, HttpService, raw)
+			if ok then
+				saved = HotbarLayout.clean(decoded)
+			end
+		end
+		loaded = true
+		render()
+	end)
 
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed or Locks.isLocked("Hotbar") then
