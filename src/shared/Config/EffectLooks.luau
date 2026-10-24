@@ -47,6 +47,8 @@ local MaxBest = 3 -- the most valuable effects are always drawn
 local MaxPicked = 3 -- plus this many of the others, picked per monster
 local MaxExtraGroups = 4
 local MaxAuras = 5
+local MaxShells = 8 -- only the biggest parts get a shell (body, head, limbs)
+local ShellGap = 0.2 -- how much bigger than its part a shell is, at least
 
 export type Extra = {
 	name: string,
@@ -180,8 +182,8 @@ end
 EffectLooks.Styles = {
 	-- Roam effects.
 	Cobwebbed = {
-		tint = { color = { 150, 150, 155 }, mix = 0.35 },
-		shell = { color = { 240, 240, 245 }, transparency = 0.7 },
+		tint = { color = { 150, 150, 155 }, mix = 0.15 },
+		shell = { color = { 240, 240, 245 }, transparency = 0.82 },
 		auras = { { kind = "Mist", color = { 170, 170, 170 } } },
 	},
 	Possessed = {
@@ -216,7 +218,7 @@ EffectLooks.Styles = {
 		auras = { { kind = "Mist", color = { 170, 90, 255 } } },
 	},
 	Vampire = {
-		tint = { color = { 210, 205, 225 }, mix = 0.45 },
+		tint = { color = { 210, 205, 225 }, mix = 0.25 },
 		fade = { color = { 90, 10, 20 }, mix = 0.8 },
 		glow = { 255, 40, 50 },
 		auras = { { kind = "Mist", color = { 120, 10, 20 } } },
@@ -908,22 +910,24 @@ end
 
 local function coverings(pieces: { Piece }, style: Style, prefix: string): { Piece }
 	local added = {}
-	for _, piece in pieces do
-		if piece.glow or not style.shell then
-			continue
-		end
-		local s = piece.size
-		if style.shell then
+	-- Shells sit outside bands and stitches (0.05 and 0.08 out), each one a little further out
+	-- than the last so two never share a face, and only on the bigger parts: shells meeting
+	-- on the same spot flickered (Giles 2026-10-24).
+	local shellStyle = style.shell
+	if shellStyle then
+		for i, piece in biggest(pieces, MaxShells) do
+			local s = piece.size
+			local grow = ShellGap + (i - 1) * 0.02
 			local shell = attach(
 				piece,
 				`{prefix}Shell{piece.name}`,
-				{ s[1] + 0.12, s[2] + 0.12, s[3] + 0.12 },
-				style.shell.color,
+				{ s[1] + grow, s[2] + grow, s[3] + grow },
+				shellStyle.color,
 				{ 0, 0, 0 }
 			)
-			shell.transparency = style.shell.transparency
-			shell.material = style.shell.material
-			shell.glow = style.shell.glow
+			shell.transparency = shellStyle.transparency
+			shell.material = shellStyle.material
+			shell.glow = shellStyle.glow
 			table.insert(added, shell)
 		end
 	end
@@ -960,7 +964,7 @@ local function coverings(pieces: { Piece }, style: Style, prefix: string): { Pie
 						`{prefix}Tick{piece.name}{t + 2}`,
 						{ 0.07, 0.32, 0.06 },
 						wrap.colors[1],
-						{ t * s[1] * 0.28, 0, -(s[3] / 2 + 0.04) }
+						{ t * s[1] * 0.28, 0, -(s[3] / 2 + 0.05) }
 					)
 					table.insert(added, tick)
 				end
@@ -1099,11 +1103,35 @@ local function worth(id: string): number
 	return if effect then effect.multiplier else 0
 end
 
+-- Roaming effects (picked up in the mansion, Roam and Critter) and combos made only of them.
+-- Nearly every mansion monster has some, so they rank below every other effect in the look:
+-- a cake, food, catch or event effect's colours and skin win (Giles 2026-10-24).
+local function roaming(id: string): boolean
+	local effect = Effects.List[id]
+	if effect then
+		return effect.source == "Roam" or effect.source == "Critter"
+	end
+	local combo = Effects.Combos[id]
+	if not combo then
+		return false
+	end
+	for _, part in combo.recipe do
+		if not roaming(part) then
+			return false
+		end
+	end
+	return true
+end
+
 function EffectLooks.dress(look: Looks.Look, effects: { string }?, variant: string?): DressedLook
 	-- The most valuable few plus a few picked others (see the top), in an order where the
 	-- most valuable come last so their skin shows, whatever order the monster got them in.
 	local ordered = table.clone(effects or {})
 	table.sort(ordered, function(a: string, b: string): boolean
+		local ra, rb = roaming(a), roaming(b)
+		if ra ~= rb then
+			return ra -- roaming effects first, so the rest are drawn over them
+		end
 		local wa, wb = worth(a), worth(b)
 		return if wa ~= wb then wa < wb else a < b
 	end)
