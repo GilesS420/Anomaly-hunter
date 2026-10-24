@@ -33,6 +33,7 @@ local MansionListController = require(script.Controllers.MansionListController)
 local DetailController = require(script.Controllers.DetailController)
 local NameTagController = require(script.Controllers.NameTagController)
 local PotionController = require(script.Controllers.PotionController)
+local MutationLogController = require(script.Controllers.MutationLogController)
 local DialogueController = require(script.Controllers.DialogueController)
 
 local controllers: { { start: () -> () } } = {
@@ -65,6 +66,7 @@ local controllers: { { start: () -> () } } = {
 	MansionListController,
 	NameTagController,
 	PotionController,
+	MutationLogController,
 	DetailController,
 	DialogueController,
 }

@@ -273,11 +273,16 @@ local function bite(player: Player, cake: Live, uid: string)
 	local b = Cakes.bite(cake.saved, caught, random, if event then event.cakeEffectMultiplier else nil)
 	MansionService.refreshMonsters(player)
 	local name = Format.monsterName(caught)
+	local text = if cake.saved.bitesLeft <= 0
+		then `{name} ate the last of your {cake.item.name}{result(data, b)}`
+		else `{name} took a bite of your {cake.item.name}{result(data, b)}`
+	Notify.toast(player, text)
+	if b.effect or b.combo then
+		Notify.log(player, text)
+	end
 	if cake.saved.bitesLeft <= 0 then
-		Notify.toast(player, `{name} ate the last of your {cake.item.name}{result(data, b)}`)
 		remove(player, cake)
 	else
-		Notify.toast(player, `{name} took a bite of your {cake.item.name}{result(data, b)}`)
 		cake.label.Text = labelText(cake)
 	end
 end
@@ -344,6 +349,7 @@ local function restore(player: Player)
 	restored[player] = true
 	local now = os.time()
 	local lines: { string } = {}
+	local logs: { string } = {} -- one per mutation, for the mutation log
 	for _, saved in table.clone(data.cakes) do
 		local item = Cakes.item(saved.itemId)
 		for _, b in Cakes.catchUp(saved, data.monsters, now, random) do
@@ -352,7 +358,10 @@ local function restore(player: Player)
 				CareService.discoverCombo(data, b.combo)
 			end
 			if caught and b.effect then
-				table.insert(lines, `{Format.monsterName(caught)} got {Format.name(b.combo or b.effect)}`)
+				local line = `{Format.monsterName(caught)} got {Format.name(b.combo or b.effect)}`
+				table.insert(lines, line)
+				local from = if item then ` from your {item.name}` else ""
+				table.insert(logs, `While you were away, {line}{from}.`)
 			end
 		end
 		if not item or Cakes.isDone(saved, now) then
@@ -373,6 +382,9 @@ local function restore(player: Player)
 					player,
 					`While you were away, your cakes did their thing: {table.concat(lines, ", ")}!`
 				)
+				for _, text in logs do
+					Notify.log(player, text)
+				end
 			end
 		end)
 	end

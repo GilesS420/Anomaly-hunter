@@ -807,8 +807,25 @@ local function tryBuild(player: Player)
 	DataService.markPresent(player)
 	if #changes > 0 then
 		task.delay(AwayBookDelay, function()
-			if player.Parent == Players then
-				awayBook:FireClient(player, changes, away)
+			if player.Parent ~= Players then
+				return
+			end
+			awayBook:FireClient(player, changes, away)
+			-- Roaming effects picked up while away go in the mutation log too.
+			for _, change in changes do
+				if #change.effects > 0 then
+					local names = {}
+					for _, id in change.effects do
+						table.insert(names, Format.name(id))
+					end
+					Notify.log(
+						player,
+						`While you were away, your {Format.name(change.monsterId)} got {table.concat(
+							names,
+							", "
+						)}.`
+					)
+				end
 			end
 		end)
 	end

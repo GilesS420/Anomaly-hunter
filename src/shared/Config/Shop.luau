@@ -47,7 +47,8 @@ Shop.ConfirmSellFrom = "Legendary"
 -- a bite; a bite may give the cake's effect (a monster can't get an effect twice). Chance cakes (effectChances) may give one of several effects.
 -- Prices are x100 like the monsters so they keep the same size relative to what a monster
 -- sells for. Event treats (`event`) are only in stock while their Watcher event is live, so
--- an event's effect can be had after it's over.
+-- an event's effect can be had after it's over. The Epic and rarer cakes are in stock about
+-- twice as often as at first (Giles 2026-10-24: "a bit less rare").
 Shop.Bakery = {
 	-- Gives a Critter effect, so only cheap monsters (Config/Effects.CritterMaxValue) can get it.
 	{
@@ -170,7 +171,7 @@ Shop.Bakery = {
 		name = "Stitch Cupcake",
 		kind = "Food",
 		price = 30_000_000,
-		restockChance = 10,
+		restockChance = 15,
 		rarity = "Epic",
 		grantsEffect = "Stitched",
 	},
@@ -179,7 +180,7 @@ Shop.Bakery = {
 		name = "Cursed Cake",
 		kind = "Food",
 		price = 250_000_000,
-		restockChance = 2,
+		restockChance = 4,
 		rarity = "Legendary",
 		grantsEffect = "Cursed",
 	},
@@ -208,7 +209,7 @@ Shop.Bakery = {
 		name = "Bone Marrow Mousse",
 		kind = "Food",
 		price = 400_000_000,
-		restockChance = 3,
+		restockChance = 5,
 		rarity = "Legendary",
 		effectChances = { { effect = "Mummy", chance = 25 }, { effect = "Batty", chance = 100 } },
 	},
@@ -217,7 +218,7 @@ Shop.Bakery = {
 		name = "Grave Gâteau",
 		kind = "Food",
 		price = 800_000_000,
-		restockChance = 2,
+		restockChance = 4,
 		rarity = "Legendary",
 		grantsEffect = "Buried",
 	},
@@ -236,7 +237,7 @@ Shop.Bakery = {
 		name = "Witch's Brew Tart",
 		kind = "Food",
 		price = 2_000_000_000,
-		restockChance = 0.8,
+		restockChance = 1.5,
 		rarity = "Mythic",
 		grantsEffect = "Hexed",
 	},
@@ -245,7 +246,7 @@ Shop.Bakery = {
 		name = "Phantom Pavlova",
 		kind = "Food",
 		price = 5_000_000_000,
-		restockChance = 0.5,
+		restockChance = 1,
 		rarity = "Mythic",
 		grantsEffect = "Spectral",
 	},
@@ -254,7 +255,7 @@ Shop.Bakery = {
 		name = "Eclipse Éclair",
 		kind = "Food",
 		price = 15_000_000_000,
-		restockChance = 0.2,
+		restockChance = 0.4,
 		rarity = "Divine",
 		grantsEffect = "Eclipsed",
 	},
@@ -263,7 +264,7 @@ Shop.Bakery = {
 		name = "Void Velvet Cake",
 		kind = "Food",
 		price = 60_000_000_000,
-		restockChance = 0.1,
+		restockChance = 0.25,
 		rarity = "Divine",
 		grantsEffect = "Voidtouched",
 	},

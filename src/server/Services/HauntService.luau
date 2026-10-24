@@ -62,6 +62,10 @@ local function announce(player: Player, gains: Gains): number
 	MansionService.refreshMonsters(player)
 	for _, message in gains.combos do
 		Notify.toast(player, message)
+		Notify.log(player, message)
+	end
+	for _, message in gains.messages do
+		Notify.log(player, message) -- every one, even when the toast is a summary
 	end
 	if #gains.messages > MaxToasts then
 		Notify.toast(player, `{#gains.messages} of your monsters picked up new haunted effects!`)
