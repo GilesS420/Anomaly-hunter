@@ -115,6 +115,32 @@ function Catching.strugglePlan(rarityId: string, sizeId: string): StrugglePlan
 	}
 end
 
+-- Every place on the meter (0 to 1) where it stops for a struggle or the Lucky Ring, in order.
+-- The client stops its meter there by itself, so it doesn't run on and snap back.
+function Catching.stops(plan: StrugglePlan): { number }
+	local result = table.clone(plan.marks)
+	if plan.ring then
+		table.insert(result, plan.ring)
+	end
+	table.sort(result)
+	return result
+end
+
+-- When a tap really happened (server time), from the client's own reading of its clock:
+-- trusted from LagAllowance behind the server to ClockSlack ahead of it (never later than
+-- now), otherwise the time it arrived.
+function Catching.tapTime(tappedAt: unknown, serverNow: number): number
+	if
+		typeof(tappedAt) == "number"
+		and tappedAt == tappedAt -- not NaN
+		and tappedAt <= serverNow + Struggles.ClockSlack
+		and tappedAt >= serverNow - Struggles.LagAllowance
+	then
+		return math.min(tappedAt, serverNow)
+	end
+	return serverNow
+end
+
 -- How big the Lucky Ring is `seconds` after it appears, as a multiple of the gold circle
 -- (1 = lined up): it shrinks steadily from startScale to nothing.
 function Catching.ringScale(seconds: number): number
