@@ -510,6 +510,9 @@ local function build()
 	button(allRow, "Refill goes", Ui.Colors.equip, 110, function()
 		send("/charges") -- Growth Chamber
 	end)
+	button(allRow, "Chamber done", Ui.Colors.equip, 120, function()
+		send("/chamber") -- the Growth Chamber's 20 minutes are up
+	end)
 	local clear = Ui.button(allRow, "Clear all", Ui.Colors.confirm, UDim2.fromOffset(100, RowHeight))
 	clear.LayoutOrder = nextOrder()
 	Ui.confirmButton(clear, "Sure?", function()

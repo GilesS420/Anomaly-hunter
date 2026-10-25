@@ -592,7 +592,8 @@ function InventoryService.syncPreviews(player: Player)
 	end
 	local folder = holder :: ScreenGui
 	local wanted: { [string]: () -> Model } = {}
-	for _, list in { data.monsters, data.storage } do
+	local bubbling = data.chamber.monster -- in the Growth Chamber: its result screen shows it
+	for _, list in { data.monsters, data.storage, if bubbling then { bubbling } else {} } do
 		for _, caught in list do
 			local monster = Monsters[caught.monsterId]
 			local key = lookOf(caught)
