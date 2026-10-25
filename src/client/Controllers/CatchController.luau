@@ -17,16 +17,22 @@
 -- No dragging and the camera never locks. The server decides everything (reach, vacuum
 -- strength, timing, see server/Services/CatchService.luau); this only sends "start" and
 -- "tapped at" and draws the meter.
+-- So clicks never feel late, the meter doesn't wait for the server's answer: a click on a
+-- monster flashes it and shows the meter at once, a struggle tap is judged here with the same
+-- rules (Util/Catching) and shown right away, and the meter stops by itself where the next
+-- struggle comes. The server's answer still wins if it disagrees.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Catching = require(Shared:WaitForChild("Util"):WaitForChild("Catching"))
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
+local Struggles = require(Shared:WaitForChild("Config"):WaitForChild("Struggles"))
 local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 
 local CatchController = {}
@@ -36,6 +42,7 @@ local player = Players.LocalPlayer
 local RAY_LENGTH = 300 -- studs; the server checks the real reach
 local TAP_SLACK = 28 -- pixels around an orb that still count as pressing it (fingers are big)
 local BAR_MAX_WIDTH = 320
+local PENDING_SECONDS = 1 -- hide the meter shown for a click if the server hasn't answered by then
 
 local target: Model? = nil -- the monster the last click asked the server to catch
 local held: Model? = nil -- the monster the server says we're catching right now
@@ -46,12 +53,52 @@ local struggle: { startedAt: number, speed: number, centre: number, width: numbe
 local struck = false -- tapped during this struggle (or ring), waiting for the server
 -- The Lucky Ring that's up now (server times), or nil.
 local ring: { startedAt: number }? = nil
+-- Where the meter stops for the struggles and the ring (0 to 1, from the server), and which
+-- of them is next.
+local stops: { number } = {}
+local nextStop = 1
+local stopPassed = false -- the struggle (or ring) at stops[nextStop - 1] is over
+-- Set when a tap here already ended the struggle (or missed the ring): the meter fills on from
+-- `from` at server time `at` without waiting for the server's attributes.
+local resume: { from: number, at: number }? = nil
+local pendingSince: number? = nil -- os.clock() of the click whose answer we're waiting for
 
 -- True unless the hand holds a Tool that isn't a vacuum.
 local function handFree(): boolean
 	local character = player.Character
 	local tool = if character then character:FindFirstChildOfClass("Tool") else nil
 	return tool == nil or tool:GetAttribute("VacuumId") ~= nil
+end
+
+-- Whether the server will most likely start this catch: a vacuum in hand and the monster
+-- within its reach. Only decides whether the meter shows before the answer comes.
+local function likelyCatch(model: Model): boolean
+	local character = player.Character
+	local tool = if character then character:FindFirstChildOfClass("Tool") else nil
+	local vacuumId = if tool then tool:GetAttribute("VacuumId") else nil
+	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	local body = model.PrimaryPart
+	if typeof(vacuumId) ~= "string" or not root or not root:IsA("BasePart") or not body then
+		return false
+	end
+	return (root.Position - body.Position).Magnitude <= Catching.reach(vacuumId)
+end
+
+-- A quick flash on the clicked monster, so the click shows the moment it lands.
+local function flash(model: Model)
+	local glow = Instance.new("Highlight")
+	glow.Name = "CatchClick"
+	glow.FillColor = Color3.fromRGB(255, 245, 180)
+	glow.FillTransparency = 0.4
+	glow.OutlineColor = Color3.fromRGB(255, 245, 180)
+	glow.DepthMode = Enum.HighlightDepthMode.Occluded
+	glow.Parent = model
+	local fade =
+		TweenService:Create(glow, TweenInfo.new(0.35), { FillTransparency = 1, OutlineTransparency = 1 })
+	fade.Completed:Connect(function()
+		glow:Destroy()
+	end)
+	fade:Play()
 end
 
 local function isPointer(input: InputObject): boolean
@@ -277,22 +324,44 @@ local function buildUi(): Ui
 	}
 end
 
--- 0 to 1: how full the meter is. Uses the server's CatchStart/CatchEnd on the model, or
--- where it stopped (CatchPaused) while the monster struggles.
-local function progress(model: Model): number
-	local paused = model:GetAttribute("CatchPaused")
-	if typeof(paused) == "number" then
-		return paused
-	end
+-- Seconds of filling the whole meter takes.
+local function totalSeconds(model: Model): number
 	local startTime = model:GetAttribute("CatchStart")
 	local endTime = model:GetAttribute("CatchEnd")
 	if typeof(startTime) == "number" and typeof(endTime) == "number" and endTime > startTime then
-		return math.clamp((workspace:GetServerTimeNow() - startTime) / (endTime - startTime), 0, 1)
+		return endTime - startTime
 	end
-	if heldSeconds > 0 then
-		return math.clamp((os.clock() - heldSince) / heldSeconds, 0, 1)
+	return heldSeconds
+end
+
+-- 0 to 1: how full the meter is. Uses the server's CatchStart/CatchEnd on the model, or
+-- where it stopped (CatchPaused) while the monster struggles. It never runs past the next
+-- struggle, so it doesn't overshoot and jump back when the server's struggle arrives.
+local function progress(model: Model): number
+	local amount = 0
+	local paused = model:GetAttribute("CatchPaused")
+	local total = totalSeconds(model)
+	local predicted = resume
+	if typeof(paused) == "number" then
+		if not predicted or total <= 0 then
+			return paused
+		end
+		-- We already ended this struggle here; the server's word is on its way.
+		amount = predicted.from + (workspace:GetServerTimeNow() - predicted.at) / total
+	else
+		local startTime = model:GetAttribute("CatchStart")
+		local endTime = model:GetAttribute("CatchEnd")
+		if typeof(startTime) == "number" and typeof(endTime) == "number" and endTime > startTime then
+			amount = (workspace:GetServerTimeNow() - startTime) / (endTime - startTime)
+		elseif heldSeconds > 0 then
+			amount = (os.clock() - heldSince) / heldSeconds
+		end
 	end
-	return 0
+	local stop = stops[nextStop]
+	if stop then
+		amount = math.min(amount, stop)
+	end
+	return math.clamp(amount, 0, 1)
 end
 
 local EMPTY_COLOR = Color3.fromRGB(255, 200, 70)
@@ -320,8 +389,58 @@ function CatchController.start()
 	local function stopShowing()
 		target = nil
 		held = nil
+		pendingSince = nil
+		resume = nil
+		stops = {}
+		nextStop = 1
+		stopPassed = false
 		meter.Visible = false
 		endStruggle()
+	end
+
+	-- The struggle or ring we were stopped at is over: the meter may run on to the next stop.
+	-- Called by our own judgement and again by the server's, but counts once.
+	local function passStop()
+		if not stopPassed then
+			stopPassed = true
+			nextStop += 1
+		end
+	end
+
+	-- A tap during a struggle or the Lucky Ring, judged right here so it shows at once.
+	local function strike(model: Model)
+		local now = workspace:GetServerTimeNow()
+		struck = true
+		Strike:FireServer(now)
+		local current, lucky = struggle, ring
+		if current then
+			local hit = Catching.struggleHit(now - current.startedAt, current.speed, current.centre, current.width)
+			if hit then
+				-- The meter fills on straight away; the server confirms with "Struggled".
+				resume = { from = progress(model), at = now }
+				passStop()
+				endStruggle()
+				struck = true -- still waiting for the server; no second tap
+				title.Text = holdText
+			else
+				-- It broke free; the server's "Ended" and message follow.
+				needle.BackgroundColor3 = Color3.fromRGB(255, 90, 90)
+				title.Text = "It broke free!"
+			end
+		elseif lucky then
+			if Catching.ringHit(now - lucky.startedAt) then
+				fill.Size = UDim2.fromScale(1, 1)
+				fill.BackgroundColor3 = FULL_COLOR
+				resume = { from = 1, at = now }
+				title.Text = "PERFECT CATCH!"
+			else
+				resume = { from = math.min(progress(model), Struggles.Ring.fallBack), at = now }
+				title.Text = holdText
+			end
+			passStop()
+			endStruggle()
+			struck = true
+		end
 	end
 
 	UserInputService.InputBegan:Connect(function(input, processed)
@@ -330,8 +449,7 @@ function CatchController.start()
 			-- tap; other clicks do nothing, so they can't start a second catch.
 			local key = input.KeyCode == Enum.KeyCode.F
 			if (struggle or ring) and not struck and not processed and (key or isPointer(input)) then
-				struck = true
-				Strike:FireServer(workspace:GetServerTimeNow())
+				strike(held)
 			end
 			return
 		end
@@ -344,6 +462,18 @@ function CatchController.start()
 		end
 		target = model
 		StartCatch:FireServer(model)
+		-- Show it straight away instead of after the server's answer.
+		flash(model)
+		if likelyCatch(model) then
+			local monsterId = model:GetAttribute("MonsterId")
+			local name = if typeof(monsterId) == "string" then Format.name(monsterId) else model.Name
+			holdText = `Catching {name}...`
+			title.Text = holdText
+			fill.Size = UDim2.fromScale(0, 1)
+			fill.BackgroundColor3 = EMPTY_COLOR
+			meter.Visible = true
+			pendingSince = os.clock()
+		end
 	end)
 
 	State.OnClientEvent:Connect(function(kind: unknown, info: unknown)
@@ -355,8 +485,22 @@ function CatchController.start()
 				return
 			end
 			held = model
+			pendingSince = nil
+			resume = nil
+			endStruggle()
 			heldSeconds = if typeof(seconds) == "number" then seconds else 0
 			heldSince = os.clock()
+			stops = {}
+			nextStop = 1
+			stopPassed = false
+			local list = if typeof(info) == "table" then (info :: any).stops else nil
+			if typeof(list) == "table" then
+				for _, stop in list do
+					if typeof(stop) == "number" then
+						table.insert(stops, stop)
+					end
+				end
+			end
 			local monsterId = model:GetAttribute("MonsterId")
 			local name = if typeof(monsterId) == "string" then Format.name(monsterId) else model.Name
 			holdText = `Catching {name}...`
@@ -378,6 +522,9 @@ function CatchController.start()
 			}
 			struggle = active
 			struck = false
+			resume = nil
+			stopPassed = false
+			needle.BackgroundColor3 = Color3.new(1, 1, 1)
 			zone.Position = UDim2.fromScale(active.centre, 0)
 			zone.Size = UDim2.fromScale(active.width, 1)
 			track.Visible = true
@@ -391,6 +538,8 @@ function CatchController.start()
 			end
 			ring = { startedAt = tonumber(data.startedAt) or workspace:GetServerTimeNow() }
 			struck = false
+			resume = nil
+			stopPassed = false
 			ui.ring.Visible = true
 			title.Text = if touch
 				then "LUCKY RING! TAP when the rings line up!"
@@ -400,8 +549,13 @@ function CatchController.start()
 			if not data or data.model ~= held then
 				return
 			end
+			passStop()
 			endStruggle()
-			title.Text = holdText
+			if kind == "Ringed" and (data :: any).hit == true then
+				title.Text = "PERFECT CATCH!"
+			else
+				title.Text = holdText
+			end
 		elseif kind == "Ended" then
 			-- Caught, escaped or gone; the server sends a message saying which.
 			-- An end for an older press (a quick re-tap on another monster) must not cancel
@@ -417,6 +571,11 @@ function CatchController.start()
 	RunService.RenderStepped:Connect(function()
 		local model = held
 		if not model then
+			-- The meter shown for a click: hide it if the server said no (its message explains why).
+			if pendingSince and os.clock() - pendingSince > PENDING_SECONDS then
+				pendingSince = nil
+				meter.Visible = false
+			end
 			return
 		end
 		if not model.Parent then

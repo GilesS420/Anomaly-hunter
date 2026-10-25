@@ -247,6 +247,23 @@ do
 			and Catching.ringScale(0) == 3
 			and Catching.ringScale(5) == 0
 	)
+	local epicStops = Catching.stops(epic)
+	check(
+		"the meter stops at every struggle and then at the ring",
+		#epicStops == #epic.marks + 1
+			and epicStops[1] == epic.marks[1]
+			and epicStops[#epicStops] == epic.ring
+			and #Catching.stops(Catching.strugglePlan("Common", "Normal")) == 1
+	)
+	check(
+		"a tap's own time counts, even a little ahead of the server's clock",
+		Catching.tapTime(9.9, 10) == 9.9
+			and Catching.tapTime(10.1, 10) == 10 -- slightly ahead: counted as now, not thrown away
+			and Catching.tapTime(11, 10) == 10
+			and Catching.tapTime(5, 10) == 10 -- too old: when it arrived
+			and Catching.tapTime("x", 10) == 10
+			and Catching.tapTime(0 / 0, 10) == 10
+	)
 	local plain, boosted = 0, 0
 	local variantRng = fakeRandom(21)
 	for _ = 1, 20_000 do

@@ -44,6 +44,11 @@ Struggles.TimeoutSeconds = 4
 -- How far a tap's time may be from the server's clock (lag) and still count, in seconds.
 Struggles.LagAllowance = 0.35
 
+-- How far ahead of the server's clock a tap's time may be (the client's synced clock is never
+-- exact) and still count, in seconds. Without it a tap right on time could be thrown away and
+-- judged late, which felt like a delayed click.
+Struggles.ClockSlack = 0.15
+
 -- The Lucky Ring (quick time event A): Epic and rarer monsters, and every event monster, have
 -- one last chance after their struggles. A ring shrinks onto a gold circle; tap as it lines up
 -- and the catch lands at once, with variantBoost times the vacuum's chance of a Silver, Gold,

@@ -15,7 +15,7 @@
 --   StopCatch   client -> server () lets go (the client doesn't send it any more since
 --               catching stopped needing a hold; kept so an older client can't break it)
 --   Strike      client -> server (serverTime the player tapped)
---   State       server -> client ("Holding", {model, seconds}), ("Struggle", {model, startedAt,
+--   State       server -> client ("Holding", {model, seconds, stops}), ("Struggle", {model, startedAt,
 --               speed, centre, width, timeout}), ("Struggled", {model}), ("Ring", {model,
 --               startedAt, seconds, startScale, window}), ("Ringed", {model, hit}) or ("Ended",
 --               {result, model})
@@ -405,7 +405,7 @@ local function onStartCatch(player: Player, model: unknown)
 		end)
 	end
 
-	State:FireClient(player, "Holding", { model = model, seconds = seconds })
+	State:FireClient(player, "Holding", { model = model, seconds = seconds, stops = Catching.stops(plan) })
 end
 
 -- The meter stops and the monster struggles: the client shows the needle and the zone.
@@ -425,7 +425,7 @@ local function beginStruggle(player: Player, hold: Hold, serverNow: number)
 	})
 end
 
--- The tap landed: the meter fills on from where it stopped.
+-- The tap landed: the meter fills on from where it stopped, from the moment of the tap.
 local function endStruggle(player: Player, hold: Hold, serverNow: number)
 	hold.struggle = nil
 	hold.fillStart = serverNow
@@ -469,26 +469,22 @@ local function onStrike(player: Player, tappedAt: unknown)
 		return
 	end
 	local serverNow = workspace:GetServerTimeNow()
-	-- The client's own clock reading of the tap, so lag doesn't move the needle; trusted only
-	-- within LagAllowance of when it arrived.
-	local at = if typeof(tappedAt) == "number"
-			and tappedAt <= serverNow
-			and tappedAt >= serverNow - Struggles.LagAllowance
-		then tappedAt
-		else serverNow
+	-- The client's own clock reading of the tap, so lag doesn't move the needle (and the meter
+	-- fills on from the moment of the tap, as the client already shows).
+	local at = Catching.tapTime(tappedAt, serverNow)
 	local ringAt = hold.ring
 	if ringAt then
 		if Catching.ringHit(at - ringAt) then
 			State:FireClient(player, "Ringed", { model = hold.model, hit = true })
 			finish(player, true)
 		else
-			missRing(player, hold, serverNow)
+			missRing(player, hold, at)
 		end
 		return
 	end
 	local struggle = hold.struggle :: { startedAt: number, centre: number }
 	if Catching.struggleHit(at - struggle.startedAt, hold.plan.speed, struggle.centre, hold.plan.zone) then
-		endStruggle(player, hold, serverNow)
+		endStruggle(player, hold, at)
 	else
 		release(player, `{hold.name} broke free! Tap when the needle is in the zone.`)
 	end
