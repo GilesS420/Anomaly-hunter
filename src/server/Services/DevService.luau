@@ -5,7 +5,7 @@
 -- the Admin button) or type them in the chat box:
 --   /money 1000000    adds money (a negative number takes some away; 5k, 2.5m and 1b work too)
 --   /wings 3          sets how many wings your mansion has (1 to 6) and rebuilds it
---   /clearmonsters    empties your mansion and Storage
+--   /clearmonsters    empties your mansion, Storage and Growth Chamber
 --   /tutorial skip    ends your tutorial now (/tutorial restart starts it again from the gate)
 --   /reset confirm    wipes YOUR save back to a brand-new player's and kicks you; rejoin to
 --                     start fresh (replay the tutorial and early game). Nobody else is touched.
@@ -23,6 +23,7 @@
 --   /grow 5           every monster in your mansion has 5 growth spurts right now, ignoring
 --                     luck and growth genes (/grow 25 makes Titans)
 --   /charges          every monster you own gets all its Growth Chamber goes back
+--   /chamber          the monster bubbling in your Growth Chamber is done right now
 --   /calm             zone monsters leave you alone (type it again to let them attack)
 --   /attack           the closest monster in your zone attacks you right now
 --   /spawn Gravepup   brings that monster to you in the zone you're in (any monster, any zone;
@@ -57,6 +58,7 @@ local CakeService = require(script.Parent.CakeService)
 local CareService = require(script.Parent.CareService)
 local DataService = require(script.Parent.DataService)
 local GoldenGhostService = require(script.Parent.GoldenGhostService)
+local GrowthService = require(script.Parent.GrowthService)
 local HauntService = require(script.Parent.HauntService)
 local HuntService = require(script.Parent.HuntService)
 local MonsterAiService = require(script.Parent.MonsterAiService)
@@ -132,6 +134,7 @@ commands["/clearmonsters"] = function(player, _, tell)
 	end
 	table.clear(data.monsters)
 	table.clear(data.storage)
+	data.chamber = {}
 	MansionService.rebuild(player)
 	tell("Your mansion and Storage are empty now.")
 end
@@ -287,6 +290,14 @@ commands["/charges"] = function(player, _, tell)
 		end
 	end
 	tell("Every monster has all its Growth Chamber goes back.")
+end
+
+commands["/chamber"] = function(player, _, tell)
+	tell(
+		if GrowthService.finish(player)
+			then "Your Growth Chamber is done. Walk up to it to see how it went."
+			else "Nothing is bubbling in your Growth Chamber."
+	)
 end
 
 commands["/calm"] = function(player, _, tell)
@@ -518,7 +529,7 @@ function DevService.start()
 		return
 	end
 	print(
-		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /calm, /attack`
+		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /charges, /chamber, /calm, /attack`
 	)
 end
 

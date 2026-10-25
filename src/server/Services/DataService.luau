@@ -33,6 +33,15 @@ export type Data = {
 	seenAt: number, -- os.time() the player was last online (0: never); the "while you were away" book
 	potion: { id: string, secondsLeft: number }, -- the luck potion going (Util/Potions), "" for none
 	hotbar: { slots: { [string]: number }, benched: { string } }, -- Util/HotbarLayout, HotbarService
+	-- The monster bubbling in the Growth Chamber (GrowthService); empty while it's free.
+	chamber: {
+		monster: Value.CaughtMonster?, -- already grown or shrunk; shown once endsAt passes
+		mode: string?,
+		endsAt: number?, -- os.time()
+		won: boolean?,
+		before: { kg: number, size: string, value: number }?,
+		told: boolean?, -- the owner got the "it's done" toast
+	},
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -58,6 +67,7 @@ DataService.Template = {
 	seenAt = 0,
 	potion = { id = "", secondsLeft = 0 },
 	hotbar = { slots = {}, benched = {} },
+	chamber = {},
 } :: Data
 
 local store = ProfileStore.New(

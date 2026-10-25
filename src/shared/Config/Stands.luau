@@ -71,7 +71,7 @@ local Stands: { [string]: Stand } = {
 		greeting = "Step right up! Bigger monsters, bigger prices.",
 		info = {
 			ask = "How does the chamber work?",
-			answer = "Put a monster from your Backpack in and pick how hard to push it. Gentle is safe but grows a little. Strong and Reckless grow a lot more, but fail more often, and then your monster shrinks. Every monster can go in 5 times. You see the odds and the fee first.",
+			answer = "Put a monster from your Backpack in and pick how hard to push it. Gentle is safe but grows a little. Strong and Reckless grow a lot more, but fail more often, and then your monster shrinks. It bubbles for about 20 minutes, even while you're away, then come back to see how it went. Every monster can go in 5 times.",
 		},
 		enter = { ask = "Let's grow a monster!" },
 		quit = "Never mind",

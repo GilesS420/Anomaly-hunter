@@ -1,6 +1,7 @@
 --!strict
 -- The Growth Chamber, next to the Collector (Giles 2026-10-24). Put one monster from your
--- Backpack in, pick how hard to push it and pay the fee. A win makes it heavier (so bigger
+-- Backpack in, pick how hard to push it and pay the fee. It bubbles for BubbleSeconds, then
+-- the chamber shows how it went. A win makes it heavier (so bigger
 -- and worth more); pushing harder wins more but fails more often, and a failed hard push
 -- makes it shrink. Rules in Util/Growth.
 --
@@ -29,6 +30,9 @@ Growth.Modes = {
 	{ id = "Reckless", name = "Reckless", chance = 30, win = 2, lose = 0.75, feeShare = 0.25 },
 } :: { Mode }
 
-Growth.RevealSeconds = 2 -- how long the chamber bubbles before it shows how it went
+-- How long the chamber bubbles before it shows how it went (Giles 2026-10-25: about 20
+-- minutes). The monster stays in the chamber meanwhile, and the clock keeps going while
+-- you're offline.
+Growth.BubbleSeconds = 20 * 60
 
 return Growth
