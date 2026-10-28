@@ -533,7 +533,13 @@ local function update()
 	end
 end
 
--- A monster hit the hunter: whatever they were catching gets away (message is toasted).
+-- The name of the monster this player is catching right now, or nil.
+function CatchService.catching(player: Player): string?
+	local hold = holds[player]
+	return hold and hold.name
+end
+
+-- A monster hit the hunter (or another hunter slapped them): whatever they were catching gets away (message is toasted).
 function CatchService.interrupt(player: Player, message: string)
 	if holds[player] then
 		release(player, message)
