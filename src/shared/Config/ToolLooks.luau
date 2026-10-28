@@ -336,6 +336,10 @@ local function slapper(
 	return parts
 end
 
+function ToolLooks.CobwebMitt(): { Part }
+	return slapper(0.9, { 215, 215, 225 }, "Fabric", { 60, 55, 70 })
+end
+
 function ToolLooks.RubberGlove(): { Part }
 	return slapper(1, { 250, 210, 60 }, "SmoothPlastic", { 230, 230, 230 })
 end
@@ -387,6 +391,7 @@ ToolLooks.ById = {
 	LuckyTonic = ToolLooks.LuckyTonic,
 	GildedElixir = ToolLooks.GildedElixir,
 	PrismDraught = ToolLooks.PrismDraught,
+	CobwebMitt = ToolLooks.CobwebMitt,
 	RubberGlove = ToolLooks.RubberGlove,
 	BoneHand = ToolLooks.BoneHand,
 	GhoulClaw = ToolLooks.GhoulClaw,

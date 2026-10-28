@@ -362,36 +362,44 @@ Shop.Workshop = {
 	-- in stock; the best one you own is the one you slap with. Reach, push and how long a slapped
 	-- thief can't steal are in Config/Slap.
 	{
-		id = "RubberGlove",
-		name = "Rubber Glove",
+		id = "CobwebMitt",
+		name = "Cobweb Mitt",
 		kind = "Slapper",
-		price = 10_000,
+		price = 500_000,
 		restockChance = 100,
 		rarity = "Common",
 	},
 	{
-		id = "BoneHand",
-		name = "Bone Hand",
+		id = "RubberGlove",
+		name = "Rubber Glove",
 		kind = "Slapper",
-		price = 250_000,
+		price = 1_000_000,
 		restockChance = 100,
 		rarity = "Uncommon",
 	},
 	{
-		id = "GhoulClaw",
-		name = "Ghoul Claw",
+		id = "BoneHand",
+		name = "Bone Hand",
 		kind = "Slapper",
 		price = 5_000_000,
 		restockChance = 100,
 		rarity = "Rare",
 	},
 	{
-		id = "WitchPaddle",
-		name = "Witch's Paddle",
+		id = "GhoulClaw",
+		name = "Ghoul Claw",
 		kind = "Slapper",
 		price = 100_000_000,
 		restockChance = 100,
 		rarity = "Epic",
+	},
+	{
+		id = "WitchPaddle",
+		name = "Witch's Paddle",
+		kind = "Slapper",
+		price = 500_000_000,
+		restockChance = 100,
+		rarity = "Legendary",
 	},
 	{
 		id = "TitanHand",
@@ -399,7 +407,7 @@ Shop.Workshop = {
 		kind = "Slapper",
 		price = 1_000_000_000,
 		restockChance = 100,
-		rarity = "Legendary",
+		rarity = "Mythic",
 	},
 	-- A convenience: it pays for itself in time saved once you hunt in zone 3.
 	{

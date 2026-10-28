@@ -20,6 +20,7 @@ local Slap = {}
 
 -- Weakest first: the last one you own is the one you use.
 Slap.Slappers = {
+	{ id = "CobwebMitt", reach = 5, push = 30, stealLockSeconds = 10 },
 	{ id = "RubberGlove", reach = 6, push = 40, stealLockSeconds = 20 },
 	{ id = "BoneHand", reach = 9, push = 60, stealLockSeconds = 60 },
 	{ id = "GhoulClaw", reach = 12, push = 80, stealLockSeconds = 2 * 60 },
