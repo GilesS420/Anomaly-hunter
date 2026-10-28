@@ -633,6 +633,9 @@ local function build()
 end
 
 local function toggle()
+	if not player:GetAttribute("Admin") then
+		return -- no longer an admin (the Studio TestAsPlayer switch)
+	end
 	if window.isOpen() then
 		window.close()
 	else
@@ -649,6 +652,11 @@ function AdminController.start()
 	UserInputService.InputBegan:Connect(function(inputObject, processed)
 		if not processed and inputObject.KeyCode == Enum.KeyCode.F2 then
 			toggle()
+		end
+	end)
+	player:GetAttributeChangedSignal("Admin"):Connect(function()
+		if not player:GetAttribute("Admin") and window.isOpen() then
+			window.close()
 		end
 	end)
 end

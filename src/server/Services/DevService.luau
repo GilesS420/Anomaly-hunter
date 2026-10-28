@@ -495,12 +495,12 @@ local function useAdminRemote()
 			runForEveryone(player, name, text)
 			return
 		end
-		-- A whole number: GetPlayerByUserId errors on NaN, infinity and fractions.
-		local target = if type(targetId) == "number"
-				and targetId % 1 == 0
-				and math.abs(targetId) < 2 ^ 53
-			then Players:GetPlayerByUserId(targetId)
-			else nil
+		-- A whole number: GetPlayerByUserId errors on NaN, infinity and fractions. A broken
+		-- one is ignored, not run on the admin themselves.
+		if type(targetId) == "number" and not (targetId % 1 == 0 and math.abs(targetId) < 2 ^ 53) then
+			return
+		end
+		local target = if type(targetId) == "number" then Players:GetPlayerByUserId(targetId) else nil
 		runCommand(player, name, text, target)
 	end)
 	remote.Parent = remotes
