@@ -3290,6 +3290,35 @@ do
 	check("missions: dealing again the same day keeps today's bonus", again.streak == 1 and again.bonus == 0)
 end
 
+-- Slapping: same place, close, not on a mansion plot, not in the tutorial, cooldown and guard.
+do
+	local Slap = require("../src/shared/Util/Slap")
+	local SlapConfig = require("../src/shared/Config/Slap")
+	local plot = Layout.Plots[1]
+	-- A spot in the open hub: well clear of every plot.
+	local hubX, hubZ = Layout.Hub.Center.x, Layout.Hub.Center.z
+	check("slap: test spot is off the plots", not Travel.inPlot(hubX, hubZ))
+	local function at(x: number, z: number, zone: string?): Slap.Hunter
+		return { alive = true, zone = zone, tutorial = false, x = x, z = z }
+	end
+	local a, b = at(hubX, hubZ), at(hubX + 4, hubZ)
+	check("slap: in the hub", Slap.blocked(a, b, 10, 0, 0, 0) == nil)
+	check("slap: in a zone", Slap.blocked(at(0, 0, "Z1"), at(3, 0, "Z1"), 10, 0, 0, 0) == nil)
+	check("slap: different zones", Slap.blocked(at(0, 0, "Z1"), at(3, 0, "Z2"), 10, 0, 0, 0) == "Apart")
+	check("slap: zone vs hub", Slap.blocked(at(0, 0, "Z1"), at(0, 3), 10, 0, 0, 0) == "Apart")
+	check("slap: too far", Slap.blocked(a, at(hubX + SlapConfig.Range + 1, hubZ), 10, 0, 0, 0) == "Far")
+	check("slap: slack covers lag", Slap.blocked(a, at(hubX + SlapConfig.Range + 1, hubZ), 10, 0, 0, 2) == nil)
+	local home = Slap.blocked(at(plot.x, plot.z), at(plot.x + 3, plot.z), 10, 0, 0, 0)
+	check("slap: mansions are safe", home == "Mansion")
+	check("slap: cooldown", Slap.blocked(a, b, 10, 12, 0, 0) == "Cooldown")
+	check("slap: guarded", Slap.blocked(a, b, 10, 0, 12, 0) == "Guarded")
+	local learner = at(hubX + 4, hubZ)
+	learner.tutorial = true
+	check("slap: tutorial is safe", Slap.blocked(a, learner, 10, 0, 0, 0) == "Tutorial")
+	local px, pz = Slap.push(0, 0, 3, 4)
+	check("slap: push points away", near(px, 0.6) and near(pz, 0.8))
+end
+
 if failures > 0 then
 	error(`{failures} check(s) failed`)
 end
