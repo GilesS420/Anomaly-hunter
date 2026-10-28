@@ -14,6 +14,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Watcher = require(ReplicatedStorage.Shared.Util.Watcher)
+local HotbarController = require(script.Parent:WaitForChild("HotbarController"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 
@@ -37,12 +38,16 @@ function EventIconController.start()
 	-- Sized for a computer screen; the Scale canvas shrinks it on a phone.
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 	local size = 54
-	local lift = if touch then 170 else 16 -- phones keep the jump button in that corner
+	-- Phones keep the jump button in the bottom-right corner, so there the icon sits along the
+	-- bottom just right of the hotbar instead (Giles 2026-10-28), level with its slots.
+	local lift = if touch then 8 else 16
 
 	local icon = Ui.button(canvas, "", Ui.Colors.equip, UDim2.fromOffset(size, size))
 	icon.Name = "EventIcon"
 	icon.AnchorPoint = Vector2.new(1, 1)
-	icon.Position = UDim2.new(1, -16, 1, -lift)
+	icon.Position = if touch
+		then UDim2.new(0.5, HotbarController.Width / 2 + 10 + size, 1, -lift)
+		else UDim2.new(1, -16, 1, -lift)
 	icon.TextScaled = true
 	icon.Font = Enum.Font.FredokaOne
 	icon.Visible = false

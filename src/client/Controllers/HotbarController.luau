@@ -30,6 +30,10 @@ local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 local HotbarController = {}
 
 local Slots = 9
+local SlotSize = 60
+local SlotGap = 6
+-- The whole bar's width (canvas pixels), so the buttons beside it on a phone can keep clear.
+HotbarController.Width = Slots * SlotSize + (Slots - 1) * SlotGap
 local SectionOrder = { Tool = 1, Cake = 2, Monster = 3 }
 local SectionColor = {
 	Tool = Ui.Colors.buy,
@@ -231,8 +235,8 @@ function HotbarController.start()
 	-- Sized for a computer screen; the Scale canvas shrinks it on a phone. The slot numbers
 	-- are the keys 1 to 9, so only show them with a keyboard.
 	local keys = UserInputService.KeyboardEnabled
-	local size = 60
-	local gap = 6
+	local size = SlotSize
+	local gap = SlotGap
 	local bar = Instance.new("Frame")
 	bar.Name = "Bar"
 	bar.BackgroundTransparency = 1
