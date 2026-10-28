@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
+local Slap = require(ReplicatedStorage.Shared.Util.Slap)
 local Tutorial = require(ReplicatedStorage.Shared.Util.Tutorial)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local Counter = require(script.Parent.Parent.Counter)
@@ -74,7 +75,7 @@ local function storeOf(item: Shop.Item): Store
 	return if item.kind == "Vacuum" then "VacuumVault" else "Workshop"
 end
 
-local kindOrder = { Vacuum = 1, Lure = 2, Charm = 3, Potion = 4, Tag = 5 }
+local kindOrder = { Vacuum = 1, Slapper = 2, Lure = 3, Charm = 4, Potion = 5, Tag = 6 }
 
 local function currentSlot(): number
 	return Workshop.slotAt(os.time())
@@ -94,6 +95,7 @@ local function viewFor(data: DataService.Data, store: Store): View
 	local slot = currentSlot()
 	local bought = boughtThisSlot(data, slot)
 	local equipped = data.equipped :: { [string]: string }
+	local slapper = Slap.best(data.inventory) -- the one they slap with
 	local items: { Row } = {}
 	for _, item in Shop.Workshop do
 		if storeOf(item) ~= store then
@@ -108,10 +110,12 @@ local function viewFor(data: DataService.Data, store: Store): View
 			description = Workshop.describe(item),
 			rarity = item.rarity,
 			rarityColor = MonsterModel.color(item.rarity),
-			tool = Workshop.isTool(item),
+			tool = Workshop.keepsForever(item),
 			inStock = Workshop.inStock(item, slot, nil, stockBoost(data, item)),
 			owned = Workshop.owns(data.inventory, item),
-			equipped = equipSlot ~= nil and equipped[equipSlot] == item.id,
+			equipped = if item.kind == "Slapper"
+				then slapper ~= nil and slapper.id == item.id
+				else equipSlot ~= nil and equipped[equipSlot] == item.id,
 			count = data.inventory[item.id] or 0,
 			bought = bought[item.id] or 0,
 			limit = Workshop.limit(item, slot),
@@ -177,6 +181,11 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 			local equipped: { [string]: string } = data.equipped
 			equipped[equipSlot] = item.id
 			message = `Bought the {item.name}! You're using it now.`
+		elseif item.kind == "Slapper" then
+			local best = Slap.best(data.inventory)
+			message = if best and best.id == item.id
+				then `Bought the {item.name}! Press Q or the Slap button next to a hunter.`
+				else `Bought the {item.name}! Your better slapper is still the one you use.`
 		else
 			message = `Bought a {item.name}! You have {data.inventory[item.id]}.`
 		end

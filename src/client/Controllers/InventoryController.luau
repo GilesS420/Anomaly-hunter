@@ -305,6 +305,7 @@ function InventoryController.start()
 			local key = `i:{item.id}`
 			local caption = if item.tool
 				then (if item.equipped then "Using" else item.name)
+				elseif item.kind == "Slapper" then item.name -- kept forever, used by the Slap button
 				else `x{item.count}`
 			card(
 				i,

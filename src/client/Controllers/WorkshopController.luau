@@ -89,7 +89,15 @@ function WorkshopController.start()
 			local left = item.limit - item.bought
 			local stock, stockColor = `{left} in stock`, ShopCards.InStock
 			local action: ShopCards.Action
-			if item.tool and item.owned then
+			if item.tool and item.owned and item.kind == "Slapper" then
+				-- The best slapper owned is always the one used, so there's nothing to equip.
+				stock = if item.equipped then "Owned · using it" else "Owned"
+				action = {
+					text = if item.equipped then "Using" else "Owned",
+					color = Ui.Colors.off,
+					enabled = false,
+				}
+			elseif item.tool and item.owned then
 				stock = if item.equipped then "Owned · using it" else "Owned"
 				action = if item.equipped
 					then { text = "Using", color = Ui.Colors.off, enabled = false }

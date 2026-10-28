@@ -1,6 +1,7 @@
 --!strict
--- Slapping (server/Services/SlapService.luau decides). When another hunter is close enough
--- to slap (Util/Slap: same zone or both in the open hub, not on a mansion plot, not in the
+-- Slapping (server/Services/SlapService.luau decides). Only with a slapper from the Workshop
+-- (the player attribute Slapper, your best one; its reach is how close you must be). When
+-- another hunter is close enough to slap (Util/Slap: same zone or both in the open hub, not on a mansion plot, not in the
 -- tutorial, not just slapped), a round Slap button shows in the bottom-right corner with
 -- their name. Tap or click it, or press Q. Slapping someone who is catching makes their
 -- monster break loose, so you can try to catch it first.
@@ -47,7 +48,8 @@ end
 -- The closest hunter a slap would land on (the cooldown aside), or nil.
 local function closestTarget(): Player?
 	local me = hunter(player)
-	if not me then
+	local tool = Slap.get(player:GetAttribute("Slapper") :: string?)
+	if not me or not tool then
 		return nil
 	end
 	local now = workspace:GetServerTimeNow()
@@ -59,7 +61,8 @@ local function closestTarget(): Player?
 			local guard = other:GetAttribute("SlapGuardUntil")
 			if
 				them
-				and Slap.blocked(me, them, now, 0, if typeof(guard) == "number" then guard else 0, 0) == nil
+				and Slap.blocked(me, them, now, 0, if typeof(guard) == "number" then guard else 0, tool.reach)
+					== nil
 			then
 				local distance = (me.x - them.x) ^ 2 + (me.z - them.z) ^ 2
 				if distance < bestDistance then
@@ -112,7 +115,7 @@ local function pop(target: Player)
 	end)
 end
 
-local function onSlapped(slapper: Player, target: Player, pushX: number, pushZ: number)
+local function onSlapped(slapper: Player, target: Player, pushX: number, pushZ: number, speed: number)
 	if typeof(target) ~= "Instance" or not target:IsA("Player") then
 		return
 	end
@@ -120,11 +123,14 @@ local function onSlapped(slapper: Player, target: Player, pushX: number, pushZ: 
 	if target ~= player or typeof(pushX) ~= "number" or typeof(pushZ) ~= "number" then
 		return
 	end
+	if typeof(speed) ~= "number" then
+		return
+	end
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if root and root:IsA("BasePart") then
 		root.AssemblyLinearVelocity =
-			Vector3.new(pushX * SlapConfig.PushSpeed, SlapConfig.PushUp, pushZ * SlapConfig.PushSpeed)
+			Vector3.new(pushX * speed, SlapConfig.PushUp, pushZ * speed)
 	end
 end
 

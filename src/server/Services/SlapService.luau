@@ -1,15 +1,22 @@
 --!strict
--- Slapping (Config/Slap, rules in Util/Slap): press the Slap button (or Q) next to another
--- hunter in a zone or in the open hub. They're knocked back, and if they were catching a
--- monster it breaks loose, dazed for a moment, so whoever is quickest can catch it. A slapped
+-- Slapping (Config/Slap, rules in Util/Slap): with a slapper from the Workshop, press the Slap
+-- button (or Q) next to another hunter in a zone or in the open hub. Your best slapper sets
+-- how far you reach, how hard you push and how long a slapped thief can't steal. They're
+-- knocked back, and if they were catching a monster it breaks loose, dazed for a moment, so
+-- whoever is quickest can catch it. A slapped
 -- hunter is guarded for a few seconds so nobody can keep them pinned. Mansion plots and the
 -- tutorial are safe.
 --
 -- Remotes in ReplicatedStorage.SlapRemotes:
 --   Slap     client -> server (target: Player)
---   Slapped  server -> all clients (slapper: Player, target: Player, pushX, pushZ)
+--   Slapped  server -> all clients (slapper: Player, target: Player, pushX, pushZ, speed)
 --            everyone sees the "SLAP!", the target's own client applies the push
--- Player attribute SlapGuardUntil (server time): nobody can slap them until then.
+-- Player attributes:
+--   Slapper          the best slapper they own (set by HuntService.refreshItems); nil = none
+--   SlapGuardUntil   server time: nobody can slap them until then
+--   Stealing         true while they're stealing a monster (set by the heist code, Sprint E)
+--   StealLockedUntil server time: a slap stopped their stealing, and they can't steal again
+--                    until then (the heist code must check it)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -58,6 +65,11 @@ local function onSlap(player: Player, target: unknown)
 	if target == player or target.Parent ~= Players then
 		return
 	end
+	local tool = Slap.get(player:GetAttribute("Slapper") :: string?)
+	if not tool then
+		Notify.toast(player, "You need a slapper first! The Hunter's Workshop sells them.")
+		return
+	end
 	local slapper = hunter(player)
 	local victim = hunter(target)
 	if not slapper or not victim then
@@ -71,7 +83,7 @@ local function onSlap(player: Player, target: unknown)
 		now,
 		readyAt[player] or 0,
 		if typeof(guard) == "number" then guard else 0,
-		SlapConfig.RangeSlack
+		tool.reach + SlapConfig.RangeSlack
 	)
 	if reason == "Guarded" then
 		Notify.toast(player, `{target.DisplayName} was just slapped. Give them a second!`)
@@ -83,7 +95,18 @@ local function onSlap(player: Player, target: unknown)
 	readyAt[player] = now + SlapConfig.CooldownSeconds - 0.25 -- a little lag allowance
 	target:SetAttribute("SlapGuardUntil", now + SlapConfig.GuardSeconds)
 	local pushX, pushZ = Slap.push(slapper.x, slapper.z, victim.x, victim.z)
-	Slapped:FireAllClients(player, target, pushX, pushZ)
+	Slapped:FireAllClients(player, target, pushX, pushZ, tool.push)
+
+	-- Caught stealing: they can't steal again for a while (longer for a better slapper).
+	if target:GetAttribute("Stealing") == true then
+		local locked = target:GetAttribute("StealLockedUntil")
+		local untilTime = Slap.stealLockUntil(tool, now, if typeof(locked) == "number" then locked else nil)
+		target:SetAttribute("StealLockedUntil", untilTime)
+		local seconds = math.ceil(untilTime - now)
+		Notify.toast(target, `{player.DisplayName} slapped you! You can't steal for {seconds} seconds.`)
+		Notify.toast(player, `SLAP! {target.DisplayName} can't steal for {seconds} seconds.`)
+		return
+	end
 
 	local monster = CatchService.catching(target)
 	if monster then
