@@ -1,7 +1,7 @@
 --!strict
 -- The Growth Chamber, next to the Collector: makes a monster from the Backpack (Storage)
 -- heavier, with odds. Pick a mode (Gentle, Strong, Reckless) and pay its fee; the monster
--- goes into the chamber and bubbles for Config/Growth.BubbleSeconds (the clock keeps going
+-- goes into the chamber and bubbles for its mode's seconds (Config/Growth; the clock keeps going
 -- while you're offline). Then the chamber shows how it went: a win grows it, a loss in a hard
 -- mode shrinks it. Pick it up to put it back in your Backpack (or try again from there).
 -- One monster in the chamber at a time; every monster can go in Config/Growth.Charges times.
@@ -32,7 +32,15 @@ local Notify = require(script.Parent.Parent.Notify)
 
 local GrowthService = {}
 
-export type Option = { id: string, name: string, chance: number, win: number, lose: number, fee: number }
+export type Option = {
+	id: string,
+	name: string,
+	chance: number,
+	win: number,
+	lose: number,
+	fee: number,
+	seconds: number, -- how long it bubbles
+}
 export type Row = {
 	uid: string,
 	name: string,
@@ -134,6 +142,7 @@ local function viewFor(data: DataService.Data): View
 				win = mode.win,
 				lose = mode.lose,
 				fee = Growth.fee(value, mode),
+				seconds = mode.seconds,
 			})
 		end
 		local variant = if caught.variant then `{caught.variant} ` else ""
@@ -210,14 +219,14 @@ GrowRemote.OnServerInvoke = function(player: Player, uid: unknown, modeId: unkno
 	data.chamber = {
 		monster = monster,
 		mode = mode.id,
-		endsAt = os.time() + GrowthConfig.BubbleSeconds,
+		endsAt = os.time() + mode.seconds,
 		won = won,
 		before = before,
 	}
 	busy[player] = nil
 	DataService.saveSoon(player)
 	MissionService.record(player, "Grow")
-	local minutes = math.ceil(GrowthConfig.BubbleSeconds / 60)
+	local minutes = math.ceil(mode.seconds / 60)
 	return {
 		ok = true,
 		message = `Your {Format.monsterName(monster)} is bubbling! Come back in {minutes} minutes.`,
