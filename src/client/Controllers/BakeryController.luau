@@ -129,6 +129,13 @@ function BakeryController.start()
 		end
 	end
 
+	-- An admin restock started or ended (server/AdminRestock): show the new stock right away.
+	workspace:GetAttributeChangedSignal("ShopRestock"):Connect(function()
+		if window.isOpen() then
+			refresh()
+		end
+	end)
+
 	Open.OnClientEvent:Connect(function(counter: unknown)
 		if typeof(counter) ~= "Vector3" then
 			return

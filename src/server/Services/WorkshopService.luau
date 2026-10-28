@@ -21,6 +21,7 @@ local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Slap = require(ReplicatedStorage.Shared.Util.Slap)
 local Tutorial = require(ReplicatedStorage.Shared.Util.Tutorial)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
+local AdminRestock = require(script.Parent.Parent.AdminRestock)
 local Counter = require(script.Parent.Parent.Counter)
 local DataService = require(script.Parent.DataService)
 local HuntService = require(script.Parent.HuntService)
@@ -91,9 +92,10 @@ local function stockBoost(data: DataService.Data, item: Shop.Item?): number?
 	return if item and item.id == Tutorial.FirstVacuum and data.tutorial == "Buy" then math.huge else nil
 end
 
-local function viewFor(data: DataService.Data, store: Store): View
+local function viewFor(player: Player, data: DataService.Data, store: Store): View
 	local slot = currentSlot()
 	local bought = boughtThisSlot(data, slot)
+	local adminBought = AdminRestock.bought(player)
 	local equipped = data.equipped :: { [string]: string }
 	local slapper = Slap.best(data.inventory) -- the one they slap with
 	local items: { Row } = {}
@@ -102,6 +104,8 @@ local function viewFor(data: DataService.Data, store: Store): View
 			continue
 		end
 		local equipSlot = Workshop.equipSlot(item)
+		-- An admin restock (server/AdminRestock) sets the stock and limit of the items in it.
+		local adminStock = AdminRestock.stock(item.id)
 		table.insert(items, {
 			id = item.id,
 			name = item.name,
@@ -111,14 +115,14 @@ local function viewFor(data: DataService.Data, store: Store): View
 			rarity = item.rarity,
 			rarityColor = MonsterModel.color(item.rarity),
 			tool = Workshop.keepsForever(item),
-			inStock = Workshop.inStock(item, slot, nil, stockBoost(data, item)),
+			inStock = if adminStock then adminStock > 0 else Workshop.inStock(item, slot, nil, stockBoost(data, item)),
 			owned = Workshop.owns(data.inventory, item),
 			equipped = if item.kind == "Slapper"
 				then slapper ~= nil and slapper.id == item.id
 				else equipSlot ~= nil and equipped[equipSlot] == item.id,
 			count = data.inventory[item.id] or 0,
-			bought = bought[item.id] or 0,
-			limit = Workshop.limit(item, slot),
+			bought = if adminStock then adminBought[item.id] or 0 else bought[item.id] or 0,
+			limit = adminStock or Workshop.limit(item, slot),
 			look = ToolModel.look(item.id),
 		})
 	end
@@ -131,7 +135,7 @@ local function viewFor(data: DataService.Data, store: Store): View
 	end)
 	return {
 		items = items,
-		secondsLeft = Workshop.restockAt(slot) - os.time(),
+		secondsLeft = AdminRestock.countdown(Workshop.restockAt(slot) - os.time()),
 		money = data.money,
 	}
 end
@@ -142,7 +146,7 @@ end
 
 GetShop.OnServerInvoke = function(player: Player, store: unknown): View?
 	local data = DataService.get(player)
-	return if data then viewFor(data, if store == "VacuumVault" then "VacuumVault" else "Workshop") else nil
+	return if data then viewFor(player, data, if store == "VacuumVault" then "VacuumVault" else "Workshop") else nil
 end
 
 Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
@@ -156,11 +160,13 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 		return {
 			ok = false,
 			message = `Walk up to the {StoreNames[store]} to shop.`,
-			view = viewFor(data, store),
+			view = viewFor(player, data, store),
 		}
 	end
 	local slot = currentSlot()
-	local bought = boughtThisSlot(data, slot)
+	local adminStock = if item then AdminRestock.stock(item.id) else nil
+	-- Buys during an admin restock count from it, not against the normal limit.
+	local bought = if adminStock then AdminRestock.bought(player) else boughtThisSlot(data, slot)
 	local check = Workshop.canBuy(
 		item,
 		slot,
@@ -168,7 +174,8 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 		data.inventory,
 		if item then bought[item.id] or 0 else 0,
 		nil,
-		stockBoost(data, item)
+		stockBoost(data, item),
+		adminStock
 	)
 
 	local message
@@ -191,22 +198,24 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 		end
 		HuntService.refreshItems(player)
 		Notify.toast(player, message)
-		return { ok = true, message = message, view = viewFor(data, store) }
+		return { ok = true, message = message, view = viewFor(player, data, store) }
 	elseif check == "TooPoor" and item then
 		message = `You need {Format.money(item.price - data.money)} more for the {item.name}.`
 	elseif check == "Owned" then
 		message = "You already own that."
 	elseif check == "SoldOut" and item then
-		message = `You bought all {Workshop.limit(item, slot)} this restock. More in {countdown(
-			Workshop.restockAt(slot) - os.time()
+		message = `You bought all {adminStock or Workshop.limit(item, slot)} this restock. More in {countdown(
+			AdminRestock.countdown(Workshop.restockAt(slot) - os.time())
 		)}.`
 	elseif check == "OutOfStock" then
-		message = `Out of stock. The Workshop restocks in {countdown(Workshop.restockAt(slot) - os.time())}.`
+		message = `Out of stock. The Workshop restocks in {countdown(
+			AdminRestock.countdown(Workshop.restockAt(slot) - os.time())
+		)}.`
 	else
 		message = "That isn't for sale."
 	end
 	Notify.toast(player, message)
-	return { ok = false, message = message, view = viewFor(data, store) }
+	return { ok = false, message = message, view = viewFor(player, data, store) }
 end
 
 -- Puts an owned tool into use (the Vault window and the Backpack both use this).
@@ -231,12 +240,12 @@ Equip.OnServerInvoke = function(player: Player, itemId: unknown): Result
 		return {
 			ok = false,
 			message = "Walk up to the Vacuum Vault to change vacuums.",
-			view = viewFor(data, "VacuumVault"),
+			view = viewFor(player, data, "VacuumVault"),
 		}
 	end
 	local ok, message = WorkshopService.equip(data, itemId)
 	HuntService.refreshItems(player) -- the bag size follows the vacuum
-	return { ok = ok, message = message, view = viewFor(data, "VacuumVault") }
+	return { ok = ok, message = message, view = viewFor(player, data, "VacuumVault") }
 end
 
 -- Flashlights and the Spirit Lens were replaced by vacuums: owners get their money back.

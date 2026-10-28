@@ -119,6 +119,9 @@ function Workshop.limit(item: Shop.Item, slot: number): number
 end
 
 -- Whether a player can buy one now. boughtThisSlot is how many they bought since the restock.
+-- `adminStock` is how many an admin restock (server/AdminRestock) put in for this item: it
+-- replaces the normal stock and limit (0 = sold out), and boughtThisSlot then counts what the
+-- player bought since that admin restock.
 function Workshop.canBuy(
 	item: Shop.Item?,
 	slot: number,
@@ -126,7 +129,8 @@ function Workshop.canBuy(
 	inventory: { [string]: number },
 	boughtThisSlot: number,
 	liveEvent: string?,
-	chanceMultiplier: number?
+	chanceMultiplier: number?,
+	adminStock: number?
 ): BuyResult
 	if not item then
 		return "Unknown"
@@ -134,10 +138,13 @@ function Workshop.canBuy(
 	if Workshop.keepsForever(item) and Workshop.owns(inventory, item) then
 		return "Owned"
 	end
-	if not Workshop.inStock(item, slot, liveEvent, chanceMultiplier) then
+	local inStock = if adminStock
+		then adminStock > 0
+		else Workshop.inStock(item, slot, liveEvent, chanceMultiplier)
+	if not inStock then
 		return "OutOfStock"
 	end
-	if boughtThisSlot >= Workshop.limit(item, slot) then
+	if boughtThisSlot >= (adminStock or Workshop.limit(item, slot)) then
 		return "SoldOut"
 	end
 	if money < item.price then
