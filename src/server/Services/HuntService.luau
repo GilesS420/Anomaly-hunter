@@ -28,6 +28,7 @@ local Catching = require(ReplicatedStorage.Shared.Util.Catching)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
 local Potions = require(ReplicatedStorage.Shared.Util.Potions)
+local Slap = require(ReplicatedStorage.Shared.Util.Slap)
 local Layout = require(ReplicatedStorage.Shared.Config.Layout)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
@@ -265,7 +266,9 @@ function HuntService.potionBoost(player: Player): number
 end
 
 local function toolName(data: DataService.Data, item: Shop.Item): string?
-	if Workshop.isTool(item) then
+	if item.kind == "Slapper" then
+		return nil -- never held: the Slap button uses your best one
+	elseif Workshop.isTool(item) then
 		return if Workshop.owns(data.inventory, item) then item.name else nil
 	end
 	local count = itemCount(data, item.id)
@@ -341,7 +344,7 @@ local function syncTools(player: Player)
 	end
 end
 
--- Updates the ReturnCharms, BaitBells and BagSize attributes (the client shows each button
+-- Updates the ReturnCharms, BaitBells, Slapper and BagSize attributes (the client shows each button
 -- only if it's above 0) and the hotbar Tools. Call it after anything changes the inventory or
 -- the equipped vacuum.
 function HuntService.refreshItems(player: Player)
@@ -353,6 +356,9 @@ function HuntService.refreshItems(player: Player)
 			player:SetAttribute(`{item.id}s`, if data then itemCount(data, item.id) else 0)
 		end
 	end
+	-- The best slapper they own (SlapService and the Slap button use it); nil = can't slap.
+	local slapper = if data then Slap.best(data.inventory) else nil
+	player:SetAttribute("Slapper", if slapper then slapper.id else nil)
 	setCarrying(player, carrying[player])
 	syncTools(player)
 end

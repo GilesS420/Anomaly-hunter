@@ -10,6 +10,7 @@ local Events = require("../Config/Events")
 local Monsters = require("../Config/Monsters")
 local Shop = require("../Config/Shop")
 local Sizes = require("../Config/Sizes")
+local SlapConfig = require("../Config/Slap")
 local Tools = require("../Config/Tools")
 local Variants = require("../Config/Variants")
 local Rng = require("./Rng")
@@ -66,7 +67,7 @@ function Workshop.inStock(
 	if item.event then
 		return item.event == liveEvent
 	end
-	if item.price <= 0 or item.kind == "Vacuum" then
+	if item.price <= 0 or Workshop.keepsForever(item) then
 		return true
 	end
 	local roll = (hash(`{slot}:{item.id}`) % 10000) / 100 -- 0 to 99.99
@@ -76,6 +77,11 @@ end
 -- Tools (vacuums) are kept forever and equipped; everything else is used up.
 function Workshop.isTool(item: Shop.Item): boolean
 	return item.kind == "Vacuum"
+end
+
+-- Bought once and kept forever (and so always in stock): vacuums and slappers.
+function Workshop.keepsForever(item: Shop.Item): boolean
+	return item.kind == "Vacuum" or item.kind == "Slapper"
 end
 
 function Workshop.equipSlot(item: Shop.Item): EquipSlot?
@@ -104,7 +110,7 @@ end
 -- How many a player can buy in one restock: one tool, or a random number of a single-use item
 -- (Shop.StockMin to StockMax), worked out from the slot like the stock itself.
 function Workshop.limit(item: Shop.Item, slot: number): number
-	if Workshop.isTool(item) then
+	if Workshop.keepsForever(item) then
 		return 1
 	end
 	local low = item.stockMin or Shop.StockMin
@@ -125,7 +131,7 @@ function Workshop.canBuy(
 	if not item then
 		return "Unknown"
 	end
-	if Workshop.isTool(item) and Workshop.owns(inventory, item) then
+	if Workshop.keepsForever(item) and Workshop.owns(inventory, item) then
 		return "Owned"
 	end
 	if not Workshop.inStock(item, slot, liveEvent, chanceMultiplier) then
@@ -192,6 +198,11 @@ function Workshop.unlocksEvents(vacuumId: string): { string }
 	return names
 end
 
+-- "15s", "2 min", "4 min".
+function Workshop.duration(seconds: number): string
+	return if seconds < 60 then `{seconds}s` else `{math.floor(seconds / 60)} min`
+end
+
 -- One short line saying what the item does, for the shop window.
 function Workshop.describe(item: Shop.Item): string
 	if item.kind == "Vacuum" then
@@ -235,6 +246,14 @@ function Workshop.describe(item: Shop.Item): string
 		return `Ring it in a zone: a monster {up} rarer comes to you{cap}`
 	elseif item.kind == "Charm" then
 		return "Takes you home from a zone, with your catch"
+	elseif item.kind == "Slapper" then
+		for _, slapper in SlapConfig.Slappers do
+			if slapper.id == item.id then
+				return `Slap hunters (Q or the Slap button) · reach {slapper.reach} · push {slapper.push}`
+					.. ` · a slapped thief can't steal for {Workshop.duration(slapper.stealLockSeconds)}`
+			end
+		end
+		return ""
 	elseif item.kind == "Potion" then
 		local minutes = math.floor((item.potionSeconds or 0) / 60)
 		return `Drink it: Silver, Gold, Shiny and Rainbow catches x{item.potionBoost or 1} for {minutes} min`

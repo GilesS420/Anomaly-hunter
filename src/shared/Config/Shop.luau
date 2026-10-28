@@ -4,12 +4,12 @@
 -- Prices and restock chances are set by the balance sheet, docs in /mnt/project-files/balance.
 -- The upgrade order is Phantom Vac, Spirit Siphon, Library, Ballroom, Banshee Blower, Moon Vac,
 -- Void Vac, each taking about 2-3x as long to afford as the one before. Vacuums are always in
--- stock (Util/Workshop.inStock), so their restockChance is not used.
+-- stock (Util/Workshop.inStock), so their restockChance is not used. Slappers too.
 
 export type Item = {
 	id: string,
 	name: string,
-	kind: "Food" | "Vacuum" | "Lure" | "Charm" | "Tag" | "Potion",
+	kind: "Food" | "Vacuum" | "Lure" | "Charm" | "Tag" | "Potion" | "Slapper",
 	price: number,
 	restockChance: number,
 	rarity: string, -- the tag in the shop window: a Config/Rarities id, or "Event" for event treats
@@ -357,6 +357,49 @@ Shop.Workshop = {
 		restockChance = 6,
 		rarity = "Legendary",
 		tier = 3,
+	},
+	-- Slappers (Giles 2026-10-28): nobody starts with one. Each is bought once and kept, always
+	-- in stock; the best one you own is the one you slap with. Reach, push and how long a slapped
+	-- thief can't steal are in Config/Slap.
+	{
+		id = "RubberGlove",
+		name = "Rubber Glove",
+		kind = "Slapper",
+		price = 5_000,
+		restockChance = 100,
+		rarity = "Common",
+	},
+	{
+		id = "BoneHand",
+		name = "Bone Hand",
+		kind = "Slapper",
+		price = 100_000,
+		restockChance = 100,
+		rarity = "Uncommon",
+	},
+	{
+		id = "GhoulClaw",
+		name = "Ghoul Claw",
+		kind = "Slapper",
+		price = 2_500_000,
+		restockChance = 100,
+		rarity = "Rare",
+	},
+	{
+		id = "WitchPaddle",
+		name = "Witch's Paddle",
+		kind = "Slapper",
+		price = 60_000_000,
+		restockChance = 100,
+		rarity = "Epic",
+	},
+	{
+		id = "TitanHand",
+		name = "Titan Hand",
+		kind = "Slapper",
+		price = 500_000_000,
+		restockChance = 100,
+		rarity = "Legendary",
 	},
 	-- A convenience: it pays for itself in time saved once you hunt in zone 3.
 	{

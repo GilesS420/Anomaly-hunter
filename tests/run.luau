@@ -3290,11 +3290,13 @@ do
 	check("missions: dealing again the same day keeps today's bonus", again.streak == 1 and again.bonus == 0)
 end
 
--- Slapping: same place, close, not on a mansion plot, not in the tutorial, cooldown and guard.
+-- Slapping: same place, close, not on a mansion plot, not in the tutorial, cooldown and guard;
+-- slappers get better up the list and every one is sold in the Workshop.
 do
 	local Slap = require("../src/shared/Util/Slap")
 	local SlapConfig = require("../src/shared/Config/Slap")
 	local plot = Layout.Plots[1]
+	local reach = 7
 	-- A spot in the open hub: well clear of every plot.
 	local hubX, hubZ = Layout.Hub.Center.x, Layout.Hub.Center.z
 	check("slap: test spot is off the plots", not Travel.inPlot(hubX, hubZ))
@@ -3302,21 +3304,56 @@ do
 		return { alive = true, zone = zone, tutorial = false, x = x, z = z }
 	end
 	local a, b = at(hubX, hubZ), at(hubX + 4, hubZ)
-	check("slap: in the hub", Slap.blocked(a, b, 10, 0, 0, 0) == nil)
-	check("slap: in a zone", Slap.blocked(at(0, 0, "Z1"), at(3, 0, "Z1"), 10, 0, 0, 0) == nil)
-	check("slap: different zones", Slap.blocked(at(0, 0, "Z1"), at(3, 0, "Z2"), 10, 0, 0, 0) == "Apart")
-	check("slap: zone vs hub", Slap.blocked(at(0, 0, "Z1"), at(0, 3), 10, 0, 0, 0) == "Apart")
-	check("slap: too far", Slap.blocked(a, at(hubX + SlapConfig.Range + 1, hubZ), 10, 0, 0, 0) == "Far")
-	check("slap: slack covers lag", Slap.blocked(a, at(hubX + SlapConfig.Range + 1, hubZ), 10, 0, 0, 2) == nil)
-	local home = Slap.blocked(at(plot.x, plot.z), at(plot.x + 3, plot.z), 10, 0, 0, 0)
+	check("slap: in the hub", Slap.blocked(a, b, 10, 0, 0, reach) == nil)
+	check("slap: in a zone", Slap.blocked(at(0, 0, "Z1"), at(3, 0, "Z1"), 10, 0, 0, reach) == nil)
+	check("slap: different zones", Slap.blocked(at(0, 0, "Z1"), at(3, 0, "Z2"), 10, 0, 0, reach) == "Apart")
+	check("slap: zone vs hub", Slap.blocked(at(0, 0, "Z1"), at(0, 3), 10, 0, 0, reach) == "Apart")
+	check("slap: too far", Slap.blocked(a, at(hubX + reach + 1, hubZ), 10, 0, 0, reach) == "Far")
+	check("slap: more reach", Slap.blocked(a, at(hubX + reach + 1, hubZ), 10, 0, 0, reach + 2) == nil)
+	local home = Slap.blocked(at(plot.x, plot.z), at(plot.x + 3, plot.z), 10, 0, 0, reach)
 	check("slap: mansions are safe", home == "Mansion")
-	check("slap: cooldown", Slap.blocked(a, b, 10, 12, 0, 0) == "Cooldown")
-	check("slap: guarded", Slap.blocked(a, b, 10, 0, 12, 0) == "Guarded")
+	check("slap: cooldown", Slap.blocked(a, b, 10, 12, 0, reach) == "Cooldown")
+	check("slap: guarded", Slap.blocked(a, b, 10, 0, 12, reach) == "Guarded")
 	local learner = at(hubX + 4, hubZ)
 	learner.tutorial = true
-	check("slap: tutorial is safe", Slap.blocked(a, learner, 10, 0, 0, 0) == "Tutorial")
+	check("slap: tutorial is safe", Slap.blocked(a, learner, 10, 0, 0, reach) == "Tutorial")
 	local px, pz = Slap.push(0, 0, 3, 4)
 	check("slap: push points away", near(px, 0.6) and near(pz, 0.8))
+
+	check("slap: nobody starts with a slapper", Slap.best({}) == nil)
+	local best = Slap.best({ RubberGlove = 1, GhoulClaw = 1 })
+	check("slap: best slapper is used", best ~= nil and best.id == "GhoulClaw")
+	local better = true
+	for i = 2, #SlapConfig.Slappers do
+		local low, high = SlapConfig.Slappers[i - 1], SlapConfig.Slappers[i]
+		better = better
+			and high.reach > low.reach
+			and high.push > low.push
+			and high.stealLockSeconds > low.stealLockSeconds
+	end
+	check("slap: each slapper beats the one before", better)
+	local sold, cheaper = true, true
+	local lastPrice = -1
+	for _, slapper in SlapConfig.Slappers do
+		local item = Workshop.item(slapper.id)
+		sold = sold and item ~= nil and item.kind == "Slapper" and item.price > 0
+		if item then
+			cheaper = cheaper and item.price > lastPrice
+			lastPrice = item.price
+		end
+	end
+	check("slap: every slapper is sold in the Workshop, dearer up the list", sold and cheaper)
+	local glove = Workshop.item("RubberGlove") :: any
+	check(
+		"slap: slappers are always in stock and kept",
+		Workshop.inStock(glove, 12345) and Workshop.limit(glove, 12345) == 1
+			and Workshop.canBuy(glove, 12345, 1e12, { RubberGlove = 1 }, 0) == "Owned"
+	)
+	local strong = SlapConfig.Slappers[#SlapConfig.Slappers]
+	local weak = SlapConfig.Slappers[1]
+	local longer = Slap.stealLockUntil(strong, 100) > Slap.stealLockUntil(weak, 100)
+	check("slap: stronger slap locks a thief longer", longer)
+	check("slap: a weak slap never shortens a lock", Slap.stealLockUntil(weak, 100, 1000) == 1000)
 end
 
 if failures > 0 then
