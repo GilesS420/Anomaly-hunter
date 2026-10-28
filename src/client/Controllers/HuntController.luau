@@ -6,7 +6,8 @@
 -- Gold; B rings the cheapest you own) that brings a rarer monster to you. Each button shows
 -- only if you own one. A "Backpack" button (G) is always there and opens your items and
 -- monsters (InventoryController), and so are a "Codex" button
--- (C, CodexController) and a "Settings" button (SettingsController).
+-- (C, CodexController), a "Missions" button (J, MissionController) and a "Settings" button
+-- (SettingsController).
 -- Everything shown comes from the server: player attributes Zone / Hearts / Carrying /
 -- CarryingSize / CarryingCount / BagSize / ReturnCharms / BaitBells / SilverBells / GoldBells and
 -- leaderstats.Money.
@@ -122,6 +123,10 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 	-- Always there too; CodexController opens the Codex with it.
 	local codex = itemButton("Codex", 8, Color3.fromRGB(110, 70, 40), if keys then "Codex (C)" else "Codex")
 	codex.Visible = true
+	-- MissionController opens the daily missions with it.
+	local missions =
+		itemButton("Missions", 8.5, Color3.fromRGB(150, 110, 30), if keys then "Missions (J)" else "Missions")
+	missions.Visible = true
 	local settings = itemButton("Settings", 9, Color3.fromRGB(60, 60, 75), "Settings")
 	settings.Visible = true
 

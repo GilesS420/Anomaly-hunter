@@ -3161,6 +3161,119 @@ do
 	check("cleaning anything else gives an empty layout", next(HotbarLayout.clean("junk").slots) == nil)
 end
 
+-- Daily missions (Util/Missions, Config/Missions).
+do
+	local Missions = require("../src/shared/Util/Missions")
+	local MissionConfig = require("../src/shared/Config/Missions")
+	local seed = 7
+	local random: any = {
+		NextInteger = function(_self, min: number, max: number): number
+			seed = (seed * 1103515245 + 12345) % 2147483648
+			return min + seed % (max - min + 1)
+		end,
+	}
+	local day = 20_000
+	local now = day * 86_400 + 3_600
+	check("missions: day number", Missions.day(now) == day)
+	check("missions: time left until reset", Missions.secondsLeft(now) == 86_400 - 3_600)
+	check("missions: rounding", Missions.round(1_234_567) == 1_200_000 and Missions.round(45) == 45)
+	check("missions: reward floor", Missions.reward(0.03, 2_000, 15_000, 0) == 2_000)
+	check("missions: reward share and bonus", Missions.reward(0.03, 2_000, 20_000_000, 0.3) == 780_000)
+	check(
+		"missions: streak bonus capped",
+		near(Missions.bonusFor(3), 0.3) and Missions.bonusFor(20) == MissionConfig.StreakMax
+	)
+	check("missions: open zones", #Missions.openZones(1) == 1 and #Missions.openZones(3) == 3)
+	check("missions: zone 4 isn't launched", #Missions.openZones(6) == 3)
+	local set = Missions.zoneTargets("PumpkinGraveyard", "Rare")
+	check("missions: zone set is Common to Rare", #set == 5 and table.find(set, "Gravepup") ~= nil)
+
+	-- Every pool entry has a known tier and a text that fills in.
+	local pooled = true
+	for _, mission in MissionConfig.Pool do
+		pooled = pooled
+			and Missions.tier(mission.tier) ~= nil
+			and (mission.count ~= nil or mission.moneyShare ~= nil or mission.kind == "ZoneSet")
+	end
+	check("missions: pool entries are complete", pooled)
+
+	local fresh = Missions.deal(nil, now, 20_000_000, 3, random)
+	check("missions: three dealt, one per tier", #fresh.list == 3)
+	local tiersSeen = {}
+	for _, saved in fresh.list do
+		local def = Missions.def(saved.id)
+		tiersSeen[def and def.tier or "?"] = true
+		check(`missions: {saved.id} text filled`, not string.find(Missions.text(saved), "{", 1, true))
+	end
+	check("missions: tiers", tiersSeen.Easy and tiersSeen.Medium and tiersSeen.Hard or false)
+	check("missions: chest", fresh.chest == 1_200_000 and fresh.rerolls == MissionConfig.Rerolls)
+
+	-- Counting.
+	local state: any = {
+		day = day,
+		worth = 1_000_000,
+		bonus = 0,
+		streak = 0,
+		lastDay = 0,
+		rerolls = 1,
+		chest = 60_000,
+		list = {
+			{ id = "Catch8", target = 2, progress = 0, reward = 30_000 },
+			{ id = "Species4", zone = "MurkyBayou", target = 2, progress = 0, seen = {}, reward = 60_000 },
+			{ id = "Variant1", target = 1, progress = 0, reward = 100_000 },
+		},
+	}
+	Missions.record(state, "Catch", { monsterId = "Bogbub", zone = "MurkyBayou" })
+	Missions.record(state, "Catch", { monsterId = "Bogbub", zone = "MurkyBayou" })
+	check("missions: catches count", state.list[1].progress == 2 and Missions.isDone(state.list[1]))
+	check("missions: same species counts once", state.list[2].progress == 1)
+	Missions.record(state, "Catch", { monsterId = "Gloomlet", zone = "PumpkinGraveyard" })
+	check("missions: other zone doesn't count", state.list[2].progress == 1)
+	local finished =
+		Missions.record(state, "Catch", { monsterId = "Croakling", zone = "MurkyBayou", variant = "Silver" })
+	check("missions: species done and variant done", #finished == 2 and state.list[3].progress == 1)
+	check("missions: catches stop at the target", state.list[1].progress == 2)
+	check("missions: three ready", Missions.ready(state) == 3)
+	check("missions: claim pays", Missions.claim(state, 1, now) == 30_000)
+	check("missions: claim only once", Missions.claim(state, 1, now) == nil)
+	check("missions: first claim starts the streak", state.streak == 1 and state.lastDay == day)
+	check("missions: chest shut until all are claimed", Missions.claimChest(state) == nil)
+	Missions.claim(state, 2, now)
+	Missions.claim(state, 3, now)
+	check("missions: chest opens", Missions.claimChest(state) == 60_000 and Missions.claimChest(state) == nil)
+	check("missions: nothing left", Missions.ready(state) == 0)
+
+	-- Sell, merges and rerolls.
+	local other: any = Missions.empty()
+	other.rerolls = 1
+	other.list = {
+		{ id = "SellSmall", target = 10_000, progress = 0, reward = 1 },
+		{ id = "MergeWin", target = 1, progress = 0, reward = 1 },
+	}
+	Missions.record(other, "Sell", { amount = 6_000 })
+	Missions.record(other, "Merge", { won = false })
+	check(
+		"missions: money adds up, lost merges don't count for wins",
+		other.list[1].progress == 6_000 and other.list[2].progress == 0
+	)
+	Missions.record(other, "Merge", { won = true })
+	check("missions: won merge counts", other.list[2].progress == 1)
+	check("missions: can't reroll a finished one", not Missions.reroll(other, 2, 3, random))
+	check(
+		"missions: reroll swaps",
+		Missions.reroll(other, 1, 3, random) and other.list[1].id ~= "SellSmall" and other.rerolls == 0
+	)
+	check("missions: no rerolls left", not Missions.reroll(other, 1, 3, random))
+
+	-- Streaks: kept for a claim yesterday, lost after a missed day.
+	local kept = Missions.deal(state, now + 86_400, 1_000_000, 3, random)
+	check("missions: streak carries over", kept.streak == 1 and near(kept.bonus, 0.1))
+	local next = Missions.deal(state, now + 2 * 86_400, 1_000_000, 3, random)
+	check("missions: missed day resets the streak", next.streak == 0 and next.bonus == 0)
+	local again = Missions.deal(state, now, 1_000_000, 3, random)
+	check("missions: dealing again the same day keeps today's bonus", again.streak == 1 and again.bonus == 0)
+end
+
 if failures > 0 then
 	error(`{failures} check(s) failed`)
 end

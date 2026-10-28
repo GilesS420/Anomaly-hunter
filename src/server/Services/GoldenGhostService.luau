@@ -23,6 +23,7 @@ local Rng = require(ReplicatedStorage.Shared.Util.Rng)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local CakeService = require(script.Parent.CakeService)
 local DataService = require(script.Parent.DataService)
+local MissionService = require(script.Parent.MissionService)
 local Notify = require(script.Parent.Parent.Notify)
 local World = require(script.Parent.Parent.World)
 
@@ -221,6 +222,7 @@ local function award(player: Player)
 	end
 	DataService.saveSoon(player)
 	Notify.toast(player, `You caught the Golden Ghost! You win {prize}!`)
+	MissionService.record(player, "GoldenGhost")
 	Notify.toastAll(`{player.DisplayName} caught the Golden Ghost and won {prize}!`)
 end
 

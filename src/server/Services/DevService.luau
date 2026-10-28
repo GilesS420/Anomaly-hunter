@@ -24,6 +24,9 @@
 --                     luck and growth genes (/grow 25 makes Titans)
 --   /charges          every monster you own gets all its Growth Chamber goes back
 --   /chamber          the monster bubbling in your Growth Chamber is done right now
+--   /missions done    finishes all of today's daily missions (/missions done 2: only the second);
+--                     /missions new deals a fresh set, /missions streak 3 sets the streak to
+--                     3 days and deals a fresh set so the bonus shows
 --   /calm             zone monsters leave you alone (type it again to let them attack)
 --   /attack           the closest monster in your zone attacks you right now
 --   /spawn Gravepup   brings that monster to you in the zone you're in (any monster, any zone;
@@ -63,6 +66,7 @@ local HauntService = require(script.Parent.HauntService)
 local HuntService = require(script.Parent.HuntService)
 local MonsterAiService = require(script.Parent.MonsterAiService)
 local MansionService = require(script.Parent.MansionService)
+local MissionService = require(script.Parent.MissionService)
 local Notify = require(script.Parent.Parent.Notify)
 local SpawnService = require(script.Parent.SpawnService)
 local TutorialService = require(script.Parent.TutorialService)
@@ -300,6 +304,32 @@ commands["/chamber"] = function(player, _, tell)
 	)
 end
 
+commands["/missions"] = function(player, argument, tell)
+	local what, number = string.match(string.lower(argument or ""), "^(%a+)%s*(%d*)$")
+	local count = tonumber(number)
+	if what == "done" then
+		tell(
+			if MissionService.finish(player, count)
+				then "Done! Open Missions to claim the rewards."
+				else "Nothing to finish (already claimed?)."
+		)
+	elseif what == "new" then
+		tell(
+			if MissionService.redeal(player)
+				then "Fresh daily missions dealt."
+				else "Your save is still loading."
+		)
+	elseif what == "streak" and count then
+		tell(
+			if MissionService.setStreak(player, count)
+				then `Streak set to {count} days, with fresh missions.`
+				else "Your save is still loading."
+		)
+	else
+		tell("Try: /missions done, /missions done 2, /missions new or /missions streak 3")
+	end
+end
+
 commands["/calm"] = function(player, _, tell)
 	local calm = not player:GetAttribute("Calm")
 	player:SetAttribute("Calm", if calm then true else nil)
@@ -529,7 +559,7 @@ function DevService.start()
 		return
 	end
 	print(
-		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /charges, /chamber, /calm, /attack`
+		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /charges, /chamber, /missions done|new|streak <days>, /calm, /attack`
 	)
 end
 

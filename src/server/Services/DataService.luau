@@ -11,6 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
+local Missions = require(ReplicatedStorage.Shared.Util.Missions)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local ProfileStore = require(script.Parent.Parent.Vendor.ProfileStore)
 
@@ -42,6 +43,7 @@ export type Data = {
 		before: { kg: number, size: string, value: number }?,
 		told: boolean?, -- the owner got the "it's done" toast
 	},
+	missions: Missions.State, -- today's daily missions and the streak (MissionService)
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -68,6 +70,7 @@ DataService.Template = {
 	potion = { id = "", secondsLeft = 0 },
 	hotbar = { slots = {}, benched = {} },
 	chamber = {},
+	missions = Missions.empty(),
 } :: Data
 
 local store = ProfileStore.New(

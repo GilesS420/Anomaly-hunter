@@ -19,6 +19,7 @@ local CareService = require(script.Parent.CareService)
 local DataService = require(script.Parent.DataService)
 local MansionService = require(script.Parent.MansionService)
 local Notify = require(script.Parent.Parent.Notify)
+local MissionService = require(script.Parent.MissionService)
 local WatcherService = require(script.Parent.WatcherService)
 
 local HauntService = {}
@@ -58,6 +59,10 @@ local function announce(player: Player, gains: Gains): number
 	local gained = #gains.messages + #gains.combos
 	if gained == 0 then
 		return 0
+	end
+	MissionService.record(player, "Effect", { amount = gained })
+	if #gains.combos > 0 then
+		MissionService.record(player, "Combo")
 	end
 	MansionService.refreshMonsters(player)
 	for _, message in gains.combos do

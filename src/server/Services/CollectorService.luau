@@ -24,6 +24,7 @@ local Counter = require(script.Parent.Parent.Counter)
 local DataService = require(script.Parent.DataService)
 local InventoryService = require(script.Parent.InventoryService)
 local MansionService = require(script.Parent.MansionService)
+local MissionService = require(script.Parent.MissionService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
 
@@ -189,6 +190,7 @@ Sell.OnServerInvoke = function(player: Player, uids: unknown): Result
 	end
 	if earned > 0 then
 		DataService.addMoney(player, earned)
+		MissionService.record(player, "Sell", { amount = earned })
 	end
 	busy[player] = nil
 

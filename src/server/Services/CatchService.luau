@@ -34,6 +34,7 @@ local DataService = require(script.Parent.DataService)
 local HuntService = require(script.Parent.HuntService)
 local MansionService = require(script.Parent.MansionService)
 local Notify = require(script.Parent.Parent.Notify)
+local MissionService = require(script.Parent.MissionService)
 local RoamService = require(script.Parent.RoamService)
 local SpawnService = require(script.Parent.SpawnService)
 local WatcherService = require(script.Parent.WatcherService)
@@ -231,6 +232,11 @@ local function finish(player: Player, lucky: boolean?)
 	local variant = if caught.variant then `{caught.variant} ` else ""
 	local perfect = if lucky then "PERFECT CATCH! " else ""
 	Notify.toast(player, `{perfect}Caught a {variant}{caught.size} {hold.name}!{bonus} {afterward}`)
+	MissionService.record(
+		player,
+		"Catch",
+		{ monsterId = caught.monsterId, zone = hold.zoneId, variant = caught.variant, lucky = lucky }
+	)
 	State:FireClient(player, "Ended", { result = "Caught", monsterId = caught.monsterId, model = model })
 end
 

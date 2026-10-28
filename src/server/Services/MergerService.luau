@@ -23,6 +23,7 @@ local Counter = require(script.Parent.Parent.Counter)
 local DataService = require(script.Parent.DataService)
 local InventoryService = require(script.Parent.InventoryService)
 local MansionService = require(script.Parent.MansionService)
+local MissionService = require(script.Parent.MissionService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
 
@@ -213,6 +214,7 @@ MergeRemote.OnServerInvoke = function(player: Player, mainUid: unknown, donorUid
 	local name = Format.monsterName(main)
 	local won = Merge.roll(main.monsterId)
 	local message
+	local madeCombo = false
 	if won then
 		local before = Value.resolveEffects(main.effects)
 		local size = main.size
@@ -224,6 +226,7 @@ MergeRemote.OnServerInvoke = function(player: Player, mainUid: unknown, donorUid
 		end
 		message ..= "."
 		if combo then
+			madeCombo = true
 			CareService.discoverCombo(data, combo)
 			message ..= ` It became a {Format.name(combo)}!`
 		end
@@ -233,6 +236,10 @@ MergeRemote.OnServerInvoke = function(player: Player, mainUid: unknown, donorUid
 	end
 	MansionService.removeMonsters(player, { [donor.uid :: string] = true })
 	busy[player] = nil
+	MissionService.record(player, "Merge", { won = won })
+	if madeCombo then
+		MissionService.record(player, "Combo")
+	end
 	DataService.saveSoon(player)
 	Notify.toast(player, message)
 	return { ok = true, won = won, message = message, view = viewFor(data) }

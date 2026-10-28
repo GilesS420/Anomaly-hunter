@@ -34,6 +34,7 @@ Tutorial.Unlocks = {
 	Sell = "Sell",
 	Shops = "Buy",
 	Codex = "Tour",
+	Missions = "Tour",
 	Settings = "Gate", -- sound and weather settings always work
 } :: { [string]: Step }
 
@@ -102,6 +103,10 @@ Tutorial.Tour = {
 	{
 		feature = "Codex",
 		text = "Your Codex lists every monster you've caught. Catch each one in Silver, Gold, Shiny and Rainbow too, for money rewards!",
+	},
+	{
+		feature = "Missions",
+		text = "Missions gives you three new missions every day. Finish them for money that grows with your mansion, and come back each day for a streak bonus.",
 	},
 	{
 		feature = "Events",

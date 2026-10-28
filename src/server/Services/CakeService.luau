@@ -24,6 +24,7 @@ local CakeModel = require(script.Parent.Parent.CakeModel)
 local CareService = require(script.Parent.CareService)
 local DataService = require(script.Parent.DataService)
 local MansionService = require(script.Parent.MansionService)
+local MissionService = require(script.Parent.MissionService)
 local PlotService = require(script.Parent.PlotService)
 local RoamService = require(script.Parent.RoamService)
 local Notify = require(script.Parent.Parent.Notify)
@@ -231,6 +232,7 @@ function CakeService.place(player: Player, itemId: string): boolean
 	Notify.toast(player, message)
 	if worked then
 		CakeService.syncTools(player)
+		MissionService.record(player, "PlaceCake")
 	end
 	return worked
 end
@@ -279,6 +281,10 @@ local function bite(player: Player, cake: Live, uid: string)
 	Notify.toast(player, text)
 	if b.effect or b.combo then
 		Notify.log(player, text)
+		MissionService.record(player, "Effect")
+	end
+	if b.combo then
+		MissionService.record(player, "Combo")
 	end
 	if cake.saved.bitesLeft <= 0 then
 		remove(player, cake)
