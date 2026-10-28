@@ -381,6 +381,11 @@ do
 		"the admin timeline lists the schedule in order, starting with the event now",
 		ordered and timeline[1].startAt == Watcher.slotAt(later).startAt
 	)
+	local skipped = Watcher.upcoming(later, 10, timeline[1].index)
+	check(
+		"the admin timeline drops a slot that was already played now",
+		#skipped == 10 and skipped[1].index == timeline[2].index and skipped[10].index ~= timeline[10].index
+	)
 	local playedAll = true
 	for _, event in Watcher.pool() do
 		if (counts[event.id] or 0) == 0 then

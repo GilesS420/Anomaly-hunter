@@ -119,21 +119,26 @@ end
 
 -- The schedule from `time` on, for the admin panel's timeline: the slot playing or coming up
 -- now and the `count` after it, each with the name players see (The Watcher Awakens with its
--- monster set, rolled the same way WatcherService does).
-export type Upcoming = { name: string, icon: string, startAt: number, endAt: number }
+-- monster set, rolled the same way WatcherService does). `skip` is a slot an admin already
+-- played or stopped in this server (workspace WatcherSkipped): it's left out, and one more
+-- comes after so the list stays `count` long.
+export type Upcoming = { index: number, name: string, icon: string, startAt: number, endAt: number }
 
-function Watcher.upcoming(time: number, count: number): { Upcoming }
+function Watcher.upcoming(time: number, count: number, skip: number?): { Upcoming }
 	local list: { Upcoming } = {}
 	local current = Watcher.slotAt(time)
-	for _ = 1, count do
-		local event = current.event
-		local set = Watcher.pickSet(event, Rng.seeded(`watcher-set:{current.index}`))
-		table.insert(list, {
-			name = if set then `{event.name}: {set.name}` else event.name,
-			icon = event.icon or "",
-			startAt = current.startAt,
-			endAt = current.endAt,
-		})
+	while #list < count do
+		if current.index ~= skip then
+			local event = current.event
+			local set = Watcher.pickSet(event, Rng.seeded(`watcher-set:{current.index}`))
+			table.insert(list, {
+				index = current.index,
+				name = if set then `{event.name}: {set.name}` else event.name,
+				icon = event.icon or "",
+				startAt = current.startAt,
+				endAt = current.endAt,
+			})
+		end
 		current = Watcher.nextSlot(current)
 	end
 	return list

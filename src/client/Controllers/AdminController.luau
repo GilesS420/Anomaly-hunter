@@ -603,7 +603,9 @@ local function build()
 					)} left)`
 					else "No event playing"
 				local lines = { "Coming up (every server):" }
-				for _, slot in Watcher.upcoming(now, TimelineLength) do
+				local skipped = workspace:GetAttribute("WatcherSkipped")
+				local skip = if type(skipped) == "number" then skipped else nil
+				for _, slot in Watcher.upcoming(now, TimelineLength, skip) do
 					local when = if now >= slot.startAt
 						then `live, {Watcher.clock(slot.endAt - now)} left`
 						else `in {Watcher.clock(slot.startAt - now)}`
