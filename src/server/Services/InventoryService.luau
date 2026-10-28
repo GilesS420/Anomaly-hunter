@@ -101,8 +101,7 @@ local Lock = remote("Lock")
 local Equip = remote("Equip")
 local Rename = remote("Rename")
 
-local kindOrder =
-	{ Vacuum = 1, Slapper = 2, Food = 3, Lure = 4, Charm = 5, Potion = 6, Tag = 7 }
+local kindOrder = { Vacuum = 1, Slapper = 2, Food = 3, Lure = 4, Charm = 5, Potion = 6, Tag = 7 }
 
 local function price(caught: Value.CaughtMonster, wingsOwned: number): number
 	local ok, value = pcall(Value.sellValue, caught, wingsOwned)
@@ -278,6 +277,13 @@ GetView.OnServerInvoke = function(player: Player): View?
 	return if data then viewFor(data) else nil
 end
 
+-- True while the player stands inside one of their own wings.
+local function atHome(player: Player): boolean
+	local character = player.Character
+	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	return root ~= nil and root:IsA("BasePart") and MansionService.floorSpot(player, root.Position, 0) ~= nil
+end
+
 Move.OnServerInvoke = function(player: Player, uid: unknown): Result
 	local data = DataService.get(player)
 	if not data then
@@ -285,6 +291,14 @@ Move.OnServerInvoke = function(player: Player, uid: unknown): Result
 	end
 	if typeof(uid) ~= "string" then
 		return { ok = false, message = "That monster is gone.", view = viewFor(data) }
+	end
+	-- Picking up works from anywhere (the mansion list), but putting a stored one back means
+	-- standing in your mansion, the same as clicking with it in hand, so a changed client
+	-- can't drop monsters home from a zone.
+	for _, stored in data.storage do
+		if stored.uid == uid and not atHome(player) then
+			return { ok = false, message = "Stand inside your mansion to place it.", view = viewFor(data) }
+		end
 	end
 	local result, caught = MansionService.move(player, uid)
 	local name = if caught then Format.monsterName(caught) else "That monster"

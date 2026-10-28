@@ -18,9 +18,17 @@ Admins.UserIds = {
 	-- 123456789, -- Giles (put your own UserId here)
 }
 
+-- Studio test switch: with the attribute TestAsPlayer ticked on Workspace (Properties >
+-- Attributes, before pressing Play, or `workspace:SetAttribute("TestAsPlayer", true)` in the
+-- Server command bar), nobody is an admin in Studio, so you can check what a normal player
+-- can and can't do. Only the server's copy counts: a client setting it changes nothing.
+function Admins.testingAsPlayer(): boolean
+	return RunService:IsStudio() and workspace:GetAttribute("TestAsPlayer") == true
+end
+
 function Admins.isAdmin(player: Player): boolean
 	if RunService:IsStudio() then
-		return true
+		return not Admins.testingAsPlayer()
 	end
 	if game.CreatorType == Enum.CreatorType.User and player.UserId == game.CreatorId then
 		return true

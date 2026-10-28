@@ -36,6 +36,11 @@ local HotbarService = require(script.Services.HotbarService)
 local DevService = require(script.Services.DevService)
 local FallService = require(script.Services.FallService)
 
+-- Studio only: the test checks (Server command bar: game.ServerScriptService.Server.Tests.RunChecks:Fire()).
+if game:GetService("RunService"):IsStudio() then
+	require(script.Tests.ServerChecks).listen()
+end
+
 local services: { { name: string, start: () -> ...any } } = {
 	{ name = "DataService", start = DataService.start },
 	{ name = "WorldBuilder", start = WorldBuilder.start },
