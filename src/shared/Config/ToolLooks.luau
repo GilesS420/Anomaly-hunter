@@ -1,6 +1,6 @@
 --!strict
--- What the hand-held tools look like: the six vacuums, the Bait Bells, the Return Charm and
--- the Name Tag (only a picture in the shop and Backpack: it is never held).
+-- What the hand-held tools look like: the six vacuums, the Bait Bells, the Return Charm,
+-- the Name Tag and the slappers (those two are only a picture in the shop and Backpack).
 -- Part data in the same format as Config/Rooms, in Tool-local studs: the hand grips the
 -- origin (the part named "Handle"), +Y is up and the business end points along -Z.
 -- Pure data so the preview page can draw the same models.
@@ -306,6 +306,75 @@ function ToolLooks.PrismDraught(): { Part }
 	return potion({ 200, 120, 255 }, { 90, 40, 140 }, true)
 end
 
+-- An open hand held up by its cuff, palm facing forward: a cuff (the grip), a palm, four
+-- fingers and a thumb. `scale` grows it for the better slappers; `extra` adds a slapper's own
+-- touch (claws, a glow). Only a picture in the shop and Backpack: you slap with the Slap button.
+local function slapper(
+	scale: number,
+	skin: { number },
+	skinMaterial: string,
+	cuff: { number },
+	extra: ((parts: { Part }, scale: number) -> ())?
+): { Part }
+	local parts: { Part } = {}
+	local function at(x: number, y: number, z: number): { number }
+		return { x * scale, y * scale, z * scale }
+	end
+	local function size(x: number, y: number, z: number): { number }
+		return { x * scale, y * scale, z * scale }
+	end
+	part(parts, "Handle", size(0.7, 0.4, 0.5), { 0, 0, 0 }, cuff, "Fabric")
+	part(parts, "Palm", size(0.9, 0.9, 0.3), at(0, 0.65, 0), skin, skinMaterial)
+	for i, x in { -0.33, -0.11, 0.11, 0.33 } do
+		local long = if i == 2 or i == 3 then 0.75 else 0.6
+		part(parts, `Finger{i}`, size(0.18, long, 0.22), at(x, 1.1 + long / 2, 0), skin, skinMaterial)
+	end
+	part(parts, "Thumb", size(0.45, 0.2, 0.22), at(0.62, 0.65, 0), skin, skinMaterial)
+	if extra then
+		extra(parts, scale)
+	end
+	return parts
+end
+
+function ToolLooks.CobwebMitt(): { Part }
+	return slapper(0.9, { 215, 215, 225 }, "Fabric", { 60, 55, 70 })
+end
+
+function ToolLooks.RubberGlove(): { Part }
+	return slapper(1, { 250, 210, 60 }, "SmoothPlastic", { 230, 230, 230 })
+end
+
+function ToolLooks.BoneHand(): { Part }
+	return slapper(1.15, { 236, 228, 205 }, "SmoothPlastic", { 70, 60, 80 })
+end
+
+function ToolLooks.GhoulClaw(): { Part }
+	return slapper(1.3, { 120, 170, 110 }, "SmoothPlastic", { 60, 40, 50 }, function(parts, scale)
+		for i, x in { -0.33, -0.11, 0.11, 0.33 } do
+			local long = if i == 2 or i == 3 then 0.75 else 0.6
+			local y = (1.1 + long + 0.12) * scale
+			local claw = { 0.12 * scale, 0.25 * scale, 0.12 * scale }
+			part(parts, `Claw{i}`, claw, { x * scale, y, 0 }, { 30, 30, 30 }, "Metal")
+		end
+	end)
+end
+
+function ToolLooks.WitchPaddle(): { Part }
+	return slapper(1.45, { 110, 60, 150 }, "Fabric", { 40, 30, 50 }, function(parts, scale)
+		local at = { 0, 0.65 * scale, -0.2 * scale }
+		local star = part(parts, "Star", { 0.3 * scale, 0.3 * scale, 0.1 * scale }, at, { 255, 200, 80 }, "Neon")
+		star.light = glow({ 255, 200, 80 })
+	end)
+end
+
+function ToolLooks.TitanHand(): { Part }
+	return slapper(1.7, { 90, 230, 255 }, "Neon", { 30, 30, 60 }, function(parts, scale)
+		local at = { 0, 0.65 * scale, -0.2 * scale }
+		local core = part(parts, "Core", { 0.4 * scale, 0.4 * scale, 0.1 * scale }, at, { 255, 255, 255 }, "Neon")
+		core.light = glow({ 90, 230, 255 })
+	end)
+end
+
 -- Recipes by Workshop item id.
 ToolLooks.ById = {
 	DustBuster = ToolLooks.DustBuster,
@@ -322,6 +391,12 @@ ToolLooks.ById = {
 	LuckyTonic = ToolLooks.LuckyTonic,
 	GildedElixir = ToolLooks.GildedElixir,
 	PrismDraught = ToolLooks.PrismDraught,
+	CobwebMitt = ToolLooks.CobwebMitt,
+	RubberGlove = ToolLooks.RubberGlove,
+	BoneHand = ToolLooks.BoneHand,
+	GhoulClaw = ToolLooks.GhoulClaw,
+	WitchPaddle = ToolLooks.WitchPaddle,
+	TitanHand = ToolLooks.TitanHand,
 } :: { [string]: () -> { Part } }
 
 return ToolLooks

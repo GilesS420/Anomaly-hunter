@@ -101,7 +101,8 @@ local Lock = remote("Lock")
 local Equip = remote("Equip")
 local Rename = remote("Rename")
 
-local kindOrder = { Vacuum = 1, Food = 2, Lure = 3, Charm = 4, Potion = 5, Tag = 6 }
+local kindOrder =
+	{ Vacuum = 1, Slapper = 2, Food = 3, Lure = 4, Charm = 5, Potion = 6, Tag = 7 }
 
 local function price(caught: Value.CaughtMonster, wingsOwned: number): number
 	local ok, value = pcall(Value.sellValue, caught, wingsOwned)
@@ -218,7 +219,7 @@ local function itemRows(data: DataService.Data): { ItemRow }
 		local details
 		if item.kind == "Food" then
 			details = `x{count} · {Cakes.describe(item)}`
-		elseif tool then
+		elseif tool or item.kind == "Slapper" then -- kept forever, so no count
 			details = Workshop.describe(item)
 		else
 			details = `x{count} · {Workshop.describe(item)}`
