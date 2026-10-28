@@ -29,6 +29,7 @@ local HauntService = require(script.Services.HauntService)
 local MonsterAiService = require(script.Services.MonsterAiService)
 local TutorialService = require(script.Services.TutorialService)
 local CodexService = require(script.Services.CodexService)
+local MissionService = require(script.Services.MissionService)
 local SettingsService = require(script.Services.SettingsService)
 local HotbarService = require(script.Services.HotbarService)
 local DevService = require(script.Services.DevService)
@@ -58,6 +59,7 @@ local services: { { name: string, start: () -> ...any } } = {
 	{ name = "MonsterAiService", start = MonsterAiService.start },
 	{ name = "TutorialService", start = TutorialService.start },
 	{ name = "CodexService", start = CodexService.start },
+	{ name = "MissionService", start = MissionService.start },
 	{ name = "SettingsService", start = SettingsService.start },
 	{ name = "HotbarService", start = HotbarService.start },
 	{ name = "DevService", start = DevService.start },

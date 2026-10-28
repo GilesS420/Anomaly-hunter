@@ -26,6 +26,7 @@ local Weight = require(ReplicatedStorage.Shared.Util.Weight)
 local Counter = require(script.Parent.Parent.Counter)
 local DataService = require(script.Parent.DataService)
 local InventoryService = require(script.Parent.InventoryService)
+local MissionService = require(script.Parent.MissionService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
 
@@ -224,6 +225,7 @@ GrowRemote.OnServerInvoke = function(player: Player, uid: unknown, modeId: unkno
 	}
 	busy[player] = nil
 	DataService.saveSoon(player)
+	MissionService.record(player, "Grow")
 	local minutes = math.ceil(mode.seconds / 60)
 	return {
 		ok = true,
