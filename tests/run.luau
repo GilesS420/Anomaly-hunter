@@ -3149,6 +3149,7 @@ do
 			and HotbarLayout.key(nil, "MoldyMuffin", nil) == "C:MoldyMuffin"
 			and HotbarLayout.key(nil, nil, "abc") == "M:abc"
 			and HotbarLayout.key(nil, nil, nil) == nil
+			and HotbarLayout.key("VoidVac", nil, nil, "VoidVac") == "V:vacuum"
 	)
 	local layout = HotbarLayout.new()
 	HotbarLayout.remember(layout, "T:DustBuster", 3)

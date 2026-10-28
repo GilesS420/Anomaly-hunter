@@ -212,6 +212,9 @@ local function itemRows(data: DataService.Data): { ItemRow }
 			return
 		end
 		local equipSlot = Workshop.equipSlot(item)
+		if equipSlot and equipped[equipSlot] ~= item.id then
+			return -- an old vacuum: kept, but only shown at the Vacuum Vault (Giles 2026-10-28)
+		end
 		local details
 		if item.kind == "Food" then
 			details = `x{count} · {Cakes.describe(item)}`

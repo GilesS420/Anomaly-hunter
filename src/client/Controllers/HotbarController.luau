@@ -120,7 +120,8 @@ local function keyOf(tool: Tool): string?
 	return HotbarLayout.key(
 		tool:GetAttribute("ToolId"),
 		tool:GetAttribute("CakeId"),
-		tool:GetAttribute("MonsterUid")
+		tool:GetAttribute("MonsterUid"),
+		tool:GetAttribute("VacuumId")
 	)
 end
 
