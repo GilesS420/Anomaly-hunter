@@ -154,7 +154,9 @@ function PlotService.teleport(player: Player, cframe: CFrame)
 	end
 	move(character, root, cframe)
 	task.spawn(function()
-		for _ = 1, Retries do
+		-- One bounce is normal (it nearly always happens on spawn) and the resend fixes it,
+		-- so Output only hears about it when every resend failed.
+		for attempt = 1, Retries + 1 do
 			task.wait(CheckAfter)
 			if trips[player] ~= trip or player.Character ~= character or not root.Parent then
 				return -- a newer trip, or a new body
@@ -162,7 +164,10 @@ function PlotService.teleport(player: Player, cframe: CFrame)
 			if (root.Position - cframe.Position).Magnitude <= MissedBy then
 				return
 			end
-			warn(`PlotService: {player.Name}'s teleport bounced back, sending them again`)
+			if attempt > Retries then
+				warn(`PlotService: {player.Name}'s teleport kept bouncing back after {Retries} resends`)
+				return
+			end
 			move(character, root, cframe)
 		end
 	end)
