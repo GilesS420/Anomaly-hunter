@@ -20,11 +20,11 @@ local Slap = {}
 
 -- Weakest first: the last one you own is the one you use.
 Slap.Slappers = {
-	{ id = "RubberGlove", reach = 6, push = 40, stealLockSeconds = 15 },
-	{ id = "BoneHand", reach = 8, push = 55, stealLockSeconds = 30 },
-	{ id = "GhoulClaw", reach = 10, push = 70, stealLockSeconds = 60 },
-	{ id = "WitchPaddle", reach = 12, push = 90, stealLockSeconds = 120 },
-	{ id = "TitanHand", reach = 15, push = 115, stealLockSeconds = 240 },
+	{ id = "RubberGlove", reach = 6, push = 40, stealLockSeconds = 20 },
+	{ id = "BoneHand", reach = 9, push = 60, stealLockSeconds = 60 },
+	{ id = "GhoulClaw", reach = 12, push = 80, stealLockSeconds = 2 * 60 },
+	{ id = "WitchPaddle", reach = 16, push = 105, stealLockSeconds = 5 * 60 },
+	{ id = "TitanHand", reach = 20, push = 130, stealLockSeconds = 10 * 60 }, -- Giles 2026-10-28
 } :: { Slapper }
 
 Slap.RangeSlack = 3 -- extra studs the server allows, for lag
