@@ -41,6 +41,7 @@ type Sort = string -- "Price", "Rarity" or "Name"
 
 local PANEL_WIDTH = 240
 local TAB_WIDTH = 26
+local PHONE_ZOOM = 1.3 -- on a phone the drawer is drawn this much bigger (Giles 2026-10-28)
 local ROW_HEIGHT = 40
 local Sorts: { Sort } = { "Price", "Rarity", "Name" }
 
@@ -87,6 +88,12 @@ function MansionListController.start()
 	limit.MinSize = Vector2.new(0, 200)
 	limit.MaxSize = Vector2.new(math.huge, 420)
 	limit.Parent = drawer
+	-- A phone shrinks the whole HUD (client/Scale), which left this list too small to read,
+	-- so there it's drawn bigger again, growing from its spot on the right edge.
+	local zoom = if Scale.isSmall() then PHONE_ZOOM else 1
+	local grow = Instance.new("UIScale")
+	grow.Scale = zoom
+	grow.Parent = drawer
 
 	local panel = Instance.new("Frame")
 	panel.Name = "Panel"
@@ -251,10 +258,13 @@ function MansionListController.start()
 
 	-- Shut, the drawer sits off screen so only the tab sticks out.
 	local function place(animate: boolean)
-		local target = UDim2.new(1, if isOpen then -8 else PANEL_WIDTH, 0.5, 0)
+		local target = UDim2.new(1, if isOpen then -8 else PANEL_WIDTH * zoom, 0.5, 0)
 		tab.Text = if isOpen then "▶" else "◀"
 		-- How far it sticks out from the right edge, so the tutorial card can stay clear.
-		drawer:SetAttribute("Reach", if isOpen then PANEL_WIDTH + TAB_WIDTH + 8 else TAB_WIDTH)
+		drawer:SetAttribute(
+			"Reach",
+			if isOpen then (PANEL_WIDTH + TAB_WIDTH) * zoom + 8 else TAB_WIDTH * zoom
+		)
 		if animate then
 			TweenService:Create(drawer, TweenInfo.new(0.2, Enum.EasingStyle.Quad), { Position = target })
 				:Play()

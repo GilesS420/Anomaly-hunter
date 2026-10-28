@@ -1,5 +1,6 @@
 --!strict
--- The mutation log (Giles 2026-10-24): a small button in the bottom-left corner opens a list
+-- The mutation log (Giles 2026-10-24): a small button in the bottom-left corner (on a phone:
+-- along the bottom, just left of the hotbar) opens a list
 -- of the latest mutation messages ("Your Gravepup picked up Vampire!", cake bites that gave
 -- an effect, combos, and what happened while you were away), newest at the top, so a toast
 -- you missed can still be read. The server sends each line through
@@ -9,6 +10,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
+local HotbarController = require(script.Parent:WaitForChild("HotbarController"))
 local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
@@ -28,14 +30,16 @@ function MutationLogController.start()
 	gui.DisplayOrder = 6
 	gui.Parent = player:WaitForChild("PlayerGui")
 
-	-- Phones keep the bottom-left for the thumbstick, so the button sits above it there.
+	-- Phones keep the bottom-left for the thumbstick, so there the button sits along the
+	-- bottom just left of the hotbar instead (Giles 2026-10-28), level with its slots.
 	local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	local lift = if touch then 170 else 16
+	local lift = if touch then 8 else 16
+	local left = if touch then UDim.new(0.5, -HotbarController.Width / 2 - 10 - IconSize) else UDim.new(0, 16)
 
 	local icon = Ui.button(canvas, "", Ui.Colors.equip, UDim2.fromOffset(IconSize, IconSize))
 	icon.Name = "MutationLogIcon"
 	icon.AnchorPoint = Vector2.new(0, 1)
-	icon.Position = UDim2.new(0, 16, 1, -lift)
+	icon.Position = UDim2.new(left, UDim.new(1, -lift))
 	Ui.corner(icon, 12)
 	local glyph = Ui.text(icon, "🧬", UDim2.fromScale(1, 0.62), Ui.Colors.text, true, 26)
 	glyph.TextXAlignment = Enum.TextXAlignment.Center
@@ -60,7 +64,7 @@ function MutationLogController.start()
 	local panel = Instance.new("Frame")
 	panel.Name = "MutationLog"
 	panel.AnchorPoint = Vector2.new(0, 1)
-	panel.Position = UDim2.new(0, 16, 1, -lift - IconSize - 10)
+	panel.Position = UDim2.new(left, UDim.new(1, -lift - IconSize - 10))
 	panel.Size = UDim2.fromOffset(PanelWidth, PanelHeight)
 	panel.BackgroundColor3 = Ui.Colors.panel
 	panel.BackgroundTransparency = 0.05
