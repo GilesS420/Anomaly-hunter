@@ -31,6 +31,17 @@ selene src
 stylua --check src
 ```
 
+### Cheat and save checks in Studio
+
+Studio only (they do nothing in a live game). Press **Play** (F5), not Run, and open **Window > Command Bar** and **Window > Output**. The Test tab's Client/Server button picks where the command bar runs.
+
+1. Server view: `game.ServerScriptService.Server.Tests.Setup:Fire()` (skips the tutorial, tops you up to $1M, gives 4 test monsters).
+2. Client view, standing in your mansion: `require(game.Players.LocalPlayer.PlayerScripts.Client.Tests.ExploitChecks).run()` (add `"deep"` to also race two requests at once).
+3. Server view: `workspace:SetAttribute("TestAsPlayer", true)`, then back in the Client view `require(game.Players.LocalPlayer.PlayerScripts.Client.Tests.ExploitChecks).run("admin")`.
+4. Server view: `game.ServerScriptService.Server.Tests.RunChecks:Fire()` (admin rules, every remote, every save, and any server error the cheat tests caused).
+
+`TestAsPlayer` on Workspace (a Boolean attribute) makes nobody an admin in Studio. A new remote must be added to `KnownRemotes` in `src/server/Tests/ServerChecks.luau` and to the lists in `src/client/Tests/ExploitChecks.luau`.
+
 ## Saving
 
 Player data saves through [ProfileStore](https://github.com/MadStudioRoblox/ProfileStore) (by loleris, Apache 2.0), vendored at `src/server/Vendor/ProfileStore.luau` with its license in `licenses/`. To test real saving in Studio, turn on **Game Settings > Security > Enable Studio Access to API Services** (the place must be published). Without it, ProfileStore uses a mock store and nothing persists between play tests.

@@ -495,6 +495,11 @@ local function useAdminRemote()
 			runForEveryone(player, name, text)
 			return
 		end
+		-- A whole number: GetPlayerByUserId errors on NaN, infinity and fractions. A broken
+		-- one is ignored, not run on the admin themselves.
+		if type(targetId) == "number" and not (targetId % 1 == 0 and math.abs(targetId) < 2 ^ 53) then
+			return
+		end
 		local target = if type(targetId) == "number" then Players:GetPlayerByUserId(targetId) else nil
 		runCommand(player, name, text, target)
 	end)
@@ -504,13 +509,20 @@ end
 -- Marks admins so their client shows the panel (the server checks again on every command).
 local function markAdmins()
 	local function mark(player: Player)
-		if Admins.isAdmin(player) then
-			player:SetAttribute("Admin", true)
-		end
+		player:SetAttribute("Admin", if Admins.isAdmin(player) then true else nil)
 	end
 	Players.PlayerAdded:Connect(mark)
 	for _, player in Players:GetPlayers() do
 		mark(player)
+	end
+	-- The Studio "test as a player" switch (Admins.luau) can be flipped during a play test.
+	workspace:GetAttributeChangedSignal("TestAsPlayer"):Connect(function()
+		for _, player in Players:GetPlayers() do
+			mark(player)
+		end
+	end)
+	if Admins.testingAsPlayer() then
+		warn("Admins: TestAsPlayer is on, so nobody is an admin in this Studio test (untick it on Workspace)")
 	end
 end
 
