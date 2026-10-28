@@ -806,6 +806,10 @@ local function tryBuild(player: Player)
 	local data = DataService.get(player)
 	local plot = PlotService.get(player)
 	if not data or not plot then
+		if data and not plot then
+			-- Every plot is taken, so there's no mansion to wait for: let the loading screen go.
+			player:SetAttribute("MansionReady", true)
+		end
 		return -- the other one calls this again when it's ready
 	end
 	local changes, away = repair(data, true)
@@ -861,6 +865,10 @@ local function tryBuild(player: Player)
 	model.Parent = mansionsFolder()
 	spawnAll(state, data)
 	updateSign(state)
+	-- The joining player's loading screen (ReplicatedFirst) waits for these: the mansion is
+	-- built, and this many monsters have to reach their client before it fades out.
+	player:SetAttribute("MansionMonsters", #state.monsters:GetChildren())
+	player:SetAttribute("MansionReady", true)
 end
 
 -- Buying the next wing from its sign. Only the plot's owner can buy.
