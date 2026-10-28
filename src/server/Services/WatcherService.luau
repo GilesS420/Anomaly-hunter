@@ -659,6 +659,8 @@ local function publish()
 	workspace:SetAttribute("WatcherNext", if phase == "Warning" and upcoming then upcoming.id else nil)
 	workspace:SetAttribute("WatcherSky", if sky then sky.id else nil)
 	workspace:SetAttribute("WatcherEyes", eyes)
+	-- The slot an admin already played or stopped here, so the admin timeline skips it.
+	workspace:SetAttribute("WatcherSkipped", stoppedSlot)
 
 	showWorldEyes()
 	for index, eye in meterEyes do
@@ -1122,7 +1124,13 @@ function WatcherService.summon(id: string?, setId: string?): boolean
 		phase = "Calm"
 		upcoming = nil
 	end
-	skipSlot(slot :: Watcher.Slot)
+	if event == slot.event then
+		-- Playing the schedule's next event now uses up its slot, so it doesn't come again
+		-- when its time comes (Giles 2026-10-28). The slot after it plays as usual.
+		stoppedSlot = slot.index
+	else
+		skipSlot(slot :: Watcher.Slot)
+	end
 	summoned = true
 	startEvent(event, now() + (event.durationSeconds or 180), set, SummonSkySeconds)
 	return true
