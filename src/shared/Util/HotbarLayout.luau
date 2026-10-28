@@ -1,7 +1,8 @@
 --!strict
 -- Where each player keeps things on their hotbar, so it comes back the same after a respawn
 -- or rejoin instead of filling up in whatever order the Tools arrive (Giles 2026-10-24).
--- A Tool is known by a key: "T:<item id>" for tools, "C:<item id>" for cakes and
+-- A Tool is known by a key: "V:vacuum" for whichever vacuum is in use (a new one takes the
+-- old one's slot), "T:<item id>" for other tools, "C:<item id>" for cakes and
 -- "M:<monster uid>" for monsters. `slots` maps a key to its slot (one key per slot), and
 -- `benched` lists the keys dragged off the bar (Backpack only). Slots stay remembered while
 -- the Tool is gone (a used-up cake), until something else is put in that slot.
@@ -20,8 +21,10 @@ function HotbarLayout.new(): Layout
 end
 
 -- The key for a Tool's attributes, or nil if it has none of them.
-function HotbarLayout.key(toolId: unknown, cakeId: unknown, monsterUid: unknown): string?
-	if typeof(toolId) == "string" and toolId ~= "" then
+function HotbarLayout.key(toolId: unknown, cakeId: unknown, monsterUid: unknown, vacuumId: unknown): string?
+	if typeof(vacuumId) == "string" and vacuumId ~= "" then
+		return "V:vacuum"
+	elseif typeof(toolId) == "string" and toolId ~= "" then
 		return "T:" .. toolId
 	elseif typeof(cakeId) == "string" and cakeId ~= "" then
 		return "C:" .. cakeId

@@ -266,7 +266,11 @@ end
 
 local function toolName(data: DataService.Data, item: Shop.Item): string?
 	if Workshop.isTool(item) then
-		return if Workshop.owns(data.inventory, item) then item.name else nil
+		-- Only the vacuum in use is in the hotbar; the others wait at the Vacuum Vault, where
+		-- you can switch back (Giles 2026-10-28).
+		local equipSlot = Workshop.equipSlot(item)
+		local inUse = equipSlot == nil or (data.equipped :: { [string]: string })[equipSlot] == item.id
+		return if Workshop.owns(data.inventory, item) and inUse then item.name else nil
 	end
 	local count = itemCount(data, item.id)
 	return if count > 0 then `{item.name} x{count}` else nil
