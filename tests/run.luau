@@ -17,6 +17,7 @@ local Events = require("../src/shared/Config/Events")
 local Watcher = require("../src/shared/Util/Watcher")
 local Shop = require("../src/shared/Config/Shop")
 local Workshop = require("../src/shared/Util/Workshop")
+local Restock = require("../src/shared/Util/Restock")
 local Care = require("../src/shared/Util/Care")
 local CareConfig = require("../src/shared/Config/Care")
 local CakeConfig = require("../src/shared/Config/Cakes")
@@ -3355,6 +3356,63 @@ do
 	local longer = Slap.stealLockUntil(strong, 100) > Slap.stealLockUntil(weak, 100)
 	check("slap: stronger slap locks a thief longer", longer)
 	check("slap: a weak slap never shortens a lock", Slap.stealLockUntil(weak, 100, 1000) == 1000)
+end
+
+-- Admin restocks (Util/Restock + Workshop.canBuy's adminStock)
+do
+	local plan = Restock.parse("cakes 10") :: Restock.Plan
+	local allCakes, noTools, noEvent = true, true, true
+	for _, item in Shop.Bakery do
+		if not item.event and plan.items[item.id] ~= 10 then
+			allCakes = false
+		end
+		if item.event and plan.items[item.id] then
+			noEvent = false
+		end
+	end
+	for _, item in Shop.Workshop do
+		if plan.items[item.id] then
+			noTools = false
+		end
+	end
+	check("restock: cakes 10 puts every cake in at 10", allCakes and noTools and plan.minutes == 5)
+	check("restock: groups leave out event treats", noEvent)
+	local picked = Restock.parse("PUMPKINCANDY 3 baitbell 0 time 15") :: Restock.Plan
+	local count = 0
+	for _ in picked.items do
+		count += 1
+	end
+	check(
+		"restock: picked items, any capitals, 0 allowed, time in minutes",
+		count == 2 and picked.items.PumpkinCandy == 3 and picked.items.BaitBell == 0 and picked.minutes == 15
+	)
+	local later = Restock.parse("all 3 PumpkinCandy 9") :: Restock.Plan
+	check("restock: a later name wins", later.items.PumpkinCandy == 9 and later.items.BaitBell == 3)
+	local everything = Restock.parse("all 1") :: Restock.Plan
+	check("restock: all leaves out vacuums and slappers", everything.items.VoidVac == nil and everything.items.RubberGlove == nil)
+	check("restock: a vacuum can't be restocked", Restock.parse("VoidVac 5") == nil)
+	check("restock: unknown items are refused", Restock.parse("Banana 5") == nil)
+	check("restock: an amount is needed", Restock.parse("cakes") == nil and Restock.parse("") == nil)
+	check("restock: amounts stay in range", Restock.parse("cakes -1") == nil and Restock.parse("cakes 1000") == nil)
+	check("restock: time stays in range", Restock.parse("cakes 1 time 0") == nil and Restock.parse("cakes 1 time 121") == nil)
+	check("restock: nan is refused", Restock.parse("cakes nan") == nil)
+	local back = Restock.parse(Restock.argument(picked.items, 15)) :: Restock.Plan
+	check(
+		"restock: the panel's argument reads back the same",
+		back.items.PumpkinCandy == 3 and back.items.BaitBell == 0 and back.minutes == 15
+	)
+	local charm = Workshop.item("ReturnCharm") :: Shop.Item
+	local outSlot = 1
+	while Workshop.inStock(charm, outSlot) do
+		outSlot += 1
+	end
+	check("restock: an admin amount puts an item in stock", Workshop.canBuy(charm, outSlot, 1e9, {}, 0, nil, nil, 20) == "Ok")
+	check("restock: it sells out at the admin amount", Workshop.canBuy(charm, outSlot, 1e9, {}, 20, nil, nil, 20) == "SoldOut")
+	local inSlot = 1
+	while not Workshop.inStock(charm, inSlot) do
+		inSlot += 1
+	end
+	check("restock: 0 means sold out", Workshop.canBuy(charm, inSlot, 1e9, {}, 0, nil, nil, 0) == "OutOfStock")
 end
 
 if failures > 0 then

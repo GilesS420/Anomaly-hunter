@@ -32,8 +32,14 @@
 --   /spawn Gravepup   brings that monster to you in the zone you're in (any monster, any zone;
 --                     add a size: /spawn TheBogKing Huge). Only you can catch it and it never
 --                     attacks. /spawn all brings every monster of the zone you're in.
+--   /restock cakes 10 an admin restock in this server: every cake in stock, 10 per player, for
+--                     5 minutes (/restock PumpkinCandy 10 BaitBell 5 picks items, "workshop"
+--                     and "all" are groups too, add "time 15" for 15 minutes; Util/Restock).
+--                     /restock end stops it and the normal stock is back.
+--   /announce Hello!  a big banner with that text for everyone in this server (filtered by
+--                     Roblox like chat)
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
--- Any command but /summon, /event, /stopevent, /ghost and /reset can be run on another player in the server, or
+-- Any command but /summon, /event, /stopevent, /ghost, /restock, /announce and /reset can be run on another player in the server, or
 -- on everyone in it: pick them at the top of the panel, or end a chat command with @name
 -- (/money 5m @Biggie) or @all.
 -- The results come back to the admin, starting with that player's name.
@@ -47,6 +53,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
+local TextService = game:GetService("TextService")
 
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Events = require(ReplicatedStorage.Shared.Config.Events)
@@ -54,6 +61,7 @@ local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Sizes = require(ReplicatedStorage.Shared.Config.Sizes)
 local Zones = require(ReplicatedStorage.Shared.Config.Zones)
 local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
+local Restock = require(ReplicatedStorage.Shared.Util.Restock)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Wings = require(ReplicatedStorage.Shared.Config.Wings)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
@@ -72,6 +80,7 @@ local SpawnService = require(script.Parent.SpawnService)
 local TutorialService = require(script.Parent.TutorialService)
 local WatcherService = require(script.Parent.WatcherService)
 local Admins = require(script.Parent.Parent.Admins)
+local AdminRestock = require(script.Parent.Parent.AdminRestock)
 
 local DevService = {}
 
@@ -394,11 +403,85 @@ commands["/spawn"] = function(player, argument, tell)
 	tell(`There's no monster called "{argument}". Try /spawn Gravepup`)
 end
 
+commands["/restock"] = function(_, argument, tell)
+	local wanted = string.lower(argument or "")
+	if wanted == "end" or wanted == "stop" then
+		if AdminRestock.stop() then
+			Notify.toastAll("The admin restock is over: the shops have their normal stock again.")
+		else
+			tell("No admin restock is on.")
+		end
+		return
+	end
+	local plan, problem = Restock.parse(argument)
+	if not plan then
+		tell(problem or "Try: /restock cakes 10")
+		return
+	end
+	local cakes, tools = 0, 0
+	for id, amount in plan.items do
+		if amount > 0 then
+			if Restock.isCake(id) then
+				cakes += 1
+			else
+				tools += 1
+			end
+		end
+	end
+	AdminRestock.start(plan.items, plan.minutes * 60)
+	local shops = if cakes > 0 and tools > 0
+		then "The Bakery and the Workshop have"
+		elseif tools > 0 then "The Workshop has"
+		else "The Bakery has"
+	Notify.toastAll(`Admin restock! {shops} fresh stock for {plan.minutes} min.`)
+	tell(`Restocked {cakes} cakes and {tools} Workshop items for {plan.minutes} min.`)
+end
+
+local MaxAnnouncementLength = 150
+
+-- Roblox's rules: text one player writes for others must go through the filter first.
+local function filterForEveryone(author: Player, text: string): string?
+	local ok, result = pcall(function()
+		local filtered = TextService:FilterStringAsync(text, author.UserId, Enum.TextFilterContext.PublicChat)
+		return filtered:GetNonChatStringForBroadcastAsync()
+	end)
+	return if ok and type(result) == "string" then result else nil
+end
+
+-- Always the admin who ran it (it's untargeted), so the filter checks it as theirs.
+commands["/announce"] = function(player, argument, tell)
+	local text = string.match(argument or "", "^%s*(.-)%s*$") or ""
+	if text == "" then
+		tell("Try: /announce Double money weekend starts now!")
+		return
+	end
+	if #text > MaxAnnouncementLength then
+		tell(`Keep it under {MaxAnnouncementLength} letters.`)
+		return
+	end
+	local filtered = filterForEveryone(player, text)
+	if not filtered then
+		tell("Roblox's text filter didn't answer. Try again in a moment.")
+		return
+	end
+	Notify.announceAll(filtered)
+end
+
 local MaxArgumentLength = 60
+-- These take a long argument: a restock lists every item it puts in, an announcement is a
+-- sentence.
+local longArguments: { [string]: number } = { ["/restock"] = 1200, ["/announce"] = MaxAnnouncementLength * 2 }
 
 -- Commands that act on the whole server or only ever on yourself: a picked player is ignored.
-local untargeted: { [string]: boolean } =
-	{ ["/summon"] = true, ["/event"] = true, ["/stopevent"] = true, ["/ghost"] = true, ["/reset"] = true }
+local untargeted: { [string]: boolean } = {
+	["/summon"] = true,
+	["/event"] = true,
+	["/stopevent"] = true,
+	["/ghost"] = true,
+	["/reset"] = true,
+	["/restock"] = true,
+	["/announce"] = true,
+}
 
 -- Runs one command for an admin, on `target` (another player in the server) or on the admin.
 -- Anything else (not an admin, unknown command, odd argument) is ignored.
@@ -408,7 +491,7 @@ local function runCommand(admin: Player, name: string, argument: string?, target
 	if not command or not Admins.isAdmin(admin) then
 		return
 	end
-	if argument and (argument == "" or #argument > MaxArgumentLength) then
+	if argument and (argument == "" or #argument > (longArguments[key] or MaxArgumentLength)) then
 		argument = nil
 	end
 	local who = if target and target.Parent == Players and not untargeted[key] then target else admin
@@ -571,7 +654,7 @@ function DevService.start()
 		return
 	end
 	print(
-		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /charges, /chamber, /missions done|new|streak <days>, /calm, /attack`
+		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /charges, /chamber, /missions done|new|streak <days>, /calm, /attack, /restock <items amounts>|end, /announce <text>`
 	)
 end
 

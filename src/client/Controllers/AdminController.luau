@@ -6,10 +6,15 @@
 --
 -- Laid out to need little scrolling and few taps (Giles 2026-10-22, 2026-10-24): a "Works on"
 -- dropdown at the top (Me, Everyone, or any player in the server), tabs down the left (Player,
--- Mansion, Items, Spawn, Events) and one short page per tab. Most things are one tap: quick
+-- Mansion, Items, Spawn, Events, Restock, Announce) and one short page per tab. Most things are one tap: quick
 -- amounts, a button per wing and per size, and a button per Watcher event (the Awakening once
 -- per monster set) with Stop next to them. Dropdowns only for long lists (items, monsters).
--- Events and "Reset my save" ignore "Works on".
+-- Events, Restock, Announce and "Reset my save" ignore "Works on".
+--
+-- Restock (Giles 2026-10-28): build a list of items with an amount each (quick buttons for
+-- all cakes / all Workshop items, or one item at a time), then "Restock now" puts exactly that
+-- in stock in this server for the minutes given (server/AdminRestock). Announce sends a
+-- banner to everyone in this server.
 --
 -- Each button sends
 --   ReplicatedStorage.Remotes.AdminCommand   client -> server: (command, argument?, targetUserId?)
@@ -21,6 +26,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local Events = require(ReplicatedStorage.Shared.Config.Events)
+local Restock = require(ReplicatedStorage.Shared.Util.Restock)
 local Watcher = require(ReplicatedStorage.Shared.Util.Watcher)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
@@ -309,6 +315,16 @@ for _, zone in Zones.List do
 	end
 end
 
+-- What an admin restock can put in stock: cakes first, event treats marked.
+local restockList: { Option } = {}
+local restockNames: { [string]: string } = {}
+for _, item in Restock.items() do
+	local shop = if Restock.isCake(item.id) then "Cake" else "Workshop"
+	local event = if item.event then " (event)" else ""
+	table.insert(restockList, { label = `{shop}: {item.name}{event}`, value = item.id })
+	restockNames[item.id] = item.name
+end
+
 local sizeList: { Option } = {}
 for _, size in Sizes do
 	table.insert(sizeList, { label = size.id, value = size.id })
@@ -374,7 +390,8 @@ local function build()
 			local other = Players:GetPlayerByUserId(tonumber(target) or 0)
 			name = if other then other.DisplayName else "you"
 		end
-		window.status.Text = `Buttons work on {name}. Events and Reset my save don't change.`
+		window.status.Text =
+			`Buttons work on {name}. Events, Restock, Announce and Reset my save don't change.`
 	end
 	local _, pickTarget = dropdown(bar, 200, playerOptions, "me", function(value)
 		target = value
@@ -628,6 +645,180 @@ local function build()
 			task.wait(1)
 		end
 	end)
+
+	-- Restock (this server only): pick items and amounts, then restock.
+	local restock = page("Restock")
+	local restockLive = Ui.text(restock, "", UDim2.new(1, 0, 0, 24), Ui.Colors.lamp, true, 18)
+	restockLive.LayoutOrder = nextOrder()
+	restockLive.TextXAlignment = Enum.TextXAlignment.Left
+	local planned: { [string]: number } = {}
+	local plannedText: TextLabel
+	local function showPlanned()
+		local ids: { string } = {}
+		for id in planned do
+			table.insert(ids, id)
+		end
+		table.sort(ids, function(a, b)
+			return restockNames[a] < restockNames[b]
+		end)
+		local parts: { string } = {}
+		for _, id in ids do
+			table.insert(parts, `{restockNames[id]} x{planned[id]}`)
+		end
+		plannedText.Text = if #parts > 0
+			then `In this restock: {table.concat(parts, ", ")}`
+			else "Nothing picked yet: use the buttons above."
+	end
+	local amountRow = row(restock, "Amount")
+	local amountBox = input(amountRow, "per player", "10", 80)
+	Ui.text(amountRow, "each player can buy (0 = sold out)", UDim2.fromOffset(250, RowHeight), Ui.Colors.muted, false, 14).LayoutOrder =
+		nextOrder()
+	local function amount(): number?
+		local value = tonumber(amountBox())
+		if not value or value ~= value or value < 0 or value > Restock.MaxAmount then
+			window.status.Text = `Amount: a number from 0 to {Restock.MaxAmount}.`
+			return nil
+		end
+		return math.floor(value)
+	end
+	local function addAll(cakes: boolean?)
+		local count = amount()
+		if not count then
+			return
+		end
+		for _, item in Restock.items() do
+			if not item.event and (cakes == nil or Restock.isCake(item.id) == cakes) then
+				planned[item.id] = count
+			end
+		end
+		showPlanned()
+	end
+	local quickRow = row(restock, "Add")
+	button(quickRow, "All cakes", Ui.Colors.equip, 100, function()
+		addAll(true)
+	end)
+	button(quickRow, "All Workshop", Ui.Colors.equip, 120, function()
+		addAll(false)
+	end)
+	button(quickRow, "Everything", Ui.Colors.equip, 100, function()
+		addAll(nil)
+	end)
+	local pickRow = row(restock, "One item")
+	local restockItem = dropdown(pickRow, 260, fixed(restockList), restockList[1] and restockList[1].value)
+	button(pickRow, "Add", Ui.Colors.equip, 60, function()
+		local id, count = restockItem(), amount()
+		if id and count then
+			planned[id] = count
+			showPlanned()
+		end
+	end)
+	button(pickRow, "Remove", Ui.Colors.off, 80, function()
+		local id = restockItem()
+		if id then
+			planned[id] = nil
+			showPlanned()
+		end
+	end)
+	plannedText = Ui.text(restock, "", UDim2.new(1, 0, 0, 0), Ui.Colors.text, false, 16)
+	plannedText.LayoutOrder = nextOrder()
+	plannedText.AutomaticSize = Enum.AutomaticSize.Y
+	plannedText.TextScaled = false
+	plannedText.TextSize = 16
+	plannedText.TextWrapped = true
+	plannedText.TextTruncate = Enum.TextTruncate.None
+	plannedText.TextXAlignment = Enum.TextXAlignment.Left
+	showPlanned()
+	local minutesRow = row(restock, "Lasts")
+	local minutesBox = input(minutesRow, "min", tostring(Restock.DefaultMinutes), 60)
+	Ui.text(minutesRow, `minutes (1 to {Restock.MaxMinutes})`, UDim2.fromOffset(160, RowHeight), Ui.Colors.muted, false, 14).LayoutOrder =
+		nextOrder()
+	local goRow = row(restock, "Go")
+	button(goRow, "Restock now", Ui.Colors.buy, 120, function()
+		if next(planned) == nil then
+			window.status.Text = "Pick items first (All cakes, All Workshop or one item)."
+			return
+		end
+		local minutes = tonumber(minutesBox()) or Restock.DefaultMinutes
+		minutes = math.clamp(math.floor(minutes), 1, Restock.MaxMinutes)
+		send("/restock", Restock.argument(planned, minutes))
+	end)
+	button(goRow, "Clear list", Ui.Colors.off, 100, function()
+		table.clear(planned)
+		showPlanned()
+	end)
+	button(goRow, "End restock", Ui.Colors.confirm, 110, function()
+		send("/restock", "end")
+	end)
+	task.spawn(function()
+		while restockLive.Parent do
+			if window.isOpen() and restock.Visible then
+				local ends = workspace:GetAttribute("AdminRestockEnd")
+				restockLive.Text = if type(ends) == "number"
+					then `Admin restock on: {Watcher.clock(math.max(ends - workspace:GetServerTimeNow(), 0))} left`
+					else "No admin restock: the shops have their normal stock"
+			end
+			task.wait(1)
+		end
+	end)
+
+	-- Announce (a banner for everyone in this server; Roblox filters it like chat).
+	local announce = page("Announce")
+	local note = Ui.text(
+		announce,
+		"Everyone in this server sees it at the top of their screen and in the chat. Up to 150 letters.",
+		UDim2.new(1, 0, 0, 0),
+		Ui.Colors.muted,
+		false,
+		16
+	)
+	note.LayoutOrder = nextOrder()
+	note.AutomaticSize = Enum.AutomaticSize.Y
+	note.TextScaled = false
+	note.TextSize = 16
+	note.TextWrapped = true
+	note.TextXAlignment = Enum.TextXAlignment.Left
+	local messageRow = row(announce, "Message")
+	local messageBox = Instance.new("TextBox")
+	messageBox.LayoutOrder = nextOrder()
+	messageBox.Size = UDim2.fromOffset(420, RowHeight * 2)
+	messageBox.BackgroundColor3 = Ui.Colors.row
+	messageBox.TextColor3 = Ui.Colors.text
+	messageBox.PlaceholderText = "Double money for the next hour!"
+	messageBox.PlaceholderColor3 = Ui.Colors.muted
+	messageBox.Text = ""
+	messageBox.Font = Enum.Font.FredokaOne
+	messageBox.TextSize = 16
+	messageBox.TextWrapped = true
+	messageBox.TextXAlignment = Enum.TextXAlignment.Left
+	messageBox.TextYAlignment = Enum.TextYAlignment.Top
+	messageBox.ClearTextOnFocus = false
+	Ui.corner(messageBox, 8)
+	Ui.rim(messageBox, Ui.Colors.rim, 1)
+	local messagePadding = Instance.new("UIPadding")
+	messagePadding.PaddingLeft = UDim.new(0, 8)
+	messagePadding.PaddingTop = UDim.new(0, 6)
+	messagePadding.Parent = messageBox
+	messageBox.Parent = messageRow
+	local function sendAnnouncement()
+		local text = string.match(messageBox.Text, "^%s*(.-)%s*$") or ""
+		if text == "" then
+			window.status.Text = "Type a message first."
+			return
+		end
+		if #text > 150 then
+			window.status.Text = `That's {#text} letters: keep it under 150.`
+			return
+		end
+		send("/announce", text)
+		messageBox.Text = ""
+	end
+	messageBox.FocusLost:Connect(function(enterPressed)
+		if enterPressed then
+			sendAnnouncement()
+		end
+	end)
+	local sendRow = row(announce, "")
+	button(sendRow, "Announce", Ui.Colors.sell, 120, sendAnnouncement)
 
 	openTab("Player")
 end

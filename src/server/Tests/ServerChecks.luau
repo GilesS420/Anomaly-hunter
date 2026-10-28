@@ -51,6 +51,7 @@ ServerChecks.KnownRemotes = {
 	"Remotes.Toast",
 	"Remotes.MutationLog",
 	"Remotes.AdminCommand",
+	"Remotes.Announcement",
 	"Remotes.AwayBook",
 	"StandRemotes.Talk",
 	"StandRemotes.Enter",

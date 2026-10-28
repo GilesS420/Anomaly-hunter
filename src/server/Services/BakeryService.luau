@@ -18,6 +18,7 @@ local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
+local AdminRestock = require(script.Parent.Parent.AdminRestock)
 local Counter = require(script.Parent.Parent.Counter)
 local CakeService = require(script.Parent.CakeService)
 local DataService = require(script.Parent.DataService)
@@ -76,13 +77,18 @@ local function countdown(seconds: number): string
 	return string.format("%d:%02d", seconds // 60, seconds % 60)
 end
 
-local function viewFor(data: DataService.Data): View
+local function viewFor(player: Player, data: DataService.Data): View
 	local slot = currentSlot()
 	local bought = Workshop.boughtThisSlot(data.shop, slot)
+	local adminBought = AdminRestock.bought(player)
 	local eventId, stockMultiplier = stockBoost()
 	local treats: { TreatRow } = {}
 	for _, item in Shop.Bakery do
-		local inStock = Workshop.inStock(item, slot, eventId, stockMultiplier)
+		-- An admin restock (server/AdminRestock) sets the stock and limit of the items in it.
+		local adminStock = AdminRestock.stock(item.id)
+		local inStock = if adminStock
+			then adminStock > 0
+			else Workshop.inStock(item, slot, eventId, stockMultiplier)
 		if item.event and not inStock then
 			continue -- event treats only show up during their event
 		end
@@ -96,8 +102,8 @@ local function viewFor(data: DataService.Data): View
 			look = InventoryService.cakeLook(item.id),
 			inStock = inStock,
 			count = data.inventory[item.id] or 0,
-			bought = bought[item.id] or 0,
-			limit = Workshop.limit(item, slot),
+			bought = if adminStock then adminBought[item.id] or 0 else bought[item.id] or 0,
+			limit = adminStock or Workshop.limit(item, slot),
 		})
 	end
 	table.sort(treats, function(a, b)
@@ -105,14 +111,14 @@ local function viewFor(data: DataService.Data): View
 	end)
 	return {
 		treats = treats,
-		secondsLeft = Workshop.restockAt(slot) - os.time(),
+		secondsLeft = AdminRestock.countdown(Workshop.restockAt(slot) - os.time()),
 		money = data.money,
 	}
 end
 
 GetShop.OnServerInvoke = function(player: Player): View?
 	local data = DataService.get(player)
-	return if data then viewFor(data) else nil
+	return if data then viewFor(player, data) else nil
 end
 
 Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
@@ -121,11 +127,13 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 		return { ok = false, message = "Your save is still loading. Try again in a moment!" }
 	end
 	if not Counter.isNear(player, counter) then
-		return { ok = false, message = "Walk up to the Bakery to shop.", view = viewFor(data) }
+		return { ok = false, message = "Walk up to the Bakery to shop.", view = viewFor(player, data) }
 	end
 	local item = if typeof(itemId) == "string" then Cakes.item(itemId) else nil
 	local slot = currentSlot()
-	local bought = Workshop.boughtThisSlot(data.shop, slot)
+	local adminStock = if item then AdminRestock.stock(item.id) else nil
+	-- Buys during an admin restock count from it, not against the normal limit.
+	local bought = if adminStock then AdminRestock.bought(player) else Workshop.boughtThisSlot(data.shop, slot)
 	local eventId, stockMultiplier = stockBoost()
 	local check = Workshop.canBuy(
 		item,
@@ -134,7 +142,8 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 		data.inventory,
 		if item then bought[item.id] or 0 else 0,
 		eventId,
-		stockMultiplier
+		stockMultiplier,
+		adminStock
 	)
 
 	local message
@@ -145,12 +154,12 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 			`Bought a {item.name}! It's in your hotbar: hold it in your mansion and click to set it out.`
 		CakeService.syncTools(player)
 		Notify.toast(player, message)
-		return { ok = true, message = message, view = viewFor(data) }
+		return { ok = true, message = message, view = viewFor(player, data) }
 	elseif check == "TooPoor" and item then
 		message = `You need {Format.money(item.price - data.money)} more for the {item.name}.`
 	elseif check == "SoldOut" and item then
-		message = `You bought all {Workshop.limit(item, slot)} this restock. More in {countdown(
-			Workshop.restockAt(slot) - os.time()
+		message = `You bought all {adminStock or Workshop.limit(item, slot)} this restock. More in {countdown(
+			AdminRestock.countdown(Workshop.restockAt(slot) - os.time())
 		)}.`
 	elseif check == "OutOfStock" and item and item.event then
 		message = `The {item.name} is only sold during its Watcher event.`
@@ -160,7 +169,7 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 		message = "That isn't for sale."
 	end
 	Notify.toast(player, message)
-	return { ok = false, message = message, view = viewFor(data) }
+	return { ok = false, message = message, view = viewFor(player, data) }
 end
 
 function BakeryService.start()

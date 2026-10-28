@@ -39,6 +39,7 @@ local NameTagController = require(script.Controllers.NameTagController)
 local PotionController = require(script.Controllers.PotionController)
 local MutationLogController = require(script.Controllers.MutationLogController)
 local DialogueController = require(script.Controllers.DialogueController)
+local AnnouncementController = require(script.Controllers.AnnouncementController)
 
 local controllers: { { start: () -> () } } = {
 	ToastController,
@@ -77,6 +78,7 @@ local controllers: { { start: () -> () } } = {
 	MutationLogController,
 	DetailController,
 	DialogueController,
+	AnnouncementController,
 }
 
 for _, controller in controllers do

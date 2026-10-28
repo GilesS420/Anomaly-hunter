@@ -2,9 +2,11 @@
 -- Short messages for players ("Caught a Big Wisp Jack!", "Your mansion is full!").
 -- Every player-facing message on the server goes through here; the client's ToastController
 -- shows them as little pop-ups near the top of the screen. Mutation news also goes in the
--- player's mutation log (client MutationLogController, bottom-left). Uses two RemoteEvents:
---   ReplicatedStorage.Remotes.Toast         server -> client: (text: string)
---   ReplicatedStorage.Remotes.MutationLog   server -> client: (text: string)
+-- player's mutation log (client MutationLogController, bottom-left). Admin announcements show
+-- as a big banner (client AnnouncementController). Uses three RemoteEvents:
+--   ReplicatedStorage.Remotes.Toast          server -> client: (text: string)
+--   ReplicatedStorage.Remotes.MutationLog    server -> client: (text: string)
+--   ReplicatedStorage.Remotes.Announcement   server -> client: (text: string)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -36,6 +38,7 @@ end
 
 local Toast = remoteEvent(folder(), "Toast")
 local MutationLog = remoteEvent(folder(), "MutationLog")
+local Announcement = remoteEvent(folder(), "Announcement")
 
 -- Shows text to one player. Quietly does nothing if they already left.
 function Notify.toast(player: Player, text: string)
@@ -60,6 +63,15 @@ function Notify.toastAll(text: string)
 		return
 	end
 	Toast:FireAllClients(text)
+end
+
+-- Shows an admin's announcement to everyone in the server. The text must already be filtered
+-- (DevService's /announce does that).
+function Notify.announceAll(text: string)
+	if text == "" then
+		return
+	end
+	Announcement:FireAllClients(text)
 end
 
 return Notify
