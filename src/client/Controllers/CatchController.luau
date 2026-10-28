@@ -414,7 +414,8 @@ function CatchController.start()
 		Strike:FireServer(now)
 		local current, lucky = struggle, ring
 		if current then
-			local hit = Catching.struggleHit(now - current.startedAt, current.speed, current.centre, current.width)
+			local hit =
+				Catching.struggleHit(now - current.startedAt, current.speed, current.centre, current.width)
 			if hit then
 				-- The meter fills on straight away; the server confirms with "Struggled".
 				resume = { from = progress(model), at = now }

@@ -4,7 +4,7 @@
 --   2. Pick Gentle, Strong or Reckless: each card shows the odds as a bar, what a win and a
 --      loss do to its weight, and "GROW: $fee" on its button (red when you can't afford it).
 --      Press it twice, so nothing goes by accident.
---   3. The monster bubbles in the chamber for about 20 minutes (Config/Growth.BubbleSeconds),
+--   3. The monster bubbles in the chamber for its mode's time (5 to 20 minutes, Config/Growth),
 --      with a countdown. You can walk away; it keeps going while you're offline.
 --   4. Then the result screen (Giles 2026-10-25): SUCCESS! or FAILED, the monster before and
 --      after (size, weight, worth), and Try again / Pick up monster.
@@ -20,7 +20,15 @@ local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
 local GrowthController = {}
 
-type Option = { id: string, name: string, chance: number, win: number, lose: number, fee: number }
+type Option = {
+	id: string,
+	name: string,
+	chance: number,
+	win: number,
+	lose: number,
+	fee: number,
+	seconds: number, -- how long it bubbles
+}
 type Row = {
 	uid: string,
 	name: string,
@@ -148,7 +156,9 @@ local function modeCard(list: ScrollingFrame, order: number, option: Option, run
 	middle.Position = UDim2.fromOffset(left, 0)
 	middle.Size = UDim2.new(1, -left - GrowWidth - 16, 1, 0)
 	middle.Parent = row
-	local title = Ui.text(middle, option.name, UDim2.fromScale(1, 0.3), Ui.Colors.lamp, true, 24)
+	local minutes = math.ceil(option.seconds / 60)
+	local title =
+		Ui.text(middle, `{option.name} · {minutes} min`, UDim2.fromScale(1, 0.3), Ui.Colors.lamp, true, 24)
 	title.Font = Ui.TitleFont
 
 	-- The odds bar: green for the win share, red for the rest.
