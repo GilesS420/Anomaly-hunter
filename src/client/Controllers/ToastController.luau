@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
+local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
 local ToastController = {}
 
@@ -59,7 +60,15 @@ local function buildUi(): Frame
 end
 
 -- Just under the fast-travel buttons, or under Roblox's top bar when they're hidden (in a zone).
+-- While a shop or other window is open the toasts drop to the bottom of the screen instead, so
+-- they don't cover the window's title (the hotbar steps aside then, so the bottom is free).
 local function place(holder: Frame)
+	if Ui.anyWindowOpen("BackpackUi") then
+		holder.AnchorPoint = Vector2.new(0.5, 1)
+		holder.Position = UDim2.new(0.5, 0, 1, -8)
+		return
+	end
+	holder.AnchorPoint = Vector2.new(0.5, 0)
 	local top = Scale.topBar().Max.Y
 	local playerGui = player:FindFirstChildOfClass("PlayerGui")
 	local travel = playerGui and playerGui:FindFirstChild("TravelUi")
@@ -175,6 +184,9 @@ function ToastController.start()
 	local holder = buildUi()
 	built = holder
 	Scale.changed:Connect(function()
+		place(holder)
+	end)
+	Ui.windowsChanged:Connect(function()
 		place(holder)
 	end)
 	place(holder)
