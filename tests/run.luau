@@ -3107,10 +3107,16 @@ do
 	g.gene = "Stunted"
 	check("growth: full charges", Growth.chargesLeft(g) == GrowthConfig.Charges)
 	local before, after = Growth.apply(g, reckless, true)
-	check("growth: a win ignores a Stunted gene", before == 20 and near(after, 40) and g.size == "Huge")
+	check(
+		"growth: a win ignores a Stunted gene",
+		before == 20 and near(after, 20 * reckless.win) and g.size == "Colossal"
+	)
 	check("growth: a go uses a charge", Growth.chargesLeft(g) == GrowthConfig.Charges - 1)
 	Growth.apply(g, reckless, false)
-	check("growth: a hard loss shrinks it", near(g.kg, 30) and g.size == "Big")
+	check(
+		"growth: a hard loss shrinks it",
+		near(g.kg, 20 * reckless.win * reckless.lose) and g.size == "Huge"
+	)
 	local kg = g.kg
 	Growth.apply(g, gentle, false)
 	check("growth: a gentle loss does nothing", g.kg == kg)
@@ -3118,9 +3124,14 @@ do
 	local ordered = true
 	for i = 2, #GrowthConfig.Modes do
 		local a, b = GrowthConfig.Modes[i - 1], GrowthConfig.Modes[i]
-		ordered = ordered and b.chance < a.chance and b.win > a.win and b.lose <= a.lose
+		ordered = ordered
+			and b.chance < a.chance
+			and b.win > a.win
+			and b.lose <= a.lose
+			and b.seconds > a.seconds
 	end
-	check("growth: harder modes risk more for more", ordered)
+	check("growth: harder modes risk more for more, and take longer", ordered)
+	check("growth: Reckless takes 20 minutes", reckless.seconds == 20 * 60)
 	-- Five Reckless wins from a Normal makes a Titan.
 	local lucky = pup("h", 20, {})
 	for _ = 1, GrowthConfig.Charges do
