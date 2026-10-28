@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
 local Weight = require(Shared:WaitForChild("Util"):WaitForChild("Weight"))
+local Loading = require(script.Parent.Parent:WaitForChild("Loading"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
 local AwayBookController = {}
@@ -65,6 +66,7 @@ function AwayBookController.start()
 		if typeof(changes) ~= "table" or #changes == 0 then
 			return
 		end
+		Loading.wait() -- not under the loading screen
 		Ui.clear(window.list)
 		local effects = 0
 		for _, change in changes do
