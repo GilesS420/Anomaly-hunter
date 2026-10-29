@@ -13,6 +13,7 @@ local UserInputService = game:GetService("UserInputService")
 local HotbarController = require(script.Parent:WaitForChild("HotbarController"))
 local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
+local Icons = require(script.Parent.Parent:WaitForChild("Icons"))
 
 local MutationLogController = {}
 
@@ -41,8 +42,11 @@ function MutationLogController.start()
 	icon.AnchorPoint = Vector2.new(0, 1)
 	icon.Position = UDim2.new(left, UDim.new(1, -lift))
 	Ui.corner(icon, 12)
-	local glyph = Ui.text(icon, "🧬", UDim2.fromScale(1, 0.62), Ui.Colors.text, true, 26)
-	glyph.TextXAlignment = Enum.TextXAlignment.Center
+	local glyph = Instance.new("Frame") -- a logbook (client/Icons)
+	glyph.Size = UDim2.fromScale(1, 0.62)
+	glyph.BackgroundTransparency = 1
+	glyph.Parent = icon
+	Icons.draw(glyph, "Notebook", 0.08)
 	local caption = Ui.text(icon, "Log", UDim2.fromScale(1, 0.38), Ui.Colors.text, true, 13)
 	caption.Position = UDim2.fromScale(0, 0.62)
 	caption.TextXAlignment = Enum.TextXAlignment.Center

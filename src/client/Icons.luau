@@ -1,12 +1,12 @@
 --!strict
 -- Little pictures drawn from plain frames, so they need no uploaded images: a backpack, a
--- book, a scroll and a gear. Icons.draw(parent, kind) fills `parent` (best a square) with
--- one. Every piece is sized and placed in scale, so the picture grows with its parent, and
+-- book, a scroll, a gear and a spiral notebook. Icons.draw(parent, kind) fills `parent` with
+-- one, kept square. Every piece is sized and placed in scale, so the picture grows with its parent, and
 -- none of them take clicks, so a button underneath still works.
 
 local Icons = {}
 
-export type Kind = "Backpack" | "Book" | "Scroll" | "Gear"
+export type Kind = "Backpack" | "Book" | "Scroll" | "Gear" | "Notebook"
 
 -- One piece of a picture: centred on (x, y), w by h, all as a share of the parent.
 local function piece(
@@ -83,6 +83,18 @@ local draw: { [Kind]: (Frame) -> () } = {
 		piece(box, 0.5, 0.5, 0.66, 0.66, metal, 0.5)
 		piece(box, 0.5, 0.5, 0.26, 0.26, Color3.fromRGB(40, 40, 52), 0.5) -- the hole
 	end,
+
+	-- A logbook: a lined page with spiral rings along the top.
+	Notebook = function(box)
+		piece(box, 0.5, 0.55, 0.7, 0.82, Color3.fromRGB(245, 238, 220), 0.1)
+		piece(box, 0.27, 0.6, 0.03, 0.66, Color3.fromRGB(220, 80, 80)) -- margin
+		for _, y in { 0.4, 0.52, 0.64, 0.76 } do
+			piece(box, 0.55, y, 0.44, 0.045, Color3.fromRGB(90, 130, 200), 0.5)
+		end
+		for _, x in { 0.3, 0.43, 0.57, 0.7 } do
+			piece(box, x, 0.15, 0.07, 0.2, Color3.fromRGB(70, 70, 85), 0.5)
+		end
+	end,
 }
 
 -- Draws a `kind` picture inside `parent`, `inset` (a share, default 0.15) away from its edges.
@@ -95,6 +107,8 @@ function Icons.draw(parent: GuiObject, kind: Kind, inset: number?): Frame
 	box.Size = UDim2.fromScale(1 - margin * 2, 1 - margin * 2)
 	box.BackgroundTransparency = 1
 	box.ZIndex = parent.ZIndex
+	local square = Instance.new("UIAspectRatioConstraint") -- stays square in a wide parent
+	square.Parent = box
 	draw[kind](box)
 	box.Parent = parent
 	return box
