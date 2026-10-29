@@ -3583,6 +3583,67 @@ do
 	)
 end
 
+-- Variant Machine (Util/VariantMachine).
+do
+	local VariantMachine = require("../src/shared/Util/VariantMachine")
+	local MachineConfig = require("../src/shared/Config/VariantMachine")
+	local function crow(variant: string?, effects: { string }): any
+		return { monsterId = "Gravepup", size = "Big", effects = effects, familiarity = 0, variant = variant }
+	end
+	check("variant machine: Rainbow is 1%", MachineConfig.Odds.Rainbow == 1)
+	check("variant machine: plain monster can win any", VariantMachine.chance(nil) == 26)
+	check("variant machine: Silver can't win Silver again", VariantMachine.chance("Silver") == 11)
+	check("variant machine: Shiny can only win Rainbow", VariantMachine.chance("Shiny") == 1)
+	check("variant machine: needs an effect", VariantMachine.problem(crow(nil, {})) == "NoEffects")
+	check(
+		"variant machine: Rainbow can't go in",
+		VariantMachine.problem(crow("Rainbow", { "Ghost" })) == "Best"
+	)
+	check(
+		"variant machine: Gold with an effect is fine",
+		VariantMachine.problem(crow("Gold", { "Ghost" })) == nil
+	)
+	check("variant machine: fee is 10% of value", VariantMachine.fee(1_000_000) == 100_000)
+
+	local silver = crow("Silver", { "Cobwebbed", "Poltergeist", "Gilded" })
+	local used = VariantMachine.apply(silver, 2, "Gold")
+	check(
+		"variant machine: example pull",
+		used == "Poltergeist" and silver.variant == "Gold" and #silver.effects == 2
+	)
+	local gold = crow("Gold", { "Ghost" })
+	VariantMachine.apply(gold, 1, "Silver")
+	check("variant machine: never a downgrade", gold.variant == "Gold" and #gold.effects == 0)
+
+	local pulls = 200_000
+	-- Two rolls per pull, so the small fakeRandom's back-to-back numbers would skew it.
+	math.randomseed(29)
+	local machineRng: any = {
+		NextNumber = function(_self)
+			return math.random()
+		end,
+	}
+	local won: { [string]: number } = {}
+	local misses, badIndex = 0, 0
+	for _ = 1, pulls do
+		local monster = crow("Silver", { "A", "B", "C" })
+		local index, variant = VariantMachine.roll(monster, machineRng)
+		if index < 1 or index > 3 then
+			badIndex += 1
+		end
+		if variant then
+			won[variant] = (won[variant] or 0) + 1
+		else
+			misses += 1
+		end
+	end
+	check("variant machine: picks a real effect", badIndex == 0)
+	check("variant machine: Silver never wins Silver", won.Silver == nil)
+	check("variant machine: Rainbow about 1%", math.abs((won.Rainbow or 0) / pulls - 0.01) < 0.002)
+	check("variant machine: Gold about 7%", math.abs((won.Gold or 0) / pulls - 0.07) < 0.004)
+	check("variant machine: misses about 89% for Silver", math.abs(misses / pulls - 0.89) < 0.005)
+end
+
 if failures > 0 then
 	error(`{failures} check(s) failed`)
 end

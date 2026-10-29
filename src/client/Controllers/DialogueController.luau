@@ -3,7 +3,8 @@
 -- the Workshop, the Vacuum Vault, the Collector or the Watcher (or tap the prompt) and a
 -- plain dialogue box opens at the bottom of the screen. The stand's name, its line typed out
 -- letter by letter (click or tap the box to skip), then three choices: ask about the stand,
--- enter it (opens its shop or sell window) or quit. Walking away closes it.
+-- enter it (opens its shop or sell window) or quit. Some stands have a second window too
+-- (`extra`, like the Merger's Variant Machine). Walking away closes it.
 -- The lines are in Shared.Config.Stands; the prompts and the Enter check in server/Counter.
 -- While the dialogue or a shop window is open the stands' Talk prompts are hidden, so a click
 -- that falls between the shop's cards can't hit the prompt behind the window and talk again.
@@ -179,7 +180,14 @@ function DialogueController.start()
 				close()
 			end
 		end)
-		choice(3, stand.quit, close)
+		local extra = stand.extra
+		if extra then
+			choice(3, extra.ask, function()
+				Enter:FireServer(standId, extra.option)
+				close()
+			end)
+		end
+		choice(if extra then 4 else 3, stand.quit, close)
 	end
 
 	say = function(text: string)

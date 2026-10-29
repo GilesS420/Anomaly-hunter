@@ -9,6 +9,11 @@
 --   GetList  client -> server () -> View?                  their Backpack monsters
 --   Preview  client -> server (main, donor) -> Preview     what a merge would make, odds, fee
 --   Merge    client -> server (main, donor) -> Result      merges them
+--
+-- The Variant Machine, the Merger's second window (Config/VariantMachine, Util/VariantMachine):
+--   OpenVariant server -> client (counter: Vector3)       the player picked "Try the Variant Machine"
+--   Pull        client -> server (uid) -> PullResult       uses up one effect for a variant pull
+-- GetList's rows carry what the machine needs too.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -17,6 +22,7 @@ local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Merge = require(ReplicatedStorage.Shared.Util.Merge)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
+local VariantMachine = require(ReplicatedStorage.Shared.Util.VariantMachine)
 local Weight = require(ReplicatedStorage.Shared.Util.Weight)
 local CareService = require(script.Parent.CareService)
 local Counter = require(script.Parent.Parent.Counter)
@@ -42,6 +48,9 @@ export type Row = {
 	locked: boolean,
 	twins: number, -- how many others of its kind are in the Backpack
 	chance: number, -- percent, for merging two of these
+	variant: string?, -- its catch variant, for the Variant Machine's odds
+	pullProblem: string?, -- why it can't go in the Variant Machine, nil if it can
+	pullFee: number, -- the Variant Machine's fee for it
 }
 export type View = { monsters: { Row } }
 export type Preview = {
@@ -56,6 +65,14 @@ export type Preview = {
 	value: number?, -- what the main would be worth
 }
 export type Result = { ok: boolean, won: boolean?, message: string, view: View? }
+export type PullResult = {
+	ok: boolean,
+	won: boolean?,
+	message: string,
+	used: string?, -- the effect the pull used up
+	variant: string?, -- the variant it won
+	view: View?,
+}
 
 local busy: { [Player]: boolean } = {}
 local counter: Attachment? = nil
@@ -74,6 +91,18 @@ PreviewRemote.Parent = remotes
 local MergeRemote = Instance.new("RemoteFunction")
 MergeRemote.Name = "Merge"
 MergeRemote.Parent = remotes
+local OpenVariant = Instance.new("RemoteEvent")
+OpenVariant.Name = "OpenVariant"
+OpenVariant.Parent = remotes
+local PullRemote = Instance.new("RemoteFunction")
+PullRemote.Name = "Pull"
+PullRemote.Parent = remotes
+
+local PullProblems: { [string]: string } = {
+	NoEffects = "It has no effects to feed the machine.",
+	Best = "It's already Rainbow, the best there is!",
+	Unknown = "That monster can't go in the machine.",
+}
 
 local function valueOf(caught: Value.CaughtMonster, wingsOwned: number): number
 	local ok, value = pcall(Value.sellValue, caught, wingsOwned)
@@ -112,6 +141,7 @@ local function viewFor(data: DataService.Data): View
 			continue
 		end
 		local variant = if caught.variant then `{caught.variant} ` else ""
+		local pullProblem = VariantMachine.problem(caught)
 		table.insert(rows, {
 			uid = caught.uid,
 			monsterId = caught.monsterId,
@@ -125,6 +155,9 @@ local function viewFor(data: DataService.Data): View
 			locked = caught.locked == true,
 			twins = (kinds[caught.monsterId] or 1) - 1,
 			chance = Merge.chance(caught.monsterId),
+			variant = caught.variant,
+			pullProblem = if pullProblem then PullProblems[pullProblem] else nil,
+			pullFee = VariantMachine.fee(valueOf(caught, data.wingsOwned)),
 		})
 	end
 	-- Kinds you can merge first, then by kind and most valuable first.
@@ -245,6 +278,50 @@ MergeRemote.OnServerInvoke = function(player: Player, mainUid: unknown, donorUid
 	return { ok = true, won = won, message = message, view = viewFor(data) }
 end
 
+PullRemote.OnServerInvoke = function(player: Player, uid: unknown): PullResult
+	local data = DataService.get(player)
+	if not data then
+		return { ok = false, message = "Your save is still loading. Try again in a moment!" }
+	end
+	if not Counter.isNear(player, counter) then
+		return { ok = false, message = "Walk up to the Merger to use the machine.", view = viewFor(data) }
+	end
+	if busy[player] then
+		return { ok = false, message = "One at a time!", view = viewFor(data) }
+	end
+	local caught = find(data, uid)
+	if not caught then
+		return { ok = false, message = "That monster isn't in your Backpack any more.", view = viewFor(data) }
+	end
+	local problem = VariantMachine.problem(caught)
+	if problem then
+		return { ok = false, message = PullProblems[problem], view = viewFor(data) }
+	end
+	local fee = VariantMachine.fee(valueOf(caught, data.wingsOwned))
+	if not DataService.addMoney(player, -fee) then
+		return { ok = false, message = `You need {Format.money(fee)} for the fee.`, view = viewFor(data) }
+	end
+
+	busy[player] = true
+	local name = Format.monsterName(caught)
+	local index, variant = VariantMachine.roll(caught)
+	local used = VariantMachine.apply(caught, index, variant)
+	local message = if variant
+		then `{string.upper(variant)}! The machine ate {Format.name(used)} and your {name} came out {variant}!`
+		else `No luck... the machine ate {Format.name(used)}. Your {name} is still {caught.variant or "plain"}.`
+	busy[player] = nil
+	DataService.saveSoon(player)
+	Notify.toast(player, message)
+	return {
+		ok = true,
+		won = variant ~= nil,
+		message = message,
+		used = Format.name(used),
+		variant = variant,
+		view = viewFor(data),
+	}
+end
+
 GetList.OnServerInvoke = function(player: Player): View?
 	local data = DataService.get(player)
 	return if data then viewFor(data) else nil
@@ -252,10 +329,14 @@ end
 
 function MergerService.start()
 	remotes.Parent = ReplicatedStorage
-	counter = Counter.prompt("Merger", "The Merger", function(player)
+	counter = Counter.prompt("Merger", "The Merger", function(player, option)
 		local at = counter
 		if at and DataService.isLoaded(player) then
-			Open:FireClient(player, at.WorldPosition)
+			if option == "Variant" then
+				OpenVariant:FireClient(player, at.WorldPosition)
+			else
+				Open:FireClient(player, at.WorldPosition)
+			end
 		end
 	end)
 	game:GetService("Players").PlayerRemoving:Connect(function(player)

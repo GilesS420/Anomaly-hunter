@@ -9,6 +9,7 @@ local CatchController = require(script.Controllers.CatchController)
 local HuntController = require(script.Controllers.HuntController)
 local CollectorController = require(script.Controllers.CollectorController)
 local MergerController = require(script.Controllers.MergerController)
+local VariantController = require(script.Controllers.VariantController)
 local GrowthController = require(script.Controllers.GrowthController)
 local WorkshopController = require(script.Controllers.WorkshopController)
 local BakeryController = require(script.Controllers.BakeryController)
@@ -49,6 +50,7 @@ local controllers: { { start: () -> () } } = {
 	HuntController,
 	CollectorController,
 	MergerController,
+	VariantController,
 	GrowthController,
 	WorkshopController,
 	BakeryController,

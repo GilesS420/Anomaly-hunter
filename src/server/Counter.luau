@@ -18,7 +18,7 @@ local PromptReach = 12 -- studs from the counter's front
 local UseReach = 30 -- studs: buying and selling only work this close (the window closes at 22)
 
 -- Talk (server to client: stand id, counter position) opens the dialogue; Enter (client to
--- server: stand id) is the "enter" choice.
+-- server: stand id, and the `extra` option for a stand's second window) is the "enter" choice.
 local remotes = Instance.new("Folder")
 remotes.Name = "StandRemotes"
 local Talk = Instance.new("RemoteEvent")
@@ -28,17 +28,18 @@ local Enter = Instance.new("RemoteEvent")
 Enter.Name = "Enter"
 Enter.Parent = remotes
 
-local stands: { [string]: { anchor: Attachment, onEnter: ((Player) -> ())? } } = {}
+type OnEnter = (Player, string?) -> () -- the player, and the `extra` option they picked (nil for enter)
+local stands: { [string]: { anchor: Attachment, onEnter: OnEnter? } } = {}
 
 -- Adds the stand's prompt to anchor. id names the stand's lines in Config/Stands; onEnter
 -- opens its window (nil for a stand that only talks, like the Watcher).
-function Counter.stand(id: string, anchor: Attachment, objectText: string, onEnter: ((Player) -> ())?)
+function Counter.stand(id: string, anchor: Attachment, objectText: string, onEnter: OnEnter?)
 	if not remotes.Parent then
 		remotes.Parent = ReplicatedStorage
-		Enter.OnServerEvent:Connect(function(player, which)
+		Enter.OnServerEvent:Connect(function(player, which, option)
 			local stand = if typeof(which) == "string" then stands[which] else nil
 			if stand and stand.onEnter and Counter.isNear(player, stand.anchor) then
-				stand.onEnter(player)
+				stand.onEnter(player, if typeof(option) == "string" then option else nil)
 			end
 		end)
 	end
@@ -61,7 +62,7 @@ end
 -- Adds the prompt at a hub landmark and returns where it sits (for the client to close the
 -- window when the player walks away). onTriggered opens the window once the player picks
 -- "enter" in the dialogue. Nil, with a warning in Output, if the landmark doesn't exist.
-function Counter.prompt(landmark: string, objectText: string, onTriggered: (Player) -> ()): Attachment?
+function Counter.prompt(landmark: string, objectText: string, onTriggered: OnEnter): Attachment?
 	-- A built landmark is a Model whose PrimaryPart is the spot in front of its counter.
 	local found = World.find(World.find(World.find(workspace, "Hub"), "Landmarks"), landmark)
 	local part = if found

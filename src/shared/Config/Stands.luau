@@ -1,7 +1,7 @@
 --!strict
 -- What the hub's stands say when you talk to them (client/Controllers/DialogueController).
 -- Press E at a stand (or tap its prompt) and a Grow a Garden style dialogue opens at the
--- bottom of the screen: the stand's greeting, then three choices. "info" answers in the
+-- bottom of the screen: the stand's greeting, then three choices (four with `extra`). "info" answers in the
 -- dialogue, "enter" opens the stand's window (the shop or the sell window) and "quit" closes.
 -- The ids are the landmark names (Counter.prompt); the Watcher's id is "Watcher".
 
@@ -12,6 +12,9 @@ export type Stand = {
 	-- Opens the stand's window. With `live`, the Watcher answers in the dialogue instead
 	-- (what's happening right now), since it has no window.
 	enter: { ask: string, live: boolean? },
+	-- A second window at the same stand, offered after enter (the Merger's Variant Machine).
+	-- `option` is passed to the stand's onEnter on the server (server/Counter).
+	extra: { ask: string, option: string }?,
 	quit: string,
 }
 
@@ -61,9 +64,10 @@ local Stands: { [string]: Stand } = {
 		greeting = "Two in, one out! Hehehe... usually.",
 		info = {
 			ask = "What does the Merger do?",
-			answer = "Bring me two of the same monster from your Backpack: one to keep and one to give. If it works, the one you keep gets heavier and takes every effect of the other, and combos can form! If it fails, the one you gave is gone. Rarer monsters are harder to merge. I show you the odds and my fee first.",
+			answer = "Bring me two of the same monster from your Backpack: one to keep and one to give. If it works, the one you keep gets heavier and takes every effect of the other, and combos can form! If it fails, the one you gave is gone. Rarer monsters are harder to merge. I show you the odds and my fee first. My Variant Machine can also turn a monster Silver, Gold, Shiny or even Rainbow: it eats one of the monster's effects for every try, but the monster always comes back.",
 		},
 		enter = { ask = "Let's merge!" },
+		extra = { ask = "Try the Variant Machine", option = "Variant" },
 		quit = "Never mind",
 	},
 	GrowthChamber = {
