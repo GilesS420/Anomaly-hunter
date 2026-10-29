@@ -94,6 +94,8 @@ local draw: { [Kind]: (Frame) -> () } = {
 			piece(box, 0.5, 0.5, 0.42, 0.24, dark, nil, angle)
 		end
 		piece(box, 0.5, 0.5, 0.16, 0.16, gold, 0.2, 45)
+	end,
+
 	-- A logbook: a lined page with spiral rings along the top.
 	Notebook = function(box)
 		piece(box, 0.5, 0.55, 0.7, 0.82, Color3.fromRGB(245, 238, 220), 0.1)

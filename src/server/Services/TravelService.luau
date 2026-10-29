@@ -23,6 +23,7 @@ local Zones = require(ReplicatedStorage.Shared.Config.Zones)
 local DataService = require(script.Parent.DataService)
 local HuntService = require(script.Parent.HuntService)
 local Notify = require(script.Parent.Parent.Notify)
+local Perks = require(script.Parent.Parent.Perks)
 local PlotService = require(script.Parent.PlotService)
 local World = require(script.Parent.Parent.World)
 
@@ -214,6 +215,7 @@ local function updateSpeeds()
 			local position = root.Position
 			local inZone = player:GetAttribute("Zone") ~= nil
 			local speed = Travel.walkSpeed(inZone, position.X, position.Z, normal, TravelConfig.HubWalkSpeed)
+				* Perks.walkMultiplier(player)
 			if humanoid.WalkSpeed ~= speed then
 				humanoid.WalkSpeed = speed
 			end

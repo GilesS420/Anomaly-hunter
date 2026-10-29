@@ -43,6 +43,11 @@ function Perks.sellBoost(player: Player): number
 	return if Perks.has(player, "VIP") then Robux.VipSellBoost else 1
 end
 
+-- What the player's walking speed is multiplied by (Faster walking speed pass).
+function Perks.walkMultiplier(player: Player): number
+	return if Perks.has(player, "FastWalk") then Robux.FastWalkMultiplier else 1
+end
+
 -- Extra free mission rerolls a day.
 function Perks.extraRerolls(player: Player): number
 	return if Perks.has(player, "VIP") then Robux.VipRerolls else 0
