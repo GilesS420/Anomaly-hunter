@@ -602,7 +602,7 @@ function CodexController.start()
 
 	local hud =
 		player:WaitForChild("PlayerGui"):WaitForChild("HuntUi"):WaitForChild("Canvas"):WaitForChild("Hud")
-	local button = hud:WaitForChild("Codex") :: TextButton
+	local button = hud:WaitForChild("Menu"):WaitForChild("Codex") :: TextButton
 	button.Activated:Connect(toggle)
 	Locks.guard(button, "Codex") -- greyed out until the tutorial is done
 end

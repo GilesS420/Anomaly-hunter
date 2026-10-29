@@ -94,7 +94,7 @@ Tutorial.Tour = {
 	},
 	{
 		feature = "Backpack",
-		text = "Your Backpack holds your monsters, cakes and tools. Drag a card onto the hotbar to hold it, and tap the heart on a monster to keep it safe.",
+		text = "The backpack button on the left opens your Backpack. It holds your monsters, cakes and tools. Drag a card onto the hotbar to hold it, and tap the heart on a monster to keep it safe.",
 	},
 	{
 		feature = "MansionList",
@@ -102,11 +102,11 @@ Tutorial.Tour = {
 	},
 	{
 		feature = "Codex",
-		text = "Your Codex lists every monster you've caught. Catch each one in Silver, Gold, Shiny and Rainbow too, for money rewards!",
+		text = "The book button opens your Codex: it lists every monster you've caught. Catch each one in Silver, Gold, Shiny and Rainbow too, for money rewards!",
 	},
 	{
 		feature = "Missions",
-		text = "Missions gives you three new missions every day. Finish them for money that grows with your mansion, and come back each day for a streak bonus.",
+		text = "The scroll button opens your Missions: three new missions every day. Finish them for money that grows with your mansion, and come back each day for a streak bonus.",
 	},
 	{
 		feature = "Events",
@@ -114,7 +114,7 @@ Tutorial.Tour = {
 	},
 	{
 		feature = "Settings",
-		text = "Settings has music and sound volume, weather, and UI size if the buttons look too big or small on your screen.",
+		text = "The gear button opens Settings: music and sound volume, weather, and UI size if the buttons look too big or small on your screen.",
 	},
 } :: { { feature: string, text: string } }
 
