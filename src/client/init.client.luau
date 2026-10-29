@@ -31,6 +31,7 @@ local MonsterVoiceController = require(script.Controllers.MonsterVoiceController
 local TutorialController = require(script.Controllers.TutorialController)
 local CodexController = require(script.Controllers.CodexController)
 local MissionController = require(script.Controllers.MissionController)
+local StoreController = require(script.Controllers.StoreController)
 local SettingsController = require(script.Controllers.SettingsController)
 local AwayBookController = require(script.Controllers.AwayBookController)
 local MansionListController = require(script.Controllers.MansionListController)
@@ -70,6 +71,7 @@ local controllers: { { start: () -> () } } = {
 	TutorialController,
 	CodexController,
 	MissionController,
+	StoreController,
 	SettingsController,
 	AwayBookController,
 	MansionListController,

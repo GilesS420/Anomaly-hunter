@@ -11,8 +11,9 @@ local Weight = require("./Weight")
 
 local Storage = {}
 
-function Storage.hasRoom(storedCount: number): boolean
-	return storedCount < InventoryConfig.StorageSlots
+-- `slots`: the player's Storage size if it isn't the normal one (the Big Storage pass).
+function Storage.hasRoom(storedCount: number, slots: number?): boolean
+	return storedCount < (slots or InventoryConfig.StorageSlots)
 end
 
 -- Call when a monster goes into Storage.

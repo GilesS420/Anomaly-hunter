@@ -20,6 +20,7 @@ local Missions = require(ReplicatedStorage.Shared.Util.Missions)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local DataService = require(script.Parent.DataService)
 local Notify = require(script.Parent.Parent.Notify)
+local Perks = require(script.Parent.Parent.Perks)
 
 local MissionService = {}
 
@@ -116,6 +117,18 @@ local function update(player: Player, state: Missions.State)
 	Changed:FireClient(player, viewFor(state))
 end
 
+-- VIP Hunters get their extra free rerolls once a day (the pass may be found after the deal,
+-- so this is checked every time, not only when dealing). True if any were added.
+local function vipRerolls(player: Player, state: Missions.State): boolean
+	local extra = Perks.extraRerolls(player)
+	if extra <= 0 or state.vipDay == state.day then
+		return false
+	end
+	state.vipDay = state.day
+	state.rerolls += extra
+	return true
+end
+
 -- Today's missions for this player, dealing new ones first if the day turned over. `quiet`:
 -- no toast (the first look when they join).
 local function current(player: Player, data: DataService.Data, quiet: boolean?): Missions.State
@@ -126,6 +139,9 @@ local function current(player: Player, data: DataService.Data, quiet: boolean?):
 		if not quiet then
 			Notify.toast(player, "New daily missions are up! Open Missions to see them.")
 		end
+		update(player, data.missions)
+	end
+	if vipRerolls(player, data.missions) then
 		update(player, data.missions)
 	end
 	return data.missions
@@ -160,6 +176,62 @@ function MissionService.record(player: Player, kind: string, done: Missions.Done
 	update(player, state)
 end
 
+-- Robux Mission Reroll: swaps every mission that isn't done yet for a new one. Returns how
+-- many were swapped (0 while the save is loading or everything is done).
+function MissionService.rerollAll(player: Player): number
+	local data = DataService.get(player)
+	if not data then
+		return 0
+	end
+	local state = current(player, data)
+	local swapped = Missions.rerollAll(state, data.wingsOwned, random)
+	update(player, state)
+	return swapped
+end
+
+-- Robux Mission Skip: finishes mission `index` (it still needs claiming). False if it's
+-- already done or there's no such mission.
+function MissionService.skip(player: Player, index: unknown): boolean
+	local data = DataService.get(player)
+	if not data or typeof(index) ~= "number" then
+		return false
+	end
+	local state = current(player, data)
+	local saved = state.list[index]
+	if not saved or saved.claimed or Missions.isDone(saved) then
+		return false
+	end
+	saved.progress = saved.target
+	Notify.toast(
+		player,
+		`Mission skipped: {Missions.text(saved)}! Claim {Format.money(saved.reward)} in Missions.`
+	)
+	update(player, state)
+	return true
+end
+
+-- True if every one of today's missions is done (nothing left to reroll or skip).
+function MissionService.allDone(player: Player): boolean
+	local data = DataService.get(player)
+	if not data then
+		return true
+	end
+	for _, saved in current(player, data).list do
+		if not saved.claimed and not Missions.isDone(saved) then
+			return false
+		end
+	end
+	return true
+end
+
+-- Brings today's missions up to date (RobuxService calls it once a VIP pass is found).
+function MissionService.refresh(player: Player)
+	local data = DataService.get(player)
+	if data then
+		current(player, data)
+	end
+end
+
 -- Admin: deals a fresh set of missions now (the streak stays).
 function MissionService.redeal(player: Player): boolean
 	local data = DataService.get(player)
@@ -168,6 +240,7 @@ function MissionService.redeal(player: Player): boolean
 	end
 	data.missions =
 		Missions.deal(data.missions, os.time(), MissionService.worth(data), data.wingsOwned, random)
+	vipRerolls(player, data.missions)
 	update(player, data.missions)
 	return true
 end

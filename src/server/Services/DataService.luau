@@ -12,6 +12,7 @@ local RunService = game:GetService("RunService")
 
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Missions = require(ReplicatedStorage.Shared.Util.Missions)
+local Robux = require(ReplicatedStorage.Shared.Util.Robux)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local ProfileStore = require(script.Parent.Parent.Vendor.ProfileStore)
 
@@ -44,6 +45,7 @@ export type Data = {
 		told: boolean?, -- the owner got the "it's done" toast
 	},
 	missions: Missions.State, -- today's daily missions and the streak (MissionService)
+	robux: Robux.Record, -- Robux purchases paid out, credits and passes (RobuxService)
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -71,6 +73,7 @@ DataService.Template = {
 	hotbar = { slots = {}, benched = {} },
 	chamber = {},
 	missions = Missions.empty(),
+	robux = Robux.empty(),
 } :: Data
 
 local store = ProfileStore.New(
@@ -168,6 +171,7 @@ local function loadPlayer(player: Player)
 	if typeof(data.money) ~= "number" or data.money ~= data.money or data.money < 0 then
 		data.money = 0 -- repair a broken balance rather than carry it around
 	end
+	data.robux = Robux.repair(data.robux)
 
 	profiles[player] = profile
 	makeLeaderstats(player, data)
@@ -192,6 +196,28 @@ function DataService.saveSoon(player: Player)
 			profile:Save()
 		end
 	end)
+end
+
+-- Saves the player's profile now and waits until it is written (up to SaveWait seconds).
+-- True once it is; false if their save isn't loaded or the write didn't finish in time. Robux
+-- purchases wait on this before telling Roblox they're paid out.
+local SaveWait = 30
+function DataService.saveNow(player: Player): boolean
+	local profile = profiles[player]
+	if not profile or not profile:IsActive() then
+		return false
+	end
+	local saved = false
+	local connection = profile.OnAfterSave:Connect(function()
+		saved = true
+	end)
+	profile:Save()
+	local deadline = os.clock() + SaveWait
+	while not saved and os.clock() < deadline and profile:IsActive() do
+		task.wait(0.2)
+	end
+	connection:Disconnect()
+	return saved
 end
 
 -- Wipes this one player's save back to a brand-new one (the template) and kicks them, so

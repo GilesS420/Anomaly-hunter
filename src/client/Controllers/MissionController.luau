@@ -1,8 +1,9 @@
 --!strict
 -- The Daily Missions window, from the HUD's Missions button (or J on a keyboard). One card per
--- mission (Easy, Medium, Hard): what to do, a progress bar, the reward and a button (Claim
--- once it's done, Reroll while there's a free reroll left), then the bonus chest for claiming
--- all three. The status line shows the streak, when new missions come and the rerolls left.
+-- mission (Easy, Medium, Hard): what to do, a progress bar, the reward and its buttons (Claim
+-- once it's done; before that Reroll while there's a free reroll left and Skip for Robux),
+-- then the bonus chest for claiming all three and a row to reroll every unfinished mission at
+-- once for Robux (server/Services/RobuxService). The status line shows the streak, when new missions come and the rerolls left.
 -- A red dot on the button means a reward is waiting (player attribute MissionsReady).
 -- Everything comes from the server (MissionRemotes, server/Services/MissionService).
 
@@ -12,6 +13,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Format = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"):WaitForChild("Format"))
 local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
+local Robux = require(script.Parent.Parent:WaitForChild("Robux"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
 local MissionController = {}
@@ -157,29 +159,51 @@ function MissionController.start()
 		reward.AnchorPoint = Vector2.new(1, 0)
 		reward.Position = UDim2.new(1, 0, 0, 4)
 		reward.TextXAlignment = Enum.TextXAlignment.Right
-		local label, buttonColor
-		if mission.claimed then
-			label, buttonColor = "Claimed", Ui.Colors.off
-		elseif mission.done then
-			label, buttonColor = "Claim", Ui.Colors.buy
-		elseif view and view.rerolls > 0 then
-			label, buttonColor = "Reroll", Ui.Colors.equip
-		end
-		if label then
-			local button = Ui.button(frame, label, buttonColor, UDim2.new(0.32, -6, 0, 40))
+		local function place(button: TextButton) -- bottom-right corner
 			button.AnchorPoint = Vector2.new(1, 1)
 			button.Position = UDim2.fromScale(1, 1)
+		end
+		if mission.claimed or mission.done then
+			local button = Ui.button(
+				frame,
+				if mission.claimed then "Claimed" else "Claim",
+				if mission.claimed then Ui.Colors.off else Ui.Colors.buy,
+				UDim2.new(0.32, -6, 0, 40)
+			)
+			place(button)
 			if mission.claimed then
 				button.AutoButtonColor = false
-			elseif mission.done then
+			else
 				button.Activated:Connect(function()
 					send(Claim, index)
 				end)
-			else
-				Ui.confirmButton(button, "Swap it?", function()
-					send(Reroll, index)
-				end)
 			end
+			return
+		end
+		-- Not done yet: Skip for Robux on the right, a free Reroll next to it while one is left.
+		local free = view ~= nil and view.rerolls > 0
+		local width = if free then UDim2.new(0.16, -6, 0, 40) else UDim2.new(0.32, -6, 0, 40)
+		local skipPrice = Robux.price("MissionSkip")
+		local skip = Ui.button(
+			frame,
+			if skipPrice then `Skip {Robux.Symbol} {skipPrice}` else "Skip · soon",
+			if skipPrice then Robux.Color else Ui.Colors.off,
+			width
+		)
+		place(skip)
+		skip.AutoButtonColor = skipPrice ~= nil
+		if skipPrice then
+			Ui.confirmButton(skip, "Skip it?", function()
+				Robux.buy("MissionSkip", index)
+			end)
+		end
+		if free then
+			local reroll = Ui.button(frame, "Reroll", Ui.Colors.equip, width)
+			reroll.AnchorPoint = Vector2.new(1, 1)
+			reroll.Position = UDim2.new(0.84, 0, 1, 0)
+			Ui.confirmButton(reroll, "Swap it?", function()
+				send(Reroll, index)
+			end)
 		end
 	end
 
@@ -209,6 +233,33 @@ function MissionController.start()
 			card(i, mission, i)
 		end
 		chestRow(10, current.chest)
+		-- Reroll every unfinished mission at once for Robux (Giles 2026-10-29).
+		local open = false
+		for _, mission in current.missions do
+			open = open or not (mission.done or mission.claimed)
+		end
+		if open then
+			local _, actions = Ui.row(
+				window.list,
+				11,
+				"Reroll all missions",
+				Ui.Colors.lamp,
+				"Every mission that isn't done yet gets swapped"
+			)
+			local price = Robux.price("MissionReroll")
+			local button = Ui.button(
+				actions,
+				Robux.label("MissionReroll"),
+				if price then Robux.Color else Ui.Colors.off,
+				UDim2.fromScale(1, 1)
+			)
+			button.AutoButtonColor = price ~= nil
+			if price then
+				button.Activated:Connect(function()
+					Robux.buy("MissionReroll")
+				end)
+			end
+		end
 	end
 
 	local function load()

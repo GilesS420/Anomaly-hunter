@@ -1,12 +1,12 @@
 --!strict
 -- Little pictures drawn from plain frames, so they need no uploaded images: a backpack, a
--- book, a scroll and a gear. Icons.draw(parent, kind) fills `parent` (best a square) with
+-- book, a scroll, a gear and a coin. Icons.draw(parent, kind) fills `parent` (best a square) with
 -- one. Every piece is sized and placed in scale, so the picture grows with its parent, and
 -- none of them take clicks, so a button underneath still works.
 
 local Icons = {}
 
-export type Kind = "Backpack" | "Book" | "Scroll" | "Gear"
+export type Kind = "Backpack" | "Book" | "Scroll" | "Gear" | "Coin"
 
 -- One piece of a picture: centred on (x, y), w by h, all as a share of the parent.
 local function piece(
@@ -82,6 +82,18 @@ local draw: { [Kind]: (Frame) -> () } = {
 		end
 		piece(box, 0.5, 0.5, 0.66, 0.66, metal, 0.5)
 		piece(box, 0.5, 0.5, 0.26, 0.26, Color3.fromRGB(40, 40, 52), 0.5) -- the hole
+	end,
+
+	Coin = function(box)
+		local gold = Color3.fromRGB(250, 205, 80)
+		local dark = Color3.fromRGB(190, 135, 30)
+		piece(box, 0.5, 0.5, 0.86, 0.86, dark, 0.5) -- the rim
+		piece(box, 0.5, 0.5, 0.7, 0.7, gold, 0.5)
+		-- A hexagon in the middle, like the Robux sign: three bars turned 60 degrees apart.
+		for _, angle in { 0, 60, 120 } do
+			piece(box, 0.5, 0.5, 0.42, 0.24, dark, nil, angle)
+		end
+		piece(box, 0.5, 0.5, 0.16, 0.16, gold, 0.2, 45)
 	end,
 }
 

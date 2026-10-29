@@ -38,6 +38,7 @@ local Wings = require(ReplicatedStorage.Shared.Config.Wings)
 local DataService = require(script.Parent.DataService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
+local Perks = require(script.Parent.Parent.Perks)
 local PlotService = require(script.Parent.PlotService)
 local Recipe = require(script.Parent.Parent.Recipe)
 local RoamService = require(script.Parent.RoamService)
@@ -928,7 +929,10 @@ end
 function MansionService.hasRoom(player: Player): boolean
 	local data = DataService.get(player)
 	return data ~= nil
-		and (Mansion.hasRoom(data.wingsOwned, #data.monsters) or Storage.hasRoom(#data.storage))
+		and (
+			Mansion.hasRoom(data.wingsOwned, #data.monsters)
+			or Storage.hasRoom(#data.storage, Perks.storageSlots(player))
+		)
 end
 
 -- Puts a monster in the mansion and lets it roam there. False if the mansion is full.
@@ -961,7 +965,7 @@ function MansionService.addMonster(player: Player, caught: Value.CaughtMonster):
 		DataService.saveSoon(player)
 		return "Mansion"
 	end
-	if not Storage.hasRoom(#data.storage) then
+	if not Storage.hasRoom(#data.storage, Perks.storageSlots(player)) then
 		return nil
 	end
 	if typeof(caught.uid) ~= "string" or caught.uid == "" then
@@ -1004,7 +1008,7 @@ function MansionService.move(player: Player, uid: string): (MoveResult, Value.Ca
 	if not indexOf(data.monsters, uid) then
 		return "NotFound", nil
 	end
-	if not Storage.hasRoom(#data.storage) then
+	if not Storage.hasRoom(#data.storage, Perks.storageSlots(player)) then
 		return "StorageFull", nil
 	end
 	local removed = MansionService.removeMonsters(player, { [uid] = true })

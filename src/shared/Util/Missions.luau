@@ -29,6 +29,7 @@ export type State = {
 	streak: number, -- days in a row, up to lastDay, with a claimed mission
 	lastDay: number, -- the last day a mission was claimed
 	rerolls: number, -- left today
+	vipDay: number?, -- the day a VIP Hunter's extra rerolls were added (MissionService)
 	chest: number, -- the bonus chest's cash
 	chestClaimed: boolean?,
 	list: { Saved },
@@ -253,6 +254,26 @@ function Missions.reroll(state: State, index: number, wingsOwned: number, random
 	state.list[index] = new
 	state.rerolls -= 1
 	return true
+end
+
+-- Swaps every mission that isn't done yet for another of its tier, without using a reroll
+-- (a Robux Mission Reroll, Giles 2026-10-29). Returns how many were swapped.
+function Missions.rerollAll(state: State, wingsOwned: number, random: Random): number
+	local zones = Missions.openZones(wingsOwned)
+	local swapped = 0
+	for index, saved in state.list do
+		local def = byId[saved.id]
+		if not def or saved.claimed or Missions.isDone(saved) then
+			continue
+		end
+		local others = table.clone(state.list) -- the old one stays in, so it isn't picked again
+		local new = pick(def.tier, others, state.worth, state.bonus, zones, random)
+		if new then
+			state.list[index] = new
+			swapped += 1
+		end
+	end
+	return swapped
 end
 
 -- Whether a catch of `done.monsterId` counts for this Catch mission.

@@ -46,6 +46,10 @@ Studio only (they do nothing in a live game). Press **Play** (F5), not Run, and 
 
 Player data saves through [ProfileStore](https://github.com/MadStudioRoblox/ProfileStore) (by loleris, Apache 2.0), vendored at `src/server/Vendor/ProfileStore.luau` with its license in `licenses/`. To test real saving in Studio, turn on **Game Settings > Security > Enable Studio Access to API Services** (the place must be published). Without it, ProfileStore uses a mock store and nothing persists between play tests.
 
+## Robux purchases
+
+Everything sold for Robux is in `src/shared/Config/Robux.luau`: 9 Developer Products (5 shop item price tiers, Shop Reroll, Mission Reroll, Mission Skip, Starter Pack) and 4 Game Passes. Create each one on the Creator Dashboard (your game > Monetization > Developer Products or Passes) and paste its id over the `0` in that file. Anything still at `0` shows "Robux · soon" in the game. `server/Services/RobuxService.luau` handles `ProcessReceipt`: every purchase id is saved in the player's profile and only marked granted once that save is written, so a purchase is never paid out twice or lost. Purchases in Studio are free test purchases.
+
 ## Sound and music
 
 All sounds are made by `tools/sound/make_sounds.py` (needs Python 3 with numpy and scipy, plus ffmpeg): they are synthesized from scratch, so nobody else owns them, and the music is our own rendition of public-domain classical pieces (Grieg, Beethoven) plus two songs of our own. Very famous melodies get rejected by Roblox audio moderation, so avoid those. Run it to write the eight files to upload into `tools/sound/out` (it also rewrites `src/shared/Config/SoundSheets.luau`).

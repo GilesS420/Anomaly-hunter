@@ -28,6 +28,7 @@ local MissionService = require(script.Parent.MissionService)
 local PlotService = require(script.Parent.PlotService)
 local RoamService = require(script.Parent.RoamService)
 local Notify = require(script.Parent.Parent.Notify)
+local Perks = require(script.Parent.Parent.Perks)
 
 local CakeService = {}
 
@@ -193,9 +194,11 @@ local function tryPlace(player: Player, itemId: string): (boolean, string)
 	if (inventory[item.id] or 0) <= 0 then
 		return false, `You don't have a {item.name}. Buy one at the Bakery!`
 	end
-	if #data.cakes >= Cakes.limit(data.wingsOwned) then
+	if #data.cakes >= Cakes.limit(data.wingsOwned, Perks.cakesPerWing(player)) then
 		return false,
-			`You already have {#data.cakes} cakes out, the most your mansion holds ({CakeConfig.PerWing} per wing). Wait until one is eaten up, or buy a new wing.`
+			`You already have {#data.cakes} cakes out, the most your mansion holds ({Perks.cakesPerWing(
+				player
+			)} per wing). Wait until one is eaten up, or buy a new wing.`
 	end
 	local character = player.Character
 	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil

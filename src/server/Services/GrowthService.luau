@@ -29,6 +29,7 @@ local InventoryService = require(script.Parent.InventoryService)
 local MissionService = require(script.Parent.MissionService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
+local Perks = require(script.Parent.Parent.Perks)
 
 local GrowthService = {}
 
@@ -250,7 +251,7 @@ PickUpRemote.OnServerInvoke = function(player: Player): Result
 	if (chamber.endsAt or 0) > os.time() then
 		return { ok = false, message = "It's still bubbling.", view = viewFor(data) }
 	end
-	if not Storage.hasRoom(#data.storage) then
+	if not Storage.hasRoom(#data.storage, Perks.storageSlots(player)) then
 		return { ok = false, message = "Your Backpack is full. Make room first!", view = viewFor(data) }
 	end
 	table.insert(data.storage, monster)

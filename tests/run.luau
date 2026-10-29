@@ -3359,7 +3359,8 @@ do
 	local glove = Workshop.item("RubberGlove") :: any
 	check(
 		"slap: slappers are always in stock and kept",
-		Workshop.inStock(glove, 12345) and Workshop.limit(glove, 12345) == 1
+		Workshop.inStock(glove, 12345)
+			and Workshop.limit(glove, 12345) == 1
 			and Workshop.canBuy(glove, 12345, 1e12, { RubberGlove = 1 }, 0) == "Owned"
 	)
 	local strong = SlapConfig.Slappers[#SlapConfig.Slappers]
@@ -3400,12 +3401,21 @@ do
 	local later = Restock.parse("all 3 PumpkinCandy 9") :: Restock.Plan
 	check("restock: a later name wins", later.items.PumpkinCandy == 9 and later.items.BaitBell == 3)
 	local everything = Restock.parse("all 1") :: Restock.Plan
-	check("restock: all leaves out vacuums and slappers", everything.items.VoidVac == nil and everything.items.RubberGlove == nil)
+	check(
+		"restock: all leaves out vacuums and slappers",
+		everything.items.VoidVac == nil and everything.items.RubberGlove == nil
+	)
 	check("restock: a vacuum can't be restocked", Restock.parse("VoidVac 5") == nil)
 	check("restock: unknown items are refused", Restock.parse("Banana 5") == nil)
 	check("restock: an amount is needed", Restock.parse("cakes") == nil and Restock.parse("") == nil)
-	check("restock: amounts stay in range", Restock.parse("cakes -1") == nil and Restock.parse("cakes 1000") == nil)
-	check("restock: time stays in range", Restock.parse("cakes 1 time 0") == nil and Restock.parse("cakes 1 time 121") == nil)
+	check(
+		"restock: amounts stay in range",
+		Restock.parse("cakes -1") == nil and Restock.parse("cakes 1000") == nil
+	)
+	check(
+		"restock: time stays in range",
+		Restock.parse("cakes 1 time 0") == nil and Restock.parse("cakes 1 time 121") == nil
+	)
 	check("restock: nan is refused", Restock.parse("cakes nan") == nil)
 	local back = Restock.parse(Restock.argument(picked.items, 15)) :: Restock.Plan
 	check(
@@ -3417,13 +3427,150 @@ do
 	while Workshop.inStock(charm, outSlot) do
 		outSlot += 1
 	end
-	check("restock: an admin amount puts an item in stock", Workshop.canBuy(charm, outSlot, 1e9, {}, 0, nil, nil, 20) == "Ok")
-	check("restock: it sells out at the admin amount", Workshop.canBuy(charm, outSlot, 1e9, {}, 20, nil, nil, 20) == "SoldOut")
+	check(
+		"restock: an admin amount puts an item in stock",
+		Workshop.canBuy(charm, outSlot, 1e9, {}, 0, nil, nil, 20) == "Ok"
+	)
+	check(
+		"restock: it sells out at the admin amount",
+		Workshop.canBuy(charm, outSlot, 1e9, {}, 20, nil, nil, 20) == "SoldOut"
+	)
 	local inSlot = 1
 	while not Workshop.inStock(charm, inSlot) do
 		inSlot += 1
 	end
-	check("restock: 0 means sold out", Workshop.canBuy(charm, inSlot, 1e9, {}, 0, nil, nil, 0) == "OutOfStock")
+	check(
+		"restock: 0 means sold out",
+		Workshop.canBuy(charm, inSlot, 1e9, {}, 0, nil, nil, 0) == "OutOfStock"
+	)
+end
+
+-- Robux purchases (Util/Robux, Config/Robux) and what they change elsewhere.
+do
+	local Robux = require("../src/shared/Util/Robux")
+	local RobuxConfig = require("../src/shared/Config/Robux")
+	local Missions = require("../src/shared/Util/Missions")
+
+	check("robux: free items have no product", Robux.tierFor(0) == nil and Robux.tierFor(0 / 0) == nil)
+	check("robux: $1M is the smallest tier", Robux.tierFor(1_000_000) == "ItemTier1")
+	check("robux: just over $1M is the next", Robux.tierFor(1_000_001) == "ItemTier2")
+	check("robux: $60B is the biggest tier", Robux.tierFor(60_000_000_000) == "ItemTier5")
+	local tiered = true
+	for _, list in { Shop.Workshop, Shop.Bakery } do
+		for _, item in list do
+			local key = Robux.tierFor(item.price)
+			tiered = tiered and (item.price <= 0 or (key ~= nil and RobuxConfig.Products[key] ~= nil))
+		end
+	end
+	check("robux: every shop item for sale has a product", tiered)
+	check("robux: the 0 id never matches a product", Robux.productKey(0) == nil and Robux.passKey(0) == nil)
+	local passText = true
+	for _, key in RobuxConfig.PassOrder do
+		passText = passText and RobuxConfig.Passes[key] ~= nil and RobuxConfig.PassText[key] ~= nil
+	end
+	check("robux: every listed pass has a name and a text", passText)
+	local starterOk = true
+	for id in RobuxConfig.StarterPack do
+		starterOk = starterOk and Workshop.item(id) ~= nil
+	end
+	check("robux: the Starter Pack only holds Workshop items", starterOk)
+
+	local record = Robux.empty()
+	check("robux: a new record has no receipts", not Robux.hasReceipt(record, "a"))
+	Robux.addReceipt(record, "a")
+	check("robux: a receipt is remembered", Robux.hasReceipt(record, "a"))
+	for i = 1, RobuxConfig.ReceiptsKept do
+		Robux.addReceipt(record, `r{i}`)
+	end
+	check(
+		"robux: only the newest receipts are kept",
+		#record.receipts == RobuxConfig.ReceiptsKept
+			and not Robux.hasReceipt(record, "a")
+			and Robux.hasReceipt(record, "r1")
+	)
+	check("robux: no credit to take at first", not Robux.takeCredit(record, "ItemTier1"))
+	Robux.addCredit(record, "ItemTier1")
+	Robux.addCredit(record, "ItemTier1")
+	check(
+		"robux: credits are taken one at a time",
+		Robux.takeCredit(record, "ItemTier1") and record.credits.ItemTier1 == 1
+	)
+	check(
+		"robux: the last credit clears",
+		Robux.takeCredit(record, "ItemTier1") and record.credits.ItemTier1 == nil
+	)
+	check("robux: a stock reroll only counts in its own slot", Robux.stockSalt(record, 5) == nil)
+	record.reroll = { slot = 5, salt = 99 }
+	check(
+		"robux: rerolled slot has its salt",
+		Robux.stockSalt(record, 5) == 99 and Robux.stockSalt(record, 6) == nil
+	)
+	Robux.countReroll(record, 10)
+	Robux.countReroll(record, 10)
+	check(
+		"robux: mission rerolls counted per day",
+		Robux.rerollsBought(record, 10) == 2 and Robux.rerollsBought(record, 11) == 0
+	)
+	Robux.countReroll(record, 11)
+	check("robux: a new day starts the count again", Robux.rerollsBought(record, 11) == 1)
+
+	local repaired = Robux.repair({ receipts = "junk", spent = 12 })
+	check(
+		"robux: repair mends a broken record and keeps good parts",
+		typeof(repaired.receipts) == "table" and repaired.spent == 12 and typeof(repaired.credits) == "table"
+	)
+	check("robux: repair of nothing is empty", #Robux.repair(nil).receipts == 0)
+
+	-- A Shop Reroll gives different stock (same chances), but never changes vacuums.
+	local differs = false
+	for slot = 1, 30 do
+		for _, item in Shop.Bakery do
+			if
+				not item.event
+				and Workshop.inStock(item, slot) ~= Workshop.inStock(item, slot, nil, nil, 12345)
+			then
+				differs = true
+			end
+		end
+	end
+	check("robux: a shop reroll changes the stock", differs)
+	local vac = Workshop.item("VoidVac") :: Shop.Item
+	check("robux: vacuums stay in stock after a reroll", Workshop.inStock(vac, 3, nil, nil, 777))
+
+	-- Passes: bigger Storage and more cakes, through the optional sizes.
+	check(
+		"robux: storage size can be raised",
+		Storage.hasRoom(InventoryConfig.StorageSlots, RobuxConfig.BigStorageSlots)
+	)
+	check(
+		"robux: raised storage still fills",
+		not Storage.hasRoom(RobuxConfig.BigStorageSlots, RobuxConfig.BigStorageSlots)
+	)
+	check(
+		"robux: cake plate raises the limit",
+		Cakes.limit(2, RobuxConfig.CakePlatePerWing) == 2 * RobuxConfig.CakePlatePerWing
+	)
+
+	-- A Robux mission reroll swaps every mission that isn't done, and leaves done ones alone.
+	local seed = 11
+	local random: any = {
+		NextInteger = function(_self, min: number, max: number): number
+			seed = (seed * 1103515245 + 12345) % 2147483648
+			return min + seed % (max - min + 1)
+		end,
+	}
+	local state = Missions.deal(nil, 20_000 * 86_400 + 60, 20_000_000, 3, random)
+	local first = state.list[1]
+	first.progress = first.target
+	local before = { state.list[2], state.list[3] }
+	local swapped = Missions.rerollAll(state, 3, random)
+	check("robux: reroll all swaps the unfinished missions", swapped == 2)
+	check("robux: reroll all keeps a finished mission", state.list[1] == first)
+	check("robux: reroll all gives new ones", state.list[2] ~= before[1] and state.list[3] ~= before[2])
+	check(
+		"robux: reroll all uses no free reroll",
+		state.rerolls == require("../src/shared/Config/Missions").Rerolls
+	)
 end
 
 if failures > 0 then

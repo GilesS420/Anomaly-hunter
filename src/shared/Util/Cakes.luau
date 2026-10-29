@@ -154,9 +154,9 @@ function Cakes.reach(itemId: string): number
 	return CakeConfig.Reach[itemId] or CakeConfig.DefaultReach
 end
 
--- How many cakes can stand at once.
-function Cakes.limit(wingsOwned: number): number
-	return wingsOwned * CakeConfig.PerWing
+-- How many cakes can stand at once. `perWing`: if not the normal number (Extra Cake Plate).
+function Cakes.limit(wingsOwned: number, perWing: number?): number
+	return wingsOwned * (perWing or CakeConfig.PerWing)
 end
 
 -- Picks who comes for the next bite: a monster that hasn't had one of this cake, preferring

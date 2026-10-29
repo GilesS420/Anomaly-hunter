@@ -32,7 +32,6 @@ local TextService = game:GetService("TextService")
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Care = require(ReplicatedStorage.Shared.Util.Care)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
-local InventoryConfig = require(ReplicatedStorage.Shared.Config.Inventory)
 local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Nickname = require(ReplicatedStorage.Shared.Util.Nickname)
@@ -46,6 +45,7 @@ local HuntService = require(script.Parent.HuntService)
 local MansionService = require(script.Parent.MansionService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
+local Perks = require(script.Parent.Parent.Perks)
 local RoamService = require(script.Parent.RoamService)
 local ToolModel = require(script.Parent.Parent.ToolModel)
 local WorkshopService = require(script.Parent.WorkshopService)
@@ -248,14 +248,14 @@ local function itemRows(data: DataService.Data): { ItemRow }
 	return rows
 end
 
-local function viewFor(data: DataService.Data): View
+local function viewFor(player: Player, data: DataService.Data): View
 	return {
 		monsters = monsterRows(data),
 		items = itemRows(data),
 		mansionCount = #data.monsters,
 		mansionCapacity = Mansion.capacity(data.wingsOwned),
 		storageCount = #data.storage,
-		storageCapacity = InventoryConfig.StorageSlots,
+		storageCapacity = Perks.storageSlots(player),
 	}
 end
 
@@ -274,7 +274,7 @@ local Loading: Result = { ok = false, message = "Your save is still loading. Try
 
 GetView.OnServerInvoke = function(player: Player): View?
 	local data = DataService.get(player)
-	return if data then viewFor(data) else nil
+	return if data then viewFor(player, data) else nil
 end
 
 -- True while the player stands inside one of their own wings.
@@ -290,14 +290,18 @@ Move.OnServerInvoke = function(player: Player, uid: unknown): Result
 		return Loading
 	end
 	if typeof(uid) ~= "string" then
-		return { ok = false, message = "That monster is gone.", view = viewFor(data) }
+		return { ok = false, message = "That monster is gone.", view = viewFor(player, data) }
 	end
 	-- Picking up works from anywhere (the mansion list), but putting a stored one back means
 	-- standing in your mansion, the same as clicking with it in hand, so a changed client
 	-- can't drop monsters home from a zone.
 	for _, stored in data.storage do
 		if stored.uid == uid and not atHome(player) then
-			return { ok = false, message = "Stand inside your mansion to place it.", view = viewFor(data) }
+			return {
+				ok = false,
+				message = "Stand inside your mansion to place it.",
+				view = viewFor(player, data),
+			}
 		end
 	end
 	local result, caught = MansionService.move(player, uid)
@@ -310,14 +314,14 @@ Move.OnServerInvoke = function(player: Player, uid: unknown): Result
 	elseif result == "MansionFull" then
 		message = "Your mansion is full. Store or sell a monster first, or buy a new wing."
 	elseif result == "StorageFull" then
-		message = `Storage is full ({InventoryConfig.StorageSlots}). Sell some at the Collector first.`
+		message = `Storage is full ({Perks.storageSlots(player)}). Sell some at the Collector first.`
 	else
 		message = "That monster is gone."
 	end
 	if result ~= "Ok" then
 		Notify.toast(player, message) -- E in the mansion has no window to show it in
 	end
-	return { ok = result == "Ok", message = message, view = viewFor(data) }
+	return { ok = result == "Ok", message = message, view = viewFor(player, data) }
 end
 
 Lock.OnServerInvoke = function(player: Player, uid: unknown): Result
@@ -327,14 +331,14 @@ Lock.OnServerInvoke = function(player: Player, uid: unknown): Result
 	end
 	local caught = if typeof(uid) == "string" then find(data, uid) else nil
 	if not caught then
-		return { ok = false, message = "That monster is gone.", view = viewFor(data) }
+		return { ok = false, message = "That monster is gone.", view = viewFor(player, data) }
 	end
 	caught.locked = if caught.locked then nil else true
 	local name = Format.monsterName(caught)
 	local message = if caught.locked
 		then `Locked {name}. The Collector won't sell it.`
 		else `Unlocked {name}.`
-	return { ok = true, message = message, view = viewFor(data) }
+	return { ok = true, message = message, view = viewFor(player, data) }
 end
 
 -- Roblox's filter for text other players see (names show over monsters in the mansion).
@@ -356,14 +360,14 @@ Rename.OnServerInvoke = function(player: Player, uid: unknown, text: unknown): R
 	end
 	local caught = if typeof(uid) == "string" then find(data, uid) else nil
 	if not caught then
-		return { ok = false, message = "That monster is gone.", view = viewFor(data) }
+		return { ok = false, message = "That monster is gone.", view = viewFor(player, data) }
 	end
 	local name = if typeof(text) == "string" then Nickname.clean(text) else nil
 	if not name then
 		return {
 			ok = false,
 			message = `A name can be up to {Nickname.MaxLength} letters.`,
-			view = viewFor(data),
+			view = viewFor(player, data),
 		}
 	end
 	if name == "" then
@@ -373,13 +377,13 @@ Rename.OnServerInvoke = function(player: Player, uid: unknown, text: unknown): R
 		local message = if had
 			then `Took the name off your {Format.name(caught.monsterId)}.`
 			else "It has no name."
-		return { ok = had, message = message, view = viewFor(data) }
+		return { ok = had, message = message, view = viewFor(player, data) }
 	end
 	if (data.inventory.NameTag or 0) <= 0 then
-		return { ok = false, message = "You need a Name Tag from the Workshop.", view = viewFor(data) }
+		return { ok = false, message = "You need a Name Tag from the Workshop.", view = viewFor(player, data) }
 	end
 	if renaming[player] then
-		return { ok = false, message = "One moment...", view = viewFor(data) }
+		return { ok = false, message = "One moment...", view = viewFor(player, data) }
 	end
 	renaming[player] = true
 	local clean = filtered(player, name) -- yields
@@ -388,20 +392,20 @@ Rename.OnServerInvoke = function(player: Player, uid: unknown, text: unknown): R
 		return {
 			ok = false,
 			message = "Couldn't check that name. Try again in a moment.",
-			view = viewFor(data),
+			view = viewFor(player, data),
 		}
 	end
 	-- The filter yields: make sure the tag and the monster are still there.
 	local count = data.inventory.NameTag or 0
 	if count <= 0 or find(data, caught.uid or "") ~= caught then
-		return { ok = false, message = "That monster is gone.", view = viewFor(data) }
+		return { ok = false, message = "That monster is gone.", view = viewFor(player, data) }
 	end
 	local inventory: { [string]: number? } = data.inventory
 	inventory.NameTag = if count <= 1 then nil else count - 1
 	caught.nickname = clean
 	MansionService.refreshMonsters(player) -- the monster's hotbar Tool follows within a second
 	HuntService.refreshItems(player) -- the Name Tag count in the hotbar
-	return { ok = true, message = `Say hi to {Format.monsterName(caught)}!`, view = viewFor(data) }
+	return { ok = true, message = `Say hi to {Format.monsterName(caught)}!`, view = viewFor(player, data) }
 end
 
 Equip.OnServerInvoke = function(player: Player, itemId: unknown): Result
@@ -411,7 +415,7 @@ Equip.OnServerInvoke = function(player: Player, itemId: unknown): Result
 	end
 	local ok, message = WorkshopService.equip(data, itemId)
 	HuntService.refreshItems(player) -- the bag size follows the vacuum
-	return { ok = ok, message = message, view = viewFor(data) }
+	return { ok = ok, message = message, view = viewFor(player, data) }
 end
 
 -- Monsters in Storage as hotbar Tools ------------------------------------------------------

@@ -27,7 +27,7 @@ local ScriptContext = game:GetService("ScriptContext")
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Catching = require(ReplicatedStorage.Shared.Util.Catching)
 local HotbarLayout = require(ReplicatedStorage.Shared.Util.HotbarLayout)
-local InventoryConfig = require(ReplicatedStorage.Shared.Config.Inventory)
+local RobuxConfig = require(ReplicatedStorage.Shared.Config.Robux)
 local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
 local Merge = require(ReplicatedStorage.Shared.Util.Merge)
 local Missions = require(ReplicatedStorage.Shared.Util.Missions)
@@ -39,6 +39,7 @@ local Wings = require(ReplicatedStorage.Shared.Config.Wings)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local Admins = require(script.Parent.Parent.Admins)
 local DataService = require(script.Parent.Parent.Services.DataService)
+local Perks = require(script.Parent.Parent.Perks)
 local MansionService = require(script.Parent.Parent.Services.MansionService)
 local TutorialService = require(script.Parent.Parent.Services.TutorialService)
 
@@ -293,12 +294,17 @@ local function checkSave(player: Player)
 	else
 		pass(`mansion holds {#data.monsters}/{capacity}`)
 	end
-	check(
-		#data.storage <= InventoryConfig.StorageSlots,
-		`Backpack holds {#data.storage}/{InventoryConfig.StorageSlots}`
-	)
+	local slots = Perks.storageSlots(player) -- more with the Big Storage pass
+	check(#data.storage <= slots, `Backpack holds {#data.storage}/{slots}`)
 	check(#data.vault <= Wings.VaultSlots, `Vault holds {#data.vault}/{Wings.VaultSlots}`)
-	local cakeLimit = Cakes.limit(data.wingsOwned)
+	local robux = data.robux
+	check(
+		typeof(robux) == "table"
+			and typeof(robux.receipts) == "table"
+			and #robux.receipts <= RobuxConfig.ReceiptsKept,
+		`Robux record is sound ({if typeof(robux) == "table" then #robux.receipts else 0} receipts kept)`
+	)
+	local cakeLimit = Cakes.limit(data.wingsOwned, Perks.cakesPerWing(player))
 	if #data.cakes > cakeLimit then
 		note(`{#data.cakes} cakes out with room for {cakeLimit} (fine after /wings, odd otherwise)`)
 	else
