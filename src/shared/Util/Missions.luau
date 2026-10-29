@@ -94,6 +94,17 @@ function Missions.reward(share: number, floor: number, worth: number, bonus: num
 	return Missions.round(math.max(floor, worth * share) * (1 + bonus))
 end
 
+-- One mission's reward: its tier's share of worth times its effort (at least the tier's floor),
+-- or for a money mission at least targetPay of its target, plus the streak bonus.
+function Missions.missionReward(mission: Config.Mission, target: number, worth: number, bonus: number): number
+	local tier = tiersById[mission.tier]
+	local base = math.max(tier.floor, worth * tier.share * (mission.effort or 1))
+	if mission.targetPay then
+		base = math.max(base, target * mission.targetPay)
+	end
+	return Missions.round(base * (1 + bonus))
+end
+
 function Missions.bonusFor(streak: number): number
 	return math.min(Config.StreakMax, streak * Config.StreakStep)
 end
@@ -173,7 +184,6 @@ local function pick(
 		return nil
 	end
 	local mission = choices[random:NextInteger(1, #choices)]
-	local tier = tiersById[tierId]
 	local zone = if mission.zone then zones[random:NextInteger(1, #zones)] else nil
 	local target = mission.count or 1
 	if mission.moneyShare then
@@ -187,7 +197,7 @@ local function pick(
 		target = target,
 		progress = 0,
 		seen = if mission.kind == "Species" or mission.kind == "ZoneSet" then {} else nil,
-		reward = Missions.reward(tier.share, tier.floor, worth, bonus),
+		reward = Missions.missionReward(mission, target, worth, bonus),
 	}
 end
 

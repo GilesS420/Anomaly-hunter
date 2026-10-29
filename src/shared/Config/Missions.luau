@@ -38,6 +38,12 @@ export type Mission = {
 	won: boolean?,
 	moneyShare: number?,
 	moneyFloor: number?,
+	-- How much work it is next to the other missions of its tier: the reward is the tier's
+	-- share of worth times this (1 when left out).
+	effort: number?,
+	-- Money missions: the reward is at least this share of the money target, so it grows
+	-- with the task (Giles 2026-10-29: selling $1.4B for $420M felt far too low).
+	targetPay: number?,
 }
 
 local Missions = {}
@@ -45,7 +51,7 @@ local Missions = {}
 -- Seconds after 00:00 UTC that the day turns over (0: midnight UTC, 01:00 in Belgium in winter).
 Missions.ResetOffset = 0
 
--- Each tier pays `share` of the player's worth, at least `floor`.
+-- Each tier pays `share` of the player's worth (times the mission's effort), at least `floor`.
 Missions.Tiers = {
 	{ id = "Easy", share = 0.03, floor = 2_000 },
 	{ id = "Medium", share = 0.06, floor = 4_000 },
@@ -70,8 +76,9 @@ Missions.Pool = {
 		id = "SellSmall",
 		tier = "Easy",
 		kind = "Sell",
-		moneyShare = 0.10,
+		moneyShare = 0.05,
 		moneyFloor = 5_000,
+		targetPay = 0.8,
 		text = "Sell monsters for {money}",
 	},
 	{ id = "Cakes2", tier = "Easy", kind = "PlaceCake", count = 2, text = "Place {n} cakes in your mansion" },
@@ -94,16 +101,25 @@ Missions.Pool = {
 	-- Medium
 	{
 		id = "Species4",
+		effort = 1.3,
 		tier = "Medium",
 		kind = "Species",
 		count = 4,
 		zone = true,
 		text = "Catch {n} different monsters in {zone}",
 	},
-	{ id = "Merge2", tier = "Medium", kind = "Merge", count = 2, text = "Merge {n} times" },
-	{ id = "Grow1", tier = "Medium", kind = "Grow", count = 1, text = "Put a monster in the Growth Chamber" },
+	{ id = "Merge2", effort = 1.2, tier = "Medium", kind = "Merge", count = 2, text = "Merge {n} times" },
+	{
+		id = "Grow1",
+		effort = 1.2,
+		tier = "Medium",
+		kind = "Grow",
+		count = 1,
+		text = "Put a monster in the Growth Chamber",
+	},
 	{
 		id = "Effects5",
+		effort = 1.2,
 		tier = "Medium",
 		kind = "Effect",
 		count = 5,
@@ -119,6 +135,7 @@ Missions.Pool = {
 	},
 	{
 		id = "Perfect3",
+		effort = 1.3,
 		tier = "Medium",
 		kind = "Catch",
 		count = 3,
@@ -127,6 +144,7 @@ Missions.Pool = {
 	},
 	{
 		id = "Event1",
+		effort = 1.3,
 		tier = "Medium",
 		kind = "Catch",
 		count = 1,
@@ -137,6 +155,7 @@ Missions.Pool = {
 	-- Hard
 	{
 		id = "ZoneSet",
+		effort = 2,
 		tier = "Hard",
 		kind = "ZoneSet",
 		zone = true,
@@ -147,13 +166,23 @@ Missions.Pool = {
 		id = "SellBig",
 		tier = "Hard",
 		kind = "Sell",
-		moneyShare = 0.50,
+		moneyShare = 0.30,
 		moneyFloor = 25_000,
+		targetPay = 0.8,
 		text = "Earn {money} selling monsters",
 	},
-	{ id = "MergeWin", tier = "Hard", kind = "Merge", count = 1, won = true, text = "Win a merge" },
+	{
+		id = "MergeWin",
+		effort = 1.3,
+		tier = "Hard",
+		kind = "Merge",
+		count = 1,
+		won = true,
+		text = "Win a merge",
+	},
 	{
 		id = "Epic1",
+		effort = 1.3,
 		tier = "Hard",
 		kind = "Catch",
 		count = 1,
@@ -162,14 +191,29 @@ Missions.Pool = {
 	},
 	{
 		id = "Variant1",
+		effort = 1.5,
 		tier = "Hard",
 		kind = "Catch",
 		count = 1,
 		variant = true,
 		text = "Catch a Silver, Gold, Shiny or Rainbow monster",
 	},
-	{ id = "Combo1", tier = "Hard", kind = "Combo", count = 1, text = "Make a combo appear on a monster" },
-	{ id = "Ghost1", tier = "Hard", kind = "GoldenGhost", count = 1, text = "Catch the Golden Ghost" },
+	{
+		id = "Combo1",
+		effort = 1.5,
+		tier = "Hard",
+		kind = "Combo",
+		count = 1,
+		text = "Make a combo appear on a monster",
+	},
+	{
+		id = "Ghost1",
+		effort = 1.5,
+		tier = "Hard",
+		kind = "GoldenGhost",
+		count = 1,
+		text = "Catch the Golden Ghost",
+	},
 } :: { Mission }
 
 return Missions
