@@ -4,10 +4,9 @@
 -- monster you're carrying, a big "Return Charm" button (tap or click it; R works too on
 -- a keyboard) that takes you home, and in a zone a button per kind of Bait Bell (Bait, Silver,
 -- Gold; B rings the cheapest you own) that brings a rarer monster to you. Each button shows
--- only if you own one. A "Backpack" button (G) is always there and opens your items and
--- monsters (InventoryController), and so are a "Codex" button
--- (C, CodexController), a "Missions" button (J, MissionController) and a "Settings" button
--- (SettingsController).
+-- only if you own one. Under them a row of square picture buttons is always there: a
+-- backpack (G, your items and monsters, InventoryController), a book (C, CodexController), a
+-- scroll (J, MissionController) and a gear (SettingsController), in Hud.Menu.
 -- Everything shown comes from the server: player attributes Zone / Hearts / Carrying /
 -- CarryingSize / CarryingCount / BagSize / ReturnCharms / BaitBells / SilverBells / GoldBells and
 -- leaderstats.Money.
@@ -20,6 +19,8 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
 local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
+local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
+local Icons = require(script.Parent.Parent:WaitForChild("Icons"))
 
 local HuntController = {}
 
@@ -27,6 +28,16 @@ local player = Players.LocalPlayer
 
 local ROW_HEIGHT = 30
 local HUD_WIDTH = 300
+local MENU_SIZE = 58 -- the square menu buttons, about a thumb wide on a phone
+
+-- The square menu buttons, left to right: the name (other controllers find the button by
+-- it), the picture, the key and the colour.
+local MenuButtons: { { name: string, icon: Icons.Kind, key: string?, color: Color3 } } = {
+	{ name = "Backpack", icon = "Backpack", key = "G", color = Color3.fromRGB(110, 90, 170) },
+	{ name = "Codex", icon = "Book", key = "C", color = Color3.fromRGB(180, 115, 60) },
+	{ name = "Missions", icon = "Scroll", key = "J", color = Color3.fromRGB(210, 160, 50) },
+	{ name = "Settings", icon = "Gear", key = nil, color = Color3.fromRGB(130, 130, 150) },
+}
 
 local function label(name: string, order: number, color: Color3, parent: Instance): TextLabel
 	local text = Instance.new("TextLabel")
@@ -111,24 +122,65 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 		Color3.fromRGB(120, 70, 200),
 		if keys then "Return Charm (R)" else "Return Charm"
 	)
-	-- LayoutOrder 5.1, 5.2, 5.3: between the charm and the Backpack.
+	-- LayoutOrder 5.1, 5.2, 5.3: between the charm and the menu row.
 	local bells: { TextButton } = {}
 	for i, kind in Bells do
 		table.insert(bells, itemButton(kind.id, 5 + i / 10, kind.color, kind.name))
 	end
-	-- Always there; InventoryController opens the Backpack with it.
-	local backpack =
-		itemButton("Backpack", 7, Color3.fromRGB(70, 60, 110), if keys then "Backpack (G)" else "Backpack")
-	backpack.Visible = true
-	-- Always there too; CodexController opens the Codex with it.
-	local codex = itemButton("Codex", 8, Color3.fromRGB(110, 70, 40), if keys then "Codex (C)" else "Codex")
-	codex.Visible = true
-	-- MissionController opens the daily missions with it.
-	local missions =
-		itemButton("Missions", 8.5, Color3.fromRGB(150, 110, 30), if keys then "Missions (J)" else "Missions")
-	missions.Visible = true
-	local settings = itemButton("Settings", 9, Color3.fromRGB(60, 60, 75), "Settings")
-	settings.Visible = true
+	-- A row of little square picture buttons, always there: Backpack (G, InventoryController),
+	-- Codex (C, CodexController), Missions (J, MissionController) and Settings
+	-- (SettingsController). With a keyboard each shows its key in the corner, and the name
+	-- pops up above it while the mouse is over it.
+	local menu = Instance.new("Frame")
+	menu.Name = "Menu"
+	menu.LayoutOrder = 7
+	menu.Size = UDim2.new(1, 0, 0, MENU_SIZE)
+	menu.BackgroundTransparency = 1
+	menu.Parent = column
+	local row = Instance.new("UIListLayout")
+	row.FillDirection = Enum.FillDirection.Horizontal
+	row.SortOrder = Enum.SortOrder.LayoutOrder
+	row.Padding = UDim.new(0, 8)
+	row.Parent = menu
+	for order, entry in MenuButtons do
+		local button = Instance.new("TextButton")
+		button.Name = entry.name
+		button.LayoutOrder = order
+		button.Size = UDim2.fromOffset(MENU_SIZE, MENU_SIZE)
+		button.Text = ""
+		button.AutoButtonColor = true
+		Ui.paint(button, entry.color)
+		Ui.corner(button, 10)
+		Icons.draw(button, entry.icon)
+		if keys and entry.key then
+			local key = Ui.text(button, entry.key, UDim2.fromOffset(18, 18), Ui.Colors.text, true, 14)
+			key.Name = "Key"
+			key.AnchorPoint = Vector2.new(1, 1)
+			key.Position = UDim2.new(1, -2, 1, -2)
+			key.BackgroundTransparency = 0.2
+			key.BackgroundColor3 = Color3.fromRGB(20, 18, 28)
+			key.TextXAlignment = Enum.TextXAlignment.Center
+			key.ZIndex = 2
+			Ui.corner(key, 5)
+		end
+		if UserInputService.MouseEnabled then -- a tap would leave the name stuck on a phone
+			local tip = Ui.text(button, entry.name, UDim2.fromOffset(110, 22), Ui.Colors.text, true, 18)
+			tip.Name = "Tip"
+			tip.AnchorPoint = Vector2.new(0.5, 1)
+			tip.Position = UDim2.new(0.5, 0, 0, -4)
+			tip.TextXAlignment = Enum.TextXAlignment.Center
+			tip.TextStrokeTransparency = 0
+			tip.ZIndex = 3
+			tip.Visible = false
+			button.MouseEnter:Connect(function()
+				tip.Visible = true
+			end)
+			button.MouseLeave:Connect(function()
+				tip.Visible = false
+			end)
+		end
+		button.Parent = menu
+	end
 
 	gui.Parent = player:WaitForChild("PlayerGui")
 	return money, hearts, carrying, charm, bells

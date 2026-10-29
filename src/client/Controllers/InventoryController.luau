@@ -446,7 +446,7 @@ function InventoryController.start()
 
 	local hud =
 		player:WaitForChild("PlayerGui"):WaitForChild("HuntUi"):WaitForChild("Canvas"):WaitForChild("Hud")
-	local button = hud:WaitForChild("Backpack") :: TextButton
+	local button = hud:WaitForChild("Menu"):WaitForChild("Backpack") :: TextButton
 	button.Activated:Connect(toggle)
 	Locks.guard(button, "Backpack") -- greyed out until the tutorial gets there
 end

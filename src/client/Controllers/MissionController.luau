@@ -266,7 +266,7 @@ function MissionController.start()
 
 	local hud =
 		player:WaitForChild("PlayerGui"):WaitForChild("HuntUi"):WaitForChild("Canvas"):WaitForChild("Hud")
-	local button = hud:WaitForChild("Missions") :: TextButton
+	local button = hud:WaitForChild("Menu"):WaitForChild("Missions") :: TextButton
 	button.Activated:Connect(toggle)
 	Locks.guard(button, "Missions") -- greyed out until the tutorial is done
 
@@ -274,7 +274,7 @@ function MissionController.start()
 	local dot = Instance.new("Frame")
 	dot.Name = "Dot"
 	dot.AnchorPoint = Vector2.new(0.5, 0.5)
-	dot.Position = UDim2.new(1, 6, 0, -4) -- reaches over the button's padding
+	dot.Position = UDim2.new(1, -5, 0, 5) -- top-right corner of the square button
 	dot.Size = UDim2.fromOffset(16, 16)
 	dot.BackgroundColor3 = Color3.fromRGB(230, 50, 60)
 	dot.ZIndex = 5

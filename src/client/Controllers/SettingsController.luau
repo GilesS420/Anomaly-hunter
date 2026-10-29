@@ -182,7 +182,7 @@ function SettingsController.start()
 
 	local hud =
 		player:WaitForChild("PlayerGui"):WaitForChild("HuntUi"):WaitForChild("Canvas"):WaitForChild("Hud")
-	local button = hud:WaitForChild("Settings") :: TextButton
+	local button = hud:WaitForChild("Menu"):WaitForChild("Settings") :: TextButton
 	button.Activated:Connect(function()
 		if window.isOpen() then
 			window.close()
