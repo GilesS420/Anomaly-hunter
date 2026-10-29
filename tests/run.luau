@@ -447,6 +447,12 @@ do
 		frostLines[1] == "Gives Frostbitten (x2.5 value)"
 			and frostLines[2] == "6% chance per monster every 30 s"
 	)
+	local cardsShort = true
+	for _, event in Events.List do
+		local lines = Watcher.cardLines(event, "Nightmares")
+		cardsShort = cardsShort and #lines >= 1 and #lines <= 2
+	end
+	check("every event card has 1 or 2 short lines", cardsShort)
 	local watchedLines =
 		table.concat(Watcher.effectLines(Events.find("WatcherAwakens") :: Events.WatcherEvent), "|")
 	check(
