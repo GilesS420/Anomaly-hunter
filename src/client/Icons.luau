@@ -6,7 +6,7 @@
 
 local Icons = {}
 
-export type Kind = "Backpack" | "Book" | "Scroll" | "Gear" | "Notebook"
+export type Kind = "Backpack" | "Book" | "Scroll" | "Gear" | "Notebook" | "Coin"
 
 -- One piece of a picture: centred on (x, y), w by h, all as a share of the parent.
 local function piece(
@@ -84,6 +84,16 @@ local draw: { [Kind]: (Frame) -> () } = {
 		piece(box, 0.5, 0.5, 0.26, 0.26, Color3.fromRGB(40, 40, 52), 0.5) -- the hole
 	end,
 
+	Coin = function(box)
+		local gold = Color3.fromRGB(250, 205, 80)
+		local dark = Color3.fromRGB(190, 135, 30)
+		piece(box, 0.5, 0.5, 0.86, 0.86, dark, 0.5) -- the rim
+		piece(box, 0.5, 0.5, 0.7, 0.7, gold, 0.5)
+		-- A hexagon in the middle, like the Robux sign: three bars turned 60 degrees apart.
+		for _, angle in { 0, 60, 120 } do
+			piece(box, 0.5, 0.5, 0.42, 0.24, dark, nil, angle)
+		end
+		piece(box, 0.5, 0.5, 0.16, 0.16, gold, 0.2, 45)
 	-- A logbook: a lined page with spiral rings along the top.
 	Notebook = function(box)
 		piece(box, 0.5, 0.55, 0.7, 0.82, Color3.fromRGB(245, 238, 220), 0.1)

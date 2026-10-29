@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
+local Robux = require(script.Parent.Parent:WaitForChild("Robux"))
 local ShopCards = require(script.Parent.Parent:WaitForChild("ShopCards"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
@@ -31,6 +32,7 @@ type Row = {
 	bought: number,
 	limit: number,
 	look: string?, -- preview model in InventoryPreviews
+	robux: string?, -- Robux product that buys it (nil: can't be bought with Robux now)
 }
 type View = { items: { Row }, secondsLeft: number, money: number }
 
@@ -138,9 +140,11 @@ function WorkshopController.start()
 				stockColor = stockColor,
 				price = item.price,
 				action = action,
+				robux = ShopCards.robuxAction(item.robux, item.id),
 			})
 		end
-		ShopCards.show(window.list, cards)
+		-- The Vault's vacuums are always in stock, so only the Workshop can be rerolled.
+		ShopCards.show(window.list, cards, if store == "Workshop" then ShopCards.rerollRow else nil)
 	end
 
 	local function refresh()
@@ -149,6 +153,13 @@ function WorkshopController.start()
 			render(if ok then view else nil)
 		end
 	end
+
+	-- A Robux purchase came through (a reroll, a vacuum...): show what changed.
+	Robux.onGranted(function()
+		if window.isOpen() then
+			refresh()
+		end
+	end)
 
 	-- An admin restock started or ended (server/AdminRestock): show the new stock right away.
 	workspace:GetAttributeChangedSignal("ShopRestock"):Connect(function()

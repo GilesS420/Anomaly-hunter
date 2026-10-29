@@ -57,12 +57,14 @@ local hash = Rng.hash
 -- True if the item is for sale in this slot. Vacuums always are (they're expensive, so a
 -- player who saved up never waits on luck: Giles 2026-10-22); an event treat
 -- is exactly while its Watcher event (`liveEvent`, an id) is live. `chanceMultiplier` raises
--- the restock chances (Sugar Rush), and anything in stock without it stays in stock.
+-- the restock chances (Sugar Rush), and anything in stock without it stays in stock. `salt`
+-- rolls the stock again for one player (a Robux Shop Reroll, Util/Robux.stockSalt).
 function Workshop.inStock(
 	item: Shop.Item,
 	slot: number,
 	liveEvent: string?,
-	chanceMultiplier: number?
+	chanceMultiplier: number?,
+	salt: number?
 ): boolean
 	if item.event then
 		return item.event == liveEvent
@@ -70,7 +72,8 @@ function Workshop.inStock(
 	if item.price <= 0 or Workshop.keepsForever(item) then
 		return true
 	end
-	local roll = (hash(`{slot}:{item.id}`) % 10000) / 100 -- 0 to 99.99
+	local key = if salt then `{slot}:{salt}:{item.id}` else `{slot}:{item.id}`
+	local roll = (hash(key) % 10000) / 100 -- 0 to 99.99
 	return roll < item.restockChance * math.max(chanceMultiplier or 1, 1)
 end
 
@@ -108,14 +111,16 @@ function Workshop.owns(inventory: { [string]: number }, item: Shop.Item): boolea
 end
 
 -- How many a player can buy in one restock: one tool, or a random number of a single-use item
--- (Shop.StockMin to StockMax), worked out from the slot like the stock itself.
-function Workshop.limit(item: Shop.Item, slot: number): number
+-- (Shop.StockMin to StockMax), worked out from the slot like the stock itself (and the salt of
+-- a Shop Reroll, if any).
+function Workshop.limit(item: Shop.Item, slot: number, salt: number?): number
 	if Workshop.keepsForever(item) then
 		return 1
 	end
 	local low = item.stockMin or Shop.StockMin
 	local spread = (item.stockMax or Shop.StockMax) - low + 1
-	return low + hash(`{slot}:{item.id}:count`) % spread
+	local key = if salt then `{slot}:{salt}:{item.id}:count` else `{slot}:{item.id}:count`
+	return low + hash(key) % spread
 end
 
 -- Whether a player can buy one now. boughtThisSlot is how many they bought since the restock.
@@ -130,7 +135,8 @@ function Workshop.canBuy(
 	boughtThisSlot: number,
 	liveEvent: string?,
 	chanceMultiplier: number?,
-	adminStock: number?
+	adminStock: number?,
+	salt: number?
 ): BuyResult
 	if not item then
 		return "Unknown"
@@ -140,11 +146,11 @@ function Workshop.canBuy(
 	end
 	local inStock = if adminStock
 		then adminStock > 0
-		else Workshop.inStock(item, slot, liveEvent, chanceMultiplier)
+		else Workshop.inStock(item, slot, liveEvent, chanceMultiplier, salt)
 	if not inStock then
 		return "OutOfStock"
 	end
-	if boughtThisSlot >= (adminStock or Workshop.limit(item, slot)) then
+	if boughtThisSlot >= (adminStock or Workshop.limit(item, slot, salt)) then
 		return "SoldOut"
 	end
 	if money < item.price then

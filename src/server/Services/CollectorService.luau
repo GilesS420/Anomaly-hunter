@@ -27,6 +27,7 @@ local MansionService = require(script.Parent.MansionService)
 local MissionService = require(script.Parent.MissionService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
+local Perks = require(script.Parent.Parent.Perks)
 
 local CollectorService = {}
 
@@ -67,8 +68,8 @@ Sell.Parent = remotes
 local confirmOrder = Rarities[Shop.ConfirmSellFrom].order
 
 -- What the Collector pays: the sell value, raised while a Watcher event with a
--- sellMultiplier is live (Gold Rush).
-local function price(caught: Value.CaughtMonster, wingsOwned: number): number
+-- sellMultiplier is live (Gold Rush) and for VIP Hunters (`boost`, Perks.sellBoost).
+local function price(caught: Value.CaughtMonster, wingsOwned: number, boost: number): number
 	local ok, value = pcall(Value.sellValue, caught, wingsOwned)
 	if not ok then
 		-- An unknown monster or effect sells for nothing (and isn't listed): say why in Output.
@@ -77,7 +78,7 @@ local function price(caught: Value.CaughtMonster, wingsOwned: number): number
 	end
 	local event = Events.find(workspace:GetAttribute("WatcherEvent"))
 	local multiplier = if event then event.sellMultiplier or 1 else 1
-	return math.floor(value * multiplier)
+	return math.floor(value * multiplier * boost)
 end
 
 -- Every monster that can be sold: the unlocked ones in the Backpack (Storage). They're
@@ -92,12 +93,12 @@ local function sellable(data: DataService.Data): { Value.CaughtMonster }
 	return list
 end
 
-local function offerFor(data: DataService.Data): Offer
+local function offerFor(player: Player, data: DataService.Data): Offer
 	local rows: { Row } = {}
 	local total = 0
 	for _, caught in data.storage do
 		local monster = Monsters[caught.monsterId]
-		local value = price(caught, data.wingsOwned)
+		local value = price(caught, data.wingsOwned, Perks.sellBoost(player))
 		if not monster or not caught.uid or value <= 0 then
 			continue
 		end
@@ -142,7 +143,7 @@ end
 
 GetList.OnServerInvoke = function(player: Player): Offer?
 	local data = DataService.get(player)
-	return if data then offerFor(data) else nil
+	return if data then offerFor(player, data) else nil
 end
 
 Sell.OnServerInvoke = function(player: Player, uids: unknown): Result
@@ -151,13 +152,13 @@ Sell.OnServerInvoke = function(player: Player, uids: unknown): Result
 		return { ok = false, message = "Your save is still loading. Try again in a moment!" }
 	end
 	if not Counter.isNear(player, counter) then
-		return { ok = false, message = "Walk up to the Collector to sell.", offer = offerFor(data) }
+		return { ok = false, message = "Walk up to the Collector to sell.", offer = offerFor(player, data) }
 	end
 	if typeof(uids) ~= "table" then
-		return { ok = false, message = "Nothing to sell.", offer = offerFor(data) }
+		return { ok = false, message = "Nothing to sell.", offer = offerFor(player, data) }
 	end
 	if busy[player] then
-		return { ok = false, message = "One sale at a time!", offer = offerFor(data) }
+		return { ok = false, message = "One sale at a time!", offer = offerFor(player, data) }
 	end
 
 	-- A set of uid strings; anything else in the request is ignored.
@@ -168,7 +169,7 @@ Sell.OnServerInvoke = function(player: Player, uids: unknown): Result
 			wanted[uid] = true
 			count += 1
 			if count > MaxPerSale then
-				return { ok = false, message = "That's too many at once.", offer = offerFor(data) }
+				return { ok = false, message = "That's too many at once.", offer = offerFor(player, data) }
 			end
 		end
 	end
@@ -180,7 +181,7 @@ Sell.OnServerInvoke = function(player: Player, uids: unknown): Result
 	local selling: { [string]: boolean } = {} -- only unlocked ones, whatever was asked
 	for _, caught in sellable(data) do
 		if caught.uid and wanted[caught.uid] then
-			priced[caught.uid] = price(caught, data.wingsOwned)
+			priced[caught.uid] = price(caught, data.wingsOwned, Perks.sellBoost(player))
 			selling[caught.uid] = true
 		end
 	end
@@ -195,12 +196,12 @@ Sell.OnServerInvoke = function(player: Player, uids: unknown): Result
 	busy[player] = nil
 
 	if #sold == 0 then
-		return { ok = false, message = "Those monsters are already gone.", offer = offerFor(data) }
+		return { ok = false, message = "Those monsters are already gone.", offer = offerFor(player, data) }
 	end
 	local what = if #sold == 1 then Format.name(sold[1].monsterId) else `{#sold} monsters`
 	local message = `Sold {what} for {Format.money(earned)}!`
 	Notify.toast(player, message)
-	return { ok = true, message = message, offer = offerFor(data) }
+	return { ok = true, message = message, offer = offerFor(player, data) }
 end
 
 function CollectorService.start()

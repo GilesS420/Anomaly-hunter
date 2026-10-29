@@ -34,6 +34,7 @@ local DataService = require(script.Parent.DataService)
 local HuntService = require(script.Parent.HuntService)
 local MansionService = require(script.Parent.MansionService)
 local Notify = require(script.Parent.Parent.Notify)
+local Perks = require(script.Parent.Parent.Perks)
 local MissionService = require(script.Parent.MissionService)
 local RoamService = require(script.Parent.RoamService)
 local SpawnService = require(script.Parent.SpawnService)
@@ -192,8 +193,11 @@ local function finish(player: Player, lucky: boolean?)
 		State:FireClient(player, "Ended", { result = "Escaped", model = model })
 		return
 	end
-	-- A lucky ring and a luck potion both multiply the chance of a Silver, Gold, Shiny or Rainbow.
-	local boost = (if lucky then Struggles.Ring.variantBoost else 1) * HuntService.potionBoost(player)
+	-- A lucky ring, a luck potion and the Lucky Hunter and VIP passes all multiply the chance
+	-- of a Silver, Gold, Shiny or Rainbow.
+	local boost = (if lucky then Struggles.Ring.variantBoost else 1)
+		* HuntService.potionBoost(player)
+		* Perks.variantBoost(player)
 	local effectBoost = if lucky then Struggles.Ring.effectBoost else nil
 	-- A potion also gives vacuums without a Rainbow of their own a small Rainbow chance.
 	local potion = HuntService.potionBoost(player) > 1

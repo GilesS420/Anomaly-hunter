@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
+local Robux = require(script.Parent.Parent:WaitForChild("Robux"))
 local ShopCards = require(script.Parent.Parent:WaitForChild("ShopCards"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
@@ -26,6 +27,7 @@ type TreatRow = {
 	count: number,
 	bought: number,
 	limit: number,
+	robux: string?, -- Robux product that buys it
 }
 type View = { treats: { TreatRow }, secondsLeft: number, money: number }
 
@@ -103,9 +105,10 @@ function BakeryController.start()
 				stockColor = stockColor,
 				price = treat.price,
 				action = action,
+				robux = ShopCards.robuxAction(treat.robux, treat.id),
 			})
 		end
-		ShopCards.show(window.list, cards)
+		ShopCards.show(window.list, cards, ShopCards.rerollRow)
 	end
 
 	function render(view: View?)
@@ -128,6 +131,13 @@ function BakeryController.start()
 			render(if ok then view else nil)
 		end
 	end
+
+	-- A Robux purchase came through (a reroll, a cake): show what changed.
+	Robux.onGranted(function()
+		if window.isOpen() then
+			refresh()
+		end
+	end)
 
 	-- An admin restock started or ended (server/AdminRestock): show the new stock right away.
 	workspace:GetAttributeChangedSignal("ShopRestock"):Connect(function()

@@ -16,6 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
+local Robux = require(ReplicatedStorage.Shared.Util.Robux)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local AdminRestock = require(script.Parent.Parent.AdminRestock)
@@ -40,6 +41,7 @@ export type TreatRow = {
 	count: number, -- how many you have
 	bought: number, -- bought since the last restock
 	limit: number, -- most you can buy per restock
+	robux: string?, -- the Robux product that buys it (Config/Robux)
 }
 export type View = { treats: { TreatRow }, secondsLeft: number, money: number }
 export type Result = { ok: boolean, message: string, view: View? }
@@ -79,6 +81,7 @@ end
 
 local function viewFor(player: Player, data: DataService.Data): View
 	local slot = currentSlot()
+	local salt = Robux.stockSalt(data.robux, slot) -- their own Shop Reroll, if they bought one
 	local bought = Workshop.boughtThisSlot(data.shop, slot)
 	local adminBought = AdminRestock.bought(player)
 	local eventId, stockMultiplier = stockBoost()
@@ -88,7 +91,7 @@ local function viewFor(player: Player, data: DataService.Data): View
 		local adminStock = AdminRestock.stock(item.id)
 		local inStock = if adminStock
 			then adminStock > 0
-			else Workshop.inStock(item, slot, eventId, stockMultiplier)
+			else Workshop.inStock(item, slot, eventId, stockMultiplier, salt)
 		if item.event and not inStock then
 			continue -- event treats only show up during their event
 		end
@@ -103,7 +106,8 @@ local function viewFor(player: Player, data: DataService.Data): View
 			inStock = inStock,
 			count = data.inventory[item.id] or 0,
 			bought = if adminStock then adminBought[item.id] or 0 else bought[item.id] or 0,
-			limit = adminStock or Workshop.limit(item, slot),
+			limit = adminStock or Workshop.limit(item, slot, salt),
+			robux = Robux.tierFor(item.price),
 		})
 	end
 	table.sort(treats, function(a, b)
@@ -131,6 +135,7 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 	end
 	local item = if typeof(itemId) == "string" then Cakes.item(itemId) else nil
 	local slot = currentSlot()
+	local salt = Robux.stockSalt(data.robux, slot)
 	local adminStock = if item then AdminRestock.stock(item.id) else nil
 	-- Buys during an admin restock count from it, not against the normal limit.
 	local bought = if adminStock then AdminRestock.bought(player) else Workshop.boughtThisSlot(data.shop, slot)
@@ -143,7 +148,8 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 		if item then bought[item.id] or 0 else 0,
 		eventId,
 		stockMultiplier,
-		adminStock
+		adminStock,
+		salt
 	)
 
 	local message
@@ -158,7 +164,7 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 	elseif check == "TooPoor" and item then
 		message = `You need {Format.money(item.price - data.money)} more for the {item.name}.`
 	elseif check == "SoldOut" and item then
-		message = `You bought all {adminStock or Workshop.limit(item, slot)} this restock. More in {countdown(
+		message = `You bought all {adminStock or Workshop.limit(item, slot, salt)} this restock. More in {countdown(
 			AdminRestock.countdown(Workshop.restockAt(slot) - os.time())
 		)}.`
 	elseif check == "OutOfStock" and item and item.event then

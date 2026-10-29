@@ -4,11 +4,12 @@
 --   [picture]  Name            [ Rarity ]
 --              3 in stock      what it does + the odds
 --              $1.2M
--- Tap a card to open it: Buy (or Equip) and Robux buttons appear underneath. Robux buying comes
--- in a later sprint, so that button only says "soon" for now and does nothing.
+-- Tap a card to open it: Buy (or Equip) and Robux buttons appear underneath. The Robux button
+-- (ShopCards.robuxAction) buys the item with Robux, even when it's sold out.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Robux = require(script.Parent:WaitForChild("Robux"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
 local Ui = require(script.Parent:WaitForChild("Ui"))
@@ -28,10 +29,31 @@ export type Card = {
 	stockColor: Color3,
 	price: number,
 	action: Action,
+	robux: Action?, -- the Robux button (nil: a grey "Robux" that does nothing)
 }
 
 ShopCards.InStock = Color3.fromRGB(140, 230, 140)
 ShopCards.NoStock = Color3.fromRGB(230, 110, 110)
+
+-- The Robux button for an item sold through product `product` (a row's `robux`), or nil if it
+-- can't be bought with Robux (not set up yet, or a tool you own).
+function ShopCards.robuxAction(product: string?, itemId: string): Action?
+	if not product then
+		return nil
+	end
+	local price = Robux.price(product)
+	if not price then
+		return { text = "Robux · soon", color = Ui.Colors.off, enabled = false }
+	end
+	return {
+		text = `{Robux.Symbol} {price}`,
+		color = Robux.Color,
+		enabled = true,
+		run = function()
+			Robux.buy("Item", itemId)
+		end,
+	}
+end
 
 local Height = 112 -- a closed card (the window's Scale canvas shrinks it on a phone)
 local ActionsHeight = 52 -- the Buy / Robux strip an open card adds
@@ -39,6 +61,7 @@ ShopCards.Padding = 12 -- inside a card, all round
 
 local opened: { [ScrollingFrame]: string? } = {} -- the open card per window
 local shown: { [ScrollingFrame]: { Card } } = {} -- what each window shows, to redraw on a tap
+local headers: { [ScrollingFrame]: ((ScrollingFrame) -> ())? } = {}
 
 -- Sets a window up for cards: wider than the default, a gap between cards, and room round
 -- the list so a card's outline isn't cut off at the edges (or under the scrollbar). Without a
@@ -160,24 +183,56 @@ local function draw(list: ScrollingFrame, order: number, card: Card)
 		if action.enabled and run then
 			main.Activated:Connect(run)
 		end
-		-- Placeholder until the Robux sprint: shows where it goes, buys nothing.
-		local robux = Ui.button(actions, "Robux · soon", Ui.Colors.off, UDim2.new(0.5, -6, 1, 0))
+		local paid: Action = card.robux or { text = "Robux", color = Ui.Colors.off, enabled = false }
+		local robux = Ui.button(actions, paid.text, paid.color, UDim2.new(0.5, -6, 1, 0))
 		robux.AnchorPoint = Vector2.new(1, 0)
 		robux.Position = UDim2.fromScale(1, 0)
-		robux.AutoButtonColor = false
-		robux.TextTransparency = 0.4
+		robux.AutoButtonColor = paid.enabled
+		local pay = paid.run
+		if paid.enabled and pay then
+			robux.Activated:Connect(pay)
+		else
+			robux.TextTransparency = 0.4
+		end
 	end
 
 	row.Activated:Connect(function()
 		opened[list] = if isOpen then nil else card.key
-		ShopCards.show(list, shown[list] or {})
+		ShopCards.show(list, shown[list] or {}, headers[list])
 	end)
 end
 
+-- The row above the Bakery's and Workshop's cards that rerolls their stock for Robux, for this
+-- player only until the next restock.
+function ShopCards.rerollRow(list: ScrollingFrame)
+	local _, actions = Ui.row(
+		list,
+		0,
+		"Reroll the stock",
+		Ui.Colors.lamp,
+		"New Bakery and Workshop stock, just for you, until the restock"
+	)
+	local price = Robux.price("ShopReroll")
+	local button = Ui.button(
+		actions,
+		Robux.label("ShopReroll"),
+		if price then Robux.Color else Ui.Colors.off,
+		UDim2.fromScale(1, 1)
+	)
+	button.AutoButtonColor = price ~= nil
+	if price then
+		button.Activated:Connect(function()
+			Robux.buy("ShopReroll")
+		end)
+	end
+end
+
 -- Draws the cards in a window's list. The open card stays open across redraws (a buy, the
--- countdown's refresh) while that item is still listed.
-function ShopCards.show(list: ScrollingFrame, cards: { Card })
+-- countdown's refresh) while that item is still listed. `header` draws anything that goes
+-- above the cards (LayoutOrder 0), like the Shop Reroll row.
+function ShopCards.show(list: ScrollingFrame, cards: { Card }, header: ((ScrollingFrame) -> ())?)
 	shown[list] = cards
+	headers[list] = header
 	local keep = false
 	for _, card in cards do
 		keep = keep or card.key == opened[list]
@@ -186,6 +241,9 @@ function ShopCards.show(list: ScrollingFrame, cards: { Card })
 		opened[list] = nil
 	end
 	Ui.clear(list)
+	if header then
+		header(list)
+	end
 	for i, card in cards do
 		draw(list, i, card)
 	end

@@ -6,7 +6,8 @@
 -- Gold; B rings the cheapest you own) that brings a rarer monster to you. Each button shows
 -- only if you own one. Under them a stack of square picture buttons is always there: a
 -- backpack (G, your items and monsters, InventoryController), a book (C, CodexController), a
--- scroll (J, MissionController) and a gear (SettingsController), in Hud.Menu.
+-- scroll (J, MissionController), a gear (SettingsController) and a coin (the Robux Store,
+-- StoreController), in Hud.Menu.
 -- Everything shown comes from the server: player attributes Zone / Hearts / Carrying /
 -- CarryingSize / CarryingCount / BagSize / ReturnCharms / BaitBells / SilverBells / GoldBells and
 -- leaderstats.Money.
@@ -38,6 +39,7 @@ local MenuButtons: { { name: string, icon: Icons.Kind, key: string?, color: Colo
 	{ name = "Codex", icon = "Book", key = "C", color = Color3.fromRGB(180, 115, 60) },
 	{ name = "Missions", icon = "Scroll", key = "J", color = Color3.fromRGB(210, 160, 50) },
 	{ name = "Settings", icon = "Gear", key = nil, color = Color3.fromRGB(130, 130, 150) },
+	{ name = "Store", icon = "Coin", key = nil, color = Color3.fromRGB(0, 140, 90) },
 }
 
 local function label(name: string, order: number, color: Color3, parent: Instance): TextLabel

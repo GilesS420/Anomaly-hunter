@@ -17,6 +17,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Format = require(ReplicatedStorage.Shared.Util.Format)
+local Robux = require(ReplicatedStorage.Shared.Util.Robux)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Slap = require(ReplicatedStorage.Shared.Util.Slap)
 local Tutorial = require(ReplicatedStorage.Shared.Util.Tutorial)
@@ -47,6 +48,7 @@ export type Row = {
 	bought: number, -- bought since the last restock
 	limit: number, -- most you can buy per restock
 	look: string?, -- preview model in InventoryPreviews (ToolModel.look)
+	robux: string?, -- the Robux product that buys it (Config/Robux), nil if it can't be bought now
 }
 export type View = { items: { Row }, secondsLeft: number, money: number }
 export type Store = string -- "Workshop" or "VacuumVault"
@@ -94,6 +96,7 @@ end
 
 local function viewFor(player: Player, data: DataService.Data, store: Store): View
 	local slot = currentSlot()
+	local salt = Robux.stockSalt(data.robux, slot) -- their own Shop Reroll, if they bought one
 	local bought = boughtThisSlot(data, slot)
 	local adminBought = AdminRestock.bought(player)
 	local equipped = data.equipped :: { [string]: string }
@@ -106,6 +109,7 @@ local function viewFor(player: Player, data: DataService.Data, store: Store): Vi
 		local equipSlot = Workshop.equipSlot(item)
 		-- An admin restock (server/AdminRestock) sets the stock and limit of the items in it.
 		local adminStock = AdminRestock.stock(item.id)
+		local owned = Workshop.owns(data.inventory, item)
 		table.insert(items, {
 			id = item.id,
 			name = item.name,
@@ -115,15 +119,18 @@ local function viewFor(player: Player, data: DataService.Data, store: Store): Vi
 			rarity = item.rarity,
 			rarityColor = MonsterModel.color(item.rarity),
 			tool = Workshop.keepsForever(item),
-			inStock = if adminStock then adminStock > 0 else Workshop.inStock(item, slot, nil, stockBoost(data, item)),
-			owned = Workshop.owns(data.inventory, item),
+			inStock = if adminStock
+				then adminStock > 0
+				else Workshop.inStock(item, slot, nil, stockBoost(data, item), salt),
+			owned = owned,
 			equipped = if item.kind == "Slapper"
 				then slapper ~= nil and slapper.id == item.id
 				else equipSlot ~= nil and equipped[equipSlot] == item.id,
 			count = data.inventory[item.id] or 0,
 			bought = if adminStock then adminBought[item.id] or 0 else bought[item.id] or 0,
-			limit = adminStock or Workshop.limit(item, slot),
+			limit = adminStock or Workshop.limit(item, slot, salt),
 			look = ToolModel.look(item.id),
+			robux = if Workshop.keepsForever(item) and owned then nil else Robux.tierFor(item.price),
 		})
 	end
 	table.sort(items, function(a, b)
@@ -164,6 +171,7 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 		}
 	end
 	local slot = currentSlot()
+	local salt = Robux.stockSalt(data.robux, slot)
 	local adminStock = if item then AdminRestock.stock(item.id) else nil
 	-- Buys during an admin restock count from it, not against the normal limit.
 	local bought = if adminStock then AdminRestock.bought(player) else boughtThisSlot(data, slot)
@@ -175,7 +183,8 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 		if item then bought[item.id] or 0 else 0,
 		nil,
 		stockBoost(data, item),
-		adminStock
+		adminStock,
+		salt
 	)
 
 	local message
@@ -204,7 +213,7 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 	elseif check == "Owned" then
 		message = "You already own that."
 	elseif check == "SoldOut" and item then
-		message = `You bought all {adminStock or Workshop.limit(item, slot)} this restock. More in {countdown(
+		message = `You bought all {adminStock or Workshop.limit(item, slot, salt)} this restock. More in {countdown(
 			AdminRestock.countdown(Workshop.restockAt(slot) - os.time())
 		)}.`
 	elseif check == "OutOfStock" then
