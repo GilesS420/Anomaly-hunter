@@ -328,6 +328,46 @@ function Watcher.vacuumLine(event: Events.WatcherEvent, setId: string?): string?
 	return if weakest then `Catch with the {Format.name(weakest)} or better` else nil
 end
 
+-- The event icon's card, kept short (Giles 2026-10-29): the effect the event gives, then
+-- one hint on what else it does, at most 2 lines. The odds and fine print are left out.
+function Watcher.cardLines(event: Events.WatcherEvent, setId: string?): { string }
+	local lines: { string } = {}
+	local effect = if event.effect then Effects.List[event.effect] else nil
+	if effect then
+		table.insert(lines, `Gives {Format.name(effect.id)} (x{effect.multiplier} value)`)
+	end
+	local hints: { string } = {}
+	if event.zoneMonsters then
+		table.insert(hints, `Zone monsters in the hub, rares x{event.zoneMonsters.rareMultiplier}`)
+	elseif shownMonsters(event, setId) then
+		local vacuum = Watcher.vacuumLine(event, setId)
+		local weakest = if vacuum then string.match(vacuum, "^Catch with the (.-) or better$") else nil
+		table.insert(hints, if weakest then `Event monsters: {weakest}+` else "Event monsters in the hub!")
+	end
+	if event.sellMultiplier then
+		table.insert(hints, `Collector pays x{event.sellMultiplier}`)
+	end
+	if event.growthMultiplier then
+		table.insert(hints, `More growth spurts (x{event.growthMultiplier})`)
+	end
+	if event.effectOddsMultiplier and event.effectOddsMultiplier ~= 1 then
+		table.insert(hints, `Other effects x{event.effectOddsMultiplier} as likely`)
+	end
+	if event.cakeEffectMultiplier then
+		table.insert(hints, `Cake effects x{event.cakeEffectMultiplier} as likely`)
+	end
+	if event.bakeryStockMultiplier then
+		table.insert(hints, "Bakery restocks more")
+	end
+	for _, hint in hints do
+		if #lines >= 2 then
+			break
+		end
+		table.insert(lines, hint)
+	end
+	return lines
+end
+
 -- "2:05"
 function Watcher.clock(seconds: number): string
 	local whole = math.max(math.ceil(seconds), 0)

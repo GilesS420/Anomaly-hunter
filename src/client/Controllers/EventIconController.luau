@@ -1,8 +1,8 @@
 --!strict
 -- While a Watcher event is live, its icon sits in the bottom-right corner of the screen (on
 -- phones, above the jump button). Hover over it (or tap it) to see the event's name and how
--- long is left, plus the effect the event gives mansion monsters and its chance
--- (Watcher.effectLines). It comes with the weather, at the start of the 30 second warning, and shows
+-- long is left, plus the effect the event gives mansion monsters and one short hint
+-- (Watcher.cardLines). It comes with the weather, at the start of the 30 second warning, and shows
 -- how long until the event starts until then.
 -- Reads the workspace attributes WatcherEvent, WatcherEventEnd, WatcherNext and WatcherSkyAt
 -- (WatcherService).
@@ -125,28 +125,9 @@ function EventIconController.start()
 				child:Destroy()
 			end
 		end
-		local lines = Watcher.effectLines(event)
-		local setId = workspace:GetAttribute("WatcherMonsterSet")
-		local monsters = Watcher.monsterLine(event, setId)
-		if monsters then
-			-- Above the Familiarity note, which is last when there are effect lines.
-			local at = math.max(#lines, 1)
-			table.insert(lines, at, monsters)
-			local vacuum = Watcher.vacuumLine(event, setId)
-			if vacuum then
-				table.insert(lines, at + 1, vacuum)
-			end
-		end
+		local lines = Watcher.cardLines(event, workspace:GetAttribute("WatcherMonsterSet"))
 		for index, line in lines do
-			local last = index == #lines -- the Familiarity note, quieter
-			local label = Ui.text(
-				details,
-				line,
-				UDim2.new(1, 0, 0, 18),
-				if last then Ui.Colors.muted else Ui.Colors.text,
-				false,
-				if last then 13 else 15
-			)
+			local label = Ui.text(details, line, UDim2.new(1, 0, 0, 18), Ui.Colors.text, false, 15)
 			label.LayoutOrder = index
 			label.TextXAlignment = Enum.TextXAlignment.Center
 		end
