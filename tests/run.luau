@@ -3212,6 +3212,16 @@ do
 		"missions: streak bonus capped",
 		near(Missions.bonusFor(3), 0.3) and Missions.bonusFor(20) == MissionConfig.StreakMax
 	)
+	local sellSmall = Missions.def("SellSmall") :: any
+	check(
+		"missions: selling pays most of the money target",
+		Missions.missionReward(sellSmall, 700_000_000, 14_000_000_000, 0) == 560_000_000
+	)
+	check(
+		"missions: effort raises a hard mission",
+		Missions.missionReward(Missions.def("ZoneSet") :: any, 5, 1_000_000, 0) == 200_000
+	)
+	check("missions: floor still applies", Missions.missionReward(sellSmall, 5_000, 0, 0) == 4_000)
 	check("missions: open zones", #Missions.openZones(1) == 1 and #Missions.openZones(3) == 3)
 	check("missions: zone 4 isn't launched", #Missions.openZones(6) == 3)
 	local set = Missions.zoneTargets("PumpkinGraveyard", "Rare")
@@ -3359,7 +3369,8 @@ do
 	local glove = Workshop.item("RubberGlove") :: any
 	check(
 		"slap: slappers are always in stock and kept",
-		Workshop.inStock(glove, 12345) and Workshop.limit(glove, 12345) == 1
+		Workshop.inStock(glove, 12345)
+			and Workshop.limit(glove, 12345) == 1
 			and Workshop.canBuy(glove, 12345, 1e12, { RubberGlove = 1 }, 0) == "Owned"
 	)
 	local strong = SlapConfig.Slappers[#SlapConfig.Slappers]
@@ -3400,12 +3411,21 @@ do
 	local later = Restock.parse("all 3 PumpkinCandy 9") :: Restock.Plan
 	check("restock: a later name wins", later.items.PumpkinCandy == 9 and later.items.BaitBell == 3)
 	local everything = Restock.parse("all 1") :: Restock.Plan
-	check("restock: all leaves out vacuums and slappers", everything.items.VoidVac == nil and everything.items.RubberGlove == nil)
+	check(
+		"restock: all leaves out vacuums and slappers",
+		everything.items.VoidVac == nil and everything.items.RubberGlove == nil
+	)
 	check("restock: a vacuum can't be restocked", Restock.parse("VoidVac 5") == nil)
 	check("restock: unknown items are refused", Restock.parse("Banana 5") == nil)
 	check("restock: an amount is needed", Restock.parse("cakes") == nil and Restock.parse("") == nil)
-	check("restock: amounts stay in range", Restock.parse("cakes -1") == nil and Restock.parse("cakes 1000") == nil)
-	check("restock: time stays in range", Restock.parse("cakes 1 time 0") == nil and Restock.parse("cakes 1 time 121") == nil)
+	check(
+		"restock: amounts stay in range",
+		Restock.parse("cakes -1") == nil and Restock.parse("cakes 1000") == nil
+	)
+	check(
+		"restock: time stays in range",
+		Restock.parse("cakes 1 time 0") == nil and Restock.parse("cakes 1 time 121") == nil
+	)
 	check("restock: nan is refused", Restock.parse("cakes nan") == nil)
 	local back = Restock.parse(Restock.argument(picked.items, 15)) :: Restock.Plan
 	check(
@@ -3417,13 +3437,22 @@ do
 	while Workshop.inStock(charm, outSlot) do
 		outSlot += 1
 	end
-	check("restock: an admin amount puts an item in stock", Workshop.canBuy(charm, outSlot, 1e9, {}, 0, nil, nil, 20) == "Ok")
-	check("restock: it sells out at the admin amount", Workshop.canBuy(charm, outSlot, 1e9, {}, 20, nil, nil, 20) == "SoldOut")
+	check(
+		"restock: an admin amount puts an item in stock",
+		Workshop.canBuy(charm, outSlot, 1e9, {}, 0, nil, nil, 20) == "Ok"
+	)
+	check(
+		"restock: it sells out at the admin amount",
+		Workshop.canBuy(charm, outSlot, 1e9, {}, 20, nil, nil, 20) == "SoldOut"
+	)
 	local inSlot = 1
 	while not Workshop.inStock(charm, inSlot) do
 		inSlot += 1
 	end
-	check("restock: 0 means sold out", Workshop.canBuy(charm, inSlot, 1e9, {}, 0, nil, nil, 0) == "OutOfStock")
+	check(
+		"restock: 0 means sold out",
+		Workshop.canBuy(charm, inSlot, 1e9, {}, 0, nil, nil, 0) == "OutOfStock"
+	)
 end
 
 if failures > 0 then
