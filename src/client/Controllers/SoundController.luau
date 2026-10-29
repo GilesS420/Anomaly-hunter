@@ -173,6 +173,7 @@ local function fadeOut(sound: Sound)
 end
 
 local fadingOut = false -- the playing song has started its fade at the end
+local resyncing = false -- the playing song is dipping out to jump back onto the clock
 
 local function updateMusic(list: { { file: string, length: number } })
 	local file, at, length = nowPlaying(list)
@@ -181,7 +182,8 @@ local function updateMusic(list: { { file: string, length: number } })
 		if playingMusic then
 			fadeOut(playingMusic)
 			if not nextTrack and #Sounds.BetweenSongs > 0 then
-				-- a little sound fills the pause, the same one for everyone (at is the song number)
+				-- a little sound fills the pause, the same one for everyone (at is the song number);
+				-- the pause is longer than any of them, so it's over before the next song starts
 				playOnce(
 					Sounds.BetweenSongs[(at - 1) % #Sounds.BetweenSongs + 1],
 					nil,
@@ -189,10 +191,14 @@ local function updateMusic(list: { { file: string, length: number } })
 					"World"
 				)
 			end
+			playingMusic = nil
 		end
-		playingMusic = nextTrack
-		fadingOut = false
-		if nextTrack then
+		-- a song still loading waits (this runs again every half second): started early, it
+		-- would begin at the wrong spot and then have to jump
+		if nextTrack and nextTrack.IsLoaded then
+			playingMusic = nextTrack
+			fadingOut = false
+			resyncing = false
 			nextTrack.TimePosition = at
 			nextTrack:Play()
 			-- every song builds up from silence over its first seconds (or, joining halfway,
@@ -206,10 +212,22 @@ local function updateMusic(list: { { file: string, length: number } })
 		tweenVolume(nextTrack, 0, math.max(length - at, 0.1))
 	elseif
 		nextTrack
-		and nextTrack.IsLoaded
+		and not fadingOut
+		and not resyncing
 		and math.abs(nextTrack.TimePosition - at) > Sounds.MusicDriftSeconds
 	then
-		nextTrack.TimePosition = at -- it fell behind (loading, a lag spike): catch up
+		-- it fell well behind (a lag spike): dip out, jump back onto the clock, come back in,
+		-- rather than skipping audibly in the middle of a note
+		resyncing = true
+		local song = nextTrack
+		tweenVolume(song, 0, 0.4, function()
+			if playingMusic == song and resyncing then
+				local _, now = nowPlaying(list)
+				song.TimePosition = now
+				resyncing = false
+				tweenVolume(song, 1, 1)
+			end
+		end)
 	end
 end
 
