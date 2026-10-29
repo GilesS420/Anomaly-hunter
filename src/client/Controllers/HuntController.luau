@@ -1,10 +1,10 @@
 --!strict
--- Hunt HUD on the left side, halfway down (the top-left corner belongs to Roblox's chat
--- window, the top-right to the player list): your money, your hearts while you're in a zone, the
--- monster you're carrying, a big "Return Charm" button (tap or click it; R works too on
--- a keyboard) that takes you home, and in a zone a button per kind of Bait Bell (Bait, Silver,
+-- Hunt HUD. Your money sits big in the top-left corner, just under Roblox's own menu buttons
+-- (Giles 2026-10-29). The rest is a column on the left side, halfway down: your hearts while
+-- you're in a zone, the monster you're carrying, a big "Return Charm" button (tap or click
+-- it; R works too on a keyboard) that takes you home, and in a zone a button per kind of Bait Bell (Bait, Silver,
 -- Gold; B rings the cheapest you own) that brings a rarer monster to you. Each button shows
--- only if you own one. Under them a row of square picture buttons is always there: a
+-- only if you own one. Under them a stack of square picture buttons is always there: a
 -- backpack (G, your items and monsters, InventoryController), a book (C, CodexController), a
 -- scroll (J, MissionController) and a gear (SettingsController), in Hud.Menu.
 -- Everything shown comes from the server: player attributes Zone / Hearts / Carrying /
@@ -29,8 +29,9 @@ local player = Players.LocalPlayer
 local ROW_HEIGHT = 30
 local HUD_WIDTH = 300
 local MENU_SIZE = 58 -- the square menu buttons, about a thumb wide on a phone
+local MONEY_HEIGHT = 44 -- text size of the money in the top-left corner
 
--- The square menu buttons, left to right: the name (other controllers find the button by
+-- The square menu buttons, top to bottom: the name (other controllers find the button by
 -- it), the picture, the key and the colour.
 local MenuButtons: { { name: string, icon: Icons.Kind, key: string?, color: Color3 } } = {
 	{ name = "Backpack", icon = "Backpack", key = "G", color = Color3.fromRGB(110, 90, 170) },
@@ -86,7 +87,18 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 	list.Padding = UDim.new(0, 4)
 	list.Parent = column
 
-	local money = label("Money", 1, Color3.fromRGB(140, 255, 140), column)
+	-- Money: top-left, big. The gui leaves Roblox's top bar out, so y = 0 is just under it.
+	local money = label("Money", 1, Color3.fromRGB(140, 255, 140), canvas)
+	money.Position = UDim2.fromOffset(16, 6)
+	money.Size = UDim2.fromOffset(0, MONEY_HEIGHT)
+	money.AutomaticSize = Enum.AutomaticSize.X
+	money.TextScaled = false
+	money.TextSize = MONEY_HEIGHT
+	money.TextStrokeTransparency = 0.2
+	local limit = money:FindFirstChildOfClass("UITextSizeConstraint")
+	if limit then
+		limit:Destroy()
+	end
 	local hearts = label("Hearts", 2, Color3.fromRGB(255, 90, 110), column)
 	local carrying = label("Carrying", 3, Color3.new(1, 1, 1), column)
 
@@ -122,26 +134,26 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 		Color3.fromRGB(120, 70, 200),
 		if keys then "Return Charm (R)" else "Return Charm"
 	)
-	-- LayoutOrder 5.1, 5.2, 5.3: between the charm and the menu row.
+	-- LayoutOrder 5.1, 5.2, 5.3: between the charm and the menu buttons.
 	local bells: { TextButton } = {}
 	for i, kind in Bells do
 		table.insert(bells, itemButton(kind.id, 5 + i / 10, kind.color, kind.name))
 	end
-	-- A row of little square picture buttons, always there: Backpack (G, InventoryController),
+	-- A stack of little square picture buttons, always there: Backpack (G, InventoryController),
 	-- Codex (C, CodexController), Missions (J, MissionController) and Settings
 	-- (SettingsController). With a keyboard each shows its key in the corner, and the name
-	-- pops up above it while the mouse is over it.
+	-- pops up beside it while the mouse is over it.
 	local menu = Instance.new("Frame")
 	menu.Name = "Menu"
 	menu.LayoutOrder = 7
-	menu.Size = UDim2.new(1, 0, 0, MENU_SIZE)
+	menu.Size = UDim2.fromOffset(MENU_SIZE, 0)
+	menu.AutomaticSize = Enum.AutomaticSize.Y
 	menu.BackgroundTransparency = 1
 	menu.Parent = column
-	local row = Instance.new("UIListLayout")
-	row.FillDirection = Enum.FillDirection.Horizontal
-	row.SortOrder = Enum.SortOrder.LayoutOrder
-	row.Padding = UDim.new(0, 8)
-	row.Parent = menu
+	local stack = Instance.new("UIListLayout")
+	stack.SortOrder = Enum.SortOrder.LayoutOrder
+	stack.Padding = UDim.new(0, 8)
+	stack.Parent = menu
 	for order, entry in MenuButtons do
 		local button = Instance.new("TextButton")
 		button.Name = entry.name
@@ -166,9 +178,8 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 		if UserInputService.MouseEnabled then -- a tap would leave the name stuck on a phone
 			local tip = Ui.text(button, entry.name, UDim2.fromOffset(110, 22), Ui.Colors.text, true, 18)
 			tip.Name = "Tip"
-			tip.AnchorPoint = Vector2.new(0.5, 1)
-			tip.Position = UDim2.new(0.5, 0, 0, -4)
-			tip.TextXAlignment = Enum.TextXAlignment.Center
+			tip.AnchorPoint = Vector2.new(0, 0.5)
+			tip.Position = UDim2.new(1, 8, 0.5, 0)
 			tip.TextStrokeTransparency = 0
 			tip.ZIndex = 3
 			tip.Visible = false
