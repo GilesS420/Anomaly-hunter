@@ -56,8 +56,8 @@ Sounds.AmbienceFadeSeconds = 3
 --   The Nursery Lullaby (our own)
 --   after Ludwig van Beethoven, Moonlight Sonata, first movement (1801)
 -- A song that isn't uploaded yet is skipped.
-Sounds.PlaylistGapSeconds = 4 -- quiet between two songs
-Sounds.MusicDriftSeconds = 1.5 -- a song this far off the server clock jumps back in time
+Sounds.PlaylistGapSeconds = 8 -- the pause between two songs: longer than any BetweenSongs sound
+Sounds.MusicDriftSeconds = 3 -- a song this far off the server clock dips out and back onto it
 
 -- WorldAmbience slices played in the pause after each song, taking turns: a music box being
 -- wound up, a far-off bell, creaking floorboards and an owl.

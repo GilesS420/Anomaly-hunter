@@ -2564,6 +2564,17 @@ do
 	for _, key in Sounds.BetweenSongs do
 		ok = ok and Sounds.Sheets.WorldAmbience[key] ~= nil
 	end
+	local fitsInPause = true
+	for _, key in Sounds.BetweenSongs do
+		local slice = Sounds.Sheets.WorldAmbience[key]
+		if slice and slice.length + 1 > Sounds.PlaylistGapSeconds then
+			fitsInPause = false
+			print(
+				`  {key} ({slice.length} s) doesn't fit in the {Sounds.PlaylistGapSeconds} s pause between songs`
+			)
+		end
+	end
+	check("every between-songs sound is over before the next song starts", fitsInPause)
 	for _, song in Sounds.Sheets.Music do
 		ok = ok and (Sounds.Files :: any)[song.file] ~= nil and song.length > 0
 	end
