@@ -69,6 +69,16 @@ root.BorderSizePixel = 0
 root.Active = true -- clicks don't fall through to the world underneath
 root.Parent = gui
 
+-- The gradient goes on its own backdrop: on the CanvasGroup itself it would tint everything
+-- inside (title, text, bar) almost black.
+local backdrop = Instance.new("Frame")
+backdrop.Name = "Backdrop"
+backdrop.Size = UDim2.fromScale(1, 1)
+backdrop.BackgroundColor3 = Color3.new(1, 1, 1) -- the gradient gives the colour
+backdrop.BorderSizePixel = 0
+backdrop.ZIndex = 0 -- under the fog and the canvas
+backdrop.Parent = root
+
 local shade = Instance.new("UIGradient")
 shade.Rotation = 90
 shade.Color = ColorSequence.new({
@@ -76,7 +86,7 @@ shade.Color = ColorSequence.new({
 	ColorSequenceKeypoint.new(0.55, Color3.fromRGB(26, 16, 36)),
 	ColorSequenceKeypoint.new(1, Color3.fromRGB(4, 3, 6)),
 })
-shade.Parent = root
+shade.Parent = backdrop
 
 -- Fog: big soft blobs drifting slowly across the screen (behind the canvas).
 local fogs: { Frame } = {}
