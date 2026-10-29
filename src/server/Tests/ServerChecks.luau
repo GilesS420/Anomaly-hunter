@@ -70,6 +70,8 @@ ServerChecks.KnownRemotes = {
 	"MergerRemotes.GetList",
 	"MergerRemotes.Preview",
 	"MergerRemotes.Merge",
+	"MergerRemotes.OpenVariant",
+	"MergerRemotes.Pull",
 	"GrowthRemotes.Open",
 	"GrowthRemotes.GetList",
 	"GrowthRemotes.Grow",
