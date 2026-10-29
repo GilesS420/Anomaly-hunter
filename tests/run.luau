@@ -3212,6 +3212,16 @@ do
 		"missions: streak bonus capped",
 		near(Missions.bonusFor(3), 0.3) and Missions.bonusFor(20) == MissionConfig.StreakMax
 	)
+	local sellSmall = Missions.def("SellSmall") :: any
+	check(
+		"missions: selling pays most of the money target",
+		Missions.missionReward(sellSmall, 700_000_000, 14_000_000_000, 0) == 560_000_000
+	)
+	check(
+		"missions: effort raises a hard mission",
+		Missions.missionReward(Missions.def("ZoneSet") :: any, 5, 1_000_000, 0) == 200_000
+	)
+	check("missions: floor still applies", Missions.missionReward(sellSmall, 5_000, 0, 0) == 4_000)
 	check("missions: open zones", #Missions.openZones(1) == 1 and #Missions.openZones(3) == 3)
 	check("missions: zone 4 isn't launched", #Missions.openZones(6) == 3)
 	local set = Missions.zoneTargets("PumpkinGraveyard", "Rare")
