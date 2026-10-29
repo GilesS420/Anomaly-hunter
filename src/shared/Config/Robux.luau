@@ -17,19 +17,19 @@ local Robux = {}
 Robux.Products = {
 	-- A shop item paid in Robux. Every Bakery, Workshop and Vault item falls into one of these by
 	-- its cash price (Robux.ItemTiers), so 5 products cover the whole shop.
-	ItemTier1 = { id = 0, price = 19, name = "Shop item: small" },
-	ItemTier2 = { id = 0, price = 49, name = "Shop item: medium" },
-	ItemTier3 = { id = 0, price = 99, name = "Shop item: large" },
-	ItemTier4 = { id = 0, price = 199, name = "Shop item: huge" },
-	ItemTier5 = { id = 0, price = 399, name = "Shop item: legendary" },
+	ItemTier1 = { id = 3723585400, price = 19, name = "Shop item: small" },
+	ItemTier2 = { id = 3723585507, price = 49, name = "Shop item: medium" },
+	ItemTier3 = { id = 3723585595, price = 99, name = "Shop item: large" },
+	ItemTier4 = { id = 3723585744, price = 199, name = "Shop item: huge" },
+	ItemTier5 = { id = 3723585809, price = 399, name = "Shop item: legendary" },
 	-- New Bakery and Workshop stock for the buyer only, until the next restock.
-	ShopReroll = { id = 0, price = 29, name = "Shop Reroll" },
-	-- One more daily mission reroll, used straight away on the mission tapped.
-	MissionReroll = { id = 0, price = 15, name = "Mission Reroll" },
+	ShopReroll = { id = 3723585894, price = 29, name = "Shop Reroll" },
+	-- Swaps every daily mission that isn't done yet (Giles 2026-10-29).
+	MissionReroll = { id = 3723585979, price = 15, name = "Mission Reroll" },
 	-- Finishes one daily mission (it still has to be claimed).
-	MissionSkip = { id = 0, price = 39, name = "Mission Skip" },
+	MissionSkip = { id = 3723586069, price = 39, name = "Mission Skip" },
 	-- Once per player.
-	StarterPack = { id = 0, price = 49, name = "Starter Pack" },
+	StarterPack = { id = 3723586118, price = 49, name = "Starter Pack" },
 } :: { [string]: Product }
 
 -- Which item product a shop item uses: the first tier whose maxCash its cash price fits under.
@@ -43,19 +43,22 @@ Robux.ItemTiers = {
 
 -- Game Passes: bought once, kept forever. Owning one sets the player attribute Pass<Key>.
 Robux.Passes = {
-	BigStorage = { id = 0, price = 149, name = "Big Storage" },
-	LuckyHunter = { id = 0, price = 399, name = "Lucky Hunter" },
-	VIP = { id = 0, price = 299, name = "VIP Hunter" },
-	CakePlate = { id = 0, price = 249, name = "Extra Cake Plate" },
+	BigStorage = { id = 2060795150, price = 149, name = "Big Storage" },
+	LuckyHunter = { id = 2060705121, price = 399, name = "Lucky Hunter" },
+	VIP = { id = 2058107865, price = 599, name = "VIP Hunter" },
+	CakePlate = { id = 2061580544, price = 149, name = "Extra Cake Plate" },
+	-- Giles added this one himself (2026-10-29): twice the walking speed everywhere.
+	FastWalk = { id = 2061754519, price = 149, name = "Faster walking speed" },
 } :: { [string]: Product }
 
 -- The order passes are listed in the Store window, with what each one does.
-Robux.PassOrder = { "BigStorage", "LuckyHunter", "VIP", "CakePlate" }
+Robux.PassOrder = { "BigStorage", "LuckyHunter", "VIP", "CakePlate", "FastWalk" }
 Robux.PassText = {
 	BigStorage = "Storage holds 120 monsters instead of 50",
 	LuckyHunter = "Silver, Gold, Shiny and Rainbow catches x1.5, forever. Stacks with potions",
 	VIP = "Gold VIP tag, +10% at the Collector, 1 extra free mission reroll a day and x1.5 Silver, Gold, Shiny and Rainbow catches",
 	CakePlate = "6 cakes out per wing instead of 5",
+	FastWalk = "Walk twice as fast, in the hub, the zones and your mansion",
 } :: { [string]: string }
 
 -- What the passes do (server/Perks reads these).
@@ -65,6 +68,7 @@ Robux.VipLuckBoost = 1.5
 Robux.VipSellBoost = 1.1 -- the Collector pays 10% more
 Robux.VipRerolls = 1 -- extra free mission rerolls a day
 Robux.CakePlatePerWing = 6
+Robux.FastWalkMultiplier = 2 -- on WalkSpeed (not while a monster has you slowed)
 
 Robux.MissionRerollsPerDay = 5 -- most Mission Rerolls one player can buy a day
 
