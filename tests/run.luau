@@ -3341,6 +3341,9 @@ do
 	check("slap: more reach", Slap.blocked(a, at(hubX + reach + 1, hubZ), 10, 0, 0, reach + 2) == nil)
 	local home = Slap.blocked(at(plot.x, plot.z), at(plot.x + 3, plot.z), 10, 0, 0, reach)
 	check("slap: mansions are safe", home == "Mansion")
+	local thief = at(plot.x + 3, plot.z)
+	thief.stealing = true
+	check("slap: a thief can be slapped in a mansion", Slap.blocked(at(plot.x, plot.z), thief, 10, 0, 0, reach) == nil)
 	check("slap: cooldown", Slap.blocked(a, b, 10, 12, 0, reach) == "Cooldown")
 	check("slap: guarded", Slap.blocked(a, b, 10, 0, 12, reach) == "Guarded")
 	local learner = at(hubX + 4, hubZ)
@@ -3724,6 +3727,120 @@ do
 		Trading.log(log, { at = i, kind = "Trade", with = 1, gave = {}, got = {} }, 20)
 	end
 	check("trading: log keeps the newest 20", #log == 20 and log[1].at == 6 and log[20].at == 25)
+end
+
+-- Monster Heists (Util/Heists, Config/Heists): who may rob whom, the daily caps, hearts and
+-- what a stolen monster loses.
+do
+	local Heists = require("../src/shared/Util/Heists")
+	local HeistConfig = require("../src/shared/Config/Heists")
+	local RobuxConfig = require("../src/shared/Config/Robux")
+
+	local function owner(): Heists.Owner
+		return {
+			tutorial = false,
+			playSeconds = HeistConfig.NewPlayerSeconds,
+			shield = true,
+			worth = HeistConfig.MinMansionWorth,
+			stealable = 3,
+			record = Heists.empty(),
+			beingRobbed = false,
+		}
+	end
+	local function thief(): Heists.Thief
+		return { userId = 7, tutorial = false, inHeist = false, lockedUntil = 0, charges = 1, hasRoom = true }
+	end
+	check("heist: can rob a fair mansion", Heists.blocked(owner(), thief(), 100) == nil)
+	local t = thief()
+	t.charges = 0
+	check("heist: needs a charge", Heists.blocked(owner(), t, 100) == "NoCharge")
+	t = thief()
+	t.lockedUntil = 150
+	check("heist: a slapped thief waits", Heists.blocked(owner(), t, 100) == "Locked")
+	check("heist: the lock runs out", Heists.blocked(owner(), t, 151) == nil)
+	t = thief()
+	t.tutorial = true
+	check("heist: not in the tutorial", Heists.blocked(owner(), t, 100) == "ThiefTutorial")
+	t = thief()
+	t.inHeist = true
+	check("heist: one heist at a time", Heists.blocked(owner(), t, 100) == "AlreadyStealing")
+	t = thief()
+	t.hasRoom = false
+	check("heist: needs room at home", Heists.blocked(owner(), t, 100) == "NoRoom")
+	local o = owner()
+	o.playSeconds = HeistConfig.NewPlayerSeconds - 1
+	check("heist: new players are shielded", Heists.blocked(o, thief(), 100) == "NewPlayer")
+	o.shield = false
+	check("heist: no shield in Studio", Heists.blocked(o, thief(), 100) == nil)
+	o = owner()
+	o.tutorial = true
+	check("heist: owners in the tutorial are safe", Heists.blocked(o, thief(), 100) == "NewPlayer")
+	o = owner()
+	o.worth = HeistConfig.MinMansionWorth - 1
+	check("heist: cheap mansions are safe", Heists.blocked(o, thief(), 100) == "TooPoor")
+	o = owner()
+	o.beingRobbed = true
+	check("heist: one thief per mansion", Heists.blocked(o, thief(), 100) == "Busy")
+	o = owner()
+	o.stealable = 0
+	check("heist: all hearted means safe", Heists.blocked(o, thief(), 100) == "AllHearted")
+
+	-- Daily caps.
+	o = owner()
+	Heists.rollDay(o.record, 5)
+	Heists.noteLoss(o.record, 7)
+	check("heist: same thief once a day", Heists.blocked(o, thief(), 100) == "SameThief")
+	local other = thief()
+	other.userId = 8
+	check("heist: another thief may", Heists.blocked(o, other, 100) == nil)
+	Heists.noteLoss(o.record, 8)
+	local third = thief()
+	third.userId = 9
+	check("heist: at most 2 losses a day", Heists.blocked(o, third, 100) == "LostEnough")
+	Heists.rollDay(o.record, 5)
+	check("heist: same day keeps the count", o.record.lost == 2)
+	Heists.rollDay(o.record, 6)
+	check("heist: a new day resets", o.record.lost == 0 and #o.record.robbedBy == 0 and o.record.lostTotal == 2)
+	check("heist: robbed again tomorrow", Heists.blocked(o, thief(), 100) == nil)
+
+	-- Every reason has its own message.
+	for _, reason in
+		{ "ThiefTutorial", "AlreadyStealing", "Locked", "NewPlayer", "TooPoor", "Busy", "LostEnough", "SameThief", "AllHearted", "NoRoom", "NoCharge" }
+	do
+		check(`heist: message for {reason}`, Heists.message(reason, "Sam", 5) ~= Heists.message("?", "Sam"))
+	end
+
+	-- Hearts.
+	local function mon(locked: boolean?): Value.CaughtMonster
+		return { uid = "u", monsterId = "Gravepup", size = "Normal", effects = {}, familiarity = 0.8, locked = locked }
+	end
+	check("heist: hearted monsters are safe", not Heists.canTake(mon(true)) and Heists.canTake(mon()))
+	check("heist: hearts are counted", Heists.hearts({ { mon(true), mon() }, { mon(true) } }) == 2)
+	if HeistConfig.MaxHearts then
+		check("heist: hearts up to the limit", Heists.canHeart(HeistConfig.MaxHearts - 1))
+		check("heist: no more hearts past it", not Heists.canHeart(HeistConfig.MaxHearts))
+	end
+
+	-- A stolen monster starts over.
+	local stolen = mon(true)
+	stolen.nickname = "Bob"
+	stolen.variant = "Gold"
+	Heists.handOver(stolen, 1234)
+	check("heist: Familiarity back to 0", stolen.familiarity == 0 and stolen.grownAt == 1234)
+	check("heist: tag and heart come off", stolen.nickname == nil and stolen.locked == nil)
+	check("heist: the rest goes along", stolen.variant == "Gold")
+
+	-- Teleports.
+	check("heist: walking is fine", not Heists.teleported(10, 5, 0.25))
+	check("heist: a jump across the hub is a teleport", Heists.teleported(300, 0, 0.25))
+
+	-- Saves.
+	local repaired = Heists.repair({ charges = 2.7, lost = "x" })
+	check("heist: repair keeps whole charges", repaired.charges == 2 and repaired.lost == 0)
+	check("heist: repair of nothing", Heists.repair(nil).charges == 0)
+	for key, count in HeistConfig.ProductCharges do
+		check(`heist: {key} is a Robux product`, RobuxConfig.Products[key] ~= nil and count > 0)
+	end
 end
 
 if failures > 0 then

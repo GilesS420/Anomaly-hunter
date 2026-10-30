@@ -316,6 +316,11 @@ local function onWarning(id: string?)
 	end
 end
 
+-- The alarm when someone starts robbing your mansion (HeistController): the bell toll.
+function SoundController.alarm()
+	playOnce("Toll", nil, "WorldAmbience")
+end
+
 -- A thunderclap for a lightning flash, a moment later (the storm is a little way off).
 function SoundController.thunder()
 	local sounds = if liveEvent then Sounds.Events[liveEvent] else nil

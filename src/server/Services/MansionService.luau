@@ -65,6 +65,8 @@ type State = {
 -- A room part as it stands in the world, with the recipe key (Rooms.key) it was built from.
 type Built = { key: string, part: BasePart }
 
+local hidden: { [Player]: { [string]: boolean } } = {} -- uids taken off the floor (MansionService.hide)
+
 local MonsterSpeed = 4 -- studs per second; mansion monsters stroll, zone monsters hurry
 local PillarHeight = 12
 local EdgeInset = 1.5 -- keeps roaming orbs off the floor edges and away from the pillars
@@ -462,6 +464,10 @@ end
 local function spawnMonster(state: State, caught: Value.CaughtMonster)
 	if mansions[state.player] ~= state then
 		return -- the owner left (or the mansion was rebuilt)
+	end
+	local hiddenHere = hidden[state.player]
+	if hiddenHere and caught.uid and hiddenHere[caught.uid] then
+		return -- in a thief's vacuum right now (HeistService)
 	end
 	local monster = Monsters[caught.monsterId]
 	if not monster then
@@ -1005,8 +1011,8 @@ function MansionService.move(player: Player, uid: string): (MoveResult, Value.Ca
 		DataService.saveSoon(player)
 		return "Ok", caught
 	end
-	if not indexOf(data.monsters, uid) then
-		return "NotFound", nil
+	if not indexOf(data.monsters, uid) or MansionService.isHidden(player, uid) then
+		return "NotFound", nil -- (a hidden one is in a thief's hands right now)
 	end
 	if not Storage.hasRoom(#data.storage, Perks.storageSlots(player)) then
 		return "StorageFull", nil
@@ -1096,6 +1102,52 @@ function MansionService.monsterModels(player: Player): { [string]: Model }
 		end
 	end
 	return out
+end
+
+-- The player's mansion Model in Workspace.Mansions, or nil while it isn't built.
+function MansionService.model(player: Player): Model?
+	local state = mansions[player]
+	return if state then state.model else nil
+end
+
+-- Takes a monster's orb out of the mansion while it stays in the save: a thief is carrying it
+-- off (HeistService). MansionService.unhide puts it back.
+function MansionService.hide(player: Player, uid: string)
+	local set = hidden[player] or {}
+	hidden[player] = set
+	set[uid] = true
+	local model = MansionService.monsterModels(player)[uid]
+	if model then
+		RoamService.remove(model)
+		model:Destroy()
+	end
+end
+
+-- True while this monster is hidden (being carried off by a thief): it can't be moved, hearted
+-- or sold until it's back.
+function MansionService.isHidden(player: Player, uid: string): boolean
+	local set = hidden[player]
+	return set ~= nil and set[uid] == true
+end
+
+-- Lets a hidden monster roam its mansion again (if it's still there).
+function MansionService.unhide(player: Player, uid: string)
+	local set = hidden[player]
+	if not set or not set[uid] then
+		return
+	end
+	set[uid] = nil
+	local state = mansions[player]
+	local data = DataService.get(player)
+	if not state or not data or MansionService.monsterModels(player)[uid] then
+		return
+	end
+	for _, caught in data.monsters do
+		if caught.uid == uid then
+			spawnMonster(state, caught)
+			return
+		end
+	end
 end
 
 -- Updates every monster's label from the save (after it got an effect, or as it gets more
@@ -1212,6 +1264,7 @@ function MansionService.start()
 		local state = mansions[player]
 		mansions[player] = nil
 		buying[player] = nil
+		hidden[player] = nil
 		if state then
 			clearMonsters(state)
 			state.model:Destroy()

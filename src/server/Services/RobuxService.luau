@@ -19,7 +19,7 @@
 -- Remotes in ReplicatedStorage.RobuxRemotes:
 --   Buy      client -> server (kind: string, arg: any) -> { ok, message }
 --            kinds: "Item" (item id), "ShopReroll", "MissionReroll", "MissionSkip" (mission
---            number), "StarterPack", "Pass" (pass key)
+--            number), "StarterPack", "Heist" ("HeistCharge" or "HeistBundle"), "Pass" (pass key)
 --   Granted  server -> client (kind: string)   something was paid out: refresh open windows
 -- ReplicatedStorage.RobuxPrices has an attribute per product and pass that is set up (its id
 -- isn't 0): its price in Robux, as Roblox knows it.
@@ -30,6 +30,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Config = require(ReplicatedStorage.Shared.Config.Robux)
+local HeistConfig = require(ReplicatedStorage.Shared.Config.Heists)
 local Missions = require(ReplicatedStorage.Shared.Util.Missions)
 local Robux = require(ReplicatedStorage.Shared.Util.Robux)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
@@ -174,6 +175,12 @@ local function payOut(player: Player, data: DataService.Data, key: string)
 		missionSkip(player, data, pending)
 	elseif key == "StarterPack" then
 		starterPack(player, data)
+	elseif HeistConfig.ProductCharges[key] then
+		local charges = HeistConfig.ProductCharges[key]
+		data.heist.charges += charges
+		player:SetAttribute("HeistCharges", data.heist.charges)
+		local word = if charges == 1 then "Heist Charge" else `{charges} Heist Charges`
+		Notify.toast(player, `You got {word}! Use one at another player's mansion worth sign.`)
 	else
 		error(`no payout for {key}`)
 	end
@@ -307,6 +314,11 @@ Buy.OnServerInvoke = function(player: Player, kind: unknown, arg: unknown): Resu
 			return { ok = false, message = "You already got the Starter Pack." }
 		end
 		return prompt(player, data, "StarterPack", nil)
+	elseif kind == "Heist" then
+		if typeof(arg) ~= "string" or not HeistConfig.ProductCharges[arg] then
+			return { ok = false, message = "That isn't for sale." }
+		end
+		return prompt(player, data, arg, nil)
 	elseif kind == "Pass" then
 		local pass = if typeof(arg) == "string" then Config.Passes[arg] else nil
 		if not pass then
@@ -412,6 +424,7 @@ function RobuxService.start()
 	end)
 	DataService.onLoaded(function(player, data)
 		player:SetAttribute("StarterPack", data.robux.starter)
+		player:SetAttribute("HeistCharges", data.heist.charges)
 		checkPasses(player, data)
 		vipTag(player)
 	end)

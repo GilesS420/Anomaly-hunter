@@ -10,6 +10,7 @@ export type Hunter = {
 	alive: boolean,
 	zone: string?, -- the zone they're in; nil in the hub (or their mansion)
 	tutorial: boolean,
+	stealing: boolean?, -- on a Monster Heist: can be slapped on a mansion plot too
 	x: number,
 	z: number,
 }
@@ -55,9 +56,10 @@ function Slap.blocked(
 		return "Apart"
 	elseif
 		slapper.zone == nil
+		and not target.stealing
 		and (Travel.inPlot(slapper.x, slapper.z) or Travel.inPlot(target.x, target.z))
 	then
-		return "Mansion" -- mansions are safe
+		return "Mansion" -- mansions are safe, except for thieves
 	end
 	local distance = math.sqrt((slapper.x - target.x) ^ 2 + (slapper.z - target.z) ^ 2)
 	if distance > reach then

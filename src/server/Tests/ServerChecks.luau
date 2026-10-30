@@ -322,6 +322,11 @@ local function checkSave(player: Player)
 			and #robux.receipts <= RobuxConfig.ReceiptsKept,
 		`Robux record is sound ({if typeof(robux) == "table" then #robux.receipts else 0} receipts kept)`
 	)
+	local heist = data.heist
+	check(
+		typeof(heist) == "table" and heist.charges >= 0 and heist.charges == math.floor(heist.charges),
+		`Heist record is sound ({if typeof(heist) == "table" then heist.charges else "?"} charges)`
+	)
 	local cakeLimit = Cakes.limit(data.wingsOwned, Perks.cakesPerWing(player))
 	if #data.cakes > cakeLimit then
 		note(`{#data.cakes} cakes out with room for {cakeLimit} (fine after /wings, odd otherwise)`)

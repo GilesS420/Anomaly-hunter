@@ -1,6 +1,7 @@
 --!strict
 -- The Robux Store window, from the coin button in the HUD menu: the Game Passes (Config/Robux)
--- and the once-only Starter Pack, each with what it does and a Robux button (or Owned).
+-- the once-only Starter Pack and Heist Charges, each with what it does and a Robux button (or
+-- Owned).
 -- Shop items, the Shop Reroll and mission rerolls and skips are bought where they're used:
 -- in the Bakery, Workshop, Vault and Missions windows.
 -- Also gives VIP Hunters a gold [VIP] in front of their chat messages.
@@ -103,6 +104,25 @@ function StoreController.start()
 					else nil
 			)
 		end
+		-- Monster Heists (server/Services/HeistService): charges to rob other players' mansions.
+		local charges = player:GetAttribute("HeistCharges")
+		local have = if typeof(charges) == "number" then charges else 0
+		for order, key in { "HeistCharge", "HeistBundle" } do
+			local product = Config.Products[key]
+			local price = Robux.price(key)
+			row(
+				30 + order,
+				product.name,
+				`Rob another player's mansion: use it at their worth sign, then vacuum a monster and run it home. You have {have}.`,
+				Robux.label(key),
+				if price then Robux.Color else Ui.Colors.off,
+				if price
+					then function()
+						Robux.buy("Heist", key)
+					end
+					else nil
+			)
+		end
 	end
 
 	local function toggle()
@@ -120,7 +140,10 @@ function StoreController.start()
 		end
 	end)
 	player.AttributeChanged:Connect(function(name)
-		if window.isOpen() and (string.sub(name, 1, 4) == "Pass" or name == "StarterPack") then
+		if
+			window.isOpen()
+			and (string.sub(name, 1, 4) == "Pass" or name == "StarterPack" or name == "HeistCharges")
+		then
 			render()
 		end
 	end)

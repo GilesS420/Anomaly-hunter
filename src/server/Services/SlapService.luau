@@ -5,7 +5,7 @@
 -- knocked back, and if they were catching a monster it breaks loose, dazed for a moment, so
 -- whoever is quickest can catch it. A slapped
 -- hunter is guarded for a few seconds so nobody can keep them pinned. Mansion plots and the
--- tutorial are safe.
+-- tutorial are safe, except for a thief on a Monster Heist (HeistService): slap them anywhere.
 --
 -- Remotes in ReplicatedStorage.SlapRemotes:
 --   Slap     client -> server (target: Player)
@@ -14,9 +14,9 @@
 -- Player attributes:
 --   Slapper          the best slapper they own (set by HuntService.refreshItems); nil = none
 --   SlapGuardUntil   server time: nobody can slap them until then
---   Stealing         true while they're stealing a monster (set by the heist code, Sprint E)
+--   Stealing         true while they're on a Monster Heist (set by HeistService)
 --   StealLockedUntil server time: a slap stopped their stealing, and they can't steal again
---                    until then (the heist code must check it)
+--                    until then (HeistService checks it)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,6 +24,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SlapConfig = require(ReplicatedStorage.Shared.Config.Slap)
 local Slap = require(ReplicatedStorage.Shared.Util.Slap)
 local CatchService = require(script.Parent.CatchService)
+local HeistService = require(script.Parent.HeistService)
 local Notify = require(script.Parent.Parent.Notify)
 
 local SlapService = {}
@@ -52,6 +53,7 @@ local function hunter(player: Player): (Slap.Hunter?, BasePart?)
 		alive = humanoid.Health > 0,
 		zone = if typeof(zone) == "string" then zone else nil,
 		tutorial = player:GetAttribute("Tutorial") ~= nil,
+		stealing = player:GetAttribute("Stealing") == true,
 		x = root.Position.X,
 		z = root.Position.Z,
 	},
@@ -108,6 +110,8 @@ local function onSlap(player: Player, target: unknown)
 		local untilTime = Slap.stealLockUntil(tool, now, if typeof(locked) == "number" then locked else nil)
 		target:SetAttribute("StealLockedUntil", untilTime)
 		local seconds = math.ceil(untilTime - now)
+		CatchService.interrupt(target, `{player.DisplayName} slapped you!`)
+		HeistService.slapped(target, player) -- whatever they stole flies back home
 		Notify.toast(target, `{player.DisplayName} slapped you! You can't steal for {seconds} seconds.`)
 		Notify.toast(player, `SLAP! {target.DisplayName} can't steal for {seconds} seconds.`)
 		return
