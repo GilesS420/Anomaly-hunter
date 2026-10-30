@@ -38,6 +38,7 @@ local Nickname = require(ReplicatedStorage.Shared.Util.Nickname)
 local Rarities = require(ReplicatedStorage.Shared.Config.Rarities)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
+local Weight = require(ReplicatedStorage.Shared.Util.Weight)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local CakeModel = require(script.Parent.Parent.CakeModel)
 local DataService = require(script.Parent.DataService)
@@ -421,11 +422,20 @@ end
 -- Monsters in Storage as hotbar Tools ------------------------------------------------------
 
 local PlaceAhead = 4 -- studs in front of you
-local HeldSize = 3 -- studs, the longest side of a carried monster whatever its real size
 local SyncSeconds = 1
 local placing: { [Player]: boolean } = {}
 
--- A small copy of the monster, carried over your head (every client raises the carrier's
+-- What a carried copy is built from: size, weight (a Titan's drawn size), variant and effects.
+-- The Tool is rebuilt when this changes (a Growth Chamber win, a Variant Machine pull).
+local function carryKey(caught: Value.CaughtMonster): string
+	return `{caught.size}|{Weight.drawScale(caught.size, caught.kg)}|{caught.variant or ""}|{table.concat(
+		Value.resolveEffects(caught.effects),
+		","
+	)}`
+end
+
+-- A copy of the monster at the size it has in the mansion (so a Titan is a Titan in your
+-- hands too, Giles 2026-10-30), carried over your head (every client raises the carrier's
 -- arms, CarryController). The Tool has no
 -- Handle (so Roblox doesn't put it in one hand with its own hold pose): the copy is welded on
 -- top of your head when you take it out, and unwelded when you put it away.
@@ -436,11 +446,29 @@ local function monsterTool(player: Player, caught: Value.CaughtMonster, rarity: 
 	tool.ToolTip = "Click in your mansion to place it there"
 	tool:SetAttribute("Section", "Monster")
 	tool:SetAttribute("MonsterUid", caught.uid)
-	local model = monsterLook(caught, rarity)
-	local _, size = model:GetBoundingBox()
-	model:ScaleTo(model:GetScale() * HeldSize / math.max(size.X, size.Y, size.Z))
-	local box, boxSize = model:GetBoundingBox()
+	tool:SetAttribute("CarryKey", carryKey(caught))
+	local radius = MonsterModel.radius(caught.size, caught.monsterId, caught.kg)
+	local model = MonsterModel.build({
+		monsterId = caught.monsterId,
+		rarity = rarity,
+		size = caught.size,
+		kg = caught.kg,
+		roamRadius = MonsterModel.roamRadius(radius), -- the same blocks as in the mansion
+		effects = Value.resolveEffects(caught.effects),
+		variant = caught.variant,
+	})
 	local body = model.PrimaryPart :: BasePart
+	for _, child in body:GetChildren() do
+		if child:IsA("BillboardGui") or child:IsA("PointLight") then
+			child:Destroy() -- no name tag or wild-monster glow on your head
+		end
+	end
+	if body.Transparency >= 1 then
+		-- With a look, the Body ball is just an invisible press target; shrink it so the copy's
+		-- bottom is its feet, not the ball's (a Titan's ball hangs well below them).
+		body.Size = Vector3.one * 0.2
+	end
+	local box, boxSize = model:GetBoundingBox()
 	-- where the body sits relative to the bottom middle of the copy
 	local fromBottom = (box * CFrame.new(0, -boxSize.Y / 2, 0)):ToObjectSpace(body.CFrame)
 	for _, child in model:GetChildren() do
@@ -525,7 +553,8 @@ function InventoryService.syncMonsterTools(player: Player)
 		for _, child in container:GetChildren() do
 			local uid = child:GetAttribute("MonsterUid")
 			if child:IsA("Tool") and typeof(uid) == "string" then
-				if not stored[uid] or have[uid] then
+				local caught = stored[uid]
+				if not caught or have[uid] or child:GetAttribute("CarryKey") ~= carryKey(caught) then
 					child:Destroy()
 				else
 					have[uid] = child
