@@ -6,7 +6,7 @@
 --
 -- Laid out to need little scrolling and few taps (Giles 2026-10-22, 2026-10-24): a "Works on"
 -- dropdown at the top (Me, Everyone, or any player in the server), tabs down the left (Player,
--- Mansion, Items, Spawn, Events, Restock, Announce) and one short page per tab. Most things are one tap: quick
+-- Mansion, Items, Spawn, Give, Events, Restock, Announce) and one short page per tab. Most things are one tap: quick
 -- amounts, a button per wing and per size, and a button per Watcher event (the Awakening once
 -- per monster set) with Stop next to them. Dropdowns only for long lists (items, monsters).
 -- Events, Restock, Announce and "Reset my save" ignore "Works on".
@@ -15,6 +15,10 @@
 -- all cakes / all Workshop items, or one item at a time), then "Restock now" puts exactly that
 -- in stock in this server for the minutes given (server/AdminRestock). Announce sends a
 -- banner to everyone in this server.
+--
+-- Give (Giles 2026-10-30): give a brand-new monster with a picked size or weight, variant and
+-- effects, or add effects to a monster the player already has (picked from their list, which
+-- comes from Remotes.AdminMonsters, admins only).
 --
 -- Each button sends
 --   ReplicatedStorage.Remotes.AdminCommand   client -> server: (command, argument?, targetUserId?)
@@ -25,12 +29,15 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
+local Effects = require(ReplicatedStorage.Shared.Config.Effects)
 local Events = require(ReplicatedStorage.Shared.Config.Events)
+local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Restock = require(ReplicatedStorage.Shared.Util.Restock)
 local Watcher = require(ReplicatedStorage.Shared.Util.Watcher)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Sizes = require(ReplicatedStorage.Shared.Config.Sizes)
+local Variants = require(ReplicatedStorage.Shared.Config.Variants)
 local Wings = require(ReplicatedStorage.Shared.Config.Wings)
 local Zones = require(ReplicatedStorage.Shared.Config.Zones)
 local Scale = require(script.Parent.Parent.Scale)
@@ -49,6 +56,7 @@ local PopupMaxHeight = 240
 local TimelineLength = 5 -- events shown on the Events tab's timeline
 
 local remote: RemoteEvent
+local monstersRemote: RemoteFunction
 local window: Ui.Window
 local target = "me" -- "me", Everyone, or a UserId as text
 
@@ -349,6 +357,43 @@ for _, event in Events.List do
 	end
 end
 
+-- Variants for a given monster, plainest first.
+local variantList: { Option } = { { label = "No variant", value = "None" } }
+for i = #Variants, 1, -1 do
+	local variant = Variants[i]
+	table.insert(variantList, { label = `{variant.id} (x{variant.multiplier})`, value = variant.id })
+end
+
+-- Every effect by name, then every combo (giving a combo gives both its effects).
+local effectList: { Option } = {}
+local effectNames: { [string]: string } = {}
+do
+	local ids: { string } = {}
+	for id in Effects.List do
+		table.insert(ids, id)
+	end
+	table.sort(ids)
+	for _, id in ids do
+		local effect = Effects.List[id]
+		table.insert(
+			effectList,
+			{ label = `{Format.name(id)} (x{effect.multiplier}, {effect.source})`, value = id }
+		)
+		effectNames[id] = Format.name(id)
+	end
+	local combos: { string } = {}
+	for id in Effects.Combos do
+		table.insert(combos, id)
+	end
+	table.sort(combos)
+	for _, id in combos do
+		local combo = Effects.Combos[id]
+		local recipe = `{Format.name(combo.recipe[1])} + {Format.name(combo.recipe[2])}`
+		table.insert(effectList, { label = `Combo: {Format.name(id)} ({recipe})`, value = id })
+		effectNames[id] = `{Format.name(id)} combo`
+	end
+end
+
 local function fixed(list: { Option }): () -> { Option }
 	return function()
 		return list
@@ -393,9 +438,13 @@ local function build()
 		window.status.Text =
 			`Buttons work on {name}. Events, Restock, Announce and Reset my save don't change.`
 	end
+	local onTargetChanged: (() -> ())? = nil
 	local _, pickTarget = dropdown(bar, 200, playerOptions, "me", function(value)
 		target = value
 		describe()
+		if onTargetChanged then
+			task.spawn(onTargetChanged)
+		end
 	end)
 	describe()
 	Players.PlayerRemoving:Connect(function(other)
@@ -588,6 +637,164 @@ local function build()
 		send("/spawn", "all Normal")
 	end)
 
+	-- Give (Giles 2026-10-30): a brand-new monster with the size, variant, weight and effects
+	-- picked here, or more effects on a monster the player already has.
+	local givePage = page("Give")
+	local refreshTheirs: () -> ()
+	local giveMonsterRow = row(givePage, "Monster")
+	local giveMonster =
+		dropdown(giveMonsterRow, 260, fixed(monsterList), monsterList[1] and monsterList[1].value)
+	local giveSizeRow = row(givePage, "Size")
+	local giveSize = dropdown(giveSizeRow, 120, fixed(sizeList), "Normal")
+	local giveKg = input(giveSizeRow, "or kg", nil, 70)
+	Ui.text(
+		giveSizeRow,
+		"a weight sets the size",
+		UDim2.fromOffset(160, RowHeight),
+		Ui.Colors.muted,
+		false,
+		14
+	).LayoutOrder =
+		nextOrder()
+	local giveVariantRow = row(givePage, "Variant")
+	local giveVariant = dropdown(giveVariantRow, 160, fixed(variantList), "None")
+	local giveEffectRow = row(givePage, "Effects")
+	local giveEffect = dropdown(giveEffectRow, 260, fixed(effectList), effectList[1] and effectList[1].value)
+	local picked: { string } = {}
+	local pickedText: TextLabel
+	local function showPicked()
+		local names: { string } = {}
+		for _, id in picked do
+			table.insert(names, effectNames[id])
+		end
+		pickedText.Text = if #names > 0
+			then `Effects on it: {table.concat(names, ", ")}`
+			else "No effects: pick one and press Add (as many as you like)."
+	end
+	button(giveEffectRow, "Add", Ui.Colors.equip, 60, function()
+		local id = giveEffect()
+		if id and not table.find(picked, id) then
+			table.insert(picked, id)
+			showPicked()
+		end
+	end)
+	button(giveEffectRow, "Clear", Ui.Colors.off, 70, function()
+		table.clear(picked)
+		showPicked()
+	end)
+	pickedText = Ui.text(givePage, "", UDim2.new(1, 0, 0, 0), Ui.Colors.text, false, 16)
+	pickedText.LayoutOrder = nextOrder()
+	pickedText.AutomaticSize = Enum.AutomaticSize.Y
+	pickedText.TextScaled = false
+	pickedText.TextSize = 16
+	pickedText.TextWrapped = true
+	pickedText.TextTruncate = Enum.TextTruncate.None
+	pickedText.TextXAlignment = Enum.TextXAlignment.Left
+	showPicked()
+	local giveRow = row(givePage, "")
+	button(giveRow, "Give monster", Ui.Colors.buy, 140, function()
+		local id = giveMonster()
+		if not id then
+			return
+		end
+		local parts = { id }
+		local kgText = giveKg()
+		if kgText then
+			local kg = tonumber(kgText)
+			if not kg or kg ~= kg or kg <= 0 then
+				window.status.Text = "Weight: a number of kg, like 120 (or leave it empty)."
+				return
+			end
+			table.insert(parts, `{kg}kg`)
+		else
+			table.insert(parts, giveSize() or "Normal")
+		end
+		local variant = giveVariant()
+		if variant and variant ~= "None" then
+			table.insert(parts, variant)
+		end
+		for _, effectId in picked do
+			table.insert(parts, effectId)
+		end
+		send("/givemonster", table.concat(parts, " "))
+		task.delay(1, refreshTheirs)
+	end)
+
+	-- More effects on a monster they already have (one player at a time).
+	local addHeading = Ui.text(
+		givePage,
+		"Add an effect to one of their monsters",
+		UDim2.new(1, 0, 0, 24),
+		Ui.Colors.lamp,
+		true,
+		18
+	)
+	addHeading.LayoutOrder = nextOrder()
+	addHeading.TextXAlignment = Enum.TextXAlignment.Left
+	local theirs: { Option } = {}
+	local theirRow = row(givePage, "Theirs")
+	local theirMonster, pickTheirs = dropdown(theirRow, 400, function()
+		return if #theirs > 0
+			then theirs
+			else { { label = "No monsters (or Everyone is picked)", value = "" } }
+	end, "")
+	button(theirRow, "Refresh", Ui.Colors.off, 80, function()
+		task.spawn(refreshTheirs)
+	end)
+	local addRow = row(givePage, "Effect")
+	local addEffect = dropdown(addRow, 260, fixed(effectList), effectList[1] and effectList[1].value)
+	button(addRow, "Add effect", Ui.Colors.buy, 110, function()
+		local uid, id = theirMonster(), addEffect()
+		if target == Everyone then
+			window.status.Text = "Add effect works on one player: pick them in Works on."
+			return
+		end
+		if not uid or uid == "" or not id then
+			window.status.Text = "Pick one of their monsters first."
+			return
+		end
+		send("/addeffect", `{uid} {id}`)
+		task.delay(1, refreshTheirs)
+	end)
+
+	-- Asks the server for the picked player's monsters (only admins get an answer).
+	local refreshing = false
+	refreshTheirs = function()
+		if refreshing then
+			return
+		end
+		refreshing = true
+		table.clear(theirs)
+		if target ~= Everyone then
+			local targetId = if target == "me" then nil else tonumber(target)
+			local ok, rows = pcall(function()
+				return monstersRemote:InvokeServer(targetId)
+			end)
+			if ok and type(rows) == "table" then
+				for _, monsterRow in rows do
+					if
+						type(monsterRow) == "table"
+						and type(monsterRow.uid) == "string"
+						and type(monsterRow.label) == "string"
+					then
+						table.insert(theirs, { label = monsterRow.label, value = monsterRow.uid })
+					end
+				end
+			end
+		end
+		local current = theirMonster()
+		local kept = false
+		for _, option in theirs do
+			kept = kept or option.value == current
+		end
+		pickTheirs(if kept and current then current elseif theirs[1] then theirs[1].value else "")
+		refreshing = false
+	end
+	onTargetChanged = refreshTheirs
+	tabs["Give"].Activated:Connect(function()
+		task.spawn(refreshTheirs)
+	end)
+
 	-- Events (Watcher events reach everyone). Tapping one starts it now, ending one that's
 	-- playing.
 	local server = page("Events")
@@ -671,7 +878,14 @@ local function build()
 	end
 	local amountRow = row(restock, "Amount")
 	local amountBox = input(amountRow, "per player", "10", 80)
-	Ui.text(amountRow, "each player can buy (0 = sold out)", UDim2.fromOffset(250, RowHeight), Ui.Colors.muted, false, 14).LayoutOrder =
+	Ui.text(
+		amountRow,
+		"each player can buy (0 = sold out)",
+		UDim2.fromOffset(250, RowHeight),
+		Ui.Colors.muted,
+		false,
+		14
+	).LayoutOrder =
 		nextOrder()
 	local function amount(): number?
 		local value = tonumber(amountBox())
@@ -730,7 +944,14 @@ local function build()
 	showPlanned()
 	local minutesRow = row(restock, "Lasts")
 	local minutesBox = input(minutesRow, "min", tostring(Restock.DefaultMinutes), 60)
-	Ui.text(minutesRow, `minutes (1 to {Restock.MaxMinutes})`, UDim2.fromOffset(160, RowHeight), Ui.Colors.muted, false, 14).LayoutOrder =
+	Ui.text(
+		minutesRow,
+		`minutes (1 to {Restock.MaxMinutes})`,
+		UDim2.fromOffset(160, RowHeight),
+		Ui.Colors.muted,
+		false,
+		14
+	).LayoutOrder =
 		nextOrder()
 	local goRow = row(restock, "Go")
 	button(goRow, "Restock now", Ui.Colors.buy, 120, function()
@@ -839,6 +1060,7 @@ function AdminController.start()
 		player:GetAttributeChangedSignal("Admin"):Wait()
 	end
 	remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AdminCommand") :: RemoteEvent
+	monstersRemote = ReplicatedStorage.Remotes:WaitForChild("AdminMonsters") :: RemoteFunction
 	build()
 	UserInputService.InputBegan:Connect(function(inputObject, processed)
 		if not processed and inputObject.KeyCode == Enum.KeyCode.F2 then

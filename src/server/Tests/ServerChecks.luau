@@ -52,6 +52,7 @@ ServerChecks.KnownRemotes = {
 	"Remotes.Toast",
 	"Remotes.MutationLog",
 	"Remotes.AdminCommand",
+	"Remotes.AdminMonsters",
 	"Remotes.Announcement",
 	"Remotes.AwayBook",
 	"StandRemotes.Talk",
@@ -172,6 +173,9 @@ local function checkAdmins()
 	local remote = ReplicatedStorage:FindFirstChild("Remotes")
 	remote = remote and remote:FindFirstChild("AdminCommand")
 	check(remote ~= nil and remote:IsA("RemoteEvent"), "the admin panel's remote exists")
+	local list = ReplicatedStorage:FindFirstChild("Remotes")
+	list = list and list:FindFirstChild("AdminMonsters")
+	check(list ~= nil and list:IsA("RemoteFunction"), "the admin panel's monster list exists")
 end
 
 local function checkRemotes()
