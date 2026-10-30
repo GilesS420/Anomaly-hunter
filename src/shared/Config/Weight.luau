@@ -54,12 +54,12 @@ Weight.SpurtMin = 0.05
 Weight.SpurtMax = 0.6
 Weight.SpurtSkew = 3
 
--- Titans are drawn from TitanStartScale (Normal = 1) and TitanScaleStep bigger each time they
--- double in weight, with no limit: weight, price and drawn size all keep growing.
--- (EngineMaxScale only keeps every block under Roblox's 2048-stud part limit; no Titan gets
--- near it, that would take hundreds of doublings.)
-Weight.TitanStartScale = 3.5
-Weight.TitanScaleStep = 0.5
+-- Titans are drawn TitanStartScale big (Normal = 1) at 500 kg and grow with the square root of
+-- their weight from there (4x the kg = 2x as big): 533 kg about 5.2, 1 t about 7, 2 t 10,
+-- 5 t about 16, 20 t about 32. Every growth spurt shows. No limit (Giles 2026-10-30):
+-- EngineMaxScale only keeps every block under Roblox's 2048-stud part limit (about 18,000 t).
+Weight.TitanStartScale = 5
+Weight.TitanScaleStep = 0.05 -- drawn sizes are rounded to this, so tiny gains don't rebuild it
 Weight.EngineMaxScale = 300
 
 -- However big a monster is drawn, it walks the mansion floors as if it were this wide
