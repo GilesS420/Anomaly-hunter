@@ -513,6 +513,18 @@ local function spawnMonster(state: State, caught: Value.CaughtMonster)
 	model.Parent = state.monsters
 end
 
+-- How big the best monster is drawn on the trophy stand: its longest side in studs, one set
+-- size per size class (Giles 2026-10-30), like the old carried copy.
+local TrophySize: { [string]: number } = {
+	Tiny = 2,
+	Small = 2.5,
+	Normal = 3,
+	Big = 3.5,
+	Huge = 4,
+	Colossal = 5,
+	Titan = 6,
+}
+
 -- The worth sign and the trophy stand out front: the total value of the mansion's monsters,
 -- and the most valuable one standing on the stand. Called whenever monsters come, go, grow
 -- or get more familiar.
@@ -559,9 +571,29 @@ function updateShowcase(state: State)
 	model.Name = "BestMonster"
 	local body = model.PrimaryPart :: BasePart
 	body.CanQuery = false -- just for show: no catching or picking up from the stand
-	local radius = MonsterModel.radius(caught.size, caught.monsterId, caught.kg)
-	local top = state.trophy.Position + Vector3.new(0, state.trophy.Size.Y / 2 + radius + 0.2, 0)
-	model:PivotTo(CFrame.new(top) * state.trophy.CFrame.Rotation)
+	-- Not its mansion size: a set size per size class (Giles 2026-10-30), so a 20 t Titan
+	-- still fits on the stand. The invisible Body ball doesn't count, only the blocks.
+	if body.Transparency >= 1 then
+		body.Size = Vector3.one * 0.2
+	end
+	local _, size = model:GetBoundingBox()
+	local longest = TrophySize[caught.size] or TrophySize.Normal
+	model:ScaleTo(model:GetScale() * longest / math.max(size.X, size.Y, size.Z))
+	model:PivotTo(CFrame.new(body.Position) * state.trophy.CFrame.Rotation)
+	local box, boxSize = model:GetBoundingBox()
+	-- stand it on the stand by its feet, label just above its head
+	local bottom = box.Position.Y - boxSize.Y / 2
+	local standTop = state.trophy.Position.Y + state.trophy.Size.Y / 2 + 0.1
+	model:PivotTo(model:GetPivot() + Vector3.new(
+		state.trophy.Position.X - body.Position.X,
+		standTop - bottom,
+		state.trophy.Position.Z - body.Position.Z
+	))
+	local label = body:FindFirstChild("Label")
+	if label and label:IsA("BillboardGui") then
+		local headroom = box.Position.Y + boxSize.Y / 2 - body.Position.Y
+		label.StudsOffset = Vector3.new(0, headroom + 1.2, 0)
+	end
 	model.Parent = state.trophy.Parent
 end
 
