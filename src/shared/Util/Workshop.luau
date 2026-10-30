@@ -262,7 +262,7 @@ function Workshop.describe(item: Shop.Item): string
 	elseif item.kind == "Slapper" then
 		for _, slapper in SlapConfig.Slappers do
 			if slapper.id == item.id then
-				return `Slap hunters (Q or the Slap button) · reach {slapper.reach} · push {slapper.push}`
+				return `Hold it and click a hunter to slap · reach {slapper.reach} · push {slapper.push}`
 					.. ` · a slapped thief can't steal for {Workshop.duration(slapper.stealLockSeconds)}`
 			end
 		end

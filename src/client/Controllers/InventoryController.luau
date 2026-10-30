@@ -305,7 +305,7 @@ function InventoryController.start()
 			local key = `i:{item.id}`
 			local caption = if item.tool
 				then (if item.equipped then "Using" else item.name)
-				-- your best slapper is the one in use (the hotbar, the Slap button and Q)
+				-- your best slapper is the one in use (the one in your hotbar)
 				elseif item.kind == "Slapper" then (if item.equipped then "Using" else item.name)
 				else `x{item.count}`
 			card(

@@ -1,6 +1,6 @@
 --!strict
 -- Who may slap whom, and with which slapper (Config/Slap). Shared by the server, which
--- decides, and the client, which only shows the Slap button when a slap would land. Pure, so
+-- decides, and the client, which only shows the Slap sign when a slap would land. Pure, so
 -- tests/run.luau can check it.
 
 local SlapConfig = require("../Config/Slap")

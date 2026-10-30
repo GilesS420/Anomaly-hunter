@@ -267,7 +267,7 @@ end
 
 local function toolName(data: DataService.Data, item: Shop.Item): string?
 	if item.kind == "Slapper" then
-		-- Only your best slapper is in the hotbar (the one the Slap button and Q use); the
+		-- Only your best slapper is in the hotbar (hold it to slap: Giles 2026-10-30); the
 		-- others stay in the Backpack window, like old vacuums.
 		local best = Slap.best(data.inventory)
 		return if best and best.id == item.id then item.name else nil
@@ -341,7 +341,7 @@ local function syncTools(player: Player)
 			end)
 		elseif item.kind == "Slapper" then
 			-- The client slaps the closest hunter in reach when you click (SlapController).
-			tool.ToolTip = "Click next to a hunter to slap them (or press Q)"
+			tool.ToolTip = "Click next to a hunter to slap them"
 		elseif item.kind == "Tag" then
 			-- The client opens the name box for the monster you click (NameTagController).
 			tool.ToolTip = "Click one of your monsters to give it a name"
@@ -367,7 +367,7 @@ function HuntService.refreshItems(player: Player)
 			player:SetAttribute(`{item.id}s`, if data then itemCount(data, item.id) else 0)
 		end
 	end
-	-- The best slapper they own (SlapService and the Slap button use it); nil = can't slap.
+	-- The best slapper they own (in the hotbar; SlapService checks it is held); nil = can't slap.
 	local slapper = if data then Slap.best(data.inventory) else nil
 	player:SetAttribute("Slapper", if slapper then slapper.id else nil)
 	setCarrying(player, carrying[player])

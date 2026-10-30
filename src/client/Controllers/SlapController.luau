@@ -2,8 +2,9 @@
 -- Slapping (server/Services/SlapService.luau decides). Only with a slapper from the Workshop
 -- (the player attribute Slapper, your best one; its reach is how close you must be). When
 -- another hunter is close enough to slap (Util/Slap: same zone or both in the open hub, not on a mansion plot, not in the
--- tutorial, not just slapped), a round Slap button shows in the bottom-right corner with
--- their name. Tap or click it, press Q, or hold your slapper from the hotbar and click.
+-- tutorial, not just slapped) and you hold your slapper from the hotbar (Giles 2026-10-30: it
+-- must be in your hand, so slapping isn't just a key press), a round Slap sign shows in the
+-- bottom-right corner with their name. Click or tap anywhere (or the sign) to slap.
 -- Slapping someone who is catching makes their
 -- monster break loose, so you can try to catch it first.
 -- Everyone sees a "SLAP!" pop over the slapped hunter; the slapped hunter's own client throws
@@ -175,9 +176,16 @@ function SlapController.start()
 	local target: Player? = nil
 	local readyAt = 0 -- server time our cooldown ends
 
+	-- The slapper in your hand, or nil.
+	local function holding(): Tool?
+		local tool = player.Character and player.Character:FindFirstChildOfClass("Tool")
+		local id = tool and tool:GetAttribute("ToolId")
+		return if tool and id == player:GetAttribute("Slapper") then tool else nil
+	end
+
 	local function slap()
 		local who = target
-		if not who or workspace:GetServerTimeNow() < readyAt then
+		if not who or not holding() or workspace:GetServerTimeNow() < readyAt then
 			return
 		end
 		readyAt = workspace:GetServerTimeNow() + SlapConfig.CooldownSeconds
@@ -186,7 +194,7 @@ function SlapController.start()
 
 	button.Activated:Connect(slap)
 
-	-- Your best slapper is also in the hotbar (HuntService): hold it and click to slap.
+	-- Your best slapper is in the hotbar (HuntService): hold it and click to slap.
 	local function watch(tool: Instance)
 		if not tool:IsA("Tool") or tool:GetAttribute("SlapWatched") then
 			return
@@ -221,11 +229,6 @@ function SlapController.start()
 			follow(child) -- a new one after respawning
 		end
 	end)
-	UserInputService.InputBegan:Connect(function(input, processed)
-		if not processed and input.KeyCode == Enum.KeyCode.Q then
-			slap()
-		end
-	end)
 
 	local since = 0
 	local cooling = false
@@ -235,7 +238,7 @@ function SlapController.start()
 			return
 		end
 		since = 0
-		target = closestTarget()
+		target = if holding() then closestTarget() else nil
 		local who = target
 		button.Visible = who ~= nil
 		if not who then
@@ -243,7 +246,7 @@ function SlapController.start()
 		end
 		name.Text = who.DisplayName
 		local left = readyAt - workspace:GetServerTimeNow()
-		word.Text = if left > 0 then `{math.ceil(left)}s` elseif touch then "SLAP" else "SLAP (Q)"
+		word.Text = if left > 0 then `{math.ceil(left)}s` else "SLAP"
 		if (left > 0) ~= cooling then
 			cooling = left > 0
 			button.AutoButtonColor = not cooling
