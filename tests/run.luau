@@ -2472,6 +2472,14 @@ do
 		"a new Titan starts at TitanStartScale",
 		near(Weight.drawScale("Titan", 500), WeightConfig.TitanStartScale)
 	)
+	check(
+		"a 2 t Titan is drawn twice as big as a new one",
+		near(Weight.drawScale("Titan", 2000), 2 * WeightConfig.TitanStartScale)
+	)
+	check(
+		"a 533 kg Titan is drawn bigger than a new one",
+		Weight.drawScale("Titan", 533) > WeightConfig.TitanStartScale
+	)
 	check("other sizes draw at their Sizes scale", near(Weight.drawScale("Huge", 50), 1.7))
 	check(
 		"value uses the weight",
