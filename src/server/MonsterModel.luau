@@ -38,6 +38,7 @@ export type Info = {
 	-- left out, the tag shows base value x size
 	kg: number?, -- mansion monsters: its weight (a Titan is drawn bigger as it grows)
 	nickname: string?, -- mansion monsters: the name its owner gave it (a Name Tag)
+	steal: string?, -- mansion monsters: the Robux product that steals it (Util/Heists.productFor)
 	roamRadius: number?, -- mansion monsters: the width it walks at, if less than its drawn
 	-- radius (MonsterModel.roamRadius); it stands that high above the floor
 }
@@ -210,6 +211,7 @@ function MonsterModel.refresh(model: Model, info: Info)
 		end
 	end
 	model:SetAttribute("Nickname", info.nickname) -- the Name Tag box shows it (NameTagController)
+	model:SetAttribute("StealProduct", info.steal) -- the Steal prompt's price (StealController)
 	local billboard = body:FindFirstChild("Label")
 	local name = billboard and billboard:FindFirstChild("Name")
 	if name and name:IsA("TextLabel") then

@@ -324,8 +324,8 @@ local function checkSave(player: Player)
 	)
 	local heist = data.heist
 	check(
-		typeof(heist) == "table" and heist.charges >= 0 and heist.charges == math.floor(heist.charges),
-		`Heist record is sound ({if typeof(heist) == "table" then heist.charges else "?"} charges)`
+		typeof(heist) == "table" and heist.playSeconds >= 0 and heist.lost >= 0,
+		`Steal record is sound ({if typeof(heist) == "table" then heist.lostTotal else "?"} lost in all)`
 	)
 	local cakeLimit = Cakes.limit(data.wingsOwned, Perks.cakesPerWing(player))
 	if #data.cakes > cakeLimit then
