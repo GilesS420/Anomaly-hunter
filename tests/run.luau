@@ -3471,6 +3471,43 @@ do
 	check("robux: $1M is the smallest tier", Robux.tierFor(1_000_000) == "ItemTier1")
 	check("robux: just over $1M is the next", Robux.tierFor(1_000_001) == "ItemTier2")
 	check("robux: $60B is the biggest tier", Robux.tierFor(60_000_000_000) == "ItemTier5")
+	-- Vacuums and slappers each cost more than the one before (Giles 2026-10-30).
+	local function climbs(ids: { string }): boolean
+		local last = 0
+		for _, id in ids do
+			local item = Workshop.item(id) :: Shop.Item
+			local key = Robux.productFor(id, item.price) :: string
+			local tier = tonumber(string.match(key, "%d+")) :: number
+			if tier < last then
+				return false
+			end
+			last = tier
+		end
+		return true
+	end
+	check(
+		"robux: vacuums never get cheaper up the line",
+		climbs({ "PhantomVac", "SpiritSiphon", "BansheeBlower", "MoonVac", "VoidVac" })
+	)
+	check(
+		"robux: Moon Vac costs more than the Banshee Blower",
+		Robux.productFor("MoonVac", 150_000_000) ~= Robux.productFor("BansheeBlower", 70_000_000)
+	)
+	check(
+		"robux: slappers never get cheaper up the line",
+		climbs({ "CobwebMitt", "RubberGlove", "BoneHand", "GhoulClaw", "WitchPaddle", "TitanHand" })
+	)
+	check(
+		"robux: Eclipse Eclair is the top price",
+		Robux.productFor("EclipseEclair", 15_000_000_000) == "ItemTier5"
+	)
+	local named = true
+	for id, key in RobuxConfig.ItemProducts do
+		named = named
+			and (Workshop.item(id) ~= nil or Cakes.item(id) ~= nil)
+			and RobuxConfig.Products[key] ~= nil
+	end
+	check("robux: every price override names a real product", named)
 	local tiered = true
 	for _, list in { Shop.Workshop, Shop.Bakery } do
 		for _, item in list do
