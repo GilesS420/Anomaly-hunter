@@ -16,6 +16,9 @@ VariantMachine.Odds = {
 	Silver = 15,
 } :: { [string]: number }
 
+-- Locked until the second wing expansion (Giles 2026-10-30): Foyer + Library + Ballroom.
+VariantMachine.UnlockWings = 3
+
 VariantMachine.FeeShare = 0.1 -- the fee: this share of the monster's sell value
 VariantMachine.RevealSeconds = 2 -- how long the machine whirs before it shows the pull
 

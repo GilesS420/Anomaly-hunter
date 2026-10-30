@@ -267,7 +267,7 @@ function VariantController.start()
 		end
 		local chance = VariantMachine.chance(monster.variant)
 		window.status.Text =
-			`{chance}% to get a better variant. One random effect is used up. Fee {Format.money(
+			`{chance}% to get a better variant. One random effect is used up. Every try is a new roll. Fee {Format.money(
 				monster.pullFee
 			)}.`
 		local go = Ui.button(
