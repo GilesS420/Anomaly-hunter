@@ -38,24 +38,35 @@
 --                     /restock end stops it and the normal stock is back.
 --   /announce Hello!  a big banner with that text for everyone in this server (filtered by
 --                     Roblox like chat)
+--   /givemonster Gravepup Huge Gold 120kg Cobwebbed Count
+--                     a brand-new monster (Giles 2026-10-30). After its name, in any order and
+--                     all optional: a size, a variant, a weight (sets the size), effects and
+--                     combos (a combo gives both its effects). Into the mansion, or Storage.
+--   /addeffect <uid> Gilded   puts effects or combos on one of the player's monsters (the
+--                     panel's Give tab picks it from a list); not with @all
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
 -- Any command but /summon, /event, /stopevent, /ghost, /restock, /announce and /reset can be run on another player in the server, or
 -- on everyone in it: pick them at the top of the panel, or end a chat command with @name
 -- (/money 5m @Biggie) or @all.
 -- The results come back to the admin, starting with that player's name.
--- The panel uses one RemoteEvent, made only on the server:
+-- The panel uses two remotes, made only on the server:
 --   ReplicatedStorage.Remotes.AdminCommand   client -> server: (command: string, argument: string?,
 --                                            targetUserId: number?; 0 = everyone)
+--   ReplicatedStorage.Remotes.AdminMonsters  RemoteFunction (targetUserId?) -> { {uid, label} }:
+--                                            that player's monsters, for /addeffect; {} for
+--                                            non-admins
 -- The server checks the player is an admin and the command exists before running it, so a
 -- player who fires it by hand gets nothing.
 
 local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 local TextService = game:GetService("TextService")
 
 local Format = require(ReplicatedStorage.Shared.Util.Format)
+local Effects = require(ReplicatedStorage.Shared.Config.Effects)
 local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Sizes = require(ReplicatedStorage.Shared.Config.Sizes)
@@ -63,6 +74,9 @@ local Zones = require(ReplicatedStorage.Shared.Config.Zones)
 local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
 local Restock = require(ReplicatedStorage.Shared.Util.Restock)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
+local Value = require(ReplicatedStorage.Shared.Util.Value)
+local Variants = require(ReplicatedStorage.Shared.Config.Variants)
+local Weight = require(ReplicatedStorage.Shared.Util.Weight)
 local Wings = require(ReplicatedStorage.Shared.Config.Wings)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local CakeService = require(script.Parent.CakeService)
@@ -72,6 +86,7 @@ local GoldenGhostService = require(script.Parent.GoldenGhostService)
 local GrowthService = require(script.Parent.GrowthService)
 local HauntService = require(script.Parent.HauntService)
 local HuntService = require(script.Parent.HuntService)
+local InventoryService = require(script.Parent.InventoryService)
 local MonsterAiService = require(script.Parent.MonsterAiService)
 local MansionService = require(script.Parent.MansionService)
 local MissionService = require(script.Parent.MissionService)
@@ -110,7 +125,8 @@ end
 
 -- `player` is who the command is for (the admin, or the player they picked); `tell` sends a
 -- result back to the admin who ran it.
-type Command = (player: Player, argument: string?, tell: (text: string) -> ()) -> ...any
+-- `admin` is who ran it.
+type Command = (player: Player, argument: string?, tell: (text: string) -> (), admin: Player) -> ...any
 
 local commands: { [string]: Command } = {}
 
@@ -403,6 +419,215 @@ commands["/spawn"] = function(player, argument, tell)
 	tell(`There's no monster called "{argument}". Try /spawn Gravepup`)
 end
 
+-- Every effect and combo id by its squashed name ("rat king" -> RatKing), for /givemonster
+-- and /addeffect. A combo gives the two effects of its recipe (they merge by themselves).
+local effectIds: { [string]: string } = {}
+for id in Effects.List do
+	effectIds[squash(id)] = id
+end
+for id in Effects.Combos do
+	effectIds[squash(id)] = id
+end
+
+local function effectsOf(id: string): { string }
+	local combo = Effects.Combos[id]
+	return if combo then table.clone(combo.recipe) else { id }
+end
+
+-- Adds `wanted` (effect and combo ids) to `effects` by the game's rules: no doubles, Critter
+-- effects only on cheap monsters. Returns the new list and the ones that didn't fit.
+local function withEffects(
+	effects: { string },
+	wanted: { string },
+	monsterId: string
+): ({ string }, { string })
+	local after = table.clone(effects)
+	local skipped: { string } = {}
+	for _, id in wanted do
+		for _, effectId in effectsOf(id) do
+			local fit = Value.fits(after, effectId, monsterId)
+			if fit == "Ok" then
+				table.insert(after, effectId)
+			elseif fit == "TooPricey" then
+				table.insert(
+					skipped,
+					`{Format.name(effectId)} (Critter effects only fit monsters worth up to {Format.money(
+						Effects.CritterMaxValue
+					)})`
+				)
+			end
+		end
+	end
+	return after, skipped
+end
+
+-- Notes the combos a monster has for the Codex.
+local function noteCombos(data: DataService.Data, effects: { string })
+	for _, id in Value.resolveEffects(effects) do
+		if Effects.Combos[id] then
+			CareService.discoverCombo(data, id)
+		end
+	end
+end
+
+local function lookName(caught: Value.CaughtMonster): string
+	local variant = if caught.variant then `{caught.variant} ` else ""
+	return `{variant}{caught.size} {Format.monsterName(caught)}`
+end
+
+local MaxGiveKg = 1e6
+
+-- /givemonster Gravepup Huge Gold 120kg Cobwebbed Count: a brand-new monster, in any order
+-- after its name. Leave out what you don't care about (a size alone gives it a weight for
+-- that size; a weight sets its size). Goes into the mansion, or Storage when that's full.
+commands["/givemonster"] = function(player, argument, tell, admin)
+	local data = DataService.get(player)
+	local words = string.split(string.match(argument or "", "^%s*(.-)%s*$") or "", " ")
+	local monsterId: string? = nil
+	for id in Monsters do
+		if words[1] and squash(id) == squash(words[1]) then
+			monsterId = id
+		end
+	end
+	if not data or not monsterId then
+		tell("Try: /givemonster Gravepup, or /givemonster Gravepup Huge Gold 120kg Cobwebbed Count")
+		return
+	end
+	local sizeId, variantId, kg = "Normal", nil :: string?, nil :: number?
+	local wanted: { string } = {}
+	for i = 2, #words do
+		local word = words[i]
+		local key = squash(word)
+		local number = tonumber(string.match(string.lower(word), "^([%d%.]+)kg$"))
+		local found = false
+		if key == "" or key == "none" then
+			found = true
+		elseif number then
+			if number ~= number or number <= 0 or number > MaxGiveKg then
+				tell(`A weight from 0.1 to {MaxGiveKg} kg, like 120kg.`)
+				return
+			end
+			kg, found = math.floor(number * 10 + 0.5) / 10, true
+		end
+		for _, size in Sizes do
+			if not found and squash(size.id) == key then
+				sizeId, found = size.id, true
+			end
+		end
+		for _, variant in Variants do
+			if not found and squash(variant.id) == key then
+				variantId, found = variant.id, true
+			end
+		end
+		if not found and effectIds[key] then
+			table.insert(wanted, effectIds[key])
+			found = true
+		end
+		if not found then
+			tell(`"{word}" isn't a size, variant, weight (120kg) or effect.`)
+			return
+		end
+	end
+
+	local effects, skipped = withEffects({}, wanted, monsterId)
+	local caught: Value.CaughtMonster = {
+		uid = HttpService:GenerateGUID(false),
+		monsterId = monsterId,
+		size = sizeId,
+		effects = effects,
+		variant = variantId,
+		familiarity = 0,
+	}
+	if kg then
+		-- Its size follows its weight; a fresh gene like any catch.
+		caught.kg = math.max(kg, 0.1)
+		caught.size = Weight.sizeFor(math.max(kg, 0.1))
+		caught.gene = Weight.rollGene()
+		caught.kgAt = os.time()
+	else
+		Weight.settle(caught, os.time()) -- a weight for its size now, so Storage shows it too
+	end
+	local where = MansionService.addMonster(player, caught)
+	if not where then
+		tell("Their mansion and Storage are full (or the save is still loading).")
+		return
+	end
+	noteCombos(data, effects)
+	InventoryService.syncMonsterTools(player)
+	local name = lookName(caught)
+	local place = if where == "Storage" then "Storage (the mansion is full)" else "the mansion"
+	tell(`Gave a {name} ({Weight.text(caught.kg or 0)}), in {place}.`)
+	if #skipped > 0 then
+		tell(`Left off: {table.concat(skipped, ", ")}`)
+	end
+	if player ~= admin then
+		Notify.toast(
+			player,
+			`An admin gave you a {name}! It's in your {if where == "Storage" then "Storage" else "mansion"}.`
+		)
+	end
+end
+
+-- A monster the player owns, in the mansion or Storage, by its uid.
+local function ownedMonster(data: DataService.Data, uid: string): Value.CaughtMonster?
+	for _, list in { data.monsters, data.storage } do
+		for _, caught in list do
+			if caught.uid == uid then
+				return caught
+			end
+		end
+	end
+	return nil
+end
+
+-- /addeffect <monster uid> Gilded Count: puts effects (a combo: both its effects) on one of
+-- the player's monsters. The admin panel picks the monster from a list (AdminMonsters below).
+commands["/addeffect"] = function(player, argument, tell, admin)
+	local data = DataService.get(player)
+	local words = string.split(string.match(argument or "", "^%s*(.-)%s*$") or "", " ")
+	local caught = if data and words[1] then ownedMonster(data, words[1]) else nil
+	if not data or not caught then
+		tell("Pick one of their monsters first (that one is gone, or the save is still loading).")
+		return
+	end
+	local wanted: { string } = {}
+	for i = 2, #words do
+		local id = effectIds[squash(words[i])]
+		if not id then
+			tell(`"{words[i]}" isn't an effect or combo.`)
+			return
+		end
+		table.insert(wanted, id)
+	end
+	if #wanted == 0 then
+		tell("Pick an effect to add.")
+		return
+	end
+	local before = #caught.effects
+	local after, skipped = withEffects(caught.effects, wanted, caught.monsterId)
+	if #after == before then
+		tell(if #skipped > 0 then `Didn't fit: {table.concat(skipped, ", ")}` else "It already has that.")
+		return
+	end
+	caught.effects = after
+	noteCombos(data, after)
+	DataService.saveSoon(player)
+	MansionService.refreshMonsters(player)
+	InventoryService.syncMonsterTools(player)
+	local names: { string } = {}
+	for _, id in Value.resolveEffects(after) do
+		table.insert(names, Format.name(id))
+	end
+	local name = Format.monsterName(caught)
+	tell(`{name} now has: {table.concat(names, ", ")}.`)
+	if #skipped > 0 then
+		tell(`Left off: {table.concat(skipped, ", ")}`)
+	end
+	if player ~= admin then
+		Notify.toast(player, `An admin haunted your {name}: it now has {table.concat(names, ", ")}!`)
+	end
+end
+
 commands["/restock"] = function(_, argument, tell)
 	local wanted = string.lower(argument or "")
 	if wanted == "end" or wanted == "stop" then
@@ -469,8 +694,13 @@ end
 
 local MaxArgumentLength = 60
 -- These take a long argument: a restock lists every item it puts in, an announcement is a
--- sentence.
-local longArguments: { [string]: number } = { ["/restock"] = 1200, ["/announce"] = MaxAnnouncementLength * 2 }
+-- sentence, a given monster can have many effects.
+local longArguments: { [string]: number } = {
+	["/restock"] = 1200,
+	["/announce"] = MaxAnnouncementLength * 2,
+	["/givemonster"] = 600,
+	["/addeffect"] = 600,
+}
 
 -- Commands that act on the whole server or only ever on yourself: a picked player is ignored.
 local untargeted: { [string]: boolean } = {
@@ -502,7 +732,7 @@ local function runCommand(admin: Player, name: string, argument: string?, target
 	local function tell(text: string)
 		Notify.toast(admin, if who ~= admin then `{who.DisplayName}: {text}` else text)
 	end
-	local ok, err = pcall(command, who, argument, tell)
+	local ok, err = pcall(command, who, argument, tell, admin)
 	if not ok then
 		warn(`DevService: {name} failed: {err}`)
 	elseif who ~= admin then
@@ -525,6 +755,12 @@ end
 
 -- Runs a command on every player in the server (once, for the server-wide ones).
 local function runForEveryone(admin: Player, name: string, argument: string?)
+	if string.lower(name) == "/addeffect" then
+		if Admins.isAdmin(admin) then
+			Notify.toast(admin, "Add effect works on one player's monster: pick that player.")
+		end
+		return
+	end
 	if string.lower(name) == "/reset" then
 		if Admins.isAdmin(admin) then
 			Notify.toast(admin, "Reset only ever wipes your own save.")
@@ -587,6 +823,50 @@ local function useAdminRemote()
 		runCommand(player, name, text, target)
 	end)
 	remote.Parent = remotes
+
+	-- The admin panel's "Add effect" list: one player's monsters (mansion, then Storage).
+	-- Empty for anyone who isn't an admin, or for a player who isn't in the server.
+	local monsterList = Instance.new("RemoteFunction")
+	monsterList.Name = "AdminMonsters"
+	monsterList.OnServerInvoke = function(
+		player: Player,
+		targetId: unknown
+	): { { uid: string, label: string } }
+		if not Admins.isAdmin(player) then
+			return {}
+		end
+		local target: Player? = player
+		if
+			type(targetId) == "number"
+			and targetId % 1 == 0
+			and math.abs(targetId) < 2 ^ 53
+			and targetId > 0
+		then
+			target = Players:GetPlayerByUserId(targetId)
+		end
+		local data = if target then DataService.get(target) else nil
+		local rows: { { uid: string, label: string } } = {}
+		if not data then
+			return rows
+		end
+		for _, list in { data.monsters, data.storage } do
+			local stored = list == data.storage
+			for _, caught in list do
+				if typeof(caught.uid) == "string" and Monsters[caught.monsterId] then
+					local names: { string } = {}
+					for _, id in Value.resolveEffects(caught.effects) do
+						table.insert(names, Format.name(id))
+					end
+					local effects = if #names > 0 then ` · {table.concat(names, ", ")}` else ""
+					local kg = if typeof(caught.kg) == "number" then ` {Weight.text(caught.kg)}` else ""
+					local where = if stored then " (Storage)" else ""
+					table.insert(rows, { uid = caught.uid, label = `{lookName(caught)}{kg}{effects}{where}` })
+				end
+			end
+		end
+		return rows
+	end
+	monsterList.Parent = remotes
 end
 
 -- Marks admins so their client shows the panel (the server checks again on every command).
@@ -654,7 +934,7 @@ function DevService.start()
 		return
 	end
 	print(
-		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /charges, /chamber, /missions done|new|streak <days>, /calm, /attack, /restock <items amounts>|end, /announce <text>`
+		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /charges, /chamber, /missions done|new|streak <days>, /calm, /attack, /restock <items amounts>|end, /announce <text>, /givemonster <monster> [size] [variant] [kg] [effects], /addeffect <uid> <effects>`
 	)
 end
 
