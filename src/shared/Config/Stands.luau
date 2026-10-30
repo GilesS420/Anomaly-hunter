@@ -70,6 +70,16 @@ local Stands: { [string]: Stand } = {
 		extra = { ask = "Try the Variant Machine", option = "Variant" },
 		quit = "Never mind",
 	},
+	TradingBooth = {
+		name = "The Broker",
+		greeting = "One eye for each side of the deal. Who are you trading with?",
+		info = {
+			ask = "How does trading work?",
+			answer = "Bring a friend to my booth. You both put monsters from your Backpack on the table, as many as you like, and see what each one is worth. When you both press Ready, a short countdown starts and I swap them. Any change stops the countdown. Hearted monsters stay home, and a traded monster loses its name tag. Want to give a monster away instead? Hold it and hold E next to the other player, anywhere.",
+		},
+		enter = { ask = "I want to trade!" },
+		quit = "Never mind",
+	},
 	GrowthChamber = {
 		name = "Growth Chamber",
 		greeting = "Step right up! Bigger monsters, bigger prices.",

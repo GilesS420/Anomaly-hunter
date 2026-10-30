@@ -3688,6 +3688,35 @@ do
 	check("variant machine: misses about 89% for Silver", math.abs(misses / pulls - 0.89) < 0.005)
 end
 
+-- Trading and gifting rules.
+do
+	local Trading = require("../src/shared/Util/Trading")
+	local function mon(uid: string, locked: boolean?): Value.CaughtMonster
+		return { uid = uid, monsterId = "Gravepup", size = "Normal", effects = {}, familiarity = 0, locked = locked }
+	end
+	local pack = { mon("a"), mon("b"), mon("c", true) }
+	check("trading: Backpack monsters can go", Trading.problem(pack, { "a", "b" }) == nil)
+	check("trading: nothing is fine too", Trading.problem(pack, {}) == nil)
+	check("trading: hearted monsters stay", Trading.problem(pack, { "a", "c" }) == "Hearted")
+	check("trading: monsters not in the Backpack can't go", Trading.problem(pack, { "zzz" }) == "Missing")
+	check("trading: the same monster can't go twice", Trading.problem(pack, { "a", "a" }) == "Twice")
+	check("trading: fits when getting fewer", Trading.fits(50, 3, 1, 50))
+	check("trading: full Backpack can't take more", not Trading.fits(50, 1, 2, 50))
+	check("trading: room for more", Trading.fits(10, 0, 5, 50))
+	local named = mon("n", true)
+	named.nickname = "Bob"
+	named.variant = "Gold"
+	Trading.handOver(named)
+	check("trading: name tag comes off", named.nickname == nil)
+	check("trading: heart comes off", named.locked == nil)
+	check("trading: the rest goes along", named.variant == "Gold" and named.uid == "n")
+	local log = {}
+	for i = 1, 25 do
+		Trading.log(log, { at = i, kind = "Trade", with = 1, gave = {}, got = {} }, 20)
+	end
+	check("trading: log keeps the newest 20", #log == 20 and log[1].at == 6 and log[20].at == 25)
+end
+
 if failures > 0 then
 	error(`{failures} check(s) failed`)
 end

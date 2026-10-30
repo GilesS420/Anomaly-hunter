@@ -89,7 +89,7 @@ Layout.Landmarks = {
 	},
 	{
 		name = "TradingBooth",
-		label = "Trading Booth (coming soon)",
+		label = "Trading Booth",
 		x = 110,
 		z = 0,
 		width = 40,
