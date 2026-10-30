@@ -505,9 +505,10 @@ local function monsterTool(player: Player, caught: Value.CaughtMonster, rarity: 
 			child.CanQuery = false
 			child.CanTouch = false
 		end
-		child.Parent = tool
 	end
-	model:Destroy()
+	-- Kept as one Model (it streams in as one piece, see MonsterModel.build) inside the Tool.
+	model.Name = "Carried"
+	model.Parent = tool
 
 	-- Carried while the Tool is on your character, whichever way it got there (hotbar, Backpack
 	-- window, respawn). A Weld with its offset written out, not a WeldConstraint: that one
