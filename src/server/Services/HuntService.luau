@@ -267,7 +267,10 @@ end
 
 local function toolName(data: DataService.Data, item: Shop.Item): string?
 	if item.kind == "Slapper" then
-		return nil -- never held: the Slap button uses your best one
+		-- Only your best slapper is in the hotbar (the one the Slap button and Q use); the
+		-- others stay in the Backpack window, like old vacuums.
+		local best = Slap.best(data.inventory)
+		return if best and best.id == item.id then item.name else nil
 	end
 	if Workshop.isTool(item) then
 		-- Only the vacuum in use is in the hotbar; the others wait at the Vacuum Vault, where
@@ -280,7 +283,7 @@ local function toolName(data: DataService.Data, item: Shop.Item): string?
 	return if count > 0 then `{item.name} x{count}` else nil
 end
 
--- Makes the hotbar match the vacuums, Bait Bells and Return Charms the player owns: one
+-- Makes the hotbar match the vacuums, slappers, Bait Bells and Return Charms the player owns: one
 -- Tool each, in Workshop order.
 local function syncTools(player: Player)
 	local data = DataService.get(player)
@@ -336,6 +339,9 @@ local function syncTools(player: Player)
 			tool.Activated:Connect(function()
 				HuntService.drinkPotion(player, item.id)
 			end)
+		elseif item.kind == "Slapper" then
+			-- The client slaps the closest hunter in reach when you click (SlapController).
+			tool.ToolTip = "Click next to a hunter to slap them (or press Q)"
 		elseif item.kind == "Tag" then
 			-- The client opens the name box for the monster you click (NameTagController).
 			tool.ToolTip = "Click one of your monsters to give it a name"

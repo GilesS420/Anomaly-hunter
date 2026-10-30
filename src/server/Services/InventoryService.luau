@@ -37,6 +37,7 @@ local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Nickname = require(ReplicatedStorage.Shared.Util.Nickname)
 local Rarities = require(ReplicatedStorage.Shared.Config.Rarities)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
+local Slap = require(ReplicatedStorage.Shared.Util.Slap)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local CakeModel = require(script.Parent.Parent.CakeModel)
@@ -205,6 +206,7 @@ local function itemRows(data: DataService.Data): { ItemRow }
 	local equipped = data.equipped :: { [string]: string }
 	local rows: { ItemRow } = {}
 	local order: { [string]: number } = {}
+	local slapper = Slap.best(data.inventory) -- the one in use
 	local function add(item: Shop.Item)
 		local tool: boolean = Workshop.isTool(item)
 		local count = data.inventory[item.id] or 0
@@ -228,7 +230,9 @@ local function itemRows(data: DataService.Data): { ItemRow }
 			name = item.name,
 			details = details,
 			tool = Workshop.isTool(item),
-			equipped = equipSlot ~= nil and equipped[equipSlot] == item.id,
+			equipped = if item.kind == "Slapper"
+				then slapper ~= nil and slapper.id == item.id
+				else equipSlot ~= nil and equipped[equipSlot] == item.id,
 			cake = item.kind == "Food",
 			kind = item.kind :: string,
 			count = count,

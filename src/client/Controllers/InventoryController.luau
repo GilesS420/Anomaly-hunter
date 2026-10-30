@@ -305,7 +305,8 @@ function InventoryController.start()
 			local key = `i:{item.id}`
 			local caption = if item.tool
 				then (if item.equipped then "Using" else item.name)
-				elseif item.kind == "Slapper" then item.name -- kept forever, used by the Slap button
+				-- your best slapper is the one in use (the hotbar, the Slap button and Q)
+				elseif item.kind == "Slapper" then (if item.equipped then "Using" else item.name)
 				else `x{item.count}`
 			card(
 				i,
@@ -335,6 +336,13 @@ function InventoryController.start()
 					Ui.paint(action, Ui.Colors.equip)
 					onAction = function()
 						hold("ToolId", id) -- then click a monster in your mansion (NameTagController)
+					end
+				elseif item.kind == "Slapper" and item.equipped then
+					action.Visible = true
+					action.Text = "Hold"
+					Ui.paint(action, Ui.Colors.equip)
+					onAction = function()
+						hold("ToolId", id) -- then click next to a hunter (SlapController)
 					end
 				elseif item.tool then
 					action.Visible = true

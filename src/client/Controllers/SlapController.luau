@@ -3,7 +3,8 @@
 -- (the player attribute Slapper, your best one; its reach is how close you must be). When
 -- another hunter is close enough to slap (Util/Slap: same zone or both in the open hub, not on a mansion plot, not in the
 -- tutorial, not just slapped), a round Slap button shows in the bottom-right corner with
--- their name. Tap or click it, or press Q. Slapping someone who is catching makes their
+-- their name. Tap or click it, press Q, or hold your slapper from the hotbar and click.
+-- Slapping someone who is catching makes their
 -- monster break loose, so you can try to catch it first.
 -- Everyone sees a "SLAP!" pop over the slapped hunter; the slapped hunter's own client throws
 -- their character back (its physics runs here).
@@ -19,6 +20,7 @@ local SlapConfig = require(Shared:WaitForChild("Config"):WaitForChild("Slap"))
 local Slap = require(Shared:WaitForChild("Util"):WaitForChild("Slap"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
+local ToastController = require(script.Parent.ToastController)
 
 local SlapController = {}
 
@@ -183,6 +185,42 @@ function SlapController.start()
 	end
 
 	button.Activated:Connect(slap)
+
+	-- Your best slapper is also in the hotbar (HuntService): hold it and click to slap.
+	local function watch(tool: Instance)
+		if not tool:IsA("Tool") or tool:GetAttribute("SlapWatched") then
+			return
+		end
+		local id = tool:GetAttribute("ToolId")
+		if not Slap.get(if typeof(id) == "string" then id else nil) then
+			return
+		end
+		tool:SetAttribute("SlapWatched", true)
+		tool.Activated:Connect(function()
+			target = target or closestTarget()
+			if target then
+				slap()
+			else
+				ToastController.show("Get closer to another hunter to slap them.")
+			end
+		end)
+	end
+	local function follow(container: Instance)
+		for _, child in container:GetChildren() do
+			watch(child)
+		end
+		container.ChildAdded:Connect(watch)
+	end
+	follow(player:WaitForChild("Backpack"))
+	player.CharacterAdded:Connect(follow)
+	if player.Character then
+		follow(player.Character)
+	end
+	player.ChildAdded:Connect(function(child)
+		if child:IsA("Backpack") then
+			follow(child) -- a new one after respawning
+		end
+	end)
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if not processed and input.KeyCode == Enum.KeyCode.Q then
 			slap()
