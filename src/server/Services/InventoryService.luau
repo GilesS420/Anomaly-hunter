@@ -115,6 +115,28 @@ function InventoryService.lookOf(caught: Value.CaughtMonster): string
 end
 local lookOf = InventoryService.lookOf
 
+-- Monsters a player has to see but doesn't own (the other side of a trade, a gift on offer),
+-- by who asked for them, so their previews are built too (InventoryService.syncPreviews).
+local shownLooks: { [Player]: { [string]: { Value.CaughtMonster } } } = {}
+
+-- Builds previews of these monsters for the player until it's called again with the same
+-- `key` and an empty list.
+function InventoryService.showLooks(player: Player, key: string, monsters: { Value.CaughtMonster })
+	local mine = shownLooks[player]
+	if not mine then
+		if #monsters == 0 then
+			return
+		end
+		mine = {}
+		shownLooks[player] = mine
+	end
+	mine[key] = if #monsters > 0 then monsters else nil
+	if next(mine) == nil then
+		shownLooks[player] = nil
+	end
+	task.spawn(InventoryService.syncPreviews, player)
+end
+
 -- Every cake has a preview, so the Bakery can show the ones you don't have yet.
 function InventoryService.cakeLook(itemId: string): string
 	return `Cake|{itemId}`
@@ -615,7 +637,11 @@ function InventoryService.syncPreviews(player: Player)
 	local folder = holder :: ScreenGui
 	local wanted: { [string]: () -> Model } = {}
 	local bubbling = data.chamber.monster -- in the Growth Chamber: its result screen shows it
-	for _, list in { data.monsters, data.storage, if bubbling then { bubbling } else {} } do
+	local lists = { data.monsters, data.storage, if bubbling then { bubbling } else {} }
+	for _, shown in shownLooks[player] or {} do
+		table.insert(lists, shown)
+	end
+	for _, list in lists do
 		for _, caught in list do
 			local monster = Monsters[caught.monsterId]
 			local key = lookOf(caught)
@@ -670,6 +696,7 @@ function InventoryService.start()
 	remotes.Parent = ReplicatedStorage
 	Players.PlayerRemoving:Connect(function(player)
 		placing[player] = nil
+		shownLooks[player] = nil
 	end)
 	task.spawn(function()
 		while true do

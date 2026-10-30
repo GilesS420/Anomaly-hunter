@@ -812,7 +812,7 @@ end
 -- hooded ghost broker with one teal and one pink eye (one for each side of a trade). A glass
 -- bell jar at each end of the counter holds a wisp on offer, a ledger and quill sit between
 -- them, shelves of wrapped parcels and crates line the back, two skeleton hands shake on the
--- roof, and a plank nailed across the counter says it opens soon.
+-- roof. Open since trading arrived (Giles 2026-10-30).
 local Midnight = { 40, 44, 72 }
 local Ghostly = { 220, 222, 236 }
 local SwapTeal = { 90, 240, 220 }
@@ -939,11 +939,6 @@ function Landmarks.TradingBooth(): { Part }
 		part(parts, `ShakeCuff{tag}`, { 0.8, 0.8, 0.8 }, { side * 3.5, roofTop + 0.725, 3.5 }, cuff, "Neon")
 	end
 	part(parts, "ShakeClasp", { 0.9, 0.75, 0.7 }, { 0, roofTop + 0.725, 3.5 }, Skull, "SmoothPlastic")
-
-	-- Not open yet: a plank nailed across the counter.
-	local plank = part(parts, "SoonPlank", { 14, 0.9, 0.2 }, { 0, y + 1.7, -2.35 }, BoardWood, "WoodPlanks")
-	plank.rot = { 0, 0, -6 }
-	plank.text = "Coming soon"
 	return parts
 end
 

@@ -13,6 +13,7 @@ local RunService = game:GetService("RunService")
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Missions = require(ReplicatedStorage.Shared.Util.Missions)
 local Robux = require(ReplicatedStorage.Shared.Util.Robux)
+local Trading = require(ReplicatedStorage.Shared.Util.Trading)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local ProfileStore = require(script.Parent.Parent.Vendor.ProfileStore)
 
@@ -46,6 +47,7 @@ export type Data = {
 	},
 	missions: Missions.State, -- today's daily missions and the streak (MissionService)
 	robux: Robux.Record, -- Robux purchases paid out, credits and passes (RobuxService)
+	trades: { Trading.LogEntry }, -- the newest trades and gifts, for checking scam reports (TradeService)
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -74,6 +76,7 @@ DataService.Template = {
 	chamber = {},
 	missions = Missions.empty(),
 	robux = Robux.empty(),
+	trades = {},
 } :: Data
 
 local store = ProfileStore.New(

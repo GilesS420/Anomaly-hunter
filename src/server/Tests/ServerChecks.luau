@@ -72,6 +72,16 @@ ServerChecks.KnownRemotes = {
 	"MergerRemotes.Merge",
 	"MergerRemotes.OpenVariant",
 	"MergerRemotes.Pull",
+	"TradeRemotes.Open",
+	"TradeRemotes.Nearby",
+	"TradeRemotes.Request",
+	"TradeRemotes.Invite",
+	"TradeRemotes.Answer",
+	"TradeRemotes.Offer",
+	"TradeRemotes.Ready",
+	"TradeRemotes.Cancel",
+	"TradeRemotes.State",
+	"TradeRemotes.Gift",
 	"GrowthRemotes.Open",
 	"GrowthRemotes.GetList",
 	"GrowthRemotes.Grow",
@@ -102,6 +112,8 @@ ServerChecks.KnownRemotes = {
 	"CodexRemotes.GetView",
 	"AttackRemotes.Warn",
 	"AttackRemotes.Hit",
+	"RobuxRemotes.Buy",
+	"RobuxRemotes.Granted",
 }
 
 local passed = 0
