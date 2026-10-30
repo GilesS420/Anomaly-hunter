@@ -23,6 +23,7 @@ local Merge = require(ReplicatedStorage.Shared.Util.Merge)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local VariantMachine = require(ReplicatedStorage.Shared.Util.VariantMachine)
+local MachineConfig = require(ReplicatedStorage.Shared.Config.VariantMachine)
 local Weight = require(ReplicatedStorage.Shared.Util.Weight)
 local CareService = require(script.Parent.CareService)
 local Counter = require(script.Parent.Parent.Counter)
@@ -98,6 +99,7 @@ local PullRemote = Instance.new("RemoteFunction")
 PullRemote.Name = "Pull"
 PullRemote.Parent = remotes
 
+local LockedMessage = "The Variant Machine unlocks once you buy the Ballroom for your mansion."
 local PullProblems: { [string]: string } = {
 	NoEffects = "It has no effects to feed the machine.",
 	Best = "It's already Rainbow, the best there is!",
@@ -293,6 +295,9 @@ PullRemote.OnServerInvoke = function(player: Player, uid: unknown): PullResult
 	if not caught then
 		return { ok = false, message = "That monster isn't in your Backpack any more.", view = viewFor(data) }
 	end
+	if data.wingsOwned < MachineConfig.UnlockWings then
+		return { ok = false, message = LockedMessage, view = viewFor(data) }
+	end
 	local problem = VariantMachine.problem(caught)
 	if problem then
 		return { ok = false, message = PullProblems[problem], view = viewFor(data) }
@@ -333,7 +338,12 @@ function MergerService.start()
 		local at = counter
 		if at and DataService.isLoaded(player) then
 			if option == "Variant" then
-				OpenVariant:FireClient(player, at.WorldPosition)
+				local data = DataService.get(player)
+				if data and data.wingsOwned >= MachineConfig.UnlockWings then
+					OpenVariant:FireClient(player, at.WorldPosition)
+				else
+					Notify.toast(player, LockedMessage)
+				end
 			else
 				Open:FireClient(player, at.WorldPosition)
 			end

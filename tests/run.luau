@@ -3648,6 +3648,15 @@ do
 		VariantMachine.problem(crow("Gold", { "Ghost" })) == nil
 	)
 	check("variant machine: fee is 10% of value", VariantMachine.fee(1_000_000) == 100_000)
+	local Stands = require("../src/shared/Config/Stands")
+	local WingsConfig = require("../src/shared/Config/Wings")
+	local extra = Stands.Merger.extra
+	check(
+		"variant machine: locked until the Ballroom",
+		extra ~= nil
+			and extra.unlockWings == MachineConfig.UnlockWings
+			and WingsConfig.List[MachineConfig.UnlockWings].id == "Ballroom"
+	)
 
 	local silver = crow("Silver", { "Cobwebbed", "Poltergeist", "Gilded" })
 	local used = VariantMachine.apply(silver, 2, "Gold")

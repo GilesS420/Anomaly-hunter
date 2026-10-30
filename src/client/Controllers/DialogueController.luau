@@ -182,12 +182,21 @@ function DialogueController.start()
 		end)
 		local extra = stand.extra
 		if extra then
-			choice(3, extra.ask, function()
-				Enter:FireServer(standId, extra.option)
-				close()
+			local wings = tonumber(player:GetAttribute("WingsOwned")) or 1
+			local open = wings >= (extra.unlockWings or 0)
+			choice(3, extra.info.ask, function()
+				say(extra.info.answer)
+			end)
+			choice(4, if open then extra.ask else `🔒 {extra.ask}`, function()
+				if open then
+					Enter:FireServer(standId, extra.option)
+					close()
+				else
+					say(extra.locked or "That isn't open yet.")
+				end
 			end)
 		end
-		choice(if extra then 4 else 3, stand.quit, close)
+		choice(if extra then 5 else 3, stand.quit, close)
 	end
 
 	say = function(text: string)

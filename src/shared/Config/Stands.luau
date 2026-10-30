@@ -12,9 +12,17 @@ export type Stand = {
 	-- Opens the stand's window. With `live`, the Watcher answers in the dialogue instead
 	-- (what's happening right now), since it has no window.
 	enter: { ask: string, live: boolean? },
-	-- A second window at the same stand, offered after enter (the Merger's Variant Machine).
-	-- `option` is passed to the stand's onEnter on the server (server/Counter).
-	extra: { ask: string, option: string }?,
+	-- A second window at the same stand, offered after enter (the Merger's Variant Machine),
+	-- with its own explanation. `option` is passed to the stand's onEnter on the server
+	-- (server/Counter). With `unlockWings` it stays locked (🔒, `locked` is said instead)
+	-- until the player owns that many wings (the Foyer counts as one).
+	extra: {
+		info: { ask: string, answer: string },
+		ask: string,
+		option: string,
+		unlockWings: number?,
+		locked: string?,
+	}?,
 	quit: string,
 }
 
@@ -64,10 +72,19 @@ local Stands: { [string]: Stand } = {
 		greeting = "Two in, one out! Hehehe... usually.",
 		info = {
 			ask = "What does the Merger do?",
-			answer = "Bring me two of the same monster from your Backpack: one to keep and one to give. If it works, the one you keep gets heavier and takes every effect of the other, and combos can form! If it fails, the one you gave is gone. Rarer monsters are harder to merge. I show you the odds and my fee first. My Variant Machine can also turn a monster Silver, Gold, Shiny or even Rainbow: it eats one of the monster's effects for every try, but the monster always comes back.",
+			answer = "Bring me two of the same monster from your Backpack: one to keep and one to give. If it works, the one you keep gets heavier and takes every effect of the other, and combos can form! If it fails, the one you gave is gone. Rarer monsters are harder to merge. I show you the odds and my fee first.",
 		},
 		enter = { ask = "Let's merge!" },
-		extra = { ask = "Try the Variant Machine", option = "Variant" },
+		extra = {
+			info = {
+				ask = "What is the Variant Machine?",
+				answer = "Put in a monster from your Backpack and the machine eats one of its effects, picked at random. In return you get one try at a better colour: Silver 15%, Gold 7%, Shiny 3%, Rainbow 1%. Every try is a new roll, nothing is ever guaranteed. If it lands on the colour your monster already has, or a lower one, nothing changes. Your monster always comes back, and it never loses its colour. Each try also costs 10% of its value.",
+			},
+			ask = "Try the Variant Machine",
+			option = "Variant",
+			unlockWings = 3, -- Config/VariantMachine.UnlockWings
+			locked = "The machine is still cold... Buy the Ballroom for your mansion and I'll fire it up for you!",
+		},
 		quit = "Never mind",
 	},
 	TradingBooth = {
