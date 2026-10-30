@@ -431,8 +431,20 @@ function dressModel(model: Model, info: Info)
 	if billboard and billboard:IsA("BillboardGui") then
 		billboard.StudsOffset = Vector3.new(0, lift + look.top * scale + 1.6, 0)
 	end
+	-- Each block is tagged with this build's version and the model says how many there are, so
+	-- a client can keep a big monster hidden until all of its blocks have arrived instead of
+	-- watching them pop in one by one (LookLoadController).
+	local version = ((model:GetAttribute("LookVersion") :: number?) or 0) + 1
+	local count = 0
+	for _, child in model:GetChildren() do
+		if child:IsA("BasePart") and child:GetAttribute("Look") then
+			child:SetAttribute("Look", version)
+			count += 1
+		end
+	end
+	model:SetAttribute("LookParts", count)
 	-- Tells the client to pick up the new swinging joints (RoamController).
-	model:SetAttribute("LookVersion", ((model:GetAttribute("LookVersion") :: number?) or 0) + 1)
+	model:SetAttribute("LookVersion", version)
 end
 
 function MonsterModel.build(info: Info): Model
