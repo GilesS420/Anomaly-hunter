@@ -130,7 +130,7 @@ local function viewFor(player: Player, data: DataService.Data, store: Store): Vi
 			bought = if adminStock then adminBought[item.id] or 0 else bought[item.id] or 0,
 			limit = adminStock or Workshop.limit(item, slot, salt),
 			look = ToolModel.look(item.id),
-			robux = if Workshop.keepsForever(item) and owned then nil else Robux.tierFor(item.price),
+			robux = if Workshop.keepsForever(item) and owned then nil else Robux.productFor(item.id, item.price),
 		})
 	end
 	table.sort(items, function(a, b)

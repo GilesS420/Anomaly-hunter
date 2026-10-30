@@ -107,7 +107,7 @@ local function viewFor(player: Player, data: DataService.Data): View
 			count = data.inventory[item.id] or 0,
 			bought = if adminStock then adminBought[item.id] or 0 else bought[item.id] or 0,
 			limit = adminStock or Workshop.limit(item, slot, salt),
-			robux = Robux.tierFor(item.price),
+			robux = Robux.productFor(item.id, item.price),
 		})
 	end
 	table.sort(treats, function(a, b)

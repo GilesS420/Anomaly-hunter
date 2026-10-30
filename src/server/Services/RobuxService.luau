@@ -74,7 +74,7 @@ end
 
 -- Why this item can't be bought with Robux right now, or nil if it can.
 local function itemProblem(data: DataService.Data, item: Shop.Item?): string?
-	if not item or not Robux.tierFor(item.price) then
+	if not item or not Robux.productFor(item.id, item.price) then
 		return "That isn't for sale."
 	end
 	if Workshop.keepsForever(item) and Workshop.owns(data.inventory, item) then
@@ -156,7 +156,11 @@ local function payOut(player: Player, data: DataService.Data, key: string)
 	if string.sub(key, 1, 8) == "ItemTier" then
 		Robux.addCredit(record, key)
 		local item = shopItem(pending)
-		if not item or Robux.tierFor(item.price) ~= key or not useItemCredit(player, data, key, item) then
+		if
+			not item
+			or Robux.productFor(item.id, item.price) ~= key
+			or not useItemCredit(player, data, key, item)
+		then
 			Notify.toast(
 				player,
 				"You have a Robux item credit: tap Robux on any item of the same price to get it free."
@@ -264,7 +268,7 @@ Buy.OnServerInvoke = function(player: Player, kind: unknown, arg: unknown): Resu
 		if problem or not item then
 			return { ok = false, message = problem or "That isn't for sale." }
 		end
-		local key = Robux.tierFor(item.price) :: string
+		local key = Robux.productFor(item.id, item.price) :: string
 		if useItemCredit(player, data, key, item) then
 			Granted:FireClient(player, key)
 			return { ok = true, message = `Used your Robux credit on the {item.name}!` }

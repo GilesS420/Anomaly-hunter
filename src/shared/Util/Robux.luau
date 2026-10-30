@@ -60,6 +60,15 @@ function Robux.tierFor(cash: number): string?
 	return nil
 end
 
+-- The item product key for a shop item: its own (Config.ItemProducts) or the one its cash price
+-- falls in. nil if it isn't sold (free).
+function Robux.productFor(itemId: string, cash: number): string?
+	if not (cash > 0) then
+		return nil
+	end
+	return Config.ItemProducts[itemId] or Robux.tierFor(cash)
+end
+
 -- The product key a dashboard id belongs to, or nil (0, the not-set-up id, never matches).
 function Robux.productKey(id: number): string?
 	if id == 0 then

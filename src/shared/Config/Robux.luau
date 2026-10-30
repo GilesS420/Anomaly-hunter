@@ -41,6 +41,24 @@ Robux.ItemTiers = {
 	{ product = "ItemTier5", maxCash = math.huge },
 }
 
+-- Items whose Robux price doesn't follow their cash price (Giles 2026-10-30): every vacuum
+-- and slapper costs more than the one before it, so the best isn't the same price as a
+-- weaker one.
+Robux.ItemProducts = {
+	PhantomVac = "ItemTier1", -- 19
+	SpiritSiphon = "ItemTier2", -- 49
+	BansheeBlower = "ItemTier3", -- 99
+	MoonVac = "ItemTier4", -- 199
+	VoidVac = "ItemTier5", -- 399
+	CobwebMitt = "ItemTier1", -- 19
+	RubberGlove = "ItemTier1", -- 19
+	BoneHand = "ItemTier2", -- 49
+	GhoulClaw = "ItemTier3", -- 99
+	WitchPaddle = "ItemTier4", -- 199
+	TitanHand = "ItemTier5", -- 399
+	EclipseEclair = "ItemTier5", -- 399
+} :: { [string]: string }
+
 -- Game Passes: bought once, kept forever. Owning one sets the player attribute Pass<Key>.
 Robux.Passes = {
 	BigStorage = { id = 2060795150, price = 149, name = "Big Storage" },

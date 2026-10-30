@@ -140,7 +140,10 @@ function WorkshopController.start()
 				stockColor = stockColor,
 				price = item.price,
 				action = action,
-				robux = ShopCards.robuxAction(item.robux, item.id),
+				-- A tool you own can't be bought again, so its Robux button says so.
+				robux = if item.tool and item.owned
+					then { text = "Owned", color = Ui.Colors.off, enabled = false }
+					else ShopCards.robuxAction(item.robux, item.id),
 			})
 		end
 		-- The Vault's vacuums are always in stock, so only the Workshop can be rerolled.
