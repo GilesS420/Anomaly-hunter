@@ -155,6 +155,35 @@ function Missions.isDone(saved: Saved): boolean
 	return saved.progress >= saved.target
 end
 
+-- Mission `mission` made for a player worth `worth` (a random open zone for zone missions),
+-- or nil for a zone mission when no zone is open. The admin panel uses it to set one.
+function Missions.build(
+	mission: Config.Mission,
+	worth: number,
+	bonus: number,
+	zones: { string },
+	random: Random
+): Saved?
+	if mission.zone and #zones == 0 then
+		return nil
+	end
+	local zone = if mission.zone then zones[random:NextInteger(1, #zones)] else nil
+	local target = mission.count or 1
+	if mission.moneyShare then
+		target = Missions.round(math.max(mission.moneyFloor or 0, worth * mission.moneyShare))
+	elseif mission.kind == "ZoneSet" and zone then
+		target = #Missions.zoneTargets(zone, mission.maxRarity)
+	end
+	return {
+		id = mission.id,
+		zone = zone,
+		target = target,
+		progress = 0,
+		seen = if mission.kind == "Species" or mission.kind == "ZoneSet" then {} else nil,
+		reward = Missions.missionReward(mission, target, worth, bonus),
+	}
+end
+
 -- Two missions on one day never count the same thing, except catches (there are many kinds).
 local function clashes(mission: Config.Mission, others: { Saved }): boolean
 	for _, other in others do
@@ -184,22 +213,7 @@ local function pick(
 	if #choices == 0 then
 		return nil
 	end
-	local mission = choices[random:NextInteger(1, #choices)]
-	local zone = if mission.zone then zones[random:NextInteger(1, #zones)] else nil
-	local target = mission.count or 1
-	if mission.moneyShare then
-		target = Missions.round(math.max(mission.moneyFloor or 0, worth * mission.moneyShare))
-	elseif mission.kind == "ZoneSet" and zone then
-		target = #Missions.zoneTargets(zone, mission.maxRarity)
-	end
-	return {
-		id = mission.id,
-		zone = zone,
-		target = target,
-		progress = 0,
-		seen = if mission.kind == "Species" or mission.kind == "ZoneSet" then {} else nil,
-		reward = Missions.missionReward(mission, target, worth, bonus),
-	}
+	return Missions.build(choices[random:NextInteger(1, #choices)], worth, bonus, zones, random)
 end
 
 -- A fresh State with nothing dealt yet (a new save).

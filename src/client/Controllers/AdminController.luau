@@ -4,26 +4,27 @@
 -- an "Admin" attribute on them (see server/Admins.luau). Press F2 to open and close it
 -- (there's no button on screen, Giles 2026-10-20).
 --
--- Laid out to need little scrolling and few taps (Giles 2026-10-22, 2026-10-24): a "Works on"
--- dropdown at the top (Me, Everyone, or any player in the server), tabs down the left (Player,
--- Mansion, Items, Spawn, Give, Events, Restock, Announce) and one short page per tab. Most things are one tap: quick
--- amounts, a button per wing and per size, and a button per Watcher event (the Awakening once
--- per monster set) with Stop next to them. Dropdowns only for long lists (items, monsters).
--- Events, Restock, Announce and "Reset my save" ignore "Works on".
---
--- Restock (Giles 2026-10-28): build a list of items with an amount each (quick buttons for
--- all cakes / all Workshop items, or one item at a time), then "Restock now" puts exactly that
--- in stock in this server for the minutes given (server/AdminRestock). Announce sends a
--- banner to everyone in this server.
---
--- Give (Giles 2026-10-30): give a brand-new monster with a picked size or weight, variant and
--- effects, or add effects to a monster the player already has (picked from their list, which
--- comes from Remotes.AdminMonsters, admins only).
+-- Laid out like Giles's sketch (2026-10-30): across the top the "who" dropdown (Me, All
+-- players, or any player in the server), the title and a "Make announcement" button; down the
+-- left one tab per kind of thing, each holding the controls that belong to it:
+--   Player    money add/remove, monster attacks on/off, daily missions (reset, change),
+--             tutorial, and the red RESET SAVE / RESET PLAYER (respawn) buttons
+--   Mansion   wings, growth spurts, skip hours, haunt, Growth Chamber
+--   Items     Workshop items and Bakery cakes for free
+--   Monsters  give a brand-new monster, add effects to one they have (both pick effects in a
+--             big pop-up of tick boxes), remove all their monsters
+--   Zones     spawn monsters in the zone they're in, make one attack now
+--   Events    start or stop Watcher events, the Golden Ghost, the coming schedule
+--   Shops     admin restocks (this server only)
+-- Events, Shops and announcements reach the whole server, whoever is picked. Anything that
+-- can't be undone (reset save, remove all monsters) asks first in a pop-up.
 --
 -- Each button sends
 --   ReplicatedStorage.Remotes.AdminCommand   client -> server: (command, argument?, targetUserId?)
 -- (targetUserId 0 = everyone) and the server checks again that you're an admin before doing
--- anything. Results come back as the usual toasts.
+-- anything. Results come back as the usual toasts. The Monsters tab also asks
+--   ReplicatedStorage.Remotes.AdminMonsters  (targetUserId?) -> { {uid, label, effects} }
+-- for the picked player's monsters (admins only; anyone else gets an empty list).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,6 +33,7 @@ local UserInputService = game:GetService("UserInputService")
 local Effects = require(ReplicatedStorage.Shared.Config.Effects)
 local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
+local MissionConfig = require(ReplicatedStorage.Shared.Config.Missions)
 local Restock = require(ReplicatedStorage.Shared.Util.Restock)
 local Watcher = require(ReplicatedStorage.Shared.Util.Watcher)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
@@ -46,14 +48,17 @@ local Ui = require(script.Parent.Parent.Ui)
 local AdminController = {}
 
 type Option = { label: string, value: string }
+type TheirMonster = { uid: string, label: string, effects: { string } }
 
 local player = Players.LocalPlayer
 local Everyone = "everyone"
 local RowHeight = 34
 local Gap = 8
-local SideWidth = 110
+local SideWidth = 160
+local HeaderHeight = 44
 local PopupMaxHeight = 240
 local TimelineLength = 5 -- events shown on the Events tab's timeline
+local MaxAnnouncement = 150
 
 local remote: RemoteEvent
 local monstersRemote: RemoteFunction
@@ -70,6 +75,17 @@ local function send(command: string, argument: string?)
 	remote:FireServer(command, argument, targetId)
 end
 
+-- Who the buttons work on, in words ("you", "Biggie", "all players").
+local function targetName(): string
+	if target == Everyone then
+		return "all players"
+	elseif target ~= "me" then
+		local other = Players:GetPlayerByUserId(tonumber(target) or 0)
+		return if other then other.DisplayName else "you"
+	end
+	return "you"
+end
+
 -- ------------------------------------------------------------------ building blocks
 
 local order = 0
@@ -79,7 +95,7 @@ local function nextOrder(): number
 end
 
 -- A line of controls with a short name in front. It wraps onto a second line when narrow.
-local function row(page: Frame, name: string): Frame
+local function row(page: Instance, name: string): Frame
 	local line = Instance.new("Frame")
 	line.LayoutOrder = nextOrder()
 	line.BackgroundTransparency = 1
@@ -93,13 +109,13 @@ local function row(page: Frame, name: string): Frame
 	layout.Padding = UDim.new(0, 6)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = line
-	local label = Ui.text(line, name, UDim2.fromOffset(84, RowHeight), Ui.Colors.muted, false, 16)
+	local label = Ui.text(line, name, UDim2.fromOffset(100, RowHeight), Ui.Colors.text, true, 18)
 	label.LayoutOrder = 0
 	return line
 end
 
 -- A wrapping block of buttons with no name in front (the Events tab's event buttons).
-local function grid(page: Frame): Frame
+local function grid(page: Instance): Frame
 	local block = Instance.new("Frame")
 	block.LayoutOrder = nextOrder()
 	block.BackgroundTransparency = 1
@@ -115,7 +131,43 @@ local function grid(page: Frame): Frame
 	return block
 end
 
-local function button(line: Frame, text: string, color: Color3, width: number, action: () -> ()): TextButton
+-- The thin line between the sections of a page, like the sketch.
+local function divider(page: Instance)
+	local line = Instance.new("Frame")
+	line.LayoutOrder = nextOrder()
+	line.BorderSizePixel = 0
+	line.BackgroundColor3 = Ui.Colors.rim
+	line.BackgroundTransparency = 0.4
+	line.Size = UDim2.new(1, -8, 0, 2)
+	line.Parent = page
+end
+
+-- A section title in lantern orange.
+local function heading(page: Instance, text: string): TextLabel
+	local label = Ui.text(page, text, UDim2.new(1, 0, 0, 24), Ui.Colors.lamp, true, 20)
+	label.LayoutOrder = nextOrder()
+	return label
+end
+
+-- A line of grey help text that wraps.
+local function note(page: Instance, text: string): TextLabel
+	local label = Ui.text(page, text, UDim2.new(1, -8, 0, 0), Ui.Colors.muted, false, 15)
+	label.LayoutOrder = nextOrder()
+	label.AutomaticSize = Enum.AutomaticSize.Y
+	label.TextScaled = false
+	label.TextSize = 15
+	label.TextWrapped = true
+	label.TextTruncate = Enum.TextTruncate.None
+	return label
+end
+
+local function button(
+	line: Instance,
+	text: string,
+	color: Color3,
+	width: number,
+	action: () -> ()
+): TextButton
 	local made = Ui.button(line, text, color, UDim2.fromOffset(width, RowHeight))
 	made.LayoutOrder = nextOrder()
 	made.Activated:Connect(action)
@@ -125,7 +177,7 @@ end
 -- A box to type a number or word into; returns a function that reads it (nil when empty).
 -- Pressing Enter in it runs `onEnter` (the row's main button), if given.
 local function input(
-	line: Frame,
+	line: Instance,
 	placeholder: string,
 	start: string?,
 	width: number,
@@ -163,7 +215,7 @@ local function input(
 end
 
 -- The one list that drops down under whichever dropdown was tapped, and a see-through cover
--- behind it: tapping anywhere else closes it.
+-- behind it: tapping anywhere else closes it. Above the pop-ups, so dropdowns work in them.
 local popup: ScrollingFrame
 local cover: TextButton
 
@@ -203,7 +255,7 @@ end
 -- opens, so a list of players stays current). Returns a function that reads the chosen value,
 -- and one that picks a value.
 local function dropdown(
-	line: Frame,
+	line: Instance,
 	width: number,
 	options: () -> { Option },
 	start: string?,
@@ -279,10 +331,129 @@ local function dropdown(
 	end, pick
 end
 
+-- A pop-up in the middle of the panel (the effect picker, announcements, missions, "are you
+-- sure?"). A dark shade behind it blocks the panel; tapping the shade or X cancels.
+type Modal = {
+	body: ScrollingFrame,
+	footer: Frame,
+	title: TextLabel,
+	open: () -> (),
+	close: () -> (),
+	isOpen: () -> boolean,
+}
+
+local modals: { Modal } = {}
+
+local function modal(canvas: Frame, titleText: string, maxSize: Vector2): Modal
+	local shade = Instance.new("TextButton")
+	shade.Text = ""
+	shade.AutoButtonColor = false
+	shade.BackgroundColor3 = Color3.new(0, 0, 0)
+	shade.BackgroundTransparency = 0.45
+	shade.Size = UDim2.fromScale(1, 1)
+	shade.ZIndex = 30
+	shade.Visible = false
+	shade.Parent = canvas
+
+	local frame = Instance.new("Frame")
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.Position = UDim2.fromScale(0.5, 0.5)
+	frame.Size = UDim2.fromScale(0.9, 0.85)
+	frame.BackgroundColor3 = Ui.Colors.panel
+	frame.Active = true
+	frame.ZIndex = 31
+	frame.Visible = false
+	frame.Parent = canvas
+	Ui.corner(frame, 14)
+	Ui.rim(frame, Ui.Colors.lamp, 2)
+	local limit = Instance.new("UISizeConstraint")
+	limit.MaxSize = maxSize
+	limit.Parent = frame
+	local padding = Instance.new("UIPadding")
+	padding.PaddingLeft = UDim.new(0, 14)
+	padding.PaddingRight = UDim.new(0, 14)
+	padding.PaddingTop = UDim.new(0, 12)
+	padding.PaddingBottom = UDim.new(0, 12)
+	padding.Parent = frame
+
+	local title = Ui.text(frame, titleText, UDim2.new(1, -54, 0, 32), Ui.Colors.lamp, true, 28)
+	title.Font = Ui.TitleFont
+	local close = Ui.button(frame, "X", Ui.Colors.off, UDim2.fromOffset(40, 40))
+	close.AnchorPoint = Vector2.new(1, 0)
+	close.Position = UDim2.new(1, 0, 0, -4)
+
+	local body = Instance.new("ScrollingFrame")
+	body.Position = UDim2.fromOffset(0, 42)
+	body.Size = UDim2.new(1, 0, 1, -42 - 50)
+	body.BackgroundTransparency = 1
+	body.BorderSizePixel = 0
+	body.ScrollBarThickness = 6
+	body.ScrollBarImageColor3 = Ui.Colors.rim
+	body.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	body.CanvasSize = UDim2.new()
+	body.Parent = frame
+	local layout = Instance.new("UIListLayout")
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Padding = UDim.new(0, Gap)
+	layout.Parent = body
+
+	local footer = Instance.new("Frame")
+	footer.AnchorPoint = Vector2.new(0, 1)
+	footer.Position = UDim2.fromScale(0, 1)
+	footer.Size = UDim2.new(1, 0, 0, 40)
+	footer.BackgroundTransparency = 1
+	footer.Parent = frame
+	local footerLayout = Instance.new("UIListLayout")
+	footerLayout.FillDirection = Enum.FillDirection.Horizontal
+	footerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+	footerLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	footerLayout.Padding = UDim.new(0, 8)
+	footerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	footerLayout.Parent = footer
+
+	local made: Modal
+	made = {
+		body = body,
+		footer = footer,
+		title = title,
+		open = function()
+			closePopup()
+			for _, other in modals do
+				if other ~= made then
+					other.close()
+				end
+			end
+			body.CanvasPosition = Vector2.zero
+			shade.Visible = true
+			frame.Visible = true
+		end,
+		close = function()
+			closePopup()
+			shade.Visible = false
+			frame.Visible = false
+		end,
+		isOpen = function()
+			return frame.Visible
+		end,
+	}
+	shade.Activated:Connect(made.close)
+	close.Activated:Connect(made.close)
+	table.insert(modals, made)
+	return made
+end
+
+local function clearBody(frame: ScrollingFrame)
+	for _, child in frame:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+end
+
 -- ------------------------------------------------------------------ the lists
 
 local function playerOptions(): { Option }
-	local list: { Option } = { { label = "Me", value = "me" }, { label = "Everyone", value = Everyone } }
+	local list: { Option } = { { label = "Me", value = "me" }, { label = "All players", value = Everyone } }
 	for _, other in Players:GetPlayers() do
 		if other ~= player then
 			table.insert(list, { label = other.DisplayName, value = tostring(other.UserId) })
@@ -291,18 +462,10 @@ local function playerOptions(): { Option }
 	return list
 end
 
-local function wingOptions(): { Option }
-	local list: { Option } = {}
-	for index, wing in Wings.List do
-		table.insert(list, { label = wing.id, value = tostring(index) })
-	end
-	return list
-end
-
 local itemList: { Option } = {}
-for _, shop in { Shop.Workshop, Shop.Bakery } do
-	for _, item in shop do
-		table.insert(itemList, { label = item.name, value = item.id })
+for _, shop in { { name = "Workshop", items = Shop.Workshop }, { name = "Bakery", items = Shop.Bakery } } do
+	for _, item in shop.items do
+		table.insert(itemList, { label = `{shop.name}: {item.name}`, value = item.id })
 	end
 end
 
@@ -364,34 +527,80 @@ for i = #Variants, 1, -1 do
 	table.insert(variantList, { label = `{variant.id} (x{variant.multiplier})`, value = variant.id })
 end
 
--- Every effect by name, then every combo (giving a combo gives both its effects).
-local effectList: { Option } = {}
+-- The effect picker's groups: effects by where they come from, then combos (giving a combo
+-- gives both its effects).
+local sourceOrder = { "Roam", "Food", "Catch", "Survive", "Event", "Critter" }
+local sourceTitles: { [string]: string } = {
+	Roam = "Roaming effects",
+	Food = "Cake effects",
+	Catch = "Catch effects",
+	Survive = "Survive effects",
+	Event = "Event effects",
+	Critter = `Critter effects (only on monsters worth up to {Format.money(Effects.CritterMaxValue)})`,
+}
+type EffectGroup = { title: string, ids: { string } }
+local effectGroups: { EffectGroup } = {}
 local effectNames: { [string]: string } = {}
 do
-	local ids: { string } = {}
-	for id in Effects.List do
-		table.insert(ids, id)
-	end
-	table.sort(ids)
-	for _, id in ids do
-		local effect = Effects.List[id]
-		table.insert(
-			effectList,
-			{ label = `{Format.name(id)} (x{effect.multiplier}, {effect.source})`, value = id }
-		)
+	local bySource: { [string]: { string } } = {}
+	for id, effect in Effects.List do
+		local source = tostring(effect.source)
+		if not table.find(sourceOrder, source) then
+			table.insert(sourceOrder, source)
+		end
+		bySource[source] = bySource[source] or {}
+		table.insert(bySource[source], id)
 		effectNames[id] = Format.name(id)
+	end
+	for _, source in sourceOrder do
+		local ids = bySource[source]
+		if ids then
+			table.sort(ids)
+			table.insert(effectGroups, { title = sourceTitles[source] or `{source} effects`, ids = ids })
+		end
 	end
 	local combos: { string } = {}
 	for id in Effects.Combos do
 		table.insert(combos, id)
-	end
-	table.sort(combos)
-	for _, id in combos do
-		local combo = Effects.Combos[id]
-		local recipe = `{Format.name(combo.recipe[1])} + {Format.name(combo.recipe[2])}`
-		table.insert(effectList, { label = `Combo: {Format.name(id)} ({recipe})`, value = id })
 		effectNames[id] = `{Format.name(id)} combo`
 	end
+	table.sort(combos)
+	table.insert(effectGroups, { title = "Combos (gives both of its effects)", ids = combos })
+end
+
+local function effectLabel(id: string): string
+	local combo = Effects.Combos[id]
+	if combo then
+		return `{Format.name(id)} x{combo.multiplier} ({Format.name(combo.recipe[1])} + {Format.name(
+			combo.recipe[2]
+		)})`
+	end
+	local effect = Effects.List[id]
+	return if effect then `{Format.name(id)} x{effect.multiplier}` else Format.name(id)
+end
+
+-- "Effects: Gilded, Count combo" or "No effects".
+local function effectSummary(ids: { string }): string
+	local names: { string } = {}
+	for _, id in ids do
+		table.insert(names, effectNames[id] or id)
+	end
+	return if #names > 0 then `Effects: {table.concat(names, ", ")}` else "No effects picked."
+end
+
+-- Today's missions to pick from, tier by tier ({n} filled in; zones and money depend on the
+-- player, so they stay general).
+local function missionOptions(tierId: string): { Option }
+	local list: { Option } = {}
+	for _, mission in MissionConfig.Pool do
+		if mission.tier == tierId then
+			local text = string.gsub(mission.text, "{n}", tostring(mission.count or 1))
+			text = string.gsub(text, "{zone}", "a zone")
+			text = string.gsub(text, "{money}", "some money")
+			table.insert(list, { label = text, value = mission.id })
+		end
+	end
+	return list
 end
 
 local function fixed(list: { Option }): () -> { Option }
@@ -400,74 +609,231 @@ local function fixed(list: { Option }): () -> { Option }
 	end
 end
 
+-- ------------------------------------------------------------------ the pop-ups
+
+local confirmModal: Modal
+local confirmText: TextLabel
+local confirmYes: TextButton
+local confirmAction: (() -> ())? = nil
+
+-- "Are you sure?" for anything that can't be undone.
+local function askFirst(question: string, yesText: string, action: () -> ())
+	confirmText.Text = question
+	confirmYes.Text = yesText
+	confirmAction = action
+	confirmModal.open()
+end
+
+local function buildConfirm(canvas: Frame)
+	confirmModal = modal(canvas, "Are you sure?", Vector2.new(460, 260))
+	confirmText = note(confirmModal.body, "")
+	confirmText.TextColor3 = Ui.Colors.text
+	confirmText.TextSize = 18
+	button(confirmModal.footer, "Cancel", Ui.Colors.off, 100, confirmModal.close)
+	confirmYes = button(confirmModal.footer, "Yes", Ui.Colors.confirm, 180, function()
+		local action = confirmAction
+		confirmAction = nil
+		confirmModal.close()
+		if action then
+			action()
+		end
+	end)
+end
+
+-- The big effect picker: a tick box per effect and combo. `owned` effects (a monster they
+-- already have) show ticked and can't be changed. Done hands the ticked ones to `onDone`.
+local pickerModal: Modal
+local pickerCount: TextLabel
+local pickerDone: ((ids: { string }) -> ())? = nil
+local pickerWorking: { string } = {}
+
+local function openPicker(
+	titleText: string,
+	selected: { string },
+	owned: { string },
+	onDone: (ids: { string }) -> ()
+)
+	pickerModal.title.Text = titleText
+	pickerDone = onDone
+	pickerWorking = table.clone(selected)
+	local body = pickerModal.body
+	clearBody(body)
+
+	local function has(id: string): boolean
+		local combo = Effects.Combos[id]
+		if combo then
+			return table.find(owned, combo.recipe[1]) ~= nil and table.find(owned, combo.recipe[2]) ~= nil
+		end
+		return table.find(owned, id) ~= nil
+	end
+	local function showCount()
+		pickerCount.Text = `{#pickerWorking} picked`
+	end
+
+	for _, group in effectGroups do
+		heading(body, group.title)
+		local block = Instance.new("Frame")
+		block.LayoutOrder = nextOrder()
+		block.BackgroundTransparency = 1
+		block.Size = UDim2.new(1, -8, 0, 0)
+		block.AutomaticSize = Enum.AutomaticSize.Y
+		block.Parent = body
+		local layout = Instance.new("UIGridLayout")
+		layout.CellSize = UDim2.new(1 / 3, -6, 0, RowHeight)
+		layout.CellPadding = UDim2.fromOffset(6, 6)
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Parent = block
+		for i, id in group.ids do
+			local box = Ui.button(block, "", Ui.Colors.off, UDim2.fromOffset(100, RowHeight))
+			box.LayoutOrder = i
+			box.TextXAlignment = Enum.TextXAlignment.Left
+			local owns = has(id)
+			local function paint()
+				local ticked = table.find(pickerWorking, id) ~= nil
+				if owns then
+					box.Text = `✔ {effectLabel(id)} (has it)`
+					Ui.paint(box, Ui.Colors.off)
+					box.TextTransparency = 0.4
+				else
+					box.Text = `{if ticked then "☑" else "☐"} {effectLabel(id)}`
+					Ui.paint(box, if ticked then Ui.Colors.buy else Ui.Colors.off)
+				end
+			end
+			paint()
+			box.Activated:Connect(function()
+				if owns then
+					return
+				end
+				local at = table.find(pickerWorking, id)
+				if at then
+					table.remove(pickerWorking, at)
+				else
+					table.insert(pickerWorking, id)
+				end
+				paint()
+				showCount()
+			end)
+		end
+	end
+	showCount()
+	pickerModal.open()
+end
+
+local function buildPicker(canvas: Frame)
+	pickerModal = modal(canvas, "Pick effects", Vector2.new(820, 560))
+	pickerCount =
+		Ui.text(pickerModal.footer, "", UDim2.fromOffset(140, RowHeight), Ui.Colors.muted, false, 18)
+	pickerCount.LayoutOrder = nextOrder()
+	button(pickerModal.footer, "Untick all", Ui.Colors.off, 110, function()
+		-- The "has it" ones stay as they are.
+		pickerWorking = {}
+		for _, child in pickerModal.body:GetDescendants() do
+			if child:IsA("TextButton") and string.sub(child.Text, 1, #"☑") == "☑" then
+				child.Text = "☐" .. string.sub(child.Text, #"☑" + 1)
+				Ui.paint(child, Ui.Colors.off)
+			end
+		end
+		pickerCount.Text = "0 picked"
+	end)
+	button(pickerModal.footer, "Cancel", Ui.Colors.off, 90, pickerModal.close)
+	button(pickerModal.footer, "Done", Ui.Colors.buy, 100, function()
+		local done = pickerDone
+		pickerModal.close()
+		if done then
+			done(table.clone(pickerWorking))
+		end
+	end)
+end
+
 -- ------------------------------------------------------------------ the panel
 
 local function build()
-	window = Ui.window("AdminPanel", "Admin panel")
+	window = Ui.window("AdminPanel", "ADMIN PANEL")
 	local panel = window.panel
+	local canvas = window.canvas
 	local limit = panel:FindFirstChildOfClass("UISizeConstraint")
 	if limit then
-		limit.MaxSize = Vector2.new(820, 560)
+		limit.MaxSize = Vector2.new(900, 600)
 	end
-	buildPopup(window.canvas)
-	window.onClose = closePopup
-
-	-- "Works on" across the top.
-	local top = 68
-	local bar = Instance.new("Frame")
-	bar.BackgroundTransparency = 1
-	bar.Position = UDim2.fromOffset(0, top)
-	bar.Size = UDim2.new(1, 0, 0, RowHeight)
-	bar.Parent = panel
-	local barLayout = Instance.new("UIListLayout")
-	barLayout.FillDirection = Enum.FillDirection.Horizontal
-	barLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-	barLayout.Padding = UDim.new(0, 6)
-	barLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	barLayout.Parent = bar
-	local barLabel = Ui.text(bar, "Works on", UDim2.fromOffset(84, RowHeight), Ui.Colors.lamp, true, 18)
-	barLabel.LayoutOrder = 0
-	local function describe()
-		local name = "you"
-		if target == Everyone then
-			name = "everyone in the server"
-		elseif target ~= "me" then
-			local other = Players:GetPlayerByUserId(tonumber(target) or 0)
-			name = if other then other.DisplayName else "you"
+	buildPopup(canvas)
+	buildConfirm(canvas)
+	buildPicker(canvas)
+	window.onClose = function()
+		closePopup()
+		for _, other in modals do
+			other.close()
 		end
-		window.status.Text =
-			`Buttons work on {name}. Events, Restock, Announce and Reset my save don't change.`
 	end
-	local onTargetChanged: (() -> ())? = nil
-	local _, pickTarget = dropdown(bar, 200, playerOptions, "me", function(value)
+	local right = SideWidth + Gap * 2 -- where the pages start
+
+	-- Top left: who the buttons work on.
+	local who = Instance.new("Frame")
+	who.BackgroundTransparency = 1
+	who.Position = UDim2.fromOffset(0, 0)
+	who.Size = UDim2.fromOffset(SideWidth, HeaderHeight)
+	who.Parent = panel
+	local whoLayout = Instance.new("UIListLayout")
+	whoLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	whoLayout.Parent = who
+	local onTargetChanged: { () -> () } = {}
+	local function describe()
+		window.status.Text =
+			`Working on: {targetName()}. Events, Shops and announcements reach the whole server.`
+	end
+	local _, pickTarget = dropdown(who, SideWidth, playerOptions, "me", function(value)
 		target = value
 		describe()
-		if onTargetChanged then
-			task.spawn(onTargetChanged)
+		for _, changed in onTargetChanged do
+			task.spawn(changed)
 		end
 	end)
-	describe()
 	Players.PlayerRemoving:Connect(function(other)
 		if target == tostring(other.UserId) then
 			pickTarget("me") -- they left: back to yourself
 		end
 	end)
 
+	-- The title in the middle, "Make announcement" top right (next to X).
+	window.title.Position = UDim2.fromOffset(right, 4)
+	window.title.Size = UDim2.new(1, -(right + 54 + 220), 0, 34)
+	window.title.TextXAlignment = Enum.TextXAlignment.Center
+	local announceButton =
+		Ui.button(panel, "📢 Make announcement", Ui.Colors.sell, UDim2.fromOffset(210, 40))
+	announceButton.AnchorPoint = Vector2.new(1, 0)
+	announceButton.Position = UDim2.new(1, -54, 0, -2)
+	window.status.Position = UDim2.fromOffset(right, HeaderHeight + 4)
+	window.status.Size = UDim2.new(1, -right, 0, 20)
+	describe()
+
+	-- The lines of the sketch: under the header and between the tabs and the pages.
+	local below = HeaderHeight + 30
+	local across = Instance.new("Frame")
+	across.BorderSizePixel = 0
+	across.BackgroundColor3 = Ui.Colors.rim
+	across.Position = UDim2.fromOffset(0, HeaderHeight + 26)
+	across.Size = UDim2.new(1, 0, 0, 2)
+	across.Parent = panel
+	local down = Instance.new("Frame")
+	down.BorderSizePixel = 0
+	down.BackgroundColor3 = Ui.Colors.rim
+	down.Position = UDim2.fromOffset(SideWidth + Gap - 1, 0)
+	down.Size = UDim2.new(0, 2, 1, 0)
+	down.Parent = panel
+
 	-- Tabs down the left, pages on the right (in the window's list).
-	local below = top + RowHeight + Gap
 	local side = Instance.new("Frame")
 	side.BackgroundTransparency = 1
-	side.Position = UDim2.fromOffset(0, below)
-	side.Size = UDim2.new(0, SideWidth, 1, -below - 62)
+	side.Position = UDim2.fromOffset(0, below + Gap)
+	side.Size = UDim2.new(0, SideWidth, 1, -below - Gap)
 	side.Parent = panel
 	local sideLayout = Instance.new("UIListLayout")
-	sideLayout.Padding = UDim.new(0, 4)
+	sideLayout.Padding = UDim.new(0, 6)
 	sideLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	sideLayout.Parent = side
 
 	local list = window.list
-	list.Position = UDim2.fromOffset(SideWidth + Gap * 2, below)
-	list.Size = UDim2.new(1, -(SideWidth + Gap * 2), 1, -below - 62)
+	list.Position = UDim2.fromOffset(right, below + Gap)
+	list.Size = UDim2.new(1, -right, 1, -below - Gap)
 
 	local pages: { [string]: Frame } = {}
 	local tabs: { [string]: TextButton } = {}
@@ -492,7 +858,7 @@ local function build()
 		layout.SortOrder = Enum.SortOrder.LayoutOrder
 		layout.Parent = frame
 		pages[name] = frame
-		local tab = Ui.button(side, name, Ui.Colors.off, UDim2.new(1, 0, 0, RowHeight))
+		local tab = Ui.button(side, name, Ui.Colors.off, UDim2.new(1, 0, 0, RowHeight + 4))
 		tab.LayoutOrder = nextOrder()
 		tab.Activated:Connect(function()
 			openTab(name)
@@ -501,62 +867,186 @@ local function build()
 		return frame
 	end
 
-	-- Player
+	-- ============================================================== Player
 	local you = page("Player")
 	local moneyRow = row(you, "Money")
-	local amount = input(moneyRow, "5m, 1b, -1k", "1m", 90, function(text)
+	local amount = input(moneyRow, "amount: 5m, 1b", "1m", 120, function(text)
 		send("/money", text)
 	end)
-	button(moneyRow, "Add", Ui.Colors.buy, 60, function()
-		send("/money", amount())
+	local function money(sign: string)
+		local text = amount()
+		if not text then
+			window.status.Text = "Type an amount first, like 5m or 1b."
+			return
+		end
+		send("/money", sign .. (string.gsub(text, "^%-", "")))
+	end
+	button(moneyRow, "Add", Ui.Colors.buy, 80, function()
+		money("")
+	end)
+	button(moneyRow, "Remove", Ui.Colors.confirm, 90, function()
+		money("-")
 	end)
 	for _, quick in { "1m", "100m", "10b" } do
-		button(moneyRow, `+{string.upper(quick)}`, Ui.Colors.buy, 64, function()
+		button(moneyRow, `+{string.upper(quick)}`, Ui.Colors.buy, 66, function()
 			send("/money", quick)
 		end)
 	end
-	local wingRow = row(you, "Wings")
-	for _, option in wingOptions() do
-		button(wingRow, option.value, Ui.Colors.equip, 40, function()
-			send("/wings", option.value)
+	divider(you)
+
+	-- Monster attacks: a switch, on = zone monsters attack (the "Calm" attribute is off).
+	local attackRow = row(you, "Attacks")
+	local onLabel = Ui.text(attackRow, "On", UDim2.fromOffset(30, RowHeight), Ui.Colors.text, true, 18)
+	onLabel.LayoutOrder = nextOrder()
+	local switch = Instance.new("TextButton")
+	switch.LayoutOrder = nextOrder()
+	switch.Text = ""
+	switch.AutoButtonColor = false
+	switch.Size = UDim2.fromOffset(90, RowHeight)
+	switch.BackgroundColor3 = Ui.Colors.row
+	switch.Parent = attackRow
+	Ui.corner(switch, RowHeight)
+	Ui.rim(switch, Ui.Colors.rim, 2)
+	local knob = Instance.new("Frame")
+	knob.AnchorPoint = Vector2.new(0, 0.5)
+	knob.Size = UDim2.fromOffset(RowHeight - 8, RowHeight - 8)
+	knob.Parent = switch
+	Ui.corner(knob, RowHeight)
+	local offLabel = Ui.text(attackRow, "Off", UDim2.fromOffset(34, RowHeight), Ui.Colors.text, true, 18)
+	offLabel.LayoutOrder = nextOrder()
+	local attackNote = Ui.text(attackRow, "", UDim2.fromOffset(220, RowHeight), Ui.Colors.muted, false, 14)
+	attackNote.LayoutOrder = nextOrder()
+	-- On unless the picked player is calm (All players: on unless every one of them is).
+	local function attacksOn(): boolean
+		if target == Everyone then
+			for _, other in Players:GetPlayers() do
+				if not other:GetAttribute("Calm") then
+					return true
+				end
+			end
+			return false
+		end
+		local picked = if target == "me" then player else Players:GetPlayerByUserId(tonumber(target) or 0)
+		return not (picked and picked:GetAttribute("Calm"))
+	end
+	local function showSwitch()
+		local on = attacksOn()
+		knob.Position = if on then UDim2.new(0, 4, 0.5, 0) else UDim2.new(1, -(RowHeight - 4), 0.5, 0)
+		knob.BackgroundColor3 = if on then Ui.Colors.money else Ui.Colors.muted
+		attackNote.Text = if on then "zone monsters attack" else "zone monsters leave them alone"
+	end
+	switch.Activated:Connect(function()
+		send("/attacks", if attacksOn() then "off" else "on")
+		task.delay(0.4, showSwitch)
+	end)
+	showSwitch()
+	table.insert(onTargetChanged, showSwitch)
+	divider(you)
+
+	local missionRow = row(you, "Missions")
+	local missionModal = modal(canvas, "Change daily missions", Vector2.new(640, 400))
+	button(missionRow, "Reset missions", Ui.Colors.equip, 150, function()
+		send("/missions", "reset")
+	end)
+	button(missionRow, "Change daily missions", Ui.Colors.equip, 210, function()
+		missionModal.title.Text = `Change daily missions ({targetName()})`
+		missionModal.open()
+	end)
+	local moreRow = row(you, "")
+	button(moreRow, "Finish all", Ui.Colors.buy, 100, function()
+		send("/missions", "done")
+	end)
+	for _, days in { "0", "3", "7" } do
+		button(moreRow, `Streak {days}`, Ui.Colors.off, 90, function()
+			send("/missions", `streak {days}`)
 		end)
 	end
+	note(you, "Reset missions: today's missions start over (no progress, claimable again).")
+
+	-- The missions pop-up: one dropdown per tier; Set swaps in that mission.
+	note(
+		missionModal.body,
+		"Pick a mission for a tier and press Set: it replaces today's mission of that tier."
+	)
+	for _, tier in MissionConfig.Tiers do
+		local tierRow = row(missionModal.body, tier.id)
+		local options = missionOptions(tier.id)
+		local chosen = dropdown(tierRow, 330, fixed(options), options[1] and options[1].value)
+		button(tierRow, "Set", Ui.Colors.buy, 70, function()
+			local id = chosen()
+			if id then
+				send("/missions", `set {id}`)
+			end
+		end)
+	end
+	button(missionModal.footer, "Random new set", Ui.Colors.equip, 170, function()
+		send("/missions", "new")
+	end)
+	button(missionModal.footer, "Close", Ui.Colors.off, 90, missionModal.close)
+	divider(you)
+
 	local tutorialRow = row(you, "Tutorial")
 	button(tutorialRow, "Skip", Ui.Colors.off, 80, function()
 		send("/tutorial", "skip")
 	end)
-	button(tutorialRow, "Restart", Ui.Colors.off, 80, function()
+	button(tutorialRow, "Restart", Ui.Colors.off, 90, function()
 		send("/tutorial", "restart")
 	end)
-	local missionRow = row(you, "Missions")
-	button(missionRow, "Finish all", Ui.Colors.buy, 90, function()
-		send("/missions", "done")
+	divider(you)
+
+	-- The two red buttons, bottom right like the sketch.
+	local dangerRow = Instance.new("Frame")
+	dangerRow.LayoutOrder = nextOrder()
+	dangerRow.BackgroundTransparency = 1
+	dangerRow.Size = UDim2.new(1, -8, 0, RowHeight + 12)
+	dangerRow.Parent = you
+	local dangerLayout = Instance.new("UIListLayout")
+	dangerLayout.FillDirection = Enum.FillDirection.Horizontal
+	dangerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+	dangerLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	dangerLayout.Padding = UDim.new(0, 16)
+	dangerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	dangerLayout.Parent = dangerRow
+	local resetSave = button(dangerRow, "RESET SAVE", Ui.Colors.confirm, 150, function()
+		if target == Everyone then
+			window.status.Text = "Reset save works on one player at a time: pick them top left."
+			return
+		end
+		local whose = if target == "me" then "your" else `{targetName()}'s`
+		local savedTarget = target
+		askFirst(
+			`Wipe {whose} whole save? Money, monsters, wings, everything goes back to a brand-new player's and they're sent out of the game. This can't be undone.`,
+			"Yes, wipe the save",
+			function()
+				if target ~= savedTarget then
+					return -- the pick changed while the pop-up was open
+				end
+				send("/reset", "confirm")
+			end
+		)
 	end)
-	button(missionRow, "New set", Ui.Colors.equip, 80, function()
-		send("/missions", "new")
+	resetSave.Size = UDim2.fromOffset(150, RowHeight + 8)
+	local resetPlayer = button(dangerRow, "RESET PLAYER", Ui.Colors.confirm, 160, function()
+		askFirst(
+			`Respawn {targetName()}? A fresh body back home, like the Reset button in the Roblox menu (a hunt in a zone ends). Their save is not touched.`,
+			"Yes, respawn",
+			function()
+				send("/respawn")
+			end
+		)
 	end)
-	for _, days in { "0", "3" } do
-		button(missionRow, `Streak {days}`, Ui.Colors.off, 80, function()
-			send("/missions", `streak {days}`)
+	resetPlayer.Size = UDim2.fromOffset(160, RowHeight + 8)
+
+	-- ============================================================== Mansion
+	local mansion = page("Mansion")
+	local wingRow = row(mansion, "Wings")
+	for index, wing in Wings.List do
+		button(wingRow, `{index} {wing.id}`, Ui.Colors.equip, 104, function()
+			send("/wings", tostring(index))
 		end)
 	end
-	local fightRow = row(you, "Monsters")
-	button(fightRow, "Calm on/off", Ui.Colors.off, 110, function()
-		send("/calm")
-	end)
-	button(fightRow, "Attack", Ui.Colors.confirm, 80, function()
-		send("/attack")
-	end)
-	local resetRow = row(you, "Your save")
-	-- Wipes only your own save and kicks you; rejoin to play as a brand-new player.
-	local reset = Ui.button(resetRow, "Reset my save", Ui.Colors.confirm, UDim2.fromOffset(130, RowHeight))
-	reset.LayoutOrder = nextOrder()
-	Ui.confirmButton(reset, "Wipe it all?", function()
-		remote:FireServer("/reset", "confirm") -- always your own save, whoever is picked
-	end)
-
-	-- Mansion
-	local mansion = page("Mansion")
+	note(mansion, "How many wings the mansion has (1 = only the Foyer). It rebuilds right away.")
+	divider(mansion)
 	local growRow = row(mansion, "Grow spurts")
 	for _, spurts in { "1", "5", "25" } do
 		button(growRow, spurts, Ui.Colors.equip, 50, function()
@@ -581,26 +1071,27 @@ local function build()
 	button(skipRow, "Go", Ui.Colors.equip, 50, function()
 		send("/skip", hoursBox())
 	end)
-	local allRow = row(mansion, "All monsters")
-	button(allRow, "Haunt all", Ui.Colors.equip, 100, function()
+	local hauntRow = row(mansion, "Effects")
+	button(hauntRow, "Haunt all", Ui.Colors.equip, 100, function()
 		send("/haunt")
 	end)
-	button(allRow, "Refill goes", Ui.Colors.equip, 110, function()
-		send("/charges") -- Growth Chamber
-	end)
-	button(allRow, "Chamber done", Ui.Colors.equip, 120, function()
+	note(
+		mansion,
+		"Haunt all: every monster in the mansion picks up a roaming effect (the event's during an event)."
+	)
+	divider(mansion)
+	local chamberRow = row(mansion, "Growth Chamber")
+	button(chamberRow, "Chamber done", Ui.Colors.equip, 130, function()
 		send("/chamber") -- the Growth Chamber's 20 minutes are up
 	end)
-	local clear = Ui.button(allRow, "Clear all", Ui.Colors.confirm, UDim2.fromOffset(100, RowHeight))
-	clear.LayoutOrder = nextOrder()
-	Ui.confirmButton(clear, "Sure?", function()
-		send("/clearmonsters")
+	button(chamberRow, "Refill goes", Ui.Colors.equip, 120, function()
+		send("/charges")
 	end)
 
-	-- Items
+	-- ============================================================== Items
 	local items = page("Items")
 	local itemRow = row(items, "Item")
-	local item = dropdown(itemRow, 230, fixed(itemList), itemList[1] and itemList[1].value)
+	local item = dropdown(itemRow, 280, fixed(itemList), itemList[1] and itemList[1].value)
 	local countRow = row(items, "Give")
 	local function give(count: string?)
 		local id = item()
@@ -617,82 +1108,36 @@ local function build()
 	button(countRow, "Go", Ui.Colors.buy, 50, function()
 		give(countBox())
 	end)
+	note(items, "Vacuums and slappers are given once and put in their hand; cakes and other items stack.")
 
-	-- Spawn (in the zone the player is standing in)
-	local spawn = page("Spawn")
-	local monsterRow = row(spawn, "Monster")
-	local monster = dropdown(monsterRow, 230, fixed(monsterList), monsterList[1] and monsterList[1].value)
-	-- One tap spawns the picked monster at that size, in the zone you're standing in.
-	local sizeRow = row(spawn, "Spawn as")
-	for _, option in sizeList do
-		button(sizeRow, option.label, Ui.Colors.sell, 78, function()
-			local id = monster()
-			if id then
-				send("/spawn", `{id} {option.value}`)
-			end
-		end)
-	end
-	local zoneRow = row(spawn, "Whole zone")
-	button(zoneRow, "Every monster of my zone", Ui.Colors.sell, 210, function()
-		send("/spawn", "all Normal")
-	end)
-
-	-- Give (Giles 2026-10-30): a brand-new monster with the size, variant, weight and effects
-	-- picked here, or more effects on a monster the player already has.
-	local givePage = page("Give")
+	-- ============================================================== Monsters
+	local monstersPage = page("Monsters")
 	local refreshTheirs: () -> ()
-	local giveMonsterRow = row(givePage, "Monster")
+	heading(monstersPage, "Give a new monster")
+	local giveMonsterRow = row(monstersPage, "Monster")
 	local giveMonster =
-		dropdown(giveMonsterRow, 260, fixed(monsterList), monsterList[1] and monsterList[1].value)
-	local giveSizeRow = row(givePage, "Size")
+		dropdown(giveMonsterRow, 280, fixed(monsterList), monsterList[1] and monsterList[1].value)
+	local giveSizeRow = row(monstersPage, "Size")
 	local giveSize = dropdown(giveSizeRow, 120, fixed(sizeList), "Normal")
 	local giveKg = input(giveSizeRow, "or kg", nil, 70)
-	Ui.text(
-		giveSizeRow,
-		"a weight sets the size",
-		UDim2.fromOffset(160, RowHeight),
-		Ui.Colors.muted,
-		false,
-		14
-	).LayoutOrder =
-		nextOrder()
-	local giveVariantRow = row(givePage, "Variant")
+	local kgNote =
+		Ui.text(giveSizeRow, "a weight sets the size", UDim2.fromOffset(160, RowHeight), Ui.Colors.muted, false, 14)
+	kgNote.LayoutOrder = nextOrder()
+	local giveVariantRow = row(monstersPage, "Variant")
 	local giveVariant = dropdown(giveVariantRow, 160, fixed(variantList), "None")
-	local giveEffectRow = row(givePage, "Effects")
-	local giveEffect = dropdown(giveEffectRow, 260, fixed(effectList), effectList[1] and effectList[1].value)
-	local picked: { string } = {}
-	local pickedText: TextLabel
-	local function showPicked()
-		local names: { string } = {}
-		for _, id in picked do
-			table.insert(names, effectNames[id])
-		end
-		pickedText.Text = if #names > 0
-			then `Effects on it: {table.concat(names, ", ")}`
-			else "No effects: pick one and press Add (as many as you like)."
-	end
-	button(giveEffectRow, "Add", Ui.Colors.equip, 60, function()
-		local id = giveEffect()
-		if id and not table.find(picked, id) then
-			table.insert(picked, id)
-			showPicked()
-		end
+	local giveEffects: { string } = {}
+	local giveEffectRow = row(monstersPage, "Effects")
+	local giveSummary: TextLabel
+	button(giveEffectRow, "✚ Pick effects...", Ui.Colors.equip, 170, function()
+		openPicker("Effects for the new monster", giveEffects, {}, function(ids)
+			giveEffects = ids
+			giveSummary.Text = effectSummary(giveEffects)
+		end)
 	end)
-	button(giveEffectRow, "Clear", Ui.Colors.off, 70, function()
-		table.clear(picked)
-		showPicked()
-	end)
-	pickedText = Ui.text(givePage, "", UDim2.new(1, 0, 0, 0), Ui.Colors.text, false, 16)
-	pickedText.LayoutOrder = nextOrder()
-	pickedText.AutomaticSize = Enum.AutomaticSize.Y
-	pickedText.TextScaled = false
-	pickedText.TextSize = 16
-	pickedText.TextWrapped = true
-	pickedText.TextTruncate = Enum.TextTruncate.None
-	pickedText.TextXAlignment = Enum.TextXAlignment.Left
-	showPicked()
-	local giveRow = row(givePage, "")
-	button(giveRow, "Give monster", Ui.Colors.buy, 140, function()
+	giveSummary = note(monstersPage, effectSummary(giveEffects))
+	giveSummary.TextColor3 = Ui.Colors.text
+	local giveRow = row(monstersPage, "")
+	button(giveRow, "Give monster", Ui.Colors.buy, 150, function()
 		local id = giveMonster()
 		if not id then
 			return
@@ -713,48 +1158,89 @@ local function build()
 		if variant and variant ~= "None" then
 			table.insert(parts, variant)
 		end
-		for _, effectId in picked do
+		for _, effectId in giveEffects do
 			table.insert(parts, effectId)
 		end
 		send("/givemonster", table.concat(parts, " "))
 		task.delay(1, refreshTheirs)
 	end)
+	button(giveRow, "Untick effects", Ui.Colors.off, 140, function()
+		giveEffects = {}
+		giveSummary.Text = effectSummary(giveEffects)
+	end)
+	divider(monstersPage)
 
 	-- More effects on a monster they already have (one player at a time).
-	local addHeading = Ui.text(
-		givePage,
-		"Add an effect to one of their monsters",
-		UDim2.new(1, 0, 0, 24),
-		Ui.Colors.lamp,
-		true,
-		18
-	)
-	addHeading.LayoutOrder = nextOrder()
-	addHeading.TextXAlignment = Enum.TextXAlignment.Left
-	local theirs: { Option } = {}
-	local theirRow = row(givePage, "Theirs")
+	heading(monstersPage, "Add effects to one of their monsters")
+	local theirs: { TheirMonster } = {}
+	local theirRow = row(monstersPage, "Theirs")
 	local theirMonster, pickTheirs = dropdown(theirRow, 400, function()
-		return if #theirs > 0
-			then theirs
-			else { { label = "No monsters (or Everyone is picked)", value = "" } }
+		local options: { Option } = {}
+		for _, monster in theirs do
+			table.insert(options, { label = monster.label, value = monster.uid })
+		end
+		return if #options > 0
+			then options
+			else { { label = "No monsters (or All players is picked)", value = "" } }
 	end, "")
 	button(theirRow, "Refresh", Ui.Colors.off, 80, function()
 		task.spawn(refreshTheirs)
 	end)
-	local addRow = row(givePage, "Effect")
-	local addEffect = dropdown(addRow, 260, fixed(effectList), effectList[1] and effectList[1].value)
-	button(addRow, "Add effect", Ui.Colors.buy, 110, function()
-		local uid, id = theirMonster(), addEffect()
+	local addEffects: { string } = {}
+	local addRow = row(monstersPage, "Effects")
+	local addSummary: TextLabel
+	button(addRow, "✚ Pick effects...", Ui.Colors.equip, 170, function()
 		if target == Everyone then
-			window.status.Text = "Add effect works on one player: pick them in Works on."
+			window.status.Text = "Add effects works on one player: pick them top left."
 			return
 		end
-		if not uid or uid == "" or not id then
+		local uid = theirMonster()
+		local owned: { string } = {}
+		local name = "their monster"
+		for _, monster in theirs do
+			if monster.uid == uid then
+				owned = monster.effects
+				name = string.match(monster.label, "^(.-)%s*·") or monster.label
+			end
+		end
+		openPicker(`Add effects: {name}`, addEffects, owned, function(ids)
+			addEffects = ids
+			addSummary.Text = effectSummary(addEffects)
+		end)
+	end)
+	addSummary = note(monstersPage, effectSummary(addEffects))
+	addSummary.TextColor3 = Ui.Colors.text
+	local addGoRow = row(monstersPage, "")
+	button(addGoRow, "Add effects", Ui.Colors.buy, 140, function()
+		local uid = theirMonster()
+		if target == Everyone then
+			window.status.Text = "Add effects works on one player: pick them top left."
+			return
+		end
+		if not uid or uid == "" then
 			window.status.Text = "Pick one of their monsters first."
 			return
 		end
-		send("/addeffect", `{uid} {id}`)
+		if #addEffects == 0 then
+			window.status.Text = "Pick effects first (✚ Pick effects...)."
+			return
+		end
+		send("/addeffect", `{uid} {table.concat(addEffects, " ")}`)
+		addEffects = {}
+		addSummary.Text = effectSummary(addEffects)
 		task.delay(1, refreshTheirs)
+	end)
+	divider(monstersPage)
+	local clearRow = row(monstersPage, "Remove all")
+	button(clearRow, "Remove all their monsters", Ui.Colors.confirm, 240, function()
+		askFirst(
+			`Remove every monster {targetName()} owns? The mansion, Storage and Growth Chamber are emptied. This can't be undone.`,
+			"Yes, remove them",
+			function()
+				send("/clearmonsters")
+				task.delay(1, refreshTheirs)
+			end
+		)
 	end)
 
 	-- Asks the server for the picked player's monsters (only admins get an answer).
@@ -777,30 +1263,72 @@ local function build()
 						and type(monsterRow.uid) == "string"
 						and type(monsterRow.label) == "string"
 					then
-						table.insert(theirs, { label = monsterRow.label, value = monsterRow.uid })
+						local effects: { string } = {}
+						if type(monsterRow.effects) == "table" then
+							for _, id in monsterRow.effects do
+								if type(id) == "string" then
+									table.insert(effects, id)
+								end
+							end
+						end
+						table.insert(
+							theirs,
+							{ uid = monsterRow.uid, label = monsterRow.label, effects = effects }
+						)
 					end
 				end
 			end
 		end
 		local current = theirMonster()
 		local kept = false
-		for _, option in theirs do
-			kept = kept or option.value == current
+		for _, monster in theirs do
+			kept = kept or monster.uid == current
 		end
-		pickTheirs(if kept and current then current elseif theirs[1] then theirs[1].value else "")
+		pickTheirs(if kept and current then current elseif theirs[1] then theirs[1].uid else "")
 		refreshing = false
 	end
-	onTargetChanged = refreshTheirs
-	tabs["Give"].Activated:Connect(function()
+	table.insert(onTargetChanged, refreshTheirs)
+	tabs["Monsters"].Activated:Connect(function()
 		task.spawn(refreshTheirs)
 	end)
 
-	-- Events (Watcher events reach everyone). Tapping one starts it now, ending one that's
-	-- playing.
+	-- ============================================================== Zones
+	local zonesPage = page("Zones")
+	note(
+		zonesPage,
+		"Works in the zone the picked player is standing in. Spawned monsters are theirs alone to catch and never attack."
+	)
+	local monsterRow = row(zonesPage, "Monster")
+	local spawnMonster =
+		dropdown(monsterRow, 280, fixed(monsterList), monsterList[1] and monsterList[1].value)
+	local sizeRow = row(zonesPage, "Spawn as")
+	for _, option in sizeList do
+		button(sizeRow, option.label, Ui.Colors.sell, 78, function()
+			local id = spawnMonster()
+			if id then
+				send("/spawn", `{id} {option.value}`)
+			end
+		end)
+	end
+	local zoneRow = row(zonesPage, "Whole zone")
+	button(zoneRow, "Every monster of the zone", Ui.Colors.sell, 230, function()
+		send("/spawn", "all Normal")
+	end)
+	divider(zonesPage)
+	local fightRow = row(zonesPage, "Attacks")
+	button(fightRow, "Attack now", Ui.Colors.confirm, 120, function()
+		send("/attack")
+	end)
+	note(
+		zonesPage,
+		"Attack now: the closest monster in their zone attacks right away. Turn attacks on or off on the Player tab."
+	)
+
+	-- ============================================================== Events
+	-- Watcher events reach everyone. Tapping one starts it now, ending one that's playing.
 	local server = page("Events")
 	local live = Ui.text(server, "", UDim2.new(1, 0, 0, 24), Ui.Colors.lamp, true, 18)
 	live.LayoutOrder = nextOrder()
-	live.TextXAlignment = Enum.TextXAlignment.Left
 	local controlRow = row(server, "Now")
 	button(controlRow, "Stop event", Ui.Colors.confirm, 110, function()
 		send("/stopevent")
@@ -819,13 +1347,9 @@ local function build()
 	end
 
 	-- The global schedule (the same in every server; a started event doesn't change it).
-	local timeline = Ui.text(server, "", UDim2.new(1, 0, 0, 0), Ui.Colors.text, false, 16)
-	timeline.LayoutOrder = nextOrder()
-	timeline.AutomaticSize = Enum.AutomaticSize.Y
-	timeline.TextScaled = false
+	local timeline = note(server, "")
+	timeline.TextColor3 = Ui.Colors.text
 	timeline.TextSize = 16
-	timeline.TextWrapped = true
-	timeline.TextTruncate = Enum.TextTruncate.None
 	timeline.TextYAlignment = Enum.TextYAlignment.Top
 	task.spawn(function()
 		while timeline.Parent do
@@ -853,11 +1377,12 @@ local function build()
 		end
 	end)
 
-	-- Restock (this server only): pick items and amounts, then restock.
-	local restock = page("Restock")
-	local restockLive = Ui.text(restock, "", UDim2.new(1, 0, 0, 24), Ui.Colors.lamp, true, 18)
+	-- ============================================================== Shops
+	-- Admin restocks (this server only): pick items and amounts, then restock.
+	local restock = page("Shops")
+	heading(restock, "Restock the Bakery and Workshop")
+	local restockLive = Ui.text(restock, "", UDim2.new(1, 0, 0, 22), Ui.Colors.muted, false, 16)
 	restockLive.LayoutOrder = nextOrder()
-	restockLive.TextXAlignment = Enum.TextXAlignment.Left
 	local planned: { [string]: number } = {}
 	local plannedText: TextLabel
 	local function showPlanned()
@@ -887,7 +1412,7 @@ local function build()
 		14
 	).LayoutOrder =
 		nextOrder()
-	local function amount(): number?
+	local function restockAmount(): number?
 		local value = tonumber(amountBox())
 		if not value or value ~= value or value < 0 or value > Restock.MaxAmount then
 			window.status.Text = `Amount: a number from 0 to {Restock.MaxAmount}.`
@@ -896,13 +1421,13 @@ local function build()
 		return math.floor(value)
 	end
 	local function addAll(cakes: boolean?)
-		local count = amount()
+		local count = restockAmount()
 		if not count then
 			return
 		end
-		for _, item in Restock.items() do
-			if not item.event and (cakes == nil or Restock.isCake(item.id) == cakes) then
-				planned[item.id] = count
+		for _, restockItem in Restock.items() do
+			if not restockItem.event and (cakes == nil or Restock.isCake(restockItem.id) == cakes) then
+				planned[restockItem.id] = count
 			end
 		end
 		showPlanned()
@@ -920,7 +1445,7 @@ local function build()
 	local pickRow = row(restock, "One item")
 	local restockItem = dropdown(pickRow, 260, fixed(restockList), restockList[1] and restockList[1].value)
 	button(pickRow, "Add", Ui.Colors.equip, 60, function()
-		local id, count = restockItem(), amount()
+		local id, count = restockItem(), restockAmount()
 		if id and count then
 			planned[id] = count
 			showPlanned()
@@ -933,14 +1458,9 @@ local function build()
 			showPlanned()
 		end
 	end)
-	plannedText = Ui.text(restock, "", UDim2.new(1, 0, 0, 0), Ui.Colors.text, false, 16)
-	plannedText.LayoutOrder = nextOrder()
-	plannedText.AutomaticSize = Enum.AutomaticSize.Y
-	plannedText.TextScaled = false
+	plannedText = note(restock, "")
+	plannedText.TextColor3 = Ui.Colors.text
 	plannedText.TextSize = 16
-	plannedText.TextWrapped = true
-	plannedText.TextTruncate = Enum.TextTruncate.None
-	plannedText.TextXAlignment = Enum.TextXAlignment.Left
 	showPlanned()
 	local minutesRow = row(restock, "Lasts")
 	local minutesBox = input(minutesRow, "min", tostring(Restock.DefaultMinutes), 60)
@@ -970,6 +1490,7 @@ local function build()
 	button(goRow, "End restock", Ui.Colors.confirm, 110, function()
 		send("/restock", "end")
 	end)
+	note(restock, "Restocks are for this server only and replace the normal stock of the items picked.")
 	task.spawn(function()
 		while restockLive.Parent do
 			if window.isOpen() and restock.Visible then
@@ -982,33 +1503,23 @@ local function build()
 		end
 	end)
 
-	-- Announce (a banner for everyone in this server; Roblox filters it like chat).
-	local announce = page("Announce")
-	local note = Ui.text(
-		announce,
-		"Everyone in this server sees it at the top of their screen and in the chat. Up to 150 letters.",
-		UDim2.new(1, 0, 0, 0),
-		Ui.Colors.muted,
-		false,
-		16
+	-- ============================================================== Make announcement
+	-- A banner for everyone in this server (Roblox filters it like chat).
+	local announceModal = modal(canvas, "Make announcement", Vector2.new(560, 320))
+	note(
+		announceModal.body,
+		`Everyone in this server sees it at the top of their screen and in the chat. Up to {MaxAnnouncement} letters.`
 	)
-	note.LayoutOrder = nextOrder()
-	note.AutomaticSize = Enum.AutomaticSize.Y
-	note.TextScaled = false
-	note.TextSize = 16
-	note.TextWrapped = true
-	note.TextXAlignment = Enum.TextXAlignment.Left
-	local messageRow = row(announce, "Message")
 	local messageBox = Instance.new("TextBox")
 	messageBox.LayoutOrder = nextOrder()
-	messageBox.Size = UDim2.fromOffset(420, RowHeight * 2)
+	messageBox.Size = UDim2.new(1, -8, 0, RowHeight * 3)
 	messageBox.BackgroundColor3 = Ui.Colors.row
 	messageBox.TextColor3 = Ui.Colors.text
 	messageBox.PlaceholderText = "Double money for the next hour!"
 	messageBox.PlaceholderColor3 = Ui.Colors.muted
 	messageBox.Text = ""
 	messageBox.Font = Enum.Font.FredokaOne
-	messageBox.TextSize = 16
+	messageBox.TextSize = 18
 	messageBox.TextWrapped = true
 	messageBox.TextXAlignment = Enum.TextXAlignment.Left
 	messageBox.TextYAlignment = Enum.TextYAlignment.Top
@@ -1019,27 +1530,47 @@ local function build()
 	messagePadding.PaddingLeft = UDim.new(0, 8)
 	messagePadding.PaddingTop = UDim.new(0, 6)
 	messagePadding.Parent = messageBox
-	messageBox.Parent = messageRow
+	messageBox.Parent = announceModal.body
+	local letters =
+		Ui.text(announceModal.footer, "", UDim2.fromOffset(120, RowHeight), Ui.Colors.muted, false, 16)
+	letters.LayoutOrder = nextOrder()
+	messageBox:GetPropertyChangedSignal("Text"):Connect(function()
+		letters.Text = `{#messageBox.Text}/{MaxAnnouncement}`
+		letters.TextColor3 = if #messageBox.Text > MaxAnnouncement then Ui.Colors.confirm else Ui.Colors.muted
+	end)
 	local function sendAnnouncement()
 		local text = string.match(messageBox.Text, "^%s*(.-)%s*$") or ""
 		if text == "" then
-			window.status.Text = "Type a message first."
 			return
 		end
-		if #text > 150 then
-			window.status.Text = `That's {#text} letters: keep it under 150.`
-			return
+		if #text > MaxAnnouncement then
+			return -- the counter is red
 		end
 		send("/announce", text)
 		messageBox.Text = ""
+		announceModal.close()
 	end
 	messageBox.FocusLost:Connect(function(enterPressed)
 		if enterPressed then
 			sendAnnouncement()
 		end
 	end)
-	local sendRow = row(announce, "")
-	button(sendRow, "Announce", Ui.Colors.sell, 120, sendAnnouncement)
+	button(announceModal.footer, "Cancel", Ui.Colors.off, 90, announceModal.close)
+	button(announceModal.footer, "📢 Announce", Ui.Colors.sell, 140, sendAnnouncement)
+	announceButton.Activated:Connect(function()
+		letters.Text = `{#messageBox.Text}/{MaxAnnouncement}`
+		announceModal.open()
+	end)
+
+	-- The attacks switch follows the picked player (another admin may flip it too).
+	task.spawn(function()
+		while switch.Parent do
+			if window.isOpen() and you.Visible then
+				showSwitch()
+			end
+			task.wait(0.5)
+		end
+	end)
 
 	openTab("Player")
 end

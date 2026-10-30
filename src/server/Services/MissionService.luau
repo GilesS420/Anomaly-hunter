@@ -263,6 +263,61 @@ function MissionService.finish(player: Player, index: number?): boolean
 	return any
 end
 
+-- Admin: today's missions start over, the same ones: no progress, nothing claimed (the
+-- rewards can be claimed again) and the free rerolls back.
+function MissionService.resetProgress(player: Player): boolean
+	local data = DataService.get(player)
+	if not data then
+		return false
+	end
+	local state = current(player, data)
+	for _, saved in state.list do
+		saved.progress = 0
+		saved.claimed = nil
+		if saved.seen then
+			saved.seen = {}
+		end
+	end
+	state.chestClaimed = nil
+	state.rerolls = Config.Rerolls
+	state.vipDay = nil
+	vipRerolls(player, state)
+	update(player, state)
+	return true
+end
+
+-- Admin: puts mission `missionId` (Config/Missions.Pool) in the place of today's mission of
+-- its tier. Returns its text, or nil when it can't (unknown id, save loading, or a zone
+-- mission with no zone open yet).
+function MissionService.setMission(player: Player, missionId: string): string?
+	local data = DataService.get(player)
+	local def: Config.Mission? = nil
+	for _, mission in Config.Pool do
+		if string.lower(mission.id) == string.lower(missionId) then
+			def = mission
+		end
+	end
+	if not data or not def then
+		return nil
+	end
+	local state = current(player, data)
+	local saved = Missions.build(def, state.worth, state.bonus, Missions.openZones(data.wingsOwned), random)
+	if not saved then
+		return nil
+	end
+	local slot = #state.list + 1
+	for index, other in state.list do
+		local otherDef = Missions.def(other.id)
+		if otherDef and otherDef.tier == def.tier then
+			slot = index
+			break
+		end
+	end
+	state.list[slot] = saved
+	update(player, state)
+	return Missions.text(saved)
+end
+
 -- Admin: sets the streak as if missions were claimed every day up to yesterday, and deals
 -- new missions so the bonus shows.
 function MissionService.setStreak(player: Player, days: number): boolean
