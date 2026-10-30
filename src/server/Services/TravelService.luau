@@ -15,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local StarterPlayer = game:GetService("StarterPlayer")
 
+local Heists = require(ReplicatedStorage.Shared.Config.Heists)
 local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
 local Travel = require(ReplicatedStorage.Shared.Util.Travel)
 local TravelConfig = require(ReplicatedStorage.Shared.Config.Travel)
@@ -216,6 +217,7 @@ local function updateSpeeds()
 			local inZone = player:GetAttribute("Zone") ~= nil
 			local speed = Travel.walkSpeed(inZone, position.X, position.Z, normal, TravelConfig.HubWalkSpeed)
 				* Perks.walkMultiplier(player)
+				* (if player:GetAttribute("HeistPhase") == "Carrying" then Heists.CarrySpeed else 1)
 			if humanoid.WalkSpeed ~= speed then
 				humanoid.WalkSpeed = speed
 			end

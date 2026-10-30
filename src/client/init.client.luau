@@ -16,6 +16,7 @@ local WorkshopController = require(script.Controllers.WorkshopController)
 local BakeryController = require(script.Controllers.BakeryController)
 local AttackController = require(script.Controllers.AttackController)
 local SlapController = require(script.Controllers.SlapController)
+local HeistController = require(script.Controllers.HeistController)
 local TravelController = require(script.Controllers.TravelController)
 local GateController = require(script.Controllers.GateController)
 local InventoryController = require(script.Controllers.InventoryController)
@@ -59,6 +60,7 @@ local controllers: { { start: () -> () } } = {
 	BakeryController,
 	AttackController,
 	SlapController,
+	HeistController,
 	TravelController,
 	GateController,
 	InventoryController,

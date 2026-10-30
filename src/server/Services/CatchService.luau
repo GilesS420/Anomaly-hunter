@@ -31,6 +31,7 @@ local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Tools = require(ReplicatedStorage.Shared.Config.Tools)
 local DataService = require(script.Parent.DataService)
+local HeistService = require(script.Parent.HeistService)
 local HuntService = require(script.Parent.HuntService)
 local MansionService = require(script.Parent.MansionService)
 local Notify = require(script.Parent.Parent.Notify)
@@ -182,6 +183,21 @@ local function finish(player: Player, lucky: boolean?)
 		return
 	end
 
+	-- A Monster Heist: it rides off on the thief's head (HeistService).
+	if not wildMonster(model) then
+		if HeistService.grab(player, model) then
+			State:FireClient(
+				player,
+				"Ended",
+				{ result = "Caught", monsterId = model:GetAttribute("MonsterId"), model = model }
+			)
+		else
+			RoamService.release(model, hold.stunSeconds)
+			State:FireClient(player, "Ended", { result = "Gone", model = model })
+		end
+		return
+	end
+
 	local vacuumId = data.equipped.vacuum
 	local inHub = hold.zoneId == ""
 	if inHub and not MansionService.hasRoom(player) then
@@ -278,6 +294,14 @@ local function onStartCatch(player: Player, model: unknown)
 	-- 2. A live wild monster nobody else is catching, in the zone the hunter is in (or both
 	-- in the main area), and the hunter is alive (a knocked-out hunter's body can't catch).
 	local spawned = wildMonster(model)
+	if not spawned then
+		-- Or, on a Monster Heist, a monster roaming the robbed mansion.
+		local why
+		spawned, why = HeistService.target(player, model)
+		if why then
+			Notify.toast(player, why)
+		end
+	end
 	if not spawned then
 		return
 	end
@@ -505,9 +529,11 @@ local function update()
 	local serverNow = workspace:GetServerTimeNow()
 	for player, hold in holds do
 		local struggle = hold.struggle
-		if wildMonster(hold.model) == nil then
-			-- Gone (cleared by an event, or the zone was removed).
+		if wildMonster(hold.model) == nil and HeistService.target(player, hold.model) == nil then
+			-- Gone (cleared by an event, or the zone was removed), or the heist it was part of
+			-- ended: a mansion monster walks on.
 			clear(player)
+			RoamService.release(hold.model, 0)
 			State:FireClient(player, "Ended", { result = "Gone", model = hold.model })
 		elseif not isHunting(player, hold.zoneId) then
 			-- Knocked out or went home (Exit, Return Charm): it just stays behind, no message.

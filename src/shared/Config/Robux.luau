@@ -30,6 +30,10 @@ Robux.Products = {
 	MissionSkip = { id = 3723586069, price = 39, name = "Mission Skip" },
 	-- Once per player.
 	StarterPack = { id = 3723586118, price = 49, name = "Starter Pack" },
+	-- Monster Heists (Config/Heists): one charge starts one heist. Set these two up on the
+	-- dashboard like the others and paste their ids over the 0s.
+	HeistCharge = { id = 0, price = 49, name = "Heist Charge" },
+	HeistBundle = { id = 0, price = 199, name = "Heist Bundle (5 charges)" },
 } :: { [string]: Product }
 
 -- Which item product a shop item uses: the first tier whose maxCash its cash price fits under.

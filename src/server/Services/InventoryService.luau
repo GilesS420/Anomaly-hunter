@@ -32,6 +32,8 @@ local TextService = game:GetService("TextService")
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Care = require(ReplicatedStorage.Shared.Util.Care)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
+local HeistConfig = require(ReplicatedStorage.Shared.Config.Heists)
+local Heists = require(ReplicatedStorage.Shared.Util.Heists)
 local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Nickname = require(ReplicatedStorage.Shared.Util.Nickname)
@@ -357,8 +359,16 @@ Lock.OnServerInvoke = function(player: Player, uid: unknown): Result
 		return Loading
 	end
 	local caught = if typeof(uid) == "string" then find(data, uid) else nil
-	if not caught then
+	if not caught or MansionService.isHidden(player, uid :: string) then
 		return { ok = false, message = "That monster is gone.", view = viewFor(player, data) }
+	end
+	-- Hearts also keep monsters safe from Monster Heists, so there's a limit (Config/Heists).
+	if not caught.locked and not Heists.canHeart(Heists.hearts({ data.monsters, data.storage })) then
+		return {
+			ok = false,
+			message = `You can heart up to {HeistConfig.MaxHearts} monsters. Take the heart off another one first.`,
+			view = viewFor(player, data),
+		}
 	end
 	caught.locked = if caught.locked then nil else true
 	local name = Format.monsterName(caught)

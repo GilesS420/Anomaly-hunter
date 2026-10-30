@@ -11,6 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
+local Heists = require(ReplicatedStorage.Shared.Util.Heists)
 local Missions = require(ReplicatedStorage.Shared.Util.Missions)
 local Robux = require(ReplicatedStorage.Shared.Util.Robux)
 local Trading = require(ReplicatedStorage.Shared.Util.Trading)
@@ -47,6 +48,7 @@ export type Data = {
 	},
 	missions: Missions.State, -- today's daily missions and the streak (MissionService)
 	robux: Robux.Record, -- Robux purchases paid out, credits and passes (RobuxService)
+	heist: Heists.Record, -- Heist Charges, play time and today's losses (HeistService)
 	trades: { Trading.LogEntry }, -- the newest trades and gifts, for checking scam reports (TradeService)
 }
 
@@ -76,6 +78,7 @@ DataService.Template = {
 	chamber = {},
 	missions = Missions.empty(),
 	robux = Robux.empty(),
+	heist = Heists.empty(),
 	trades = {},
 } :: Data
 
@@ -175,6 +178,7 @@ local function loadPlayer(player: Player)
 		data.money = 0 -- repair a broken balance rather than carry it around
 	end
 	data.robux = Robux.repair(data.robux)
+	data.heist = Heists.repair(data.heist)
 
 	profiles[player] = profile
 	makeLeaderstats(player, data)
