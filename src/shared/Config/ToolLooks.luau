@@ -308,7 +308,7 @@ end
 
 -- An open hand held up by its cuff, palm facing forward: a cuff (the grip), a palm, four
 -- fingers and a thumb. `scale` grows it for the better slappers; `extra` adds a slapper's own
--- touch (claws, a glow). Only a picture in the shop and Backpack: you slap with the Slap button.
+-- touch (claws, a glow). Your best one is in the hotbar: hold it and click to slap.
 local function slapper(
 	scale: number,
 	skin: { number },

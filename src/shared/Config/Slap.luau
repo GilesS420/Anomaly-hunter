@@ -4,9 +4,9 @@
 -- a moment), so you can challenge them for it. Never in a mansion plot or the tutorial.
 -- You need a slapper to slap: everyone starts without one, and the Hunter's Workshop sells
 -- them (Shop.Workshop, kind "Slapper"; bought once, kept forever, always in stock). Your best
--- slapper is the one you use, no need to hold it. Better slappers reach further, push harder
--- and lock a thief out of stealing for longer (Giles 2026-10-28).
--- Rules in Util/Slap, server SlapService, button and Q key in client SlapController.
+-- slapper is in your hotbar and must be in your hand to slap (Giles 2026-10-30). Better
+-- slappers reach further, push harder and lock a thief out of stealing for longer.
+-- Rules in Util/Slap, server SlapService, holding and clicking in client SlapController.
 -- All numbers are placeholders to tune in playtesting.
 
 export type Slapper = {

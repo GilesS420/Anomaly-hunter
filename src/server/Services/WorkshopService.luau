@@ -200,7 +200,7 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 		elseif item.kind == "Slapper" then
 			local best = Slap.best(data.inventory)
 			message = if best and best.id == item.id
-				then `Bought the {item.name}! Press Q or the Slap button next to a hunter.`
+				then `Bought the {item.name}! Hold it from your hotbar and click next to a hunter.`
 				else `Bought the {item.name}! Your better slapper is still the one you use.`
 		else
 			message = `Bought a {item.name}! You have {data.inventory[item.id]}.`

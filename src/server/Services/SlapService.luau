@@ -1,6 +1,6 @@
 --!strict
--- Slapping (Config/Slap, rules in Util/Slap): with a slapper from the Workshop, press the Slap
--- button (or Q) next to another hunter in a zone or in the open hub. Your best slapper sets
+-- Slapping (Config/Slap, rules in Util/Slap): with a slapper from the Workshop in your hand,
+-- click next to another hunter in a zone or in the open hub. Your best slapper sets
 -- how far you reach, how hard you push and how long a slapped thief can't steal. They're
 -- knocked back, and if they were catching a monster it breaks loose, dazed for a moment, so
 -- whoever is quickest can catch it. A slapped
@@ -68,6 +68,11 @@ local function onSlap(player: Player, target: unknown)
 	local tool = Slap.get(player:GetAttribute("Slapper") :: string?)
 	if not tool then
 		Notify.toast(player, "You need a slapper first! The Hunter's Workshop sells them.")
+		return
+	end
+	-- Only with the slapper in your hand (Giles 2026-10-30): hold it from the hotbar first.
+	local held = player.Character and player.Character:FindFirstChildOfClass("Tool")
+	if not held or held:GetAttribute("ToolId") ~= tool.id then
 		return
 	end
 	local slapper = hunter(player)
