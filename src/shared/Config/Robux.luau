@@ -57,6 +57,7 @@ Robux.ItemProducts = {
 	WitchPaddle = "ItemTier4", -- 199
 	TitanHand = "ItemTier5", -- 399
 	EclipseEclair = "ItemTier5", -- 399
+	PrismDraught = "ItemTier4", -- 199: a $1B potion (Giles 2026-10-30)
 } :: { [string]: string }
 
 -- Game Passes: bought once, kept forever. Owning one sets the player attribute Pass<Key>.

@@ -3501,6 +3501,7 @@ do
 		"robux: Eclipse Eclair is the top price",
 		Robux.productFor("EclipseEclair", 15_000_000_000) == "ItemTier5"
 	)
+	check("robux: Prism Draught costs 199", Robux.productFor("PrismDraught", 1_000_000_000) == "ItemTier4")
 	local named = true
 	for id, key in RobuxConfig.ItemProducts do
 		named = named
