@@ -63,7 +63,6 @@ local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
-local TextService = game:GetService("TextService")
 
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Effects = require(ReplicatedStorage.Shared.Config.Effects)
@@ -96,6 +95,7 @@ local TutorialService = require(script.Parent.TutorialService)
 local WatcherService = require(script.Parent.WatcherService)
 local Admins = require(script.Parent.Parent.Admins)
 local AdminRestock = require(script.Parent.Parent.AdminRestock)
+local TextFilter = require(script.Parent.Parent.TextFilter)
 
 local DevService = {}
 
@@ -664,15 +664,6 @@ end
 
 local MaxAnnouncementLength = 150
 
--- Roblox's rules: text one player writes for others must go through the filter first.
-local function filterForEveryone(author: Player, text: string): string?
-	local ok, result = pcall(function()
-		local filtered = TextService:FilterStringAsync(text, author.UserId, Enum.TextFilterContext.PublicChat)
-		return filtered:GetNonChatStringForBroadcastAsync()
-	end)
-	return if ok and type(result) == "string" then result else nil
-end
-
 -- Always the admin who ran it (it's untargeted), so the filter checks it as theirs.
 commands["/announce"] = function(player, argument, tell)
 	local text = string.match(argument or "", "^%s*(.-)%s*$") or ""
@@ -684,9 +675,15 @@ commands["/announce"] = function(player, argument, tell)
 		tell(`Keep it under {MaxAnnouncementLength} letters.`)
 		return
 	end
-	local filtered = filterForEveryone(player, text)
+	-- Roblox's rules: text one player writes for others goes through the filter first. This
+	-- is the only way an announcement goes out, whichever panel or chat sends /announce.
+	local filtered, hidden = TextFilter.forEveryone(player, text)
 	if not filtered then
 		tell("Roblox's text filter didn't answer. Try again in a moment.")
+		return
+	end
+	if hidden then
+		tell(`Not sent: Roblox's chat filter hid part of it ("{filtered}"). Reword it and try again.`)
 		return
 	end
 	Notify.announceAll(filtered)
