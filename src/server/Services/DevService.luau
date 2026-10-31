@@ -1,14 +1,16 @@
 --!strict
 -- Admin commands for play testing. Only admins can use them (see server/Admins.luau: anyone
 -- in Studio, the game's owner and the UserIds listed there); for everyone else they do
--- nothing. Admins can press the buttons in the admin panel (client AdminController, F2 or
--- the Admin button) or type them in the chat box:
+-- nothing. Admins can press the buttons in the admin panel (client AdminController, F2) or
+-- type them in the chat box:
 --   /money 1000000    adds money (a negative number takes some away; 5k, 2.5m and 1b work too)
 --   /wings 3          sets how many wings your mansion has (1 to 6) and rebuilds it
 --   /clearmonsters    empties your mansion, Storage and Growth Chamber
 --   /tutorial skip    ends your tutorial now (/tutorial restart starts it again from the gate)
---   /reset confirm    wipes YOUR save back to a brand-new player's and kicks you; rejoin to
---                     start fresh (replay the tutorial and early game). Nobody else is touched.
+--   /reset confirm    wipes the save back to a brand-new player's and kicks them; rejoin to
+--                     start fresh (replay the tutorial and early game). Yours, or one picked
+--                     player's (Giles 2026-10-30), never everyone's at once.
+--   /respawn          a fresh body back home, like the Reset button in the Roblox menu
 --   /summon           starts the next Watcher event right away (skipping its warning)
 --   /event BloodMoon  starts that Watcher event right away, ending one that's playing
 --                     (/event alone lists them; any capitals: /event frostfog works too;
@@ -26,8 +28,11 @@
 --   /chamber          the monster bubbling in your Growth Chamber is done right now
 --   /missions done    finishes all of today's daily missions (/missions done 2: only the second);
 --                     /missions new deals a fresh set, /missions streak 3 sets the streak to
---                     3 days and deals a fresh set so the bonus shows
+--                     3 days and deals a fresh set so the bonus shows; /missions reset starts
+--                     today's missions over (no progress, claimable again); /missions set Merge2
+--                     swaps in that mission (Config/Missions.Pool) for today's of its tier
 --   /calm             zone monsters leave you alone (type it again to let them attack)
+--   /attacks off      the same, but sets it (/attacks on lets them attack again)
 --   /attack           the closest monster in your zone attacks you right now
 --   /spawn Gravepup   brings that monster to you in the zone you're in (any monster, any zone;
 --                     add a size: /spawn TheBogKing Huge). Only you can catch it and it never
@@ -43,18 +48,19 @@
 --                     all optional: a size, a variant, a weight (sets the size), effects and
 --                     combos (a combo gives both its effects). Into the mansion, or Storage.
 --   /addeffect <uid> Gilded   puts effects or combos on one of the player's monsters (the
---                     panel's Give tab picks it from a list); not with @all
+--                     panel's Monsters tab picks it from a list); not with @all
 -- Works with the new chat (TextChatService) and the old one (LegacyChatService).
--- Any command but /summon, /event, /stopevent, /ghost, /restock, /announce and /reset can be run on another player in the server, or
--- on everyone in it: pick them at the top of the panel, or end a chat command with @name
+-- Any command but /summon, /event, /stopevent, /ghost, /restock and /announce can be run on another
+-- player in the server, and all of those but /reset and /addeffect on everyone in it: pick them
+-- at the top of the panel, or end a chat command with @name
 -- (/money 5m @Biggie) or @all.
 -- The results come back to the admin, starting with that player's name.
 -- The panel uses two remotes, made only on the server:
 --   ReplicatedStorage.Remotes.AdminCommand   client -> server: (command: string, argument: string?,
 --                                            targetUserId: number?; 0 = everyone)
---   ReplicatedStorage.Remotes.AdminMonsters  RemoteFunction (targetUserId?) -> { {uid, label} }:
---                                            that player's monsters, for /addeffect; {} for
---                                            non-admins
+--   ReplicatedStorage.Remotes.AdminMonsters  RemoteFunction (targetUserId?) -> { {uid, label,
+--                                            effects} }: that player's monsters (their effect
+--                                            ids, no combos), for /addeffect; {} for non-admins
 -- The server checks the player is an admin and the command exists before running it, so a
 -- player who fires it by hand gets nothing.
 
@@ -181,15 +187,22 @@ commands["/tutorial"] = function(player, argument, tell)
 	end
 end
 
--- Only ever the player who typed it: runCommand never sends it to another player.
-commands["/reset"] = function(player, argument, tell)
+-- One player at a time: runForEveryone never sends it to everyone.
+commands["/reset"] = function(player, argument, tell, admin)
 	if string.lower(argument or "") ~= "confirm" then
-		tell("This wipes your whole save. Type /reset confirm to do it.")
+		tell("This wipes the whole save. Type /reset confirm to do it.")
 		return
 	end
 	if not DataService.reset(player) then
-		tell("Your save is still loading. Try again in a moment.")
+		tell("The save is still loading. Try again in a moment.")
+	elseif player ~= admin then
+		tell("Save wiped. They were sent out of the game and start fresh when they rejoin.")
 	end
+end
+
+commands["/respawn"] = function(player, _, tell)
+	player:LoadCharacter() -- HuntService ends a hunt the old body was on
+	tell("Respawned at home.")
 end
 
 commands["/summon"] = function(_, _, tell)
@@ -330,8 +343,9 @@ commands["/chamber"] = function(player, _, tell)
 end
 
 commands["/missions"] = function(player, argument, tell)
-	local what, number = string.match(string.lower(argument or ""), "^(%a+)%s*(%d*)$")
-	local count = tonumber(number)
+	local what, rest = string.match(argument or "", "^%s*(%a+)%s*(%S*)%s*$")
+	what = if what then string.lower(what) else nil
+	local count = tonumber(rest)
 	if what == "done" then
 		tell(
 			if MissionService.finish(player, count)
@@ -344,6 +358,17 @@ commands["/missions"] = function(player, argument, tell)
 				then "Fresh daily missions dealt."
 				else "Your save is still loading."
 		)
+	elseif what == "reset" then
+		tell(
+			if MissionService.resetProgress(player)
+				then "Today's missions start over (claimable again)."
+				else "Your save is still loading."
+		)
+	elseif what == "set" and rest and rest ~= "" then
+		local text = MissionService.setMission(player, rest)
+		tell(
+			if text then `Mission set: {text}` else `Couldn't set "{rest}" (zone missions need a zone open).`
+		)
 	elseif what == "streak" and count then
 		tell(
 			if MissionService.setStreak(player, count)
@@ -351,7 +376,9 @@ commands["/missions"] = function(player, argument, tell)
 				else "Your save is still loading."
 		)
 	else
-		tell("Try: /missions done, /missions done 2, /missions new or /missions streak 3")
+		tell(
+			"Try: /missions done, /missions done 2, /missions new, /missions reset, /missions set Merge2 or /missions streak 3"
+		)
 	end
 end
 
@@ -359,6 +386,16 @@ commands["/calm"] = function(player, _, tell)
 	local calm = not player:GetAttribute("Calm")
 	player:SetAttribute("Calm", if calm then true else nil)
 	tell(if calm then "Monsters leave you alone now. /calm again to undo." else "Monsters attack you again.")
+end
+
+commands["/attacks"] = function(player, argument, tell)
+	local wanted = string.lower(argument or "")
+	if wanted ~= "on" and wanted ~= "off" then
+		tell("Try: /attacks on or /attacks off")
+		return
+	end
+	player:SetAttribute("Calm", if wanted == "off" then true else nil)
+	tell(if wanted == "off" then "Monsters leave you alone now." else "Monsters attack you again.")
 end
 
 commands["/attack"] = function(player, _, tell)
@@ -705,7 +742,6 @@ local untargeted: { [string]: boolean } = {
 	["/event"] = true,
 	["/stopevent"] = true,
 	["/ghost"] = true,
-	["/reset"] = true,
 	["/restock"] = true,
 	["/announce"] = true,
 }
@@ -721,11 +757,13 @@ local function runCommand(admin: Player, name: string, argument: string?, target
 	if argument and (argument == "" or #argument > (longArguments[key] or MaxArgumentLength)) then
 		argument = nil
 	end
-	local who = if target and target.Parent == Players and not untargeted[key] then target else admin
-	if target and target ~= admin and key == "/reset" then
-		Notify.toast(admin, "Reset only ever wipes your own save.")
+	-- A picked player who left: nothing happens (never falls back to the admin, so a Reset save
+	-- meant for them can't wipe the admin's own).
+	if target and target.Parent ~= Players and not untargeted[key] then
+		Notify.toast(admin, "That player left the server.")
 		return
 	end
+	local who = if target and not untargeted[key] then target else admin
 	local function tell(text: string)
 		Notify.toast(admin, if who ~= admin then `{who.DisplayName}: {text}` else text)
 	end
@@ -760,7 +798,7 @@ local function runForEveryone(admin: Player, name: string, argument: string?)
 	end
 	if string.lower(name) == "/reset" then
 		if Admins.isAdmin(admin) then
-			Notify.toast(admin, "Reset only ever wipes your own save.")
+			Notify.toast(admin, "Reset save works on one player at a time: pick them.")
 		end
 		return
 	end
@@ -817,6 +855,12 @@ local function useAdminRemote()
 			return
 		end
 		local target = if type(targetId) == "number" then Players:GetPlayerByUserId(targetId) else nil
+		if type(targetId) == "number" and not target then
+			if Admins.isAdmin(player) then
+				Notify.toast(player, "That player left the server.")
+			end
+			return
+		end
 		runCommand(player, name, text, target)
 	end)
 	remote.Parent = remotes
@@ -828,7 +872,7 @@ local function useAdminRemote()
 	monsterList.OnServerInvoke = function(
 		player: Player,
 		targetId: unknown
-	): { { uid: string, label: string } }
+	): { { uid: string, label: string, effects: { string } } }
 		if not Admins.isAdmin(player) then
 			return {}
 		end
@@ -842,7 +886,7 @@ local function useAdminRemote()
 			target = Players:GetPlayerByUserId(targetId)
 		end
 		local data = if target then DataService.get(target) else nil
-		local rows: { { uid: string, label: string } } = {}
+		local rows: { { uid: string, label: string, effects: { string } } } = {}
 		if not data then
 			return rows
 		end
@@ -857,7 +901,11 @@ local function useAdminRemote()
 					local effects = if #names > 0 then ` · {table.concat(names, ", ")}` else ""
 					local kg = if typeof(caught.kg) == "number" then ` {Weight.text(caught.kg)}` else ""
 					local where = if stored then " (Storage)" else ""
-					table.insert(rows, { uid = caught.uid, label = `{lookName(caught)}{kg}{effects}{where}` })
+					table.insert(rows, {
+						uid = caught.uid,
+						label = `{lookName(caught)}{kg}{effects}{where}`,
+						effects = table.clone(caught.effects),
+					})
 				end
 			end
 		end
@@ -931,7 +979,7 @@ function DevService.start()
 		return
 	end
 	print(
-		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /charges, /chamber, /missions done|new|streak <days>, /calm, /attack, /restock <items amounts>|end, /announce <text>, /givemonster <monster> [size] [variant] [kg] [effects], /addeffect <uid> <effects>`
+		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /charges, /chamber, /missions done|new|reset|set <id>|streak <days>, /calm, /attacks on|off, /respawn, /attack, /restock <items amounts>|end, /announce <text>, /givemonster <monster> [size] [variant] [kg] [effects], /addeffect <uid> <effects>`
 	)
 end
 

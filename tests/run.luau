@@ -3250,6 +3250,15 @@ do
 	end
 	check("missions: pool entries are complete", pooled)
 
+	-- The admin panel sets a mission by id (Missions.build).
+	local graveyard = { "PumpkinGraveyard" }
+	local built = Missions.build(Missions.def("Merge2") :: any, 1_000_000, 0, graveyard, random)
+	check("missions: admin builds a mission", built ~= nil and built.id == "Merge2" and built.progress == 0)
+	local zoneBuilt = Missions.build(Missions.def("Zone3") :: any, 1_000_000, 0, graveyard, random)
+	check("missions: admin zone mission gets a zone", zoneBuilt ~= nil and zoneBuilt.zone == "PumpkinGraveyard")
+	local noZone = Missions.build(Missions.def("Zone3") :: any, 0, 0, {}, random)
+	check("missions: no zone open, no zone mission", noZone == nil)
+
 	local fresh = Missions.deal(nil, now, 20_000_000, 3, random)
 	check("missions: three dealt, one per tier", #fresh.list == 3)
 	local tiersSeen = {}
