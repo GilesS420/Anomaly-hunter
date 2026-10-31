@@ -42,6 +42,7 @@ local DataService = require(script.Parent.Parent.Services.DataService)
 local Perks = require(script.Parent.Parent.Perks)
 local MansionService = require(script.Parent.Parent.Services.MansionService)
 local TutorialService = require(script.Parent.Parent.Services.TutorialService)
+local TextFilter = require(script.Parent.Parent.TextFilter)
 
 local ServerChecks = {}
 
@@ -365,6 +366,18 @@ local function checkRules()
 	check(Nickname.clean("\255\254") == nil, "a name that isn't valid text is refused")
 	local cleaned = Nickname.clean("Bob\n\tthe\0Great")
 	check(cleaned ~= nil and not string.find(cleaned, "%c"), "control characters are stripped from names")
+	local someone = Players:GetPlayers()[1]
+	if someone then
+		-- Roblox doesn't filter in Studio; TextFilter hides its test words here instead.
+		local rude, hidden = TextFilter.forEveryone(someone, "Mr badword")
+		if rude == nil then
+			print("  SKIP  the text filter didn't answer (test players in a Local Server can't use it)")
+		else
+			check(hidden, "the text filter hides a Studio test word")
+			local nice, changed = TextFilter.forEveryone(someone, "Bob")
+			check(nice == "Bob" and not changed, "the text filter lets a normal name through")
+		end
+	end
 	local junkSlots = {}
 	for i = 1, 500 do
 		junkSlots[`key{i}`] = i

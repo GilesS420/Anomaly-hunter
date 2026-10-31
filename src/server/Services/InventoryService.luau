@@ -27,7 +27,6 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TextService = game:GetService("TextService")
 
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Care = require(ReplicatedStorage.Shared.Util.Care)
@@ -50,6 +49,7 @@ local MansionService = require(script.Parent.MansionService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
 local Perks = require(script.Parent.Parent.Perks)
+local TextFilter = require(script.Parent.Parent.TextFilter)
 local RoamService = require(script.Parent.RoamService)
 local ToolModel = require(script.Parent.Parent.ToolModel)
 local WorkshopService = require(script.Parent.WorkshopService)
@@ -378,16 +378,6 @@ Lock.OnServerInvoke = function(player: Player, uid: unknown): Result
 	return { ok = true, message = message, view = viewFor(player, data) }
 end
 
--- Roblox's filter for text other players see (names show over monsters in the mansion).
--- nil when the filter can't be reached; then nothing is saved.
-local function filtered(player: Player, text: string): string?
-	local ok, result = pcall(function()
-		local filter = TextService:FilterStringAsync(text, player.UserId, Enum.TextFilterContext.PublicChat)
-		return filter:GetNonChatStringForBroadcastAsync()
-	end)
-	return if ok and typeof(result) == "string" then result else nil
-end
-
 local renaming: { [Player]: boolean } = {}
 
 Rename.OnServerInvoke = function(player: Player, uid: unknown, text: unknown): Result
@@ -423,12 +413,20 @@ Rename.OnServerInvoke = function(player: Player, uid: unknown, text: unknown): R
 		return { ok = false, message = "One moment...", view = viewFor(player, data) }
 	end
 	renaming[player] = true
-	local clean = filtered(player, name) -- yields
+	-- Roblox's filter: names show over monsters for everyone in the server.
+	local clean, hidden = TextFilter.forEveryone(player, name) -- yields
 	renaming[player] = nil
 	if not clean then
 		return {
 			ok = false,
 			message = "Couldn't check that name. Try again in a moment.",
+			view = viewFor(player, data),
+		}
+	end
+	if hidden then
+		return {
+			ok = false,
+			message = "Roblox's chat filter doesn't allow that name. Try another one (your Name Tag is safe).",
 			view = viewFor(player, data),
 		}
 	end
@@ -736,8 +734,54 @@ function InventoryService.syncPreviews(player: Player)
 	end
 end
 
+-- Roblox's filter gets stricter over time, so saved names are checked again on every join
+-- (as their owner's text). A name it now hides comes off, and the Name Tag comes back.
+local MaxNameChecks = 40 -- per join, to stay well inside Roblox's filter limits
+
+local function recheckNames(player: Player, data: DataService.Data)
+	local named: { Value.CaughtMonster } = {}
+	for _, list in { data.monsters, data.storage } do
+		for _, caught in list do
+			if caught.nickname and #named < MaxNameChecks then
+				table.insert(named, caught)
+			end
+		end
+	end
+	local removed = 0
+	for _, caught in named do
+		local name = caught.nickname
+		if not name then
+			continue
+		end
+		local _, hidden = TextFilter.forEveryone(player, name) -- yields; nil (filter down) keeps it
+		if player.Parent ~= Players or DataService.get(player) ~= data then
+			return -- they left
+		end
+		-- Still theirs, and not renamed while the filter was busy.
+		if hidden and caught.nickname == name and find(data, caught.uid or "") == caught then
+			caught.nickname = nil
+			local inventory: { [string]: number? } = data.inventory
+			inventory.NameTag = (inventory.NameTag or 0) + 1
+			removed += 1
+		end
+	end
+	if removed > 0 then
+		MansionService.refreshMonsters(player)
+		HuntService.refreshItems(player)
+		Notify.toast(
+			player,
+			if removed == 1
+				then "Roblox's chat filter no longer allows one of your monster names, so it came off. You got the Name Tag back."
+				else `Roblox's chat filter no longer allows {removed} of your monster names, so they came off. You got the Name Tags back.`
+		)
+	end
+end
+
 function InventoryService.start()
 	remotes.Parent = ReplicatedStorage
+	DataService.onLoaded(function(player, data)
+		task.spawn(recheckNames, player, data)
+	end)
 	Players.PlayerRemoving:Connect(function(player)
 		placing[player] = nil
 		shownLooks[player] = nil
