@@ -6,6 +6,7 @@
 -- the side hunters walk in from. Zone-local studs: the zone floor's top is y = 0, its middle
 -- is x = z = 0 and -Z is the arrival side (Layout.ZoneArrival, Layout.ZoneExit).
 
+local Names = require("./Names")
 local Rooms = require("./Rooms")
 
 type Part = Rooms.Part
@@ -744,7 +745,7 @@ local function murkyBayou(): { Part }
 	end
 	part(parts, "GateBar", { 12.8, 0.8, 0.6 }, { 0, 8.4, -62 }, Rotten, "Wood")
 	local sign = part(parts, "GateSign", { 9, 1.8, 0.3 }, { 0, 6.9, -62.75 }, { 150, 130, 90 }, "WoodPlanks")
-	sign.text = "Murky Bayou"
+	sign.text = Names.MurkyBayou
 	part(parts, "CrateA", { 2.4, 2.4, 2.4 }, { -52, 1.2, -84 }, Plank, "WoodPlanks", true)
 	part(parts, "CrateB", { 2, 2, 2 }, { -52.3, 3.4, -84.2 }, Rotten, "WoodPlanks", true)
 	part(parts, "Barrel", { 1.8, 2.6, 1.8 }, { -48.6, 1.3, -85 }, Rotten, "Wood", true)

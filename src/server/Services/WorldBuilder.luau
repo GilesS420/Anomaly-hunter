@@ -645,6 +645,15 @@ function WorldBuilder.start()
 		if exit and exit:IsA("BasePart") then
 			portalLabel(exit, "Exit", "Bring your catch home", ExitLabelHeight)
 		end
+		-- A zone saved in the place keeps its old gate sign: give it the zone's current name
+		-- (Murky Bayou was renamed, Config/Names).
+		local scenery = if zone.launch then World.find(World.find(zonesFolder, zone.id), "Scenery") else nil
+		local sign = World.find(scenery, "GateSign")
+		local label = sign and sign:FindFirstChildWhichIsA("SurfaceGui")
+		local text = label and label:FindFirstChildWhichIsA("TextLabel")
+		if text then
+			text.Text = zone.name
+		end
 	end
 
 	if #built > 0 then

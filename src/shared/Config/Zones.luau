@@ -1,5 +1,8 @@
 --!strict
 -- Haunted zones, reached through the Zone Gates. Each opens with the matching wing.
+-- `id` is what saves and Studio folders use; `name` is what players see.
+
+local Names = require("./Names")
 
 export type Zone = {
 	id: string,
@@ -11,7 +14,7 @@ export type Zone = {
 
 local Zones: { Zone } = {
 	{ id = "PumpkinGraveyard", index = 1, name = "Pumpkin Graveyard", wing = "Foyer", launch = true },
-	{ id = "MurkyBayou", index = 2, name = "Murky Bayou", wing = "Library", launch = true },
+	{ id = "MurkyBayou", index = 2, name = Names.MurkyBayou, wing = "Library", launch = true },
 	{ id = "AbandonedCarnival", index = 3, name = "Abandoned Carnival", wing = "Ballroom", launch = true },
 	{ id = "SpookySchool", index = 4, name = "Spooky School", wing = "Attic", launch = false },
 	{ id = "GhostShip", index = 5, name = "Ghost Ship", wing = "Crypt", launch = false },

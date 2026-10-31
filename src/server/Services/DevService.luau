@@ -406,7 +406,12 @@ end
 
 -- "the bog king", "TheBogKing" and "thebogking" all find TheBogKing.
 local function squash(text: string): string
-	return string.lower((string.gsub(text, "[%s_]", "")))
+	return string.lower((string.gsub(text, "[%s_%-']", "")))
+end
+
+-- A monster typed by its id or by the name players see ("Gloomlet" or "Shiverling").
+local function isMonster(id: string, typed: string): boolean
+	return squash(id) == typed or squash(Format.name(id)) == typed
 end
 
 commands["/spawn"] = function(player, argument, tell)
@@ -447,7 +452,7 @@ commands["/spawn"] = function(player, argument, tell)
 	end
 
 	for id in Monsters do
-		if squash(id) == wanted then
+		if isMonster(id, wanted) then
 			local _, message = SpawnService.spawnFor(player, id, sizeId)
 			tell(message)
 			return
@@ -522,7 +527,7 @@ commands["/givemonster"] = function(player, argument, tell, admin)
 	local words = string.split(string.match(argument or "", "^%s*(.-)%s*$") or "", " ")
 	local monsterId: string? = nil
 	for id in Monsters do
-		if words[1] and squash(id) == squash(words[1]) then
+		if words[1] and isMonster(id, squash(words[1])) then
 			monsterId = id
 		end
 	end

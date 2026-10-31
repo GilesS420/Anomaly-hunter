@@ -1,5 +1,5 @@
 --!strict
--- Short messages for players ("Caught a Big Wisp Jack!", "Your mansion is full!").
+-- Short messages for players ("Caught a Big Gravepup!", "Your mansion is full!").
 -- Every player-facing message on the server goes through here; the client's ToastController
 -- shows them as little pop-ups near the top of the screen. Mutation news also goes in the
 -- player's mutation log (client MutationLogController, bottom-left). Admin announcements show

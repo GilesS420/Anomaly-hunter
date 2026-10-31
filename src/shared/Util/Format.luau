@@ -1,6 +1,8 @@
 --!strict
 -- Text formatting shared by server messages and client UI.
 
+local Names = require("../Config/Names")
+
 local Format = {}
 
 local suffixes: { { size: number, letter: string } } = {
@@ -25,8 +27,13 @@ function Format.money(amount: number): string
 	return `{sign}${math.floor(value)}`
 end
 
--- "TheGroundskeeper" -> "The Groundskeeper", "WispJack" -> "Wisp Jack".
+-- "TheGroundskeeper" -> "The Groundskeeper", "LadyOfLanterns" -> "Lady Of Lanterns". A renamed
+-- monster or zone gets its new name from Config/Names instead.
 function Format.name(id: string): string
+	local renamed = Names[id]
+	if renamed then
+		return renamed
+	end
 	local spaced = string.gsub(id, "(%l)(%u)", "%1 %2")
 	return spaced
 end

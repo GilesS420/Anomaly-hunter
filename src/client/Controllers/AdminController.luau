@@ -490,7 +490,7 @@ for _, zone in Zones.List do
 		return Monsters[a].baseValue < Monsters[b].baseValue
 	end)
 	for _, id in ids do
-		table.insert(monsterList, { label = `{zone.name}: {id}`, value = id })
+		table.insert(monsterList, { label = `{zone.name}: {Format.name(id)}`, value = id })
 	end
 end
 

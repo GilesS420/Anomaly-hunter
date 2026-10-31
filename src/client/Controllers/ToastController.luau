@@ -1,5 +1,5 @@
 --!strict
--- Little pop-up messages near the top of the screen ("Caught a Big Wisp Jack!").
+-- Little pop-up messages near the top of the screen ("Caught a Big Gravepup!").
 -- The server sends them through ReplicatedStorage.Remotes.Toast (see server/Notify.luau).
 -- Up to 3 show at once, newest at the bottom; each fades away after a few seconds.
 
