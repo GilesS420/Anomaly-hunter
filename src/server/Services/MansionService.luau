@@ -24,6 +24,7 @@ local CareConfig = require(ReplicatedStorage.Shared.Config.Care)
 local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Haunting = require(ReplicatedStorage.Shared.Util.Haunting)
+local Heists = require(ReplicatedStorage.Shared.Util.Heists)
 local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
 local Layout = require(ReplicatedStorage.Shared.Config.Layout)
 local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
@@ -64,8 +65,6 @@ type State = {
 
 -- A room part as it stands in the world, with the recipe key (Rooms.key) it was built from.
 type Built = { key: string, part: BasePart }
-
-local hidden: { [Player]: { [string]: boolean } } = {} -- uids taken off the floor (MansionService.hide)
 
 local MonsterSpeed = 4 -- studs per second; mansion monsters stroll, zone monsters hurry
 local PillarHeight = 12
@@ -457,6 +456,7 @@ local function infoFor(player: Player, caught: Value.CaughtMonster, rarity: stri
 		status = Care.status(caught),
 		value = if ok then value else 0,
 		nickname = caught.nickname,
+		steal = Heists.productFor(if ok then value else 0, caught.locked == true),
 	}
 end
 
@@ -464,10 +464,6 @@ end
 local function spawnMonster(state: State, caught: Value.CaughtMonster)
 	if mansions[state.player] ~= state then
 		return -- the owner left (or the mansion was rebuilt)
-	end
-	local hiddenHere = hidden[state.player]
-	if hiddenHere and caught.uid and hiddenHere[caught.uid] then
-		return -- in a thief's vacuum right now (HeistService)
 	end
 	local monster = Monsters[caught.monsterId]
 	if not monster then
@@ -519,18 +515,6 @@ local function spawnMonster(state: State, caught: Value.CaughtMonster)
 	model.Parent = state.monsters
 end
 
--- How big the best monster is drawn on the trophy stand: its longest side in studs, one set
--- size per size class (Giles 2026-10-30), like the old carried copy.
-local TrophySize: { [string]: number } = {
-	Tiny = 2,
-	Small = 2.5,
-	Normal = 3,
-	Big = 3.5,
-	Huge = 4,
-	Colossal = 5,
-	Titan = 6,
-}
-
 -- The worth sign and the trophy stand out front: the total value of the mansion's monsters,
 -- and the most valuable one standing on the stand. Called whenever monsters come, go, grow
 -- or get more familiar.
@@ -577,29 +561,9 @@ function updateShowcase(state: State)
 	model.Name = "BestMonster"
 	local body = model.PrimaryPart :: BasePart
 	body.CanQuery = false -- just for show: no catching or picking up from the stand
-	-- Not its mansion size: a set size per size class (Giles 2026-10-30), so a 20 t Titan
-	-- still fits on the stand. The invisible Body ball doesn't count, only the blocks.
-	if body.Transparency >= 1 then
-		body.Size = Vector3.one * 0.2
-	end
-	local _, size = model:GetBoundingBox()
-	local longest = TrophySize[caught.size] or TrophySize.Normal
-	model:ScaleTo(model:GetScale() * longest / math.max(size.X, size.Y, size.Z))
-	model:PivotTo(CFrame.new(body.Position) * state.trophy.CFrame.Rotation)
-	local box, boxSize = model:GetBoundingBox()
-	-- stand it on the stand by its feet, label just above its head
-	local bottom = box.Position.Y - boxSize.Y / 2
-	local standTop = state.trophy.Position.Y + state.trophy.Size.Y / 2 + 0.1
-	model:PivotTo(model:GetPivot() + Vector3.new(
-		state.trophy.Position.X - body.Position.X,
-		standTop - bottom,
-		state.trophy.Position.Z - body.Position.Z
-	))
-	local label = body:FindFirstChild("Label")
-	if label and label:IsA("BillboardGui") then
-		local headroom = box.Position.Y + boxSize.Y / 2 - body.Position.Y
-		label.StudsOffset = Vector3.new(0, headroom + 1.2, 0)
-	end
+	local radius = MonsterModel.radius(caught.size, caught.monsterId, caught.kg)
+	local top = state.trophy.Position + Vector3.new(0, state.trophy.Size.Y / 2 + radius + 0.2, 0)
+	model:PivotTo(CFrame.new(top) * state.trophy.CFrame.Rotation)
 	model.Parent = state.trophy.Parent
 end
 
@@ -1043,8 +1007,8 @@ function MansionService.move(player: Player, uid: string): (MoveResult, Value.Ca
 		DataService.saveSoon(player)
 		return "Ok", caught
 	end
-	if not indexOf(data.monsters, uid) or MansionService.isHidden(player, uid) then
-		return "NotFound", nil -- (a hidden one is in a thief's hands right now)
+	if not indexOf(data.monsters, uid) then
+		return "NotFound", nil
 	end
 	if not Storage.hasRoom(#data.storage, Perks.storageSlots(player)) then
 		return "StorageFull", nil
@@ -1134,52 +1098,6 @@ function MansionService.monsterModels(player: Player): { [string]: Model }
 		end
 	end
 	return out
-end
-
--- The player's mansion Model in Workspace.Mansions, or nil while it isn't built.
-function MansionService.model(player: Player): Model?
-	local state = mansions[player]
-	return if state then state.model else nil
-end
-
--- Takes a monster's orb out of the mansion while it stays in the save: a thief is carrying it
--- off (HeistService). MansionService.unhide puts it back.
-function MansionService.hide(player: Player, uid: string)
-	local set = hidden[player] or {}
-	hidden[player] = set
-	set[uid] = true
-	local model = MansionService.monsterModels(player)[uid]
-	if model then
-		RoamService.remove(model)
-		model:Destroy()
-	end
-end
-
--- True while this monster is hidden (being carried off by a thief): it can't be moved, hearted
--- or sold until it's back.
-function MansionService.isHidden(player: Player, uid: string): boolean
-	local set = hidden[player]
-	return set ~= nil and set[uid] == true
-end
-
--- Lets a hidden monster roam its mansion again (if it's still there).
-function MansionService.unhide(player: Player, uid: string)
-	local set = hidden[player]
-	if not set or not set[uid] then
-		return
-	end
-	set[uid] = nil
-	local state = mansions[player]
-	local data = DataService.get(player)
-	if not state or not data or MansionService.monsterModels(player)[uid] then
-		return
-	end
-	for _, caught in data.monsters do
-		if caught.uid == uid then
-			spawnMonster(state, caught)
-			return
-		end
-	end
 end
 
 -- Updates every monster's label from the save (after it got an effect, or as it gets more
@@ -1296,7 +1214,6 @@ function MansionService.start()
 		local state = mansions[player]
 		mansions[player] = nil
 		buying[player] = nil
-		hidden[player] = nil
 		if state then
 			clearMonsters(state)
 			state.model:Destroy()

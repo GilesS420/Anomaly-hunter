@@ -48,11 +48,11 @@ Player data saves through [ProfileStore](https://github.com/MadStudioRoblox/Prof
 
 ## Robux purchases
 
-Everything sold for Robux is in `src/shared/Config/Robux.luau`: 11 Developer Products (5 shop item price tiers, Shop Reroll, Mission Reroll, Mission Skip, Starter Pack, Heist Charge, Heist Bundle) and 5 Game Passes. Create each one on the Creator Dashboard (your game > Monetization > Developer Products or Passes) and paste its id over the `0` in that file. Anything still at `0` shows "Robux · soon" in the game. `server/Services/RobuxService.luau` handles `ProcessReceipt`: every purchase id is saved in the player's profile and only marked granted once that save is written, so a purchase is never paid out twice or lost. Purchases in Studio are free test purchases.
+Everything sold for Robux is in `src/shared/Config/Robux.luau`: 15 Developer Products (5 shop item price tiers, Shop Reroll, Mission Reroll, Mission Skip, Starter Pack, 6 Steal products) and 5 Game Passes. Create each one on the Creator Dashboard (your game > Monetization > Developer Products or Passes) and paste its id over the `0` in that file. Anything still at `0` shows "Robux · soon" in the game. `server/Services/RobuxService.luau` handles `ProcessReceipt`: every purchase id is saved in the player's profile and only marked granted once that save is written, so a purchase is never paid out twice or lost. Purchases in Studio are free test purchases.
 
-### Monster Heists
+### Stealing monsters
 
-`server/Services/HeistService.luau` (rules in `src/shared/Util/Heists.luau`, numbers in `src/shared/Config/Heists.luau`). A Heist Charge (the `HeistCharge` and `HeistBundle` products in `Config/Robux.luau`) starts a heist at another player's worth sign: the owner hears an alarm, the thief gets 60 seconds to vacuum a monster that isn't hearted and 120 seconds to walk it to their own plot. One slap sends it home. Hearted monsters (at most 5 hearts), players in the tutorial or their first 2 hours, mansions worth under $1M and players already robbed twice that day are safe. In Studio the 2-hour shield is off, so heists can be tried with Test > Clients and Servers (2 players).
+Hold E on a monster roaming another player's mansion to steal it for Robux (`server/Services/HeistService.luau`, rules in `src/shared/Util/Heists.luau`, numbers in `src/shared/Config/Heists.luau`). The price is one of the six `Steal1`-`Steal6` products in `Config/Robux.luau`, by what the monster is worth; a hearted monster costs a step more. Once paid it moves straight into the thief's mansion with its Familiarity back at 0. Players in the tutorial or their first 2 hours, and players already robbed twice that day (or once by the same thief), are safe. In Studio the 2-hour shield is off, so stealing can be tried with Test > Clients and Servers (2 players).
 
 ## Sound and music
 

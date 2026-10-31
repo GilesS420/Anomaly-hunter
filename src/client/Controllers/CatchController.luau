@@ -106,23 +106,11 @@ local function isPointer(input: InputObject): boolean
 		or input.UserInputType == Enum.UserInputType.Touch
 end
 
--- True for a wild monster, or on a Monster Heist, a monster roaming the mansion being robbed
--- (HeistService; the server still checks it isn't hearted).
-local function catchable(instance: Instance): boolean
-	if instance:GetAttribute("Wild") == true then
-		return true
-	end
-	local owner = Players.LocalPlayer:GetAttribute("HeistOwner")
-	return owner ~= nil
-		and Players.LocalPlayer:GetAttribute("HeistPhase") == "Inside"
-		and instance:GetAttribute("OwnerId") == owner
-end
-
--- Every monster we can catch right now (mansion pets are roamers too, but not catchable).
+-- Every wild monster we can see right now (mansion pets are roamers too, but not catchable).
 local function wildMonsters(): { Model }
 	local result = {}
 	for _, instance in CollectionService:GetTagged("Roamer") do
-		if instance:IsA("Model") and catchable(instance) and instance.PrimaryPart then
+		if instance:IsA("Model") and instance:GetAttribute("Wild") == true and instance.PrimaryPart then
 			table.insert(result, instance)
 		end
 	end
@@ -146,7 +134,7 @@ local function monsterAt(screenPosition: Vector3): Model?
 	local hit = workspace:Raycast(ray.Origin, ray.Direction * RAY_LENGTH, params)
 	if hit then
 		local model = hit.Instance:FindFirstAncestorOfClass("Model")
-		if model and catchable(model) then
+		if model and model:GetAttribute("Wild") == true then
 			return model
 		end
 	end

@@ -43,7 +43,6 @@ local function hunter(who: Player): Slap.Hunter?
 		alive = humanoid.Health > 0,
 		zone = if typeof(zone) == "string" then zone else nil,
 		tutorial = who:GetAttribute("Tutorial") ~= nil,
-		stealing = who:GetAttribute("Stealing") == true,
 		x = root.Position.X,
 		z = root.Position.Z,
 	}
@@ -65,14 +64,7 @@ local function closestTarget(): Player?
 			local guard = other:GetAttribute("SlapGuardUntil")
 			if
 				them
-				and Slap.blocked(
-						me,
-						them,
-						now,
-						0,
-						if typeof(guard) == "number" then guard else 0,
-						tool.reach
-					)
+				and Slap.blocked(me, them, now, 0, if typeof(guard) == "number" then guard else 0, tool.reach)
 					== nil
 			then
 				local distance = (me.x - them.x) ^ 2 + (me.z - them.z) ^ 2
@@ -140,7 +132,8 @@ local function onSlapped(slapper: Player, target: Player, pushX: number, pushZ: 
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if root and root:IsA("BasePart") then
-		root.AssemblyLinearVelocity = Vector3.new(pushX * speed, SlapConfig.PushUp, pushZ * speed)
+		root.AssemblyLinearVelocity =
+			Vector3.new(pushX * speed, SlapConfig.PushUp, pushZ * speed)
 	end
 end
 

@@ -48,7 +48,7 @@ export type Data = {
 	},
 	missions: Missions.State, -- today's daily missions and the streak (MissionService)
 	robux: Robux.Record, -- Robux purchases paid out, credits and passes (RobuxService)
-	heist: Heists.Record, -- Heist Charges, play time and today's losses (HeistService)
+	heist: Heists.Record, -- play time and monsters stolen and lost (HeistService)
 	trades: { Trading.LogEntry }, -- the newest trades and gifts, for checking scam reports (TradeService)
 }
 

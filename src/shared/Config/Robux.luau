@@ -1,7 +1,7 @@
 --!strict
 -- Everything sold for Robux (Sprint E, Giles picked these on 2026-10-29). Paying players get
 -- the same things as everyone else, only faster; VIP Hunter is the one perk money alone buys.
--- Monsters are never sold for Robux.
+-- Monsters are never sold for Robux, except by stealing one from another player (Steal1-6).
 --
 -- The ids come from the Creator Dashboard: Developer Products under Monetization >
 -- Developer Products, Game Passes under Monetization > Passes. Paste each id over the 0.
@@ -30,10 +30,15 @@ Robux.Products = {
 	MissionSkip = { id = 3723586069, price = 39, name = "Mission Skip" },
 	-- Once per player.
 	StarterPack = { id = 3723586118, price = 49, name = "Starter Pack" },
-	-- Monster Heists (Config/Heists): one charge starts one heist. Set these two up on the
-	-- dashboard like the others and paste their ids over the 0s.
-	HeistCharge = { id = 0, price = 49, name = "Heist Charge" },
-	HeistBundle = { id = 0, price = 199, name = "Heist Bundle (5 charges)" },
+	-- Stealing a monster from another player's mansion (Config/Heists, Giles 2026-10-30):
+	-- hold E on it. The price goes by what it's worth; a hearted one costs a step more.
+	-- Set these six up on the dashboard like the others and paste their ids over the 0s.
+	Steal1 = { id = 0, price = 29, name = "Steal a monster (up to $1M)" },
+	Steal2 = { id = 0, price = 79, name = "Steal a monster (up to $50M)" },
+	Steal3 = { id = 0, price = 149, name = "Steal a monster (up to $1B)" },
+	Steal4 = { id = 0, price = 299, name = "Steal a monster (up to $20B)" },
+	Steal5 = { id = 0, price = 499, name = "Steal a monster (over $20B)" },
+	Steal6 = { id = 0, price = 799, name = "Steal a hearted monster (over $20B)" },
 } :: { [string]: Product }
 
 -- Which item product a shop item uses: the first tier whose maxCash its cash price fits under.
