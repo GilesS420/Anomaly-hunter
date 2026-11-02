@@ -375,6 +375,14 @@ local function modal(canvas: Frame, titleText: string, maxSize: Vector2): Modal
 	padding.PaddingTop = UDim.new(0, 12)
 	padding.PaddingBottom = UDim.new(0, 12)
 	padding.Parent = frame
+	-- Everything inside draws above the pop-up itself: the window's ScreenGui stacks by ZIndex
+	-- across the whole gui, so at the default 1 the contents hid behind the frame (Giles
+	-- 2026-10-31: the effect picker was blank).
+	frame.DescendantAdded:Connect(function(child)
+		if child:IsA("GuiObject") then
+			child.ZIndex = 32
+		end
+	end)
 
 	local title = Ui.text(frame, titleText, UDim2.new(1, -54, 0, 32), Ui.Colors.lamp, true, 28)
 	title.Font = Ui.TitleFont
