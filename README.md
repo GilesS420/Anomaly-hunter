@@ -1,4 +1,6 @@
-# Anomaly Hunter
+# Hunt a Monster
+
+_Formerly "Anomaly Hunter" (the repository and Rojo project keep that name)._
 
 A Roblox ghost-hunting game: catch monsters in haunted zones, let them haunt your mansion to raise their value, sell them, and upgrade your mansion to reach deeper zones.
 

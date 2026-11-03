@@ -1,4 +1,4 @@
-"""Small synthesizer toolkit for Anomaly Hunter's sounds.
+"""Small synthesizer toolkit for Hunt a Monster's sounds.
 
 Everything here is built from sine waves, noise and filters, so every sound it makes is our
 own: no samples, no recordings, nothing anyone else owns. make_sounds.py uses it to render

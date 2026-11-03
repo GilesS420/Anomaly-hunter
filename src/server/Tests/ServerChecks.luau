@@ -433,7 +433,7 @@ function ServerChecks.run()
 	passed = 0
 	failed = {}
 	warned = {}
-	print("========== Anomaly Hunter server checks ==========")
+	print("========== Hunt a Monster server checks ==========")
 	local steps: { { name: string, run: () -> () } } = {
 		{ name = "admins", run = checkAdmins },
 		{ name = "remotes", run = checkRemotes },
