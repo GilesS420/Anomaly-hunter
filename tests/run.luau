@@ -3260,7 +3260,10 @@ do
 	local built = Missions.build(Missions.def("Merge2") :: any, 1_000_000, 0, graveyard, random)
 	check("missions: admin builds a mission", built ~= nil and built.id == "Merge2" and built.progress == 0)
 	local zoneBuilt = Missions.build(Missions.def("Zone3") :: any, 1_000_000, 0, graveyard, random)
-	check("missions: admin zone mission gets a zone", zoneBuilt ~= nil and zoneBuilt.zone == "PumpkinGraveyard")
+	check(
+		"missions: admin zone mission gets a zone",
+		zoneBuilt ~= nil and zoneBuilt.zone == "PumpkinGraveyard"
+	)
 	local noZone = Missions.build(Missions.def("Zone3") :: any, 0, 0, {}, random)
 	check("missions: no zone open, no zone mission", noZone == nil)
 
@@ -3723,7 +3726,14 @@ end
 do
 	local Trading = require("../src/shared/Util/Trading")
 	local function mon(uid: string, locked: boolean?): Value.CaughtMonster
-		return { uid = uid, monsterId = "Gravepup", size = "Normal", effects = {}, familiarity = 0, locked = locked }
+		return {
+			uid = uid,
+			monsterId = "Gravepup",
+			size = "Normal",
+			effects = {},
+			familiarity = 0,
+			locked = locked,
+		}
 	end
 	local pack = { mon("a"), mon("b"), mon("c", true) }
 	check("trading: Backpack monsters can go", Trading.problem(pack, { "a", "b" }) == nil)
@@ -3763,7 +3773,10 @@ do
 	check("steal: the priciest hearted is step 6", Heists.productFor(1e15, true) == "Steal6")
 	check("steal: nothing goes past step 6", Heists.productFor(1 / 0, true) == "Steal6")
 	for _, step in HeistConfig.Steps do
-		check(`steal: {step.product} is a Robux product`, RobuxConfig.Products[step.product] ~= nil and Heists.isProduct(step.product))
+		check(
+			`steal: {step.product} is a Robux product`,
+			RobuxConfig.Products[step.product] ~= nil and Heists.isProduct(step.product)
+		)
 	end
 	check("steal: other products aren't steals", not Heists.isProduct("ItemTier1"))
 	local last = 0
@@ -3776,7 +3789,12 @@ do
 	check("steal: every step costs more", climbs)
 
 	local function owner(): Heists.Owner
-		return { tutorial = false, playSeconds = HeistConfig.NewPlayerSeconds, shield = true, record = Heists.empty() }
+		return {
+			tutorial = false,
+			playSeconds = HeistConfig.NewPlayerSeconds,
+			shield = true,
+			record = Heists.empty(),
+		}
 	end
 	local function thief(): Heists.Thief
 		return { userId = 7, tutorial = false, hasRoom = true }
@@ -3811,7 +3829,10 @@ do
 	Heists.rollDay(o.record, 5)
 	check("steal: same day keeps the count", o.record.lost == 2)
 	Heists.rollDay(o.record, 6)
-	check("steal: a new day resets", o.record.lost == 0 and #o.record.robbedBy == 0 and o.record.lostTotal == 2)
+	check(
+		"steal: a new day resets",
+		o.record.lost == 0 and #o.record.robbedBy == 0 and o.record.lostTotal == 2
+	)
 	for _, reason in { "ThiefTutorial", "NewPlayer", "LostEnough", "SameThief", "NoRoom" } do
 		check(`steal: message for {reason}`, Heists.message(reason, "Sam") ~= Heists.message("?", "Sam"))
 	end
@@ -3947,6 +3968,65 @@ do
 	local old = { 0, 1 }
 	local count = Movement.strike(old, MovementConfig.StrikeWindow + 5)
 	check("movement: old pulls are forgotten", count == 1)
+	local Feedback = require("../src/shared/Util/Feedback")
+	local FeedbackConfig = require("../src/shared/Config/Feedback")
+	check("feedback: Bug is a kind", Feedback.kind("Bug") ~= nil)
+	check("feedback: junk kinds are refused", Feedback.kind("x") == nil and Feedback.kind(5) == nil)
+	check("feedback: too short is refused", Feedback.clean("hi") == nil)
+	check("feedback: not text is refused", Feedback.clean(42) == nil and Feedback.clean(nil) == nil)
+	check(
+		"feedback: too long is refused",
+		Feedback.clean(string.rep("a", FeedbackConfig.MaxLength + 1)) == nil
+	)
+	check("feedback: a giant string is refused", Feedback.clean(string.rep("a", 100000)) == nil)
+	check("feedback: broken letters are refused", Feedback.clean("hello \255\254 there") == nil)
+	check(
+		"feedback: the longest note is fine",
+		Feedback.clean(string.rep("a", FeedbackConfig.MaxLength)) ~= nil
+	)
+	local cleaned = Feedback.clean("  The   vacuum\0 broke\r\n\n\n\n\nagain  ")
+	check("feedback: text is cleaned", cleaned == "The vacuum broke\n\nagain")
+	check("feedback: only spaces is refused", Feedback.clean("        \n\n   ") == nil)
+	local now = 1_800_000_000
+	local record = Feedback.empty()
+	check("feedback: a new player can send", (Feedback.canSend(record, now)))
+	record = Feedback.sent(record, now)
+	check("feedback: not again within a minute", not Feedback.canSend(record, now + 30))
+	check("feedback: again after a minute", (Feedback.canSend(record, now + FeedbackConfig.CooldownSeconds)))
+	local busy = { day = Feedback.day(now), count = FeedbackConfig.PerDay, lastAt = now - 3600 }
+	check("feedback: not more than the daily limit", not Feedback.canSend(busy, now))
+	check("feedback: the limit resets the next day", (Feedback.canSend(busy, now + 86400)))
+	check("feedback: a new day counts from one", Feedback.sent(busy, now + 86400).count == 1)
+	local fixed = Feedback.fix({ day = 0 / 0, count = "lots" })
+	check("feedback: broken records are fixed", fixed.day == 0 and fixed.count == 0 and fixed.lastAt == 0)
+	local function entry(id: string): any
+		return {
+			id = id,
+			userId = 1,
+			name = "a",
+			displayName = "a",
+			kind = "Bug",
+			text = "hello",
+			at = 0,
+			read = false,
+		}
+	end
+	local inbox = Feedback.add({ entry("old") }, { entry("first"), entry("second") })
+	check(
+		"feedback: newest notes come first",
+		inbox[1].id == "second" and inbox[2].id == "first" and inbox[3].id == "old"
+	)
+	check("feedback: a retried note isn't added twice", #Feedback.add(inbox, { entry("first") }) == 3)
+	local big = {}
+	for i = 1, FeedbackConfig.InboxSize do
+		table.insert(big, entry(`n{i}`))
+	end
+	local cut = Feedback.add(big, { entry("newest") })
+	check(
+		"feedback: the inbox keeps the newest notes",
+		#cut == FeedbackConfig.InboxSize and cut[1].id == "newest"
+	)
+	check("feedback: time ago reads well", Feedback.ago(5) == "just now" and Feedback.ago(7200) == "2 h ago")
 end
 
 if failures > 0 then
