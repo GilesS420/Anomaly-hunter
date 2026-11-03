@@ -2,12 +2,14 @@
 -- The Settings window, from the HUD's Settings button. One row per setting (Shared.Util.Settings):
 -- its name, a line on what it does, and either a slider (volumes, 0 to 100%: you hear it change
 -- while you drag, it's saved when you let go) or its choices as buttons (the chosen one is lit;
--- tapping another saves it straight away, see client/Settings).
+-- tapping another saves it straight away, see client/Settings). At the bottom, "Send feedback"
+-- opens the feedback window (FeedbackController).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
+local FeedbackController = require(script.Parent:WaitForChild("FeedbackController"))
 local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
 local Settings = require(script.Parent.Parent:WaitForChild("Settings"))
 local Shared = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"):WaitForChild("Settings"))
@@ -179,6 +181,16 @@ function SettingsController.start()
 	end
 
 	Settings.changed(paint)
+
+	-- Bottom of the window: write to the team (FeedbackController, Giles 2026-11-03).
+	local feedback =
+		Ui.button(window.footer, "💬 Send feedback", Ui.Colors.equip, UDim2.fromOffset(200, 42))
+	feedback.AnchorPoint = Vector2.new(0.5, 0.5)
+	feedback.Position = UDim2.fromScale(0.5, 0.5)
+	feedback.Activated:Connect(function()
+		window.close()
+		FeedbackController.open()
+	end)
 
 	local hud =
 		player:WaitForChild("PlayerGui"):WaitForChild("HuntUi"):WaitForChild("Canvas"):WaitForChild("Hud")

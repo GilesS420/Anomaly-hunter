@@ -11,6 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
+local Feedback = require(ReplicatedStorage.Shared.Util.Feedback)
 local Heists = require(ReplicatedStorage.Shared.Util.Heists)
 local Missions = require(ReplicatedStorage.Shared.Util.Missions)
 local Robux = require(ReplicatedStorage.Shared.Util.Robux)
@@ -50,6 +51,7 @@ export type Data = {
 	robux: Robux.Record, -- Robux purchases paid out, credits and passes (RobuxService)
 	heist: Heists.Record, -- play time and monsters stolen and lost (HeistService)
 	trades: { Trading.LogEntry }, -- the newest trades and gifts, for checking scam reports (TradeService)
+	feedback: Feedback.Record, -- how many feedback notes they sent today, and when (FeedbackService)
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -80,6 +82,7 @@ DataService.Template = {
 	robux = Robux.empty(),
 	heist = Heists.empty(),
 	trades = {},
+	feedback = Feedback.empty(),
 } :: Data
 
 local store = ProfileStore.New(
