@@ -44,6 +44,12 @@ Studio only (they do nothing in a live game). Press **Play** (F5), not Run, and 
 
 `TestAsPlayer` on Workspace (a Boolean attribute) makes nobody an admin in Studio. A new remote must be added to `KnownRemotes` in `src/server/Tests/ServerChecks.luau` and to the lists in `src/client/Tests/ExploitChecks.luau`.
 
+### Movement anti-cheat
+
+`src/server/Services/MovementService.luau` checks every player 4 times a second (rules in `src/shared/Util/Movement.luau`, numbers in `src/shared/Config/Movement.luau`): walking faster than the hub speed allows (Faster walking speed pass included), teleporting, rising higher than a jump, and hovering. A cheater is put back on the last spot they stood on; 12 pull-backs in 30 s is a kick (`KickStrikes = 0` turns kicking off). Output shows a `MovementService: pulled ... back` line for each one. Anything the game moves on purpose calls `MovementService.excuse` first (`PlotService.teleport` for portals, Return Charm, fast travel and spawning; the fall rescue; slaps; monster knockbacks), so a new teleport or push must do the same.
+
+Test it in the Client view: `require(game.Players.LocalPlayer.PlayerScripts.Client.Tests.ExploitChecks).run("movement")`.
+
 ## Saving
 
 Player data saves through [ProfileStore](https://github.com/MadStudioRoblox/ProfileStore) (by loleris, Apache 2.0), vendored at `src/server/Vendor/ProfileStore.luau` with its license in `licenses/`. To test real saving in Studio, turn on **Game Settings > Security > Enable Studio Access to API Services** (the place must be published). Without it, ProfileStore uses a mock store and nothing persists between play tests.

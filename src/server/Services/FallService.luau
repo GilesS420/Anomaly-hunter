@@ -9,6 +9,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Layout = require(ReplicatedStorage.Shared.Config.Layout)
+local MovementConfig = require(ReplicatedStorage.Shared.Config.Movement)
+local MovementService = require(script.Parent.MovementService)
 local Zones = require(ReplicatedStorage.Shared.Config.Zones)
 local World = require(script.Parent.Parent.World)
 
@@ -51,6 +53,7 @@ local function check()
 		if character and root and root:IsA("BasePart") then
 			local point = rescuePoint(root.Position)
 			if point then
+				MovementService.excuse(player, MovementConfig.TeleportGrace) -- a rescue, not a cheat
 				root.AssemblyLinearVelocity = Vector3.zero
 				character:PivotTo(CFrame.new(point.Position + Vector3.new(0, 4, 0)))
 			end

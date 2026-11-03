@@ -24,10 +24,12 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local AttackConfig = require(ReplicatedStorage.Shared.Config.Attacks)
 local Attacks = require(ReplicatedStorage.Shared.Util.Attacks)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
+local MovementConfig = require(ReplicatedStorage.Shared.Config.Movement)
 local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
 local Rarities = require(ReplicatedStorage.Shared.Config.Rarities)
 local Roam = require(ReplicatedStorage.Shared.Util.Roam)
 local CatchService = require(script.Parent.CatchService)
+local MovementService = require(script.Parent.MovementService)
 local HuntService = require(script.Parent.HuntService)
 local Notify = require(script.Parent.Parent.Notify)
 local RoamService = require(script.Parent.RoamService)
@@ -197,6 +199,7 @@ local function hitPlayer(player: Player, brain: Brain, attack: Attacks.Attack, w
 	elseif kind == "Charge" or kind == "Shockwave" then
 		local px, pz =
 			Attacks.pushDirection(attack, windup.mx, windup.mz, windup.ax, windup.az, target.x, target.z)
+		MovementService.excuse(player, MovementConfig.KnockbackGrace) -- the push isn't a speed cheat
 		Hit:FireClient(player, kind, 0, px, pz)
 	end
 end

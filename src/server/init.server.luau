@@ -39,6 +39,7 @@ local HotbarService = require(script.Services.HotbarService)
 local FeedbackService = require(script.Services.FeedbackService)
 local DevService = require(script.Services.DevService)
 local FallService = require(script.Services.FallService)
+local MovementService = require(script.Services.MovementService)
 
 -- Studio only: the test checks (Server command bar: game.ServerScriptService.Server.Tests.RunChecks:Fire()).
 if game:GetService("RunService"):IsStudio() then
@@ -79,6 +80,7 @@ local services: { { name: string, start: () -> ...any } } = {
 	{ name = "FeedbackService", start = FeedbackService.start },
 	{ name = "DevService", start = DevService.start },
 	{ name = "FallService", start = FallService.start },
+	{ name = "MovementService", start = MovementService.start },
 }
 
 -- One service failing to start shows its error in Output but doesn't stop the others.
