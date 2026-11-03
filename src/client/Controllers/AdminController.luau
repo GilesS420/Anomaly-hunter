@@ -16,6 +16,8 @@
 --   Zones     spawn monsters in the zone they're in, make one attack now
 --   Events    start or stop Watcher events, the Golden Ghost, the coming schedule
 --   Shops     admin restocks (this server only)
+--   Feedback  notes players sent from Settings > Send feedback, from every server (mark read,
+--             delete). The tab shows how many are new: Feedback (3)
 -- Events, Shops and announcements reach the whole server, whoever is picked. Anything that
 -- can't be undone (reset save, remove all monsters) asks first in a pop-up.
 --
@@ -24,7 +26,8 @@
 -- (targetUserId 0 = everyone) and the server checks again that you're an admin before doing
 -- anything. Results come back as the usual toasts. The Monsters tab also asks
 --   ReplicatedStorage.Remotes.AdminMonsters  (targetUserId?) -> { {uid, label, effects} }
--- for the picked player's monsters (admins only; anyone else gets an empty list).
+-- for the picked player's monsters (admins only; anyone else gets an empty list). The Feedback
+-- tab uses ReplicatedStorage.FeedbackRemotes.Admin (see server/Services/FeedbackService).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,6 +35,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Effects = require(ReplicatedStorage.Shared.Config.Effects)
 local Events = require(ReplicatedStorage.Shared.Config.Events)
+local FeedbackRules = require(ReplicatedStorage.Shared.Util.Feedback)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local MissionConfig = require(ReplicatedStorage.Shared.Config.Missions)
 local Restock = require(ReplicatedStorage.Shared.Util.Restock)
@@ -49,6 +53,7 @@ local AdminController = {}
 
 type Option = { label: string, value: string }
 type TheirMonster = { uid: string, label: string, effects: { string } }
+type FeedbackEntry = FeedbackRules.Entry
 
 local player = Players.LocalPlayer
 local Everyone = "everyone"
@@ -62,6 +67,8 @@ local MaxAnnouncement = 150
 
 local remote: RemoteEvent
 local monstersRemote: RemoteFunction
+local feedbackRemote: RemoteFunction
+local refreshFeedback: () -> () = function() end -- set by build(): reloads the Feedback tab
 local window: Ui.Window
 local target = "me" -- "me", Everyone, or a UserId as text
 
@@ -845,8 +852,13 @@ local function build()
 
 	local pages: { [string]: Frame } = {}
 	local tabs: { [string]: TextButton } = {}
+	local tabOpened: { [string]: () -> () } = {} -- run each time that tab is opened
 	local function openTab(name: string)
 		closePopup()
+		local opened = tabOpened[name]
+		if opened then
+			opened()
+		end
 		for other, page in pages do
 			page.Visible = other == name
 			Ui.paint(tabs[other], if other == name then Ui.Colors.lamp else Ui.Colors.off)
@@ -1128,8 +1140,14 @@ local function build()
 	local giveSizeRow = row(monstersPage, "Size")
 	local giveSize = dropdown(giveSizeRow, 120, fixed(sizeList), "Normal")
 	local giveKg = input(giveSizeRow, "or kg", nil, 70)
-	local kgNote =
-		Ui.text(giveSizeRow, "a weight sets the size", UDim2.fromOffset(160, RowHeight), Ui.Colors.muted, false, 14)
+	local kgNote = Ui.text(
+		giveSizeRow,
+		"a weight sets the size",
+		UDim2.fromOffset(160, RowHeight),
+		Ui.Colors.muted,
+		false,
+		14
+	)
 	kgNote.LayoutOrder = nextOrder()
 	local giveVariantRow = row(monstersPage, "Variant")
 	local giveVariant = dropdown(giveVariantRow, 160, fixed(variantList), "None")
@@ -1511,6 +1529,159 @@ local function build()
 		end
 	end)
 
+	-- ============================================================== Feedback
+	-- Notes players sent from Settings > Send feedback (FeedbackService), from every server,
+	-- newest first. Not about the picked player: everyone's notes are here.
+	local feedbackPage = page("Feedback")
+	heading(feedbackPage, "Player feedback")
+	local feedbackLine = note(feedbackPage, "Loading...")
+	local showAll = false
+	local feedbackEntries: { FeedbackEntry } = {}
+	local feedbackRows: { Instance } = {}
+	local showFilter: TextButton
+	local function setFeedbackTab(unread: number)
+		local tab = tabs["Feedback"]
+		if tab then
+			tab.Text = if unread > 0 then `Feedback ({unread})` else "Feedback"
+		end
+	end
+	local drawFeedback: () -> ()
+	local function askFeedback(action: string, id: string?)
+		feedbackLine.Text = if action == "list" then "Loading..." else "Saving..."
+		local ok, answer = pcall(function()
+			return feedbackRemote:InvokeServer(action, id)
+		end)
+		if not ok or type(answer) ~= "table" or not answer.ok then
+			feedbackLine.Text = if ok
+					and type(answer) == "table"
+					and type(answer.message) == "string"
+				then answer.message
+				else "Couldn't load the feedback. Try Refresh."
+			return
+		end
+		feedbackEntries = if type(answer.entries) == "table" then answer.entries else {}
+		local unread = if type(answer.unread) == "number" then answer.unread else 0
+		setFeedbackTab(unread)
+		local total = #feedbackEntries
+		local summary = `{total} note{if total == 1 then "" else "s"}, {unread} new.`
+		feedbackLine.Text = if type(answer.message) == "string" then `{summary} {answer.message}` else summary
+		drawFeedback()
+	end
+	refreshFeedback = function()
+		task.spawn(askFeedback, "list")
+	end
+	local feedbackTools = row(feedbackPage, "Show")
+	showFilter = button(feedbackTools, "New only", Ui.Colors.equip, 110, function()
+		showAll = not showAll
+		showFilter.Text = if showAll then "All notes" else "New only"
+		drawFeedback()
+	end)
+	button(feedbackTools, "🔄 Refresh", Ui.Colors.off, 110, refreshFeedback)
+	button(feedbackTools, "Mark all read", Ui.Colors.off, 130, function()
+		task.spawn(askFeedback, "readall")
+	end)
+	local feedbackList = Instance.new("Frame")
+	feedbackList.LayoutOrder = nextOrder()
+	feedbackList.BackgroundTransparency = 1
+	feedbackList.Size = UDim2.new(1, -8, 0, 0)
+	feedbackList.AutomaticSize = Enum.AutomaticSize.Y
+	feedbackList.Parent = feedbackPage
+	local feedbackLayout = Instance.new("UIListLayout")
+	feedbackLayout.Padding = UDim.new(0, 6)
+	feedbackLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	feedbackLayout.Parent = feedbackList
+	drawFeedback = function()
+		for _, old in feedbackRows do
+			old:Destroy()
+		end
+		table.clear(feedbackRows)
+		local now = os.time()
+		local shown = 0
+		for i, entry in feedbackEntries do
+			if not showAll and entry.read then
+				continue
+			end
+			shown += 1
+			local card = Instance.new("Frame")
+			card.LayoutOrder = i
+			card.BackgroundColor3 = Ui.Colors.row
+			card.Size = UDim2.new(1, 0, 0, 0)
+			card.AutomaticSize = Enum.AutomaticSize.Y
+			card.Parent = feedbackList
+			Ui.corner(card, 10)
+			Ui.rim(card, if entry.read then Ui.Colors.rim else Ui.Colors.lamp, if entry.read then 1 else 2)
+			local cardPadding = Instance.new("UIPadding")
+			cardPadding.PaddingLeft = UDim.new(0, 10)
+			cardPadding.PaddingRight = UDim.new(0, 10)
+			cardPadding.PaddingTop = UDim.new(0, 6)
+			cardPadding.PaddingBottom = UDim.new(0, 8)
+			cardPadding.Parent = card
+			local cardLayout = Instance.new("UIListLayout")
+			cardLayout.Padding = UDim.new(0, 4)
+			cardLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			cardLayout.Parent = card
+			local kind = FeedbackRules.kind(entry.kind)
+			local icon = if kind then `{kind.icon} {kind.label}` else entry.kind
+			local new = if entry.read then "" else "NEW · "
+			local who = Ui.text(
+				card,
+				`{new}{icon} · {entry.displayName} (@{entry.name}) · {FeedbackRules.ago(now - entry.at)}`,
+				UDim2.new(1, 0, 0, 22),
+				if entry.read then Ui.Colors.muted else Ui.Colors.lamp,
+				true,
+				17
+			)
+			who.LayoutOrder = 1
+			local body = Ui.text(card, entry.text, UDim2.new(1, 0, 0, 0), Ui.Colors.text, false, 16)
+			body.LayoutOrder = 2
+			body.AutomaticSize = Enum.AutomaticSize.Y
+			body.TextScaled = false
+			body.TextSize = 16
+			body.TextWrapped = true
+			body.TextTruncate = Enum.TextTruncate.None
+			local actions = Instance.new("Frame")
+			actions.LayoutOrder = 3
+			actions.BackgroundTransparency = 1
+			actions.Size = UDim2.new(1, 0, 0, RowHeight)
+			actions.Parent = card
+			local actionsLayout = Instance.new("UIListLayout")
+			actionsLayout.FillDirection = Enum.FillDirection.Horizontal
+			actionsLayout.Padding = UDim.new(0, 6)
+			actionsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			actionsLayout.Parent = actions
+			local id = entry.id
+			button(
+				actions,
+				if entry.read then "Mark new" else "✓ Mark read",
+				Ui.Colors.equip,
+				120,
+				function()
+					task.spawn(askFeedback, if entry.read then "unread" else "read", id)
+				end
+			)
+			button(actions, "Delete", Ui.Colors.confirm, 90, function()
+				askFirst(
+					`Delete this note from {entry.displayName}? It's gone for good.`,
+					"Delete",
+					function()
+						task.spawn(askFeedback, "delete", id)
+					end
+				)
+			end)
+			table.insert(feedbackRows, card)
+		end
+		if shown == 0 then
+			local empty = note(
+				feedbackList,
+				if showAll or #feedbackEntries == 0
+					then "No feedback yet."
+					else "No new notes. Tap New only to see all of them."
+			)
+			table.insert(feedbackRows, empty)
+		end
+	end
+	tabOpened["Feedback"] = refreshFeedback
+
 	-- ============================================================== Make announcement
 	-- A banner for everyone in this server (Roblox filters it like chat).
 	local announceModal = modal(canvas, "Make announcement", Vector2.new(560, 320))
@@ -1591,6 +1762,7 @@ local function toggle()
 		window.close()
 	else
 		window.open()
+		refreshFeedback() -- the Feedback tab shows how many notes are new
 	end
 end
 
@@ -1600,6 +1772,7 @@ function AdminController.start()
 	end
 	remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("AdminCommand") :: RemoteEvent
 	monstersRemote = ReplicatedStorage.Remotes:WaitForChild("AdminMonsters") :: RemoteFunction
+	feedbackRemote = ReplicatedStorage:WaitForChild("FeedbackRemotes"):WaitForChild("Admin") :: RemoteFunction
 	build()
 	UserInputService.InputBegan:Connect(function(inputObject, processed)
 		if not processed and inputObject.KeyCode == Enum.KeyCode.F2 then

@@ -116,6 +116,8 @@ ServerChecks.KnownRemotes = {
 	"AttackRemotes.Hit",
 	"RobuxRemotes.Buy",
 	"RobuxRemotes.Granted",
+	"FeedbackRemotes.Send",
+	"FeedbackRemotes.Admin",
 }
 
 local passed = 0
