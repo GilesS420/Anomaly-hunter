@@ -39,6 +39,8 @@ local Variants = require("../src/shared/Config/Variants")
 local InventoryConfig = require("../src/shared/Config/Inventory")
 local Weight = require("../src/shared/Util/Weight")
 local WeightConfig = require("../src/shared/Config/Weight")
+local Movement = require("../src/shared/Util/Movement")
+local MovementConfig = require("../src/shared/Config/Movement")
 
 local failures = 0
 local function check(name: string, ok: boolean)
@@ -3856,6 +3858,95 @@ do -- renamed monsters and zones (Giles 2026-10-31): new name for players, same 
 		string.find(TutorialText.Text.Catch, Names.Gloomlet, 1, true) ~= nil
 			and string.find(TutorialText.Text.Catch, "Gloomlet", 1, true) == nil
 	)
+end
+
+do
+	-- Movement anti-cheat (Util/Movement): legit movement passes, cheats don't.
+	local hub = TravelConfig.HubWalkSpeed
+	local limits = { maxSpeed = Movement.maxSpeed(16, hub, 1), jumpHeight = 7.2 }
+	local fast = { maxSpeed = Movement.maxSpeed(16, hub, 2), jumpHeight = 7.2 }
+	local dt = MovementConfig.CheckSeconds
+
+	-- Walks `seconds` at `speed` along X, on the ground; returns the first "no" (or nil).
+	local function walk(lim: Movement.Limits, speed: number, seconds: number): string?
+		local state = Movement.new(0, 3, 0, lim)
+		local x = 0
+		for _ = 1, math.floor(seconds / dt) do
+			x += speed * dt
+			local why = Movement.step(state, x, 3, 0, dt, true, lim)
+			if why then
+				return why
+			end
+		end
+		return nil
+	end
+	check("movement: hub walking (32) for a minute is fine", walk(limits, hub, 60) == nil)
+	check("movement: Fast Walk in the hub (64) for a minute is fine", walk(fast, hub * 2, 60) == nil)
+	check("movement: 64 without the pass is too fast", walk(limits, hub * 2, 10) == "speed")
+	check("movement: a 150 speed hack is caught even with the pass", walk(fast, 150, 10) == "speed")
+
+	-- Lag: nothing for 2 s, then the whole walk at once.
+	local state = Movement.new(0, 3, 0, limits)
+	local lagged = Movement.step(state, hub * 2, 3, 0, 2, true, limits)
+	check("movement: 2 s of lag catching up at once is fine", lagged == nil)
+
+	state = Movement.new(0, 3, 0, limits)
+	check("movement: a 300-stud teleport is caught", Movement.step(state, 300, 3, 0, dt, true, limits) == "speed")
+	check("movement: and the safe spot is where they stood", state.safeX == 0 and state.safeY == 3)
+	Movement.pulledBack(state, limits)
+	check("movement: after a pull-back the walk budget is empty", state.budget == 0 and state.lastX == 0)
+
+	-- A normal jump (up 7 and back down in about 0.7 s) is fine.
+	state = Movement.new(0, 3, 0, limits)
+	local jumpOk = true
+	for _, y in { 8, 10, 8, 3 } do
+		if Movement.step(state, 0, y, 0, dt, y == 3, limits) then
+			jumpOk = false
+		end
+	end
+	check("movement: a normal jump is fine", jumpOk)
+
+	state = Movement.new(0, 3, 0, limits)
+	Movement.step(state, 0, 12, 0, dt, false, limits)
+	check("movement: rising 40 studs is caught", Movement.step(state, 0, 43, 0, dt, false, limits) == "jump")
+
+	-- Hovering 5 studs up.
+	state = Movement.new(0, 3, 0, limits)
+	local hover: string? = nil
+	for _ = 1, 20 do
+		hover = hover or Movement.step(state, 0, 8, 0, dt, false, limits)
+	end
+	check("movement: hovering is caught", hover == "fly")
+
+	-- Falling off a ledge for a long way is fine.
+	state = Movement.new(0, 100, 0, limits)
+	local fall: string? = nil
+	local y, vy = 100, 0
+	for _ = 1, 16 do
+		vy -= 196.2 * dt
+		y += vy * dt
+		fall = fall or Movement.step(state, 0, y, 0, dt, false, limits)
+	end
+	check("movement: a long fall is fine", fall == nil)
+
+	-- Walking up a staircase (ground all the way) is fine.
+	state = Movement.new(0, 3, 0, limits)
+	local stairs: string? = nil
+	for i = 1, 40 do
+		stairs = stairs or Movement.step(state, i * 4, 3 + i * 2, 0, dt, true, limits)
+	end
+	check("movement: walking up stairs is fine", stairs == nil)
+
+	local strikes = {}
+	local kicked = false
+	for i = 1, MovementConfig.KickStrikes do
+		local _, kick = Movement.strike(strikes, i)
+		kicked = kick
+	end
+	check("movement: KickStrikes pulls in the window kick", kicked)
+	local old = { 0, 1 }
+	local count = Movement.strike(old, MovementConfig.StrikeWindow + 5)
+	check("movement: old pulls are forgotten", count == 1)
 end
 
 if failures > 0 then

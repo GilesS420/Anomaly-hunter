@@ -12,6 +12,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Layout = require(ReplicatedStorage.Shared.Config.Layout)
+local MovementConfig = require(ReplicatedStorage.Shared.Config.Movement)
+local MovementService = require(script.Parent.MovementService)
 local Notify = require(script.Parent.Parent.Notify)
 local World = require(script.Parent.Parent.World)
 
@@ -130,7 +132,8 @@ local MissedBy = 60 -- studs; further than this from the destination means the m
 local Retries = 3
 local trips: { [Player]: number } = setmetatable({}, { __mode = "k" }) :: any
 
-local function move(character: Model, root: BasePart, cframe: CFrame)
+local function move(player: Player, character: Model, root: BasePart, cframe: CFrame)
+	MovementService.excuse(player, MovementConfig.TeleportGrace) -- not a teleport cheat
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		humanoid.Sit = false -- otherwise the seat comes along
@@ -152,7 +155,7 @@ function PlotService.teleport(player: Player, cframe: CFrame)
 	if not character or not root or not root:IsA("BasePart") or trips[player] ~= trip then
 		return -- no body, or a newer trip started while the zone streamed in
 	end
-	move(character, root, cframe)
+	move(player, character, root, cframe)
 	task.spawn(function()
 		-- One bounce is normal (it nearly always happens on spawn) and the resend fixes it,
 		-- so Output only hears about it when every resend failed.
@@ -168,7 +171,7 @@ function PlotService.teleport(player: Player, cframe: CFrame)
 				warn(`PlotService: {player.Name}'s teleport kept bouncing back after {Retries} resends`)
 				return
 			end
-			move(character, root, cframe)
+			move(player, character, root, cframe)
 		end
 	end)
 end

@@ -21,9 +21,11 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local MovementConfig = require(ReplicatedStorage.Shared.Config.Movement)
 local SlapConfig = require(ReplicatedStorage.Shared.Config.Slap)
 local Slap = require(ReplicatedStorage.Shared.Util.Slap)
 local CatchService = require(script.Parent.CatchService)
+local MovementService = require(script.Parent.MovementService)
 local Notify = require(script.Parent.Parent.Notify)
 
 local SlapService = {}
@@ -100,6 +102,7 @@ local function onSlap(player: Player, target: unknown)
 	readyAt[player] = now + SlapConfig.CooldownSeconds - 0.25 -- a little lag allowance
 	target:SetAttribute("SlapGuardUntil", now + SlapConfig.GuardSeconds)
 	local pushX, pushZ = Slap.push(slapper.x, slapper.z, victim.x, victim.z)
+	MovementService.excuse(target, MovementConfig.KnockbackGrace) -- the push isn't a speed cheat
 	Slapped:FireAllClients(player, target, pushX, pushZ, tool.push)
 
 	-- Caught stealing: they can't steal again for a while (longer for a better slapper).

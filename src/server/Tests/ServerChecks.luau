@@ -51,6 +51,7 @@ local ServerChecks = {}
 -- a new one gets added to both lists (and gets tested) when it's made.
 ServerChecks.KnownRemotes = {
 	"Remotes.Toast",
+	"TestRemotes.PauseMovement", -- Studio only (MovementService), for the client cheat tests
 	"Remotes.MutationLog",
 	"Remotes.AdminCommand",
 	"Remotes.AdminMonsters",
