@@ -12,8 +12,8 @@ return {
 	WillowWisp = "Weepwillow",
 	MireSerpent = "Swamp Viper",
 	MoonlitHeron = "The Pale Stalker",
-	Poplet = "Gorecorn",
-	CarouselColt = "Merry-Go-Gore",
+	Poplet = "Popgrin",
+	CarouselColt = "Merry-Go-Ghost",
 
 	-- Zones
 	MurkyBayou = "Sunken Swamp",
