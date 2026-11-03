@@ -7,14 +7,14 @@
 return {
 	-- Monsters
 	Gloomlet = "Shiverling",
-	Skittercrow = "Rotraven",
+	Skittercrow = "Grave Raven",
 	WispJack = "Hollowflame",
 	WillowWisp = "Weepwillow",
-	MireSerpent = "The Drowned Coil",
-	MoonlitHeron = "The Bone Wader",
+	MireSerpent = "Swamp Viper",
+	MoonlitHeron = "The Pale Stalker",
 	Poplet = "Gorecorn",
 	CarouselColt = "Merry-Go-Gore",
 
 	-- Zones
-	MurkyBayou = "Drowned Swamp",
+	MurkyBayou = "Sunken Swamp",
 } :: { [string]: string }
