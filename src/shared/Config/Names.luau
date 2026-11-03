@@ -1,0 +1,20 @@
+--!strict
+-- Names players see for monsters and zones that were renamed (Giles 2026-10-31). Saves, the
+-- Codex, missions and Studio folders keep using the old id (Workspace > Zones > MurkyBayou
+-- stays), so nothing has to be migrated: only the text players read changes. Format.name
+-- looks here first.
+
+return {
+	-- Monsters
+	Gloomlet = "Shiverling",
+	Skittercrow = "Grave Raven",
+	WispJack = "Hollowflame",
+	WillowWisp = "Weepwillow",
+	MireSerpent = "Swamp Viper",
+	MoonlitHeron = "The Pale Stalker",
+	Poplet = "Gorecorn",
+	CarouselColt = "Merry-Go-Gore",
+
+	-- Zones
+	MurkyBayou = "Sunken Swamp",
+} :: { [string]: string }

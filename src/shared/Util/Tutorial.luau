@@ -9,6 +9,8 @@
 -- The current step is the player attribute Tutorial (nil once it's done) and the save's
 -- `tutorial` field ("Done" once it's done).
 
+local Names = require("../Config/Names")
+
 local Tutorial = {}
 
 export type Step = "Gate" | "Catch" | "Home" | "Pickup" | "Sell" | "Buy" | "Tour"
@@ -17,6 +19,7 @@ Tutorial.Steps = { "Gate", "Catch", "Home", "Pickup", "Sell", "Buy", "Tour" } ::
 
 Tutorial.Zone = "PumpkinGraveyard" -- where the first hunt goes
 Tutorial.Monster = "Gloomlet" -- the tutorial's own monster, only the player can catch it
+local Monster = Names[Tutorial.Monster] -- what the guide card calls it
 Tutorial.Effect = "Cobwebbed" -- the cheapest effect, shown off as soon as it's home
 Tutorial.FirstVacuum = "PhantomVac" -- the first thing bought in the shop (Giles 2026-10-21)
 Tutorial.RespawnSeconds = 5 -- a tutorial monster that vanished comes back after this long
@@ -42,20 +45,20 @@ Tutorial.Unlocks = {
 -- without one (TouchText, where it differs).
 Tutorial.Text = {
 	Gate = "Follow the glowing trail to the Pumpkin Graveyard gate, or press Portals at the top.",
-	Catch = "Press 1 to hold your vacuum, then click the Gloomlet. When it struggles, click or press F while the needle is in the green.",
+	Catch = `Press 1 to hold your vacuum, then click the {Monster}. When it struggles, click or press F while the needle is in the green.`,
 	Home = "Got it! Follow the trail back to the exit, or press R to use your free Return Charm.",
-	Pickup = "Your Gloomlet is home and turned Cobwebbed: effects make monsters worth more! Press E next to it, or open the mansion list (the arrow on the right edge) and press Pick up.",
-	Sell = 'The Collector only buys monsters from your Backpack. Press Sell at the top, then press E at the Collector, pick "I want to sell my monsters." and sell your Gloomlet.',
+	Pickup = `Your {Monster} is home and turned Cobwebbed: effects make monsters worth more! Press E next to it, or open the mansion list (the arrow on the right edge) and press Pick up.`,
+	Sell = `The Collector only buys monsters from your Backpack. Press Sell at the top, then press E at the Collector, pick "I want to sell my monsters." and sell your {Monster}.`,
 	Buy = "The Collector gave you a welcome gift! Press Shops and buy the Phantom Vac at the Vacuum Vault, the middle shop.",
 	Tour = "You're ready! Here's what the buttons do.",
 } :: { [Step]: string }
 
 Tutorial.TouchText = {
 	Gate = "Follow the glowing trail to the Pumpkin Graveyard gate, or tap Portals at the top.",
-	Catch = "Tap the first hotbar slot to hold your vacuum, then tap the Gloomlet. When it struggles, tap while the needle is in the green.",
+	Catch = `Tap the first hotbar slot to hold your vacuum, then tap the {Monster}. When it struggles, tap while the needle is in the green.`,
 	Home = "Got it! Follow the trail back to the exit, or tap Return Charm to jump home.",
-	Pickup = "Your Gloomlet is home and turned Cobwebbed: effects make monsters worth more! Tap the prompt next to it, or open the mansion list (the arrow on the right edge) and tap Pick up.",
-	Sell = 'The Collector only buys monsters from your Backpack. Tap Sell at the top, then tap Talk at the Collector, pick "I want to sell my monsters." and sell your Gloomlet.',
+	Pickup = `Your {Monster} is home and turned Cobwebbed: effects make monsters worth more! Tap the prompt next to it, or open the mansion list (the arrow on the right edge) and tap Pick up.`,
+	Sell = `The Collector only buys monsters from your Backpack. Tap Sell at the top, then tap Talk at the Collector, pick "I want to sell my monsters." and sell your {Monster}.`,
 	Buy = "The Collector gave you a welcome gift! Tap Shops and buy the Phantom Vac at the Vacuum Vault, the middle shop.",
 } :: { [Step]: string }
 
@@ -64,8 +67,8 @@ Tutorial.Hints = {
 	Gate = "The Zone Gates are at the far end of the hub. Press Portals to jump there.",
 	Catch = "Hold your vacuum (the first hotbar slot) and stay close. Each struggle is one click, tap or F while the needle crosses the green zone; miss and it breaks free for a moment, so just try again.",
 	Home = "Walk back through the exit arch you came in by.",
-	Pickup = "Press Mansion at the top to go home, then stand next to the Gloomlet and press E (or tap the prompt).",
-	Sell = 'Talk to the Collector (E or tap Talk) and pick "I want to sell my monsters.", then press Sell on your Gloomlet.',
+	Pickup = `Press Mansion at the top to go home, then stand next to the {Monster} and press E (or tap the prompt).`,
+	Sell = `Talk to the Collector (E or tap Talk) and pick "I want to sell my monsters.", then press Sell on your {Monster}.`,
 	Buy = 'Talk to the Vacuum Vault (between the Bakery and the Workshop) and pick "Show me the vacuums.", then press the Phantom Vac card and Buy.',
 	Tour = "Press Next to see the next button.",
 } :: { [Step]: string }

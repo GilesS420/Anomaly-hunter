@@ -2996,7 +2996,10 @@ do
 		"a named monster reads 'Bob the Gravepup'",
 		Format.monsterName({ monsterId = "Gravepup", nickname = "Bob" }) == "Bob the Gravepup"
 	)
-	check("an unnamed one just its species", Format.monsterName({ monsterId = "WispJack" }) == "Wisp Jack")
+	check(
+		"an unnamed one just its species",
+		Format.monsterName({ monsterId = "TheBogKing" }) == "The Bog King"
+	)
 end
 
 -- Luck potions (Util/Potions).
@@ -3823,6 +3826,36 @@ do
 	local repaired = Heists.repair({ lost = "x", playSeconds = 0 / 0 })
 	check("steal: repair mends broken parts", repaired.lost == 0 and repaired.playSeconds == 0)
 	check("steal: repair of nothing", Heists.repair(nil).stolen == 0)
+end
+
+do -- renamed monsters and zones (Giles 2026-10-31): new name for players, same id in saves
+	local Names = require("../src/shared/Config/Names")
+	local ZoneConfig = require("../src/shared/Config/Zones")
+	local TutorialText = require("../src/shared/Util/Tutorial")
+	local seen: { [string]: string } = {}
+	for id in Monsters do
+		local shown = Format.name(id)
+		check(`rename: {shown} is only used once`, seen[shown] == nil)
+		seen[shown] = id
+	end
+	local zoneIds: { [string]: boolean } = {}
+	for _, zone in ZoneConfig.List do
+		zoneIds[zone.id] = true
+	end
+	for id, shown in Names do
+		check(`rename: {id} still exists`, Monsters[id] ~= nil or zoneIds[id] == true)
+		check(`rename: {id} shows as {shown}`, Format.name(id) == shown)
+	end
+	check("rename: other monsters keep their spaced id", Format.name("TheBogKing") == "The Bog King")
+	check(
+		"rename: the zone list uses the new swamp name",
+		ZoneConfig.List[2].id == "MurkyBayou" and ZoneConfig.List[2].name == Names.MurkyBayou
+	)
+	check(
+		"rename: the tutorial talks about the new name",
+		string.find(TutorialText.Text.Catch, Names.Gloomlet, 1, true) ~= nil
+			and string.find(TutorialText.Text.Catch, "Gloomlet", 1, true) == nil
+	)
 end
 
 if failures > 0 then
