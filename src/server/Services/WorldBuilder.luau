@@ -18,6 +18,12 @@
 --   Workspace.Zones.<ZoneId>         a floating island per zone (only if that zone folder is missing),
 --                                    with its scenery from Config/Scenery when it has one
 -- Positions and sizes come from Shared.Config.Layout.
+--
+-- Streaming: Workspace.Hub is a Model set to ModelStreamingMode Persistent, so every player gets
+-- the whole hub once and it never pops in or out as they walk around. A Hub saved in the place
+-- as a Folder is swapped for a Model of the same name (its contents move over untouched).
+-- Mansions (Workspace.Mansions) and the zones (Workspace.Zones) keep streaming normally: they
+-- load near you and unload when you're far away or in another zone.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -74,6 +80,33 @@ local landmarkColors: { [string]: Color3 } = {
 }
 
 local built: { string } = {} -- what was made this run, for the Output line
+
+-- Workspace.Hub as an always-loaded Model (see Streaming at the top). Runs before anything
+-- else looks the hub up, so nobody holds on to the old Folder.
+local function persistentHub(): Model
+	local existing = World.find(workspace, "Hub")
+	local hub: Model
+	if existing and existing:IsA("Model") then
+		hub = existing
+	else
+		hub = Instance.new("Model")
+		hub.Name = if existing then existing.Name else "Hub"
+		if existing then
+			for key, value in existing:GetAttributes() do
+				hub:SetAttribute(key, value)
+			end
+			for _, child in existing:GetChildren() do
+				child.Parent = hub
+			end
+			existing:Destroy()
+		else
+			table.insert(built, "Hub")
+		end
+	end
+	hub.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+	hub.Parent = workspace
+	return hub
+end
 
 local function folderAt(parent: Instance, name: string, path: string): Instance
 	local existing = World.find(parent, name)
@@ -593,7 +626,7 @@ function WorldBuilder.start()
 	if baseplate and baseplate:IsA("BasePart") then
 		baseplate:Destroy()
 	end
-	local hub = folderAt(workspace, "Hub", "Hub")
+	local hub = persistentHub()
 	local ground = World.find(hub, "Ground")
 	if ground and ground:GetAttribute("GroundVersion") ~= GroundVersion then
 		ground:Destroy() -- a floor an older version built; swap it for the current one
