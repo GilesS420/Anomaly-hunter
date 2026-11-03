@@ -180,7 +180,7 @@ for i, x in { 0.18, 0.82 } do
 	table.insert(eyeParts, eye)
 end
 
-local title = label("Title", "ANOMALY HUNTER", Enum.Font.Creepster, Colors.lamp, -70, 110)
+local title = label("Title", "HUNT A MONSTER", Enum.Font.Creepster, Colors.lamp, -70, 110)
 local status = label("Status", "Opening the gates...", Enum.Font.FredokaOne, Colors.muted, 40, 30)
 
 -- The progress bar under the status line.

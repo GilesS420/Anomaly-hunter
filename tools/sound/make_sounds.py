@@ -1,4 +1,4 @@
-"""Render all of Anomaly Hunter's sounds.
+"""Render all of Hunt a Monster's sounds.
 
     python tools/sound/make_sounds.py [out_dir]
 
