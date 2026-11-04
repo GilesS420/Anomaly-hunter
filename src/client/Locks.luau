@@ -7,7 +7,6 @@
 -- Locks.glow(feature, true) also greys out the whole screen except those buttons (Giles
 -- 2026-11-04: shows players where things really are), for the tour and the unlock tips.
 
-local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -44,6 +43,14 @@ dimGui.IgnoreGuiInset = true
 dimGui.ResetOnSpawn = false
 dimGui.DisplayOrder = 7
 dimGui.Enabled = false
+-- An empty frame at the grey's own top-left corner: every AbsolutePosition is measured from
+-- the same point, so a button's place minus this one's is where it is in the grey, whatever
+-- each gui's IgnoreGuiInset (the top bar's buttons ignore it, the HUD doesn't).
+local origin = Instance.new("Frame")
+origin.Name = "Origin"
+origin.BackgroundTransparency = 1
+origin.Size = UDim2.fromOffset(0, 0)
+origin.Parent = dimGui
 local panels: { Frame } = {}
 for i = 1, 4 do
 	local panel = Instance.new("Frame")
@@ -157,11 +164,11 @@ local function showing(gui: GuiObject, screen: ScreenGui): boolean
 	return at == screen and screen.Enabled
 end
 
--- Where the glowing buttons are on the screen (counting Roblox's top bar), as one box, or
+-- Where the glowing buttons are in the grey's own pixels, as one box, or
 -- nil if none of them is showing.
 local function holeRect(): (Vector2?, Vector2?)
 	local low: Vector2?, high: Vector2? = nil, nil
-	local inset = GuiService:GetGuiInset()
+	local zero = origin.AbsolutePosition
 	for _, entry in guarded do
 		local gui = entry.gui
 		if entry.feature ~= glowing or entry.cover.Visible then
@@ -171,7 +178,7 @@ local function holeRect(): (Vector2?, Vector2?)
 		if not screen or not gui:IsDescendantOf(player.PlayerGui) or not showing(gui, screen) then
 			continue
 		end
-		local at = gui.AbsolutePosition + (if screen.IgnoreGuiInset then Vector2.zero else inset)
+		local at = gui.AbsolutePosition - zero
 		local size = gui.AbsoluteSize
 		if size.X <= 0 or size.Y <= 0 then
 			continue
