@@ -4,7 +4,9 @@
 -- plain dialogue box opens at the bottom of the screen. The stand's name, its line typed out
 -- letter by letter (click or tap the box to skip), then three choices: ask about the stand,
 -- enter it (opens its shop or sell window) or quit. Some stands have a second window too
--- (`extra`, like the Merger's Variant Machine). Walking away closes it.
+-- (`extra`, like the Merger's Variant Machine). The Guild stand's choices open Roblox's own
+-- Join Group and Invite Friends windows instead (`client`, client/Community). Walking away
+-- closes it.
 -- The lines are in Shared.Config.Stands; the prompts and the Enter check in server/Counter.
 -- While the dialogue or a shop window is open the stands' Talk prompts are hidden, so a click
 -- that falls between the shop's cards can't hit the prompt behind the window and talk again.
@@ -17,6 +19,7 @@ local RunService = game:GetService("RunService")
 local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Stands = require(ReplicatedStorage.Shared.Config.Stands)
 local Watcher = require(ReplicatedStorage.Shared.Util.Watcher)
+local Community = require(script.Parent.Parent:WaitForChild("Community"))
 local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
@@ -163,31 +166,70 @@ function DialogueController.start()
 
 	-- Types out what the stand says, then shows the choices.
 	local say: (text: string) -> ()
+
+	-- A choice done on this screen (Config/Stands `client`): the stand waits while Roblox's
+	-- window is open, then says how it went.
+	local function clientAction(action: string)
+		local run = if action == "JoinGroup"
+			then Community.join
+			elseif action == "Invite" then Community.invite
+			else nil
+		if not run then
+			return
+		end
+		local talkingTo = standId
+		clearChoices()
+		line.Text = "..."
+		line.MaxVisibleGraphemes = -1
+		task.spawn(function()
+			local answer = run()
+			if gui.Enabled and standId == talkingTo then
+				say(answer)
+			end
+		end)
+	end
+
 	local function showChoices()
 		clearChoices()
 		local stand = standId and Stands[standId]
 		if not stand then
 			return
 		end
-		choice(1, stand.info.ask, function()
+		local order = 0
+		local function add(text: string, picked: () -> ())
+			order += 1
+			choice(order, text, picked)
+		end
+		add(stand.info.ask, function()
 			say(stand.info.answer)
 		end)
-		choice(2, stand.enter.ask, function()
+		add(stand.enter.ask, function()
 			if stand.enter.live then
 				say(watcherNow())
+			elseif stand.enter.client then
+				clientAction(stand.enter.client)
 			else
 				Enter:FireServer(standId)
 				close()
 			end
 		end)
+		for _, more in stand.more or {} do
+			add(more.ask, function()
+				if more.client then
+					clientAction(more.client)
+				elseif more.answer then
+					say(more.answer)
+				end
+			end)
+		end
 		local extra = stand.extra
 		if extra then
 			local wings = tonumber(player:GetAttribute("WingsOwned")) or 1
 			local open = wings >= (extra.unlockWings or 0)
-			choice(3, extra.info.ask, function()
+			add(extra.info.ask, function()
 				say(extra.info.answer)
 			end)
-			choice(4, if open then extra.ask else `🔒 {extra.ask}`, function()
+			add(if open then extra.ask else `🔒 {extra.ask}`, function()
 				if open then
 					Enter:FireServer(standId, extra.option)
 					close()
@@ -196,7 +238,7 @@ function DialogueController.start()
 				end
 			end)
 		end
-		choice(if extra then 5 else 3, stand.quit, close)
+		add(stand.quit, close)
 	end
 
 	say = function(text: string)

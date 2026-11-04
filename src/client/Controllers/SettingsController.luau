@@ -2,14 +2,17 @@
 -- The Settings window, from the HUD's Settings button. One row per setting (Shared.Util.Settings):
 -- its name, a line on what it does, and either a slider (volumes, 0 to 100%: you hear it change
 -- while you drag, it's saved when you let go) or its choices as buttons (the chosen one is lit;
--- tapping another saves it straight away, see client/Settings). At the bottom, "Send feedback"
--- opens the feedback window (FeedbackController).
+-- tapping another saves it straight away, see client/Settings). At the bottom, "Feedback"
+-- opens the feedback window (FeedbackController), and "Join group" and "Invite" open Roblox's
+-- own Join Group and Invite Friends windows (client/Community, same as the Guild stand).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
+local Community = require(script.Parent.Parent:WaitForChild("Community"))
 local FeedbackController = require(script.Parent:WaitForChild("FeedbackController"))
+local ToastController = require(script.Parent:WaitForChild("ToastController"))
 local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
 local Settings = require(script.Parent.Parent:WaitForChild("Settings"))
 local Shared = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"):WaitForChild("Settings"))
@@ -182,14 +185,35 @@ function SettingsController.start()
 
 	Settings.changed(paint)
 
-	-- Bottom of the window: write to the team (FeedbackController, Giles 2026-11-03).
-	local feedback =
-		Ui.button(window.footer, "💬 Send feedback", Ui.Colors.equip, UDim2.fromOffset(200, 42))
-	feedback.AnchorPoint = Vector2.new(0.5, 0.5)
-	feedback.Position = UDim2.fromScale(0.5, 0.5)
+	-- Bottom of the window: write to the team (FeedbackController, Giles 2026-11-03), join
+	-- the Hunter's Guild group or invite friends (client/Community, Giles 2026-11-04).
+	local footerLayout = Instance.new("UIListLayout")
+	footerLayout.FillDirection = Enum.FillDirection.Horizontal
+	footerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	footerLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	footerLayout.Padding = UDim.new(0, 8)
+	footerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	footerLayout.Parent = window.footer
+	local footerSize = UDim2.new(1 / 3, -6, 0, 42)
+	local feedback = Ui.button(window.footer, "💬 Feedback", Ui.Colors.equip, footerSize)
+	feedback.LayoutOrder = 1
 	feedback.Activated:Connect(function()
 		window.close()
 		FeedbackController.open()
+	end)
+	local join = Ui.button(window.footer, "🛡️ Join group", Ui.Colors.buy, footerSize)
+	join.LayoutOrder = 2
+	join.Activated:Connect(function()
+		task.spawn(function()
+			ToastController.show(Community.join())
+		end)
+	end)
+	local invite = Ui.button(window.footer, "📨 Invite", Ui.Colors.sell, footerSize)
+	invite.LayoutOrder = 3
+	invite.Activated:Connect(function()
+		task.spawn(function()
+			ToastController.show(Community.invite())
+		end)
 	end)
 
 	local hud =

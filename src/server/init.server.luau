@@ -37,6 +37,7 @@ local RobuxService = require(script.Services.RobuxService)
 local SettingsService = require(script.Services.SettingsService)
 local HotbarService = require(script.Services.HotbarService)
 local FeedbackService = require(script.Services.FeedbackService)
+local CommunityService = require(script.Services.CommunityService)
 local DevService = require(script.Services.DevService)
 local FallService = require(script.Services.FallService)
 local MovementService = require(script.Services.MovementService)
@@ -78,6 +79,7 @@ local services: { { name: string, start: () -> ...any } } = {
 	{ name = "SettingsService", start = SettingsService.start },
 	{ name = "HotbarService", start = HotbarService.start },
 	{ name = "FeedbackService", start = FeedbackService.start },
+	{ name = "CommunityService", start = CommunityService.start },
 	{ name = "DevService", start = DevService.start },
 	{ name = "FallService", start = FallService.start },
 	{ name = "MovementService", start = MovementService.start },

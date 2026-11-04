@@ -1307,6 +1307,110 @@ function Landmarks.GrowthChamber(): { Part }
 	return parts
 end
 
+------------------------------------------------------------------------------------------
+-- The Hunter's Guild stand
+------------------------------------------------------------------------------------------
+
+local GuildPurple = { 120, 60, 200 }
+local GuildPurpleDark = { 60, 28, 104 }
+local Paper = { 226, 214, 184 }
+
+-- A small notice board by Watcher Square (Giles 2026-11-04): a roofed board covered in pinned
+-- notices under a purple "Hunter's Guild" sign with the Watcher's eye on a crest, and the
+-- Guild Keeper in a hooded robe behind a lectern. Talking to her lets players join the
+-- game's group, invite friends and hear how to help the game (Config/Stands).
+function Landmarks.GuildStand(): { Part }
+	local parts: { Part } = {}
+	local y = 0.4
+	part(parts, "Deck", { 16, y, 8 }, { 0, y / 2, 0 }, StoneDark, "Slate", true)
+
+	-- The board: two posts, a plank back, a little slate roof and the sign on top.
+	local bz = 2.6
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		part(parts, `Post{tag}`, { 0.8, 10, 0.8 }, { side * 7, y + 5, bz }, BenchWood, "Wood", true)
+		Kit.lantern(parts, `Lantern{tag}`, side * 7, y + 6.6, bz - 0.4, { 0, -1 })
+	end
+	part(parts, "Board", { 13.2, 6, 0.5 }, { 0, y + 4.6, bz }, BoardWood, "WoodPlanks", true)
+	part(parts, "BoardFrame", { 13.6, 0.4, 0.7 }, { 0, y + 1.5, bz }, BenchWood, "Wood")
+	part(parts, "Roof", { 16, 0.5, 4 }, { 0, y + 10.25, bz - 0.4 }, Iron, "Slate", true)
+	local sign = part(parts, "Sign", { 12, 1.8, 0.4 }, { 0, y + 8.7, bz - 0.4 }, GuildPurple, "WoodPlanks")
+	sign.text = "Hunter's Guild"
+
+	-- Pinned notices, each with a red pin, round a crest with the Watcher's eye in the middle.
+	local notices = {
+		{ -5, 5.8, 1.6, 2 },
+		{ -3.2, 3.6, 2, 1.6 },
+		{ -5.2, 2.9, 1.4, 1.4 },
+		{ 3.4, 5.6, 1.8, 2.2 },
+		{ 5.3, 3.4, 1.4, 1.8 },
+		{ 3.1, 3, 1.6, 1.2 },
+	}
+	for i, n in notices do
+		part(parts, `Notice{i}`, { n[3], n[4], 0.1 }, { n[1], y + n[2], bz - 0.3 }, Paper, "SmoothPlastic")
+		part(
+			parts,
+			`Pin{i}`,
+			{ 0.25, 0.25, 0.2 },
+			{ n[1], y + n[2] + n[4] / 2 - 0.3, bz - 0.4 },
+			IrisRed,
+			"Metal"
+		)
+	end
+	part(parts, "Crest", { 3, 3.6, 0.2 }, { 0, y + 4.6, bz - 0.35 }, GuildPurpleDark, "Fabric")
+	part(parts, "CrestEye", { 2.2, 1.1, 0.1 }, { 0, y + 4.8, bz - 0.5 }, Bone, "SmoothPlastic")
+	local iris = part(parts, "CrestIris", { 0.1, 0.8, 0.8 }, { 0, y + 4.8, bz - 0.56 }, WatcherPurple, "Neon")
+	iris.shape = "Cylinder"
+	iris.rot = { 0, 90, 0 }
+
+	-- The Guild Keeper: a hooded purple robe, a pale face in the hood's shadow, glowing eyes.
+	local kz = 0.4
+	part(parts, "Keeper", { 3, 4.8, 1.8 }, { 0, y + 2.4, kz }, GuildPurpleDark, "Fabric", true)
+	part(parts, "KeeperSash", { 3.05, 0.5, 1.85 }, { 0, y + 3.2, kz }, GuildPurple, "Fabric")
+	part(parts, "KeeperHead", { 2, 2, 1.8 }, { 0, y + 5.8, kz }, { 196, 186, 176 }, "SmoothPlastic")
+	part(parts, "KeeperHood", { 2.6, 2.6, 2.2 }, { 0, y + 6, kz + 0.3 }, GuildPurpleDark, "Fabric")
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		local eye = part(
+			parts,
+			`KeeperEye{tag}`,
+			{ 0.35, 0.3, 0.1 },
+			{ side * 0.45, y + 6, kz - 0.92 },
+			WatcherPurple,
+			"Neon"
+		)
+		eye.light = if side < 0 then { color = WatcherPurple, range = 6, brightness = 0.6 } else nil
+	end
+
+	-- The lectern players walk up to, with its own note: please like the game.
+	local counter = part(
+		parts,
+		"Counter",
+		{ 6, 3.2, 1.6 },
+		{ 0, y + 1.6, -2.4 },
+		BenchWood,
+		"WoodPlanks",
+		true
+	)
+	counter.text = "Like the game!"
+	part(parts, "CounterTop", { 6.6, 0.3, 2 }, { 0, y + 3.35, -2.4 }, GuildPurple, "Wood", true)
+	part(parts, "Ledger", { 1.8, 0.2, 1.2 }, { 1.4, y + 3.6, -2.4 }, Paper, "SmoothPlastic")
+	part(parts, "Candle", { 0.4, 0.9, 0.4 }, { -2, y + 3.95, -2.4 }, Bone, "SmoothPlastic")
+	part(parts, "Flame", { 0.25, 0.35, 0.25 }, { -2, y + 4.6, -2.4 }, Glow, "Neon").light =
+		{ color = Glow, range = 10, brightness = 0.8 }
+	local spot = part(
+		parts,
+		Landmarks.CounterSpot,
+		{ 0.2, 6, 0.2 },
+		{ 0, 3, -4.2 },
+		{ 255, 255, 255 },
+		"SmoothPlastic"
+	)
+	spot.transparency = 1
+
+	return parts
+end
+
 -- Recipes by landmark name (Layout.Landmarks), and which of their parts is the model's
 -- PrimaryPart: what Counter puts the prompt on.
 Landmarks.ByName = {
@@ -1318,6 +1422,7 @@ Landmarks.ByName = {
 	TradingBooth = Landmarks.TradingBooth,
 	Merger = Landmarks.Merger,
 	GrowthChamber = Landmarks.GrowthChamber,
+	GuildStand = Landmarks.GuildStand,
 } :: { [string]: () -> { Part } }
 
 Landmarks.Anchor = {
@@ -1329,6 +1434,7 @@ Landmarks.Anchor = {
 	TradingBooth = Landmarks.CounterSpot,
 	Merger = Landmarks.CounterSpot,
 	GrowthChamber = Landmarks.CounterSpot,
+	GuildStand = Landmarks.CounterSpot,
 } :: { [string]: string }
 
 return Landmarks

@@ -7,6 +7,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CakeConfig = require(ReplicatedStorage.Shared.Config.Cakes)
+local Community = require(ReplicatedStorage.Shared.Config.Community)
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.Inventory)
 local Robux = require(ReplicatedStorage.Shared.Config.Robux)
 
@@ -38,9 +39,14 @@ function Perks.variantBoost(player: Player): number
 	return boost
 end
 
--- What the Collector's prices are multiplied by for this player.
+-- What the Collector's prices are multiplied by for this player: VIP Hunters and members of
+-- the Hunter's Guild group (CommunityService sets InGuild) get more, and the two stack.
 function Perks.sellBoost(player: Player): number
-	return if Perks.has(player, "VIP") then Robux.VipSellBoost else 1
+	local boost = if Perks.has(player, "VIP") then Robux.VipSellBoost else 1
+	if player:GetAttribute("InGuild") == true then
+		boost *= Community.SellBoost
+	end
+	return boost
 end
 
 -- What the player's walking speed is multiplied by (Faster walking speed pass).
