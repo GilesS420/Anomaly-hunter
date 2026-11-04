@@ -14,7 +14,7 @@ local Community = {}
 
 -- The group's id: the number in the group's web address,
 -- roblox.com/communities/<this number>/... While it's 0 the stand says the Guild isn't open yet.
-Community.GroupId = 0
+Community.GroupId = 314237203 -- Hunt a Monster Hunters (Giles 2026-11-04)
 
 -- The one-time gift for joining, as shop item ids -> how many (Config/Shop).
 Community.Gift = { GoldBell = 1 } :: { [string]: number }
