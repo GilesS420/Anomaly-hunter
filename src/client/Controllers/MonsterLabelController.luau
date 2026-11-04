@@ -1,8 +1,9 @@
 --!strict
 -- Monster info (price, name, details, familiarity) shows as a small card right next to the
--- mouse while you point at a monster. On phones and tablets (no mouse) it shows for the
--- monster you're looking at (the middle of the screen), just above it, or for a few seconds
--- for one you tapped.
+-- mouse while you point at a monster. On phones and tablets it only shows once you tap a
+-- monster, just above it, and stays until you tap that monster again or tap somewhere else
+-- (or walk away from it). Just looking at a monster shows nothing, so the card doesn't cover
+-- the screen. A tap that starts a catch (wild monster, vacuum in hand) opens no card.
 -- The labels MonsterModel builds over each monster stay hidden; the card copies their text.
 --
 -- A monster is found by its press orb (Body) first. Big monsters (Titans) are drawn much
@@ -22,7 +23,6 @@ local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 
 local MonsterLabelController = {}
 
-local TapSeconds = 4
 local Reach = 400 -- studs
 local BoxSeconds = 3 -- a remembered bounding box is worked out again after this long
 
@@ -218,17 +218,41 @@ function MonsterLabelController.start()
 		return best
 	end
 
-	local tapped: Model? = nil
-	local tapAt = Vector2.zero
-	local tappedUntil = 0
+	-- Phones and tablets: the last thing pressed was the screen, or there's no mouse at all.
+	-- A touch laptop goes back to the mouse card as soon as the mouse moves.
+	local function touchMode(): boolean
+		local last = UserInputService:GetLastInputType()
+		if last == Enum.UserInputType.Touch then
+			return true
+		end
+		if last == Enum.UserInputType.Keyboard or string.find(last.Name, "Mouse") then
+			return false
+		end
+		return UserInputService.TouchEnabled and not UserInputService.MouseEnabled
+	end
+
+	-- This tap starts a catch instead (CatchController): a wild monster with a vacuum in hand.
+	local function catching(model: Model): boolean
+		if model:GetAttribute("Wild") ~= true then
+			return false
+		end
+		local character = player.Character
+		local tool = if character then character:FindFirstChildOfClass("Tool") else nil
+		return tool ~= nil and tool:GetAttribute("VacuumId") ~= nil
+	end
+
+	local tapped: Model? = nil -- the monster whose card is open on a touch screen
 	UserInputService.TouchTapInWorld:Connect(function(position: Vector2, processed: boolean)
 		if processed then
-			return
+			return -- a button, a stand's Talk prompt or a steal prompt took the tap
 		end
 		local inset = GuiService:GetGuiInset()
-		tapAt = position + inset -- TouchTapInWorld is below the top bar; the card isn't
-		tapped = monsterAt(tapAt)
-		tappedUntil = os.clock() + TapSeconds
+		local model = monsterAt(position + inset) -- TouchTapInWorld is below the top bar; the card isn't
+		if model == nil or model == tapped or catching(model) then
+			tapped = nil -- tap elsewhere or on the same monster again: close
+		else
+			tapped = model
+		end
 	end)
 
 	local frameCount = 0
@@ -236,9 +260,29 @@ function MonsterLabelController.start()
 	RunService.RenderStepped:Connect(function()
 		local model: Model? = nil
 		local at = Vector2.zero
-		if tapped and os.clock() < tappedUntil and tapped.Parent then
-			model, at = tapped, tapAt
-		elseif UserInputService.MouseEnabled then
+		local camera = workspace.CurrentCamera
+		if touchMode() then
+			current = nil
+			local open = tapped
+			if open and (not open:IsDescendantOf(workspace) or not open.PrimaryPart) then
+				tapped, open = nil, nil -- it was caught, sold or picked up
+			end
+			if open then
+				local frame, size = open:GetBoundingBox()
+				if (frame.Position - camera.CFrame.Position).Magnitude > Reach then
+					tapped = nil -- walked away from it
+				else
+					-- just above the monster, centred on it; hidden while it's off screen
+					local top, onScreen =
+						camera:WorldToViewportPoint(frame.Position + Vector3.new(0, size.Y / 2, 0))
+					if onScreen then
+						model = open
+						at = Vector2.new(top.X - card.AbsoluteSize.X / 2 - 18, top.Y - card.AbsoluteSize.Y - 24)
+					end
+				end
+			end
+		else
+			tapped = nil
 			at = UserInputService:GetMouseLocation()
 			-- the bounding-box search is the costly part, so look again every other frame
 			frameCount += 1
@@ -246,25 +290,6 @@ function MonsterLabelController.start()
 				current = monsterAt(at)
 			end
 			model = current
-		else
-			-- what you're looking at: the middle of the screen
-			local camera = workspace.CurrentCamera
-			frameCount += 1
-			if frameCount % 2 == 0 or (current and not current.Parent) then
-				current = monsterAt(camera.ViewportSize / 2)
-			end
-			model = current
-			if model then
-				-- just above the monster, centred on it
-				local frame, size = model:GetBoundingBox()
-				local top, onScreen =
-					camera:WorldToViewportPoint(frame.Position + Vector3.new(0, size.Y / 2, 0))
-				if onScreen then
-					at = Vector2.new(top.X - card.AbsoluteSize.X / 2 - 18, top.Y - card.AbsoluteSize.Y - 24)
-				else
-					model = nil
-				end
-			end
 		end
 		local label = if model then labelOf(model) else nil
 		if label then
