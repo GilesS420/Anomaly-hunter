@@ -9,6 +9,7 @@
 -- The current step is the player attribute Tutorial (nil once it's done) and the save's
 -- `tutorial` field ("Done" once it's done).
 
+local Community = require("../Config/Community")
 local Names = require("../Config/Names")
 
 local Tutorial = {}
@@ -38,6 +39,7 @@ Tutorial.Unlocks = {
 	Shops = "Buy",
 	Codex = "Tour",
 	Missions = "Tour",
+	Store = "Tour", -- the Robux Store button
 	Settings = "Gate", -- sound and weather settings always work
 } :: { [string]: Step }
 
@@ -49,7 +51,7 @@ Tutorial.Text = {
 	Home = "Got it! Follow the trail back to the exit, or press R to use your free Return Charm.",
 	Pickup = `Your {Monster} is home and turned Cobwebbed: effects make monsters worth more! Press E next to it, or open the mansion list (the arrow on the right edge) and press Pick up.`,
 	Sell = `The Collector only buys monsters from your Backpack. Press Sell at the top, then press E at the Collector, pick "I want to sell my monsters." and sell your {Monster}.`,
-	Buy = "The Collector gave you a welcome gift! Press Shops and buy the Phantom Vac at the Vacuum Vault, the middle shop.",
+	Buy = 'The Collector gave you a welcome gift! Press Shops, then press E at the Vacuum Vault (the middle shop), pick "Show me the vacuums." and buy the Phantom Vac.',
 	Tour = "You're ready! Here's what the buttons do.",
 } :: { [Step]: string }
 
@@ -59,7 +61,7 @@ Tutorial.TouchText = {
 	Home = "Got it! Follow the trail back to the exit, or tap Return Charm to jump home.",
 	Pickup = `Your {Monster} is home and turned Cobwebbed: effects make monsters worth more! Tap the prompt next to it, or open the mansion list (the arrow on the right edge) and tap Pick up.`,
 	Sell = `The Collector only buys monsters from your Backpack. Tap Sell at the top, then tap Talk at the Collector, pick "I want to sell my monsters." and sell your {Monster}.`,
-	Buy = "The Collector gave you a welcome gift! Tap Shops and buy the Phantom Vac at the Vacuum Vault, the middle shop.",
+	Buy = 'The Collector gave you a welcome gift! Tap Shops, then tap Talk at the Vacuum Vault (the middle shop), pick "Show me the vacuums." and buy the Phantom Vac.',
 } :: { [Step]: string }
 
 -- Shown under the guide card after HintSeconds on one step.
@@ -73,7 +75,10 @@ Tutorial.Hints = {
 	Tour = "Press Next to see the next button.",
 } :: { [Step]: string }
 
--- The tour at the end: one card per button, in this order. `feature` makes that button glow.
+-- The tour at the end: one card per button, in this order. `feature` makes that button glow
+-- (none: nothing to point at), `touch` is the phone wording where it differs. Things a player
+-- only gets later (cakes, bells, slappers, events...) are explained once when they first get
+-- them instead (Util/Tips).
 Tutorial.Tour = {
 	{
 		feature = "Home",
@@ -85,23 +90,24 @@ Tutorial.Tour = {
 	},
 	{
 		feature = "Shops",
-		text = "Shops takes you to the Haunted Bakery (cakes), the Vacuum Vault (vacuums) and the Hunter's Workshop (Bait Bells, Return Charms, Name Tags and more).",
-	},
-	{
-		feature = "Hotbar",
-		text = "Cakes give effects. Hold one from your hotbar and click (or tap) the floor in one of your wings: monsters come over for bites and change, even while you're offline.",
+		text = "Shops takes you to the Haunted Bakery (cakes), the Vacuum Vault (vacuums) and the Hunter's Workshop (Bait Bells, Return Charms, Name Tags, luck potions and slappers).",
 	},
 	{
 		feature = "Sell",
-		text = "Sell takes you to the Collector. Only monsters in your Backpack can be sold.",
+		text = `Sell takes you to the Collector. Only monsters in your Backpack can be sold. Every Roblox friend in your server makes the Collector pay you {math.round(Community.FriendSellBonus * 100)}% more.`,
 	},
 	{
 		feature = "Backpack",
-		text = "The backpack button on the left opens your Backpack. It holds your monsters, cakes and tools. Drag a card onto the hotbar to hold it, and tap the heart on a monster to keep it safe.",
+		text = "The backpack button on the left opens your Backpack: your monsters, cakes and tools. Drag a card onto the hotbar to hold it, and tap the heart on a monster to keep it safe. Hold a monster and hold E next to another hunter to give it to them.",
+		touch = "The backpack button on the left opens your Backpack: your monsters, cakes and tools. Drag a card onto the hotbar to hold it, and tap the heart on a monster to keep it safe. Hold a monster and hold the Give button next to another hunter to give it to them.",
 	},
 	{
 		feature = "MansionList",
 		text = "The arrow on the right edge lists the monsters in your mansion, sorted by price, rarity or name, each with a Pick up button.",
+	},
+	{
+		text = "Around the hub are more stands: the Merger (two monsters into one), the Growth Chamber (makes monsters bigger), the Trading Booth (swap with other hunters) and the Hunter's Guild. Press E at any stand to talk to it.",
+		touch = "Around the hub are more stands: the Merger (two monsters into one), the Growth Chamber (makes monsters bigger), the Trading Booth (swap with other hunters) and the Hunter's Guild. Tap Talk at any stand to talk to it.",
 	},
 	{
 		feature = "Codex",
@@ -112,14 +118,23 @@ Tutorial.Tour = {
 		text = "The scroll button opens your Missions: three new missions every day. Finish them for money that grows with your mansion, and come back each day for a streak bonus.",
 	},
 	{
-		feature = "Events",
-		text = "Every few minutes the Watcher wakes an event for the whole game: the sky changes and monsters get its effect. Its icon shows bottom right.",
+		feature = "Store",
+		text = "The coin button opens the Store, with game passes and Robux items.",
 	},
 	{
 		feature = "Settings",
-		text = "The gear button opens Settings: music and sound volume, weather, and UI size if the buttons look too big or small on your screen.",
+		text = "The gear button opens Settings: music and sound volume, weather, UI size if the buttons look too big or small, and Feedback to tell us what you think.",
 	},
-} :: { { feature: string, text: string } }
+} :: { { feature: string?, text: string, touch: string? } }
+
+-- The words for a tour card on this device.
+function Tutorial.tourText(index: number, touch: boolean): string
+	local stop = Tutorial.Tour[index]
+	if not stop then
+		return Tutorial.Text.Tour
+	end
+	return if touch and stop.touch then stop.touch else stop.text
+end
 
 -- The words for a step on this device: the touch version when there's no keyboard.
 function Tutorial.textFor(step: string, touch: boolean): string

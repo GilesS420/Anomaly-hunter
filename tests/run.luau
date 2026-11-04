@@ -2728,6 +2728,124 @@ do
 	)
 end
 
+-- The tour at the end of the tutorial, and the one-time unlock tutorials (Util/Tips).
+do
+	local Tutorial = require("../src/shared/Util/Tutorial")
+	local Tips = require("../src/shared/Util/Tips")
+	local ShopConfig = require("../src/shared/Config/Shop")
+	local Stands = require("../src/shared/Config/Stands")
+	local VariantMachine = require("../src/shared/Config/VariantMachine")
+	local HeistsConfig = require("../src/shared/Config/Heists")
+
+	check(
+		"tour: every glowing card names a button the tutorial unlocks by the tour",
+		(function()
+			for _, stop in Tutorial.Tour do
+				if stop.feature and not Tutorial.isUnlocked("Tour", stop.feature) then
+					return false
+				end
+			end
+			return true
+		end)()
+	)
+	check(
+		"tour: phone words where they differ",
+		Tutorial.tourText(5, true) ~= Tutorial.tourText(5, false)
+			and Tutorial.tourText(1, true) == Tutorial.tourText(1, false)
+			and Tutorial.tourText(99, false) == Tutorial.Text.Tour
+	)
+
+	local function facts(changes: { [string]: any }?): Tips.Facts
+		local base: Tips.Facts = {
+			wings = 1,
+			owns = {},
+			pair = false,
+			combo = false,
+			playSeconds = 0,
+			event = false,
+			ghost = false,
+			inHub = true,
+		}
+		for key, value in changes or {} do
+			(base :: any)[key] = value
+		end
+		return base
+	end
+
+	check("tips: nothing due for a brand-new hunter", Tips.next(facts(), {}) == nil)
+	check(
+		"tips: the Variant Machine waits for its wing",
+		Tips.next(facts({ wings = VariantMachine.UnlockWings - 1 }), {}) == nil
+			and Tips.next(facts({ wings = VariantMachine.UnlockWings }), {}) == "VariantMachine"
+	)
+	check(
+		"tips: a seen tip never comes back",
+		Tips.next(facts({ wings = VariantMachine.UnlockWings }), { VariantMachine = true }) == nil
+	)
+	check(
+		"tips: owning a slapper, bell, cake, tag or potion",
+		Tips.next(facts({ owns = { Slapper = true } }), {}) == "Slapper"
+			and Tips.next(facts({ owns = { Lure = true } }), {}) == "BaitBell"
+			and Tips.next(facts({ owns = { Food = true } }), {}) == "Cake"
+			and Tips.next(facts({ owns = { Tag = true } }), {}) == "NameTag"
+			and Tips.next(facts({ owns = { Potion = true } }), {}) == "Potion"
+	)
+	check(
+		"tips: no tip for owning a vacuum or a charm",
+		Tips.next(facts({ owns = { Vacuum = true, Charm = true } }), {}) == nil
+	)
+	check(
+		"tips: the steal shield ends after its time",
+		Tips.next(facts({ playSeconds = HeistsConfig.NewPlayerSeconds - 1 }), {}) == nil
+			and Tips.next(facts({ playSeconds = HeistsConfig.NewPlayerSeconds }), {}) == "Stealing"
+	)
+	check(
+		"tips: the Golden Ghost tip only in the hub, and goes away with the ghost",
+		Tips.next(facts({ ghost = true, inHub = false }), {}) == nil
+			and Tips.next(facts({ ghost = true }), {}) == "GoldenGhost"
+			and Tips.expired("GoldenGhost", facts())
+			and not Tips.expired("GoldenGhost", facts({ ghost = true }))
+			and not Tips.expired("Slapper", facts())
+	)
+	check(
+		"tips: a pair is two of the same monster",
+		Tips.hasPair({ { monsterId = "Gloomlet" }, { monsterId = "Gravepup" }, { monsterId = "Gloomlet" } })
+			and not Tips.hasPair({ { monsterId = "Gloomlet" }, { monsterId = "Gravepup" } })
+	)
+	local kinds: { [string]: boolean } = {}
+	for _, list in { ShopConfig.Workshop, ShopConfig.Bakery } do
+		for _, item in list do
+			kinds[item.kind] = true
+		end
+	end
+	check(
+		"tips: every item kind a tip waits for is sold",
+		kinds.Slapper and kinds.Lure and kinds.Food and kinds.Tag and kinds.Potion
+	)
+	check(
+		"tips: unique ids, words and a title each, landmarks are real stands",
+		(function()
+			local ids = {}
+			for _, tip in Tips.List do
+				if ids[tip.id] or tip.title == "" or tip.text == "" then
+					return false
+				end
+				ids[tip.id] = true
+				if tip.landmark and not Stands[tip.landmark] then
+					return false
+				end
+			end
+			return Tips.textFor("Slapper", true) ~= Tips.textFor("Slapper", false)
+				and Tips.textFor("Stealing", true) == Tips.textFor("Stealing", false)
+				and Tips.textFor("Nope", false) == ""
+		end)()
+	)
+	check(
+		"tips: Variant Machine unlock matches the Merger's lock",
+		Stands.Merger.extra ~= nil and Stands.Merger.extra.unlockWings == VariantMachine.UnlockWings
+	)
+end
+
 -- The Codex (Util/Codex).
 do
 	local Codex = require("../src/shared/Util/Codex")

@@ -42,6 +42,7 @@ local Restock = require(ReplicatedStorage.Shared.Util.Restock)
 local Watcher = require(ReplicatedStorage.Shared.Util.Watcher)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
+local Tips = require(ReplicatedStorage.Shared.Util.Tips)
 local Sizes = require(ReplicatedStorage.Shared.Config.Sizes)
 local Variants = require(ReplicatedStorage.Shared.Config.Variants)
 local Wings = require(ReplicatedStorage.Shared.Config.Wings)
@@ -1011,6 +1012,22 @@ local function build()
 	end)
 	button(tutorialRow, "Restart", Ui.Colors.off, 90, function()
 		send("/tutorial", "restart")
+	end)
+	-- The one-time unlock tutorials (Util/Tips): show one now, or forget the seen ones.
+	local tipRow = row(you, "Unlock tips")
+	local tipOptions: { Option } = {}
+	for _, tip in Tips.List do
+		table.insert(tipOptions, { label = tip.id, value = tip.id })
+	end
+	local chosenTip = dropdown(tipRow, 200, fixed(tipOptions), tipOptions[1] and tipOptions[1].value)
+	button(tipRow, "Show", Ui.Colors.buy, 70, function()
+		local id = chosenTip()
+		if id then
+			send("/tip", id)
+		end
+	end)
+	button(tipRow, "Reset seen", Ui.Colors.off, 120, function()
+		send("/tips", "reset")
 	end)
 	divider(you)
 

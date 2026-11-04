@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextChatService = game:GetService("TextChatService")
 
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("Robux"))
+local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
 local Robux = require(script.Parent.Parent:WaitForChild("Robux"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
@@ -141,6 +142,7 @@ function StoreController.start()
 		player:WaitForChild("PlayerGui"):WaitForChild("HuntUi"):WaitForChild("Canvas"):WaitForChild("Hud")
 	local button = hud:WaitForChild("Menu"):WaitForChild("Store") :: TextButton
 	button.Activated:Connect(toggle)
+	Locks.guard(button, "Store") -- greyed out until the tutorial's tour gets there
 end
 
 return StoreController

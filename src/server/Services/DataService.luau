@@ -53,6 +53,7 @@ export type Data = {
 	trades: { Trading.LogEntry }, -- the newest trades and gifts, for checking scam reports (TradeService)
 	feedback: Feedback.Record, -- how many feedback notes they sent today, and when (FeedbackService)
 	guildGift: boolean, -- got the one-time Hunter's Guild gift for joining the group (CommunityService)
+	tips: { [string]: boolean }, -- unlock tutorials already seen, by Util/Tips id (TipService)
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -85,6 +86,7 @@ DataService.Template = {
 	trades = {},
 	feedback = Feedback.empty(),
 	guildGift = false,
+	tips = {},
 } :: Data
 
 local store = ProfileStore.New(
