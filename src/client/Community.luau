@@ -1,5 +1,6 @@
 --!strict
--- Joining the Hunter's Guild (the game's Roblox group, Config/Community) and inviting friends,
+-- Joining the Hunter's Guild (the game's Roblox group, Config/Community), favouriting the
+-- game and inviting friends,
 -- from the Guild stand's dialogue (DialogueController) and from Settings. Both open Roblox's
 -- own window, and only when the player picks that line: nothing here ever opens by itself.
 -- Roblox only lets a LocalScript open the Join Group window, so joining happens here; the gift
@@ -8,6 +9,7 @@
 -- Each function waits for the window to close and returns a line for the stand to say (or
 -- for Settings to show as a toast).
 
+local AvatarEditorService = game:GetService("AvatarEditorService")
 local GroupService = game:GetService("GroupService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -62,6 +64,47 @@ function Community.join(): string
 	end
 	local result = claim()
 	return if result then result.message else "Welcome to the Guild!"
+end
+
+-- Opens Roblox's Favourite window for this game. Roblox made it for avatar items, but a
+-- game's place is an asset too, so the game's PlaceId works (as other games do it). There is
+-- no such window for the like (thumbs up) button.
+function Community.favourite(): string
+	if game.PlaceId == 0 then
+		return "Favouriting only works once the game is published."
+	end
+	if busy then
+		return "One window at a time, hunter."
+	end
+	busy = true
+	local done = Instance.new("BindableEvent")
+	local answer: boolean? = nil
+	local connection = AvatarEditorService.PromptSetFavoriteCompleted:Connect(function(result)
+		answer = result == Enum.AvatarPromptResult.Success
+		done:Fire()
+	end)
+	local ok = pcall(
+		AvatarEditorService.PromptSetFavorite,
+		AvatarEditorService,
+		game.PlaceId,
+		Enum.AvatarItemType.Asset,
+		true
+	)
+	if ok then
+		task.delay(120, function()
+			done:Fire() -- the window never answered: don't wait forever
+		end)
+		done.Event:Wait()
+	end
+	connection:Disconnect()
+	done:Destroy()
+	busy = false
+	if not ok then
+		return "The Favourite window didn't open. Try again in a moment."
+	end
+	return if answer
+		then "Thank you, hunter! You'll find us in your Favourites now."
+		else "No worries. You can always tap the ⭐ on the game's page later."
 end
 
 -- Opens Roblox's Invite Friends window.

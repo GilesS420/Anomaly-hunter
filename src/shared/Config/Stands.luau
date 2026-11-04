@@ -17,7 +17,7 @@ export type Stand = {
 	enter: { ask: string, live: boolean?, client: string? },
 	-- More choices after enter (the Guild stand's). One with `answer` answers in the
 	-- dialogue; one with `client` is done on this screen by client/Community ("JoinGroup",
-	-- "Invite"), like enter with `client`.
+	-- "Favourite", "Invite"), like enter with `client`.
 	more: { Choice }?,
 	-- A second window at the same stand, offered after enter (the Merger's Variant Machine),
 	-- with its own explanation. `option` is passed to the stand's onEnter on the server
@@ -123,10 +123,11 @@ local Stands: { [string]: Stand } = {
 		},
 		enter = { ask = "Join the Guild!", client = "JoinGroup" },
 		more = {
+			{ ask = "⭐ Favourite the game", client = "Favourite" } :: Choice,
 			{ ask = "Invite my friends", client = "Invite" } :: Choice,
 			{
-				ask = "How can I help the game?",
-				answer = "Tap the 👍 and the ⭐ on the game's page! Likes and favourites help other hunters find us. Telling your friends helps too.",
+				ask = "👍 How do I like the game?",
+				answer = "Roblox only lets you like a game on its page, not from inside the game. When you're done hunting, tap the 👍 under the game's picture. Likes help other hunters find us!",
 			} :: Choice,
 		},
 		quit = "Never mind",

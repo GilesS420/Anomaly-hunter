@@ -1,7 +1,7 @@
 --!strict
 -- The Hunter's Guild: the game's Roblox group (Config/Community, Giles 2026-11-04).
 --
--- Players join at the Guild stand by Watcher Square (Hub.Landmarks.GuildStand, its Talk
+-- Players join at the Guild stand in front of the shops (Hub.Landmarks.GuildStand, its Talk
 -- dialogue in Config/Stands) or from Settings. Joining itself happens on the client: Roblox
 -- only lets a LocalScript open its Join Group window (GroupService:PromptJoinAsync), see
 -- client/Community. Afterwards the client asks here for the gift, and this server checks with

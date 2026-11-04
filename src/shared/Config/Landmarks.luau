@@ -1315,7 +1315,7 @@ local GuildPurple = { 120, 60, 200 }
 local GuildPurpleDark = { 60, 28, 104 }
 local Paper = { 226, 214, 184 }
 
--- A small notice board by Watcher Square (Giles 2026-11-04): a roofed board covered in pinned
+-- A small notice board in front of the shops (Giles 2026-11-04): a roofed board covered in pinned
 -- notices under a purple "Hunter's Guild" sign with the Watcher's eye on a crest, and the
 -- Guild Keeper in a hooded robe behind a lectern. Talking to her lets players join the
 -- game's group, invite friends and hear how to help the game (Config/Stands).
