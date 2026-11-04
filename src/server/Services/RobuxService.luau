@@ -155,7 +155,7 @@ local function payOut(player: Player, data: DataService.Data, key: string)
 	local record = data.robux
 	local pending = record.pending[key]
 	record.pending[key] = nil
-	if string.sub(key, 1, 8) == "ItemTier" then
+	if Robux.isItemProduct(key) then
 		Robux.addCredit(record, key)
 		local item = shopItem(pending)
 		if
@@ -163,9 +163,12 @@ local function payOut(player: Player, data: DataService.Data, key: string)
 			or Robux.productFor(item.id, item.price) ~= key
 			or not useItemCredit(player, data, key, item)
 		then
+			local own = Config.Products[key]
 			Notify.toast(
 				player,
-				"You have a Robux item credit: tap Robux on any item of the same price to get it free."
+				if own and own.tier
+					then `You have a Robux credit for the {own.name}: tap its Robux button to get it free.`
+					else "You have a Robux item credit: tap Robux on any item of the same price to get it free."
 			)
 		end
 	elseif key == "ShopReroll" then
@@ -273,7 +276,12 @@ Buy.OnServerInvoke = function(player: Player, kind: unknown, arg: unknown): Resu
 			return { ok = false, message = problem or "That isn't for sale." }
 		end
 		local key = Robux.productFor(item.id, item.price) :: string
-		if useItemCredit(player, data, key, item) then
+		-- A credit for the shared tier still counts once the item has its own product.
+		local tier = Config.Products[key].tier
+		if
+			useItemCredit(player, data, key, item)
+			or (tier ~= nil and useItemCredit(player, data, tier, item))
+		then
 			Granted:FireClient(player, key)
 			return { ok = true, message = `Used your Robux credit on the {item.name}!` }
 		end

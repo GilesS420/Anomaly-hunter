@@ -9,7 +9,9 @@
 -- shown in the game is read from Roblox, so the dashboard decides it; `price` here is only
 -- what the dashboard should be set to (and what shows if Roblox can't be asked).
 
-export type Product = { id: number, price: number, name: string }
+-- `tier` is set on an item's own product (see ItemProducts): the shared ItemTier product it
+-- falls back to while its own id is still 0.
+export type Product = { id: number, price: number, name: string, tier: string? }
 
 local Robux = {}
 
@@ -22,6 +24,23 @@ Robux.Products = {
 	ItemTier3 = { id = 3723585595, price = 99, name = "Shop item: large" },
 	ItemTier4 = { id = 3723585744, price = 199, name = "Shop item: huge" },
 	ItemTier5 = { id = 3723585809, price = 399, name = "Shop item: legendary" },
+	-- Items with a product of their own (Giles 2026-11-04), so Roblox's purchase prompt shows
+	-- that item's own picture and name instead of a shared "Shop item" one. While an id is
+	-- still 0 the item is sold through its `tier` product instead, so nothing breaks before
+	-- they're made on the dashboard.
+	ItemPhantomVac = { id = 0, price = 19, name = "Phantom Vac", tier = "ItemTier1" },
+	ItemSpiritSiphon = { id = 0, price = 49, name = "Spirit Siphon", tier = "ItemTier2" },
+	ItemBansheeBlower = { id = 0, price = 99, name = "Banshee Blower", tier = "ItemTier3" },
+	ItemMoonVac = { id = 0, price = 199, name = "Moon Vac", tier = "ItemTier4" },
+	ItemVoidVac = { id = 0, price = 399, name = "Void Vac", tier = "ItemTier5" },
+	ItemCobwebMitt = { id = 0, price = 19, name = "Cobweb Mitt", tier = "ItemTier1" },
+	ItemRubberGlove = { id = 0, price = 19, name = "Rubber Glove", tier = "ItemTier1" },
+	ItemBoneHand = { id = 0, price = 49, name = "Bone Hand", tier = "ItemTier2" },
+	ItemGhoulClaw = { id = 0, price = 99, name = "Ghoul Claw", tier = "ItemTier3" },
+	ItemWitchPaddle = { id = 0, price = 199, name = "Witch's Paddle", tier = "ItemTier4" },
+	ItemTitanHand = { id = 0, price = 399, name = "Titan Hand", tier = "ItemTier5" },
+	ItemEclipseEclair = { id = 0, price = 399, name = "Eclipse Éclair", tier = "ItemTier5" },
+	ItemPrismDraught = { id = 0, price = 199, name = "Prism Draught", tier = "ItemTier4" },
 	-- New Bakery and Workshop stock for the buyer only, until the next restock.
 	ShopReroll = { id = 3723585894, price = 29, name = "Shop Reroll" },
 	-- Swaps every daily mission that isn't done yet (Giles 2026-10-29).
@@ -51,21 +70,21 @@ Robux.ItemTiers = {
 
 -- Items whose Robux price doesn't follow their cash price (Giles 2026-10-30): every vacuum
 -- and slapper costs more than the one before it, so the best isn't the same price as a
--- weaker one.
+-- weaker one. Each has its own product (above) so the purchase prompt shows its picture.
 Robux.ItemProducts = {
-	PhantomVac = "ItemTier1", -- 19
-	SpiritSiphon = "ItemTier2", -- 49
-	BansheeBlower = "ItemTier3", -- 99
-	MoonVac = "ItemTier4", -- 199
-	VoidVac = "ItemTier5", -- 399
-	CobwebMitt = "ItemTier1", -- 19
-	RubberGlove = "ItemTier1", -- 19
-	BoneHand = "ItemTier2", -- 49
-	GhoulClaw = "ItemTier3", -- 99
-	WitchPaddle = "ItemTier4", -- 199
-	TitanHand = "ItemTier5", -- 399
-	EclipseEclair = "ItemTier5", -- 399
-	PrismDraught = "ItemTier4", -- 199: a $1B potion (Giles 2026-10-30)
+	PhantomVac = "ItemPhantomVac", -- 19
+	SpiritSiphon = "ItemSpiritSiphon", -- 49
+	BansheeBlower = "ItemBansheeBlower", -- 99
+	MoonVac = "ItemMoonVac", -- 199
+	VoidVac = "ItemVoidVac", -- 399
+	CobwebMitt = "ItemCobwebMitt", -- 19
+	RubberGlove = "ItemRubberGlove", -- 19
+	BoneHand = "ItemBoneHand", -- 49
+	GhoulClaw = "ItemGhoulClaw", -- 99
+	WitchPaddle = "ItemWitchPaddle", -- 199
+	TitanHand = "ItemTitanHand", -- 399
+	EclipseEclair = "ItemEclipseEclair", -- 399
+	PrismDraught = "ItemPrismDraught", -- 199
 } :: { [string]: string }
 
 -- Game Passes: bought once, kept forever. Owning one sets the player attribute Pass<Key>.
