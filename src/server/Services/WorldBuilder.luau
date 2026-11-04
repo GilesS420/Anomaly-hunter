@@ -341,10 +341,11 @@ end
 
 -- Where a landmark stands, turned so its front (-Z) faces the middle of the hub along
 -- whichever axis points there most directly (the shops at the west end face due east). One
--- with faceOut is turned the other way, toward the nearest end of the hub.
+-- with faceOut is turned the other way, toward the nearest end of the hub; one with faceZ
+-- faces the middle along z (north or south) wherever it stands.
 local function landmarkFrame(spot: Layout.Landmark): CFrame
 	local at = Vector3.new(spot.x, GroundTop, spot.z)
-	local facing = if math.abs(spot.x) >= math.abs(spot.z)
+	local facing = if math.abs(spot.x) >= math.abs(spot.z) and not spot.faceZ
 		then Vector3.new(-math.sign(spot.x), 0, 0)
 		else Vector3.new(0, 0, -math.sign(spot.z))
 	if facing.Magnitude < 0.5 then

@@ -36,6 +36,7 @@ export type Landmark = {
 	depth: number,
 	height: number,
 	faceOut: boolean?, -- its front faces away from the middle of the hub instead of toward it
+	faceZ: boolean?, -- its front faces the middle along z (north or south) even when it's further out along x
 }
 
 local Layout = {}
@@ -79,13 +80,14 @@ Layout.PlotSpawn = { x = 0, z = -45 }
 Layout.Landmarks = {
 	{ name = "WatcherSquare", label = "Watcher Square", x = 0, z = 0, width = 60, depth = 60, height = 1 },
 	-- The Hunter's Guild stand (Giles 2026-11-04): join the game's group, favourite the game and
-	-- invite friends. In the row of shops at the west end, just north of the Bakery, facing
-	-- the middle of the hub like the shops do (Giles 2026-11-04: closer to the shops).
+	-- invite friends. On the north edge of the shop plaza, facing south onto the plaza, just
+	-- in front of the Bakery (Giles 2026-11-04, drawn on a screenshot).
 	{
 		name = "GuildStand",
 		label = "Hunter's Guild",
-		x = -380,
-		z = -86,
+		x = -345,
+		z = -75,
+		faceZ = true,
 		width = 16,
 		depth = 8,
 		height = 10,
