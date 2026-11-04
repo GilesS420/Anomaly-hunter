@@ -48,15 +48,16 @@ Robux.Products = {
 	-- Finishes one daily mission (it still has to be claimed).
 	MissionSkip = { id = 3723586069, price = 39, name = "Mission Skip" },
 	-- Once per player.
-	StarterPack = { id = 3723586118, price = 49, name = "Starter Pack" },
+	StarterPack = { id = 3723586118, price = 30, name = "Starter Pack" },
 	-- Stealing a monster from another player's mansion (Config/Heists, Giles 2026-10-30):
 	-- hold E on it. The price goes by what it's worth; a hearted one costs a step more.
-	Steal1 = { id = 3728028014, price = 29, name = "Steal a monster (up to $1M)" },
-	Steal2 = { id = 3728028069, price = 79, name = "Steal a monster (up to $50M)" },
-	Steal3 = { id = 3728028116, price = 149, name = "Steal a monster (up to $1B)" },
-	Steal4 = { id = 3728028179, price = 299, name = "Steal a monster (up to $20B)" },
-	Steal5 = { id = 3728028284, price = 399, name = "Steal a monster (over $20B)" },
-	Steal6 = { id = 3728028373, price = 599, name = "Steal a hearted monster (over $20B)" },
+	-- Prices lowered by Giles on the dashboard (2026-11-04).
+	Steal1 = { id = 3728028014, price = 9, name = "Steal a monster (up to $1M)" },
+	Steal2 = { id = 3728028069, price = 29, name = "Steal a monster (up to $50M)" },
+	Steal3 = { id = 3728028116, price = 39, name = "Steal a monster (up to $1B)" },
+	Steal4 = { id = 3728028179, price = 99, name = "Steal a monster (up to $20B)" },
+	Steal5 = { id = 3728028284, price = 119, name = "Steal a monster (over $20B)" },
+	Steal6 = { id = 3728028373, price = 299, name = "Steal a hearted monster (over $20B)" },
 } :: { [string]: Product }
 
 -- Which item product a shop item uses: the first tier whose maxCash its cash price fits under.
