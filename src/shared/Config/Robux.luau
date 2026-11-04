@@ -29,8 +29,8 @@ Robux.Products = {
 	-- still 0 the item is sold through its `tier` product instead, so nothing breaks before
 	-- they're made on the dashboard.
 	ItemPhantomVac = { id = 3728313540, price = 19, name = "Phantom Vac", tier = "ItemTier1" },
-	ItemSpiritSiphon = { id = 3728313835, price = 49, name = "Spirit Siphon", tier = "ItemTier2" },
-	ItemBansheeBlower = { id = 3728314073, price = 99, name = "Banshee Blower", tier = "ItemTier3" },
+	ItemSpiritSiphon = { id = 3728313835, price = 39, name = "Spirit Siphon", tier = "ItemTier2" },
+	ItemBansheeBlower = { id = 3728314073, price = 49, name = "Banshee Blower", tier = "ItemTier3" },
 	ItemMoonVac = { id = 3728314254, price = 199, name = "Moon Vac", tier = "ItemTier4" },
 	ItemVoidVac = { id = 3728314987, price = 399, name = "Void Vac", tier = "ItemTier5" },
 	ItemCobwebMitt = { id = 3728316774, price = 19, name = "Cobweb Mitt", tier = "ItemTier1" },
@@ -73,8 +73,8 @@ Robux.ItemTiers = {
 -- weaker one. Each has its own product (above) so the purchase prompt shows its picture.
 Robux.ItemProducts = {
 	PhantomVac = "ItemPhantomVac", -- 19
-	SpiritSiphon = "ItemSpiritSiphon", -- 49
-	BansheeBlower = "ItemBansheeBlower", -- 99
+	SpiritSiphon = "ItemSpiritSiphon", -- 39 (Giles lowered it, 2026-11-04)
+	BansheeBlower = "ItemBansheeBlower", -- 49 (Giles lowered it, 2026-11-04)
 	MoonVac = "ItemMoonVac", -- 199
 	VoidVac = "ItemVoidVac", -- 399
 	CobwebMitt = "ItemCobwebMitt", -- 19

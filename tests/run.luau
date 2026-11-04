@@ -3527,15 +3527,15 @@ do
 	end
 	check("robux: Eclipse Eclair is the top price", robuxPrice("EclipseEclair", 15_000_000_000) == 399)
 	check("robux: Prism Draught costs 199", robuxPrice("PrismDraught", 1_000_000_000) == 199)
-	-- Items with their own product (for its own picture in the purchase prompt) cost the same
-	-- as the tier they fall back to, and use the tier until their own id is filled in.
+	-- Items with their own product (for its own picture in the purchase prompt) name a real
+	-- tier to fall back to, and use it until their own id is filled in. Their price can differ
+	-- from the tier's (Giles set some lower on the dashboard, 2026-11-04).
 	local ownOk = true
 	for id, key in RobuxConfig.ItemProducts do
 		local own = RobuxConfig.Products[key]
 		local tier = own and own.tier and RobuxConfig.Products[own.tier]
 		ownOk = ownOk
 			and tier ~= nil
-			and own.price == tier.price
 			and Robux.isItemProduct(key)
 			and Robux.productFor(id, 1) == (if own.id == 0 then own.tier else key)
 	end
