@@ -31,6 +31,7 @@ export type Tip = {
 	title: string,
 	text: string, -- with a keyboard
 	touch: string?, -- on a phone or tablet without one, where the words differ
+	feature: string?, -- a button (client/Locks feature) to glow, with the rest of the screen greyed out
 	landmark: string?, -- Hub.Landmarks child the trail points at while the card is up (in the hub)
 	-- Only while it's happening (an event, the Golden Ghost): once it's over before Got it,
 	-- the card goes away unseen and comes back next time.
@@ -52,6 +53,7 @@ Tips.List = {
 	},
 	{
 		id = "Slapper",
+		feature = "Hotbar",
 		title = "You can slap now!",
 		text = "Hold your slapper from the hotbar and walk up to another hunter in a zone or the open hub. When the Slap sign shows bottom right, click to slap. A slap knocks them back, makes the monster they're catching break loose, and stops a thief from stealing for a while.",
 		touch = "Hold your slapper from the hotbar and walk up to another hunter in a zone or the open hub. When the Slap sign shows bottom right, tap to slap. A slap knocks them back, makes the monster they're catching break loose, and stops a thief from stealing for a while.",
@@ -70,6 +72,7 @@ Tips.List = {
 	},
 	{
 		id = "Cake",
+		feature = "Hotbar",
 		title = "Your first cake",
 		text = "Hold the cake from your hotbar and click the floor in one of your wings to set it out. Monsters near it come over for bites and can pick up its effect, even while you're offline. Point at a placed cake to see how far it reaches. You can have 5 cakes out for every wing you own.",
 		touch = "Hold the cake from your hotbar and tap the floor in one of your wings to set it out. Monsters near it come over for bites and can pick up its effect, even while you're offline. Tap a placed cake to see how far it reaches. You can have 5 cakes out for every wing you own.",
@@ -79,6 +82,7 @@ Tips.List = {
 	},
 	{
 		id = "NameTag",
+		feature = "Hotbar",
 		title = "Name Tags",
 		text = "Hold the Name Tag from your hotbar and click one of your mansion monsters to give it a name of your own. A traded or gifted monster loses its name.",
 		touch = "Hold the Name Tag from your hotbar and tap one of your mansion monsters to give it a name of your own. A traded or gifted monster loses its name.",
@@ -88,6 +92,7 @@ Tips.List = {
 	},
 	{
 		id = "Potion",
+		feature = "Hotbar",
 		title = "Luck potions",
 		text = "Hold the potion from your hotbar and click to drink it. While it lasts, Silver, Gold, Shiny and Rainbow catches are more likely. The flask bottom right shows the time left, which only runs while you're in the game. A stronger potion replaces a weaker one.",
 		touch = "Hold the potion from your hotbar and tap to drink it. While it lasts, Silver, Gold, Shiny and Rainbow catches are more likely. The flask bottom right shows the time left, which only runs while you're in the game. A stronger potion replaces a weaker one.",
@@ -107,6 +112,7 @@ Tips.List = {
 	},
 	{
 		id = "Combo",
+		feature = "Codex",
 		title = "Your first combo!",
 		text = "Two effects on one monster just made a combo, and combos are worth a lot more. The recipes are secret: each combo you make is written in your Codex (C, the book button), and it gives clues for the ones you haven't found yet.",
 		touch = "Two effects on one monster just made a combo, and combos are worth a lot more. The recipes are secret: each combo you make is written in your Codex (the book button), and it gives clues for the ones you haven't found yet.",

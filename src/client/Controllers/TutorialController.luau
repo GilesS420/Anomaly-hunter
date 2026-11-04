@@ -280,7 +280,8 @@ function TutorialController.start()
 			hint.Text = ""
 			nextButton.Visible = true
 			nextButton.Text = "Got it"
-			Locks.glow(nil)
+			-- A tip that points at a button greys out the rest of the screen round it.
+			Locks.glow(shownTip.feature, shownTip.feature ~= nil)
 			return -- the trail follows in the heartbeat below
 		end
 		if not current then
@@ -296,7 +297,7 @@ function TutorialController.start()
 			hint.Text = `{math.min(tourIndex, #Tutorial.Tour)} of {#Tutorial.Tour}`
 			nextButton.Visible = true
 			nextButton.Text = if tourIndex >= #Tutorial.Tour then "Let's hunt!" else "Next"
-			Locks.glow(if stop then stop.feature else nil)
+			Locks.glow(if stop then stop.feature else nil, true) -- the rest of the screen greys out
 			hideTrail()
 			return
 		end
@@ -315,6 +316,7 @@ function TutorialController.start()
 			Seen:FireServer(shownTip.id)
 			gui.Enabled = false -- straight away; the server clears Tip a moment later
 			hideTrail()
+			Locks.glow(nil)
 			return
 		end
 		if step() ~= "Tour" then
