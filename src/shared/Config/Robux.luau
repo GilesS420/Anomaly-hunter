@@ -28,19 +28,19 @@ Robux.Products = {
 	-- that item's own picture and name instead of a shared "Shop item" one. While an id is
 	-- still 0 the item is sold through its `tier` product instead, so nothing breaks before
 	-- they're made on the dashboard.
-	ItemPhantomVac = { id = 0, price = 19, name = "Phantom Vac", tier = "ItemTier1" },
-	ItemSpiritSiphon = { id = 0, price = 49, name = "Spirit Siphon", tier = "ItemTier2" },
-	ItemBansheeBlower = { id = 0, price = 99, name = "Banshee Blower", tier = "ItemTier3" },
-	ItemMoonVac = { id = 0, price = 199, name = "Moon Vac", tier = "ItemTier4" },
-	ItemVoidVac = { id = 0, price = 399, name = "Void Vac", tier = "ItemTier5" },
-	ItemCobwebMitt = { id = 0, price = 19, name = "Cobweb Mitt", tier = "ItemTier1" },
-	ItemRubberGlove = { id = 0, price = 19, name = "Rubber Glove", tier = "ItemTier1" },
-	ItemBoneHand = { id = 0, price = 49, name = "Bone Hand", tier = "ItemTier2" },
-	ItemGhoulClaw = { id = 0, price = 99, name = "Ghoul Claw", tier = "ItemTier3" },
-	ItemWitchPaddle = { id = 0, price = 199, name = "Witch's Paddle", tier = "ItemTier4" },
-	ItemTitanHand = { id = 0, price = 399, name = "Titan Hand", tier = "ItemTier5" },
-	ItemEclipseEclair = { id = 0, price = 399, name = "Eclipse Éclair", tier = "ItemTier5" },
-	ItemPrismDraught = { id = 0, price = 199, name = "Prism Draught", tier = "ItemTier4" },
+	ItemPhantomVac = { id = 3728313540, price = 19, name = "Phantom Vac", tier = "ItemTier1" },
+	ItemSpiritSiphon = { id = 3728313835, price = 39, name = "Spirit Siphon", tier = "ItemTier2" },
+	ItemBansheeBlower = { id = 3728314073, price = 49, name = "Banshee Blower", tier = "ItemTier3" },
+	ItemMoonVac = { id = 3728314254, price = 199, name = "Moon Vac", tier = "ItemTier4" },
+	ItemVoidVac = { id = 3728314987, price = 399, name = "Void Vac", tier = "ItemTier5" },
+	ItemCobwebMitt = { id = 3728316774, price = 19, name = "Cobweb Mitt", tier = "ItemTier1" },
+	ItemRubberGlove = { id = 3728317505, price = 19, name = "Rubber Glove", tier = "ItemTier1" },
+	ItemBoneHand = { id = 3728317640, price = 49, name = "Bone Hand", tier = "ItemTier2" },
+	ItemGhoulClaw = { id = 3728317896, price = 99, name = "Ghoul Claw", tier = "ItemTier3" },
+	ItemWitchPaddle = { id = 3728318189, price = 199, name = "Witch's Paddle", tier = "ItemTier4" },
+	ItemTitanHand = { id = 3728318321, price = 399, name = "Titan Hand", tier = "ItemTier5" },
+	ItemEclipseEclair = { id = 3728320070, price = 399, name = "Eclipse Éclair", tier = "ItemTier5" },
+	ItemPrismDraught = { id = 3728320624, price = 199, name = "Prism Draught", tier = "ItemTier4" },
 	-- New Bakery and Workshop stock for the buyer only, until the next restock.
 	ShopReroll = { id = 3723585894, price = 29, name = "Shop Reroll" },
 	-- Swaps every daily mission that isn't done yet (Giles 2026-10-29).
@@ -48,15 +48,16 @@ Robux.Products = {
 	-- Finishes one daily mission (it still has to be claimed).
 	MissionSkip = { id = 3723586069, price = 39, name = "Mission Skip" },
 	-- Once per player.
-	StarterPack = { id = 3723586118, price = 49, name = "Starter Pack" },
+	StarterPack = { id = 3723586118, price = 30, name = "Starter Pack" },
 	-- Stealing a monster from another player's mansion (Config/Heists, Giles 2026-10-30):
 	-- hold E on it. The price goes by what it's worth; a hearted one costs a step more.
-	Steal1 = { id = 3728028014, price = 29, name = "Steal a monster (up to $1M)" },
-	Steal2 = { id = 3728028069, price = 79, name = "Steal a monster (up to $50M)" },
-	Steal3 = { id = 3728028116, price = 149, name = "Steal a monster (up to $1B)" },
-	Steal4 = { id = 3728028179, price = 299, name = "Steal a monster (up to $20B)" },
-	Steal5 = { id = 3728028284, price = 399, name = "Steal a monster (over $20B)" },
-	Steal6 = { id = 3728028373, price = 599, name = "Steal a hearted monster (over $20B)" },
+	-- Prices lowered by Giles on the dashboard (2026-11-04).
+	Steal1 = { id = 3728028014, price = 9, name = "Steal a monster (up to $1M)" },
+	Steal2 = { id = 3728028069, price = 29, name = "Steal a monster (up to $50M)" },
+	Steal3 = { id = 3728028116, price = 39, name = "Steal a monster (up to $1B)" },
+	Steal4 = { id = 3728028179, price = 99, name = "Steal a monster (up to $20B)" },
+	Steal5 = { id = 3728028284, price = 119, name = "Steal a monster (over $20B)" },
+	Steal6 = { id = 3728028373, price = 299, name = "Steal a hearted monster (over $20B)" },
 } :: { [string]: Product }
 
 -- Which item product a shop item uses: the first tier whose maxCash its cash price fits under.
@@ -73,8 +74,8 @@ Robux.ItemTiers = {
 -- weaker one. Each has its own product (above) so the purchase prompt shows its picture.
 Robux.ItemProducts = {
 	PhantomVac = "ItemPhantomVac", -- 19
-	SpiritSiphon = "ItemSpiritSiphon", -- 49
-	BansheeBlower = "ItemBansheeBlower", -- 99
+	SpiritSiphon = "ItemSpiritSiphon", -- 39 (Giles lowered it, 2026-11-04)
+	BansheeBlower = "ItemBansheeBlower", -- 49 (Giles lowered it, 2026-11-04)
 	MoonVac = "ItemMoonVac", -- 199
 	VoidVac = "ItemVoidVac", -- 399
 	CobwebMitt = "ItemCobwebMitt", -- 19
