@@ -5,7 +5,7 @@
 -- letter by letter (click or tap the box to skip), then three choices: ask about the stand,
 -- enter it (opens its shop or sell window) or quit. Some stands have a second window too
 -- (`extra`, like the Merger's Variant Machine). The Guild stand's choices open Roblox's own
--- Join Group and Invite Friends windows instead (`client`, client/Community). Walking away
+-- Join Group, Favourite and Invite Friends windows instead (`client`, client/Community). Walking away
 -- closes it.
 -- The lines are in Shared.Config.Stands; the prompts and the Enter check in server/Counter.
 -- While the dialogue or a shop window is open the stands' Talk prompts are hidden, so a click
@@ -172,6 +172,7 @@ function DialogueController.start()
 	local function clientAction(action: string)
 		local run = if action == "JoinGroup"
 			then Community.join
+			elseif action == "Favourite" then Community.favourite
 			elseif action == "Invite" then Community.invite
 			else nil
 		if not run then

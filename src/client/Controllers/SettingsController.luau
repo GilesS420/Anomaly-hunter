@@ -3,8 +3,9 @@
 -- its name, a line on what it does, and either a slider (volumes, 0 to 100%: you hear it change
 -- while you drag, it's saved when you let go) or its choices as buttons (the chosen one is lit;
 -- tapping another saves it straight away, see client/Settings). At the bottom, "Feedback"
--- opens the feedback window (FeedbackController), and "Join group" and "Invite" open Roblox's
--- own Join Group and Invite Friends windows (client/Community, same as the Guild stand).
+-- opens the feedback window (FeedbackController), and "Join group", "Favourite" and "Invite"
+-- open Roblox's own Join Group, Favourite and Invite Friends windows (client/Community, same
+-- as the Guild stand).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -194,7 +195,7 @@ function SettingsController.start()
 	footerLayout.Padding = UDim.new(0, 8)
 	footerLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	footerLayout.Parent = window.footer
-	local footerSize = UDim2.new(1 / 3, -6, 0, 42)
+	local footerSize = UDim2.new(1 / 4, -6, 0, 42)
 	local feedback = Ui.button(window.footer, "💬 Feedback", Ui.Colors.equip, footerSize)
 	feedback.LayoutOrder = 1
 	feedback.Activated:Connect(function()
@@ -208,8 +209,15 @@ function SettingsController.start()
 			ToastController.show(Community.join())
 		end)
 	end)
-	local invite = Ui.button(window.footer, "📨 Invite", Ui.Colors.sell, footerSize)
-	invite.LayoutOrder = 3
+	local favourite = Ui.button(window.footer, "⭐ Favourite", Ui.Colors.sell, footerSize)
+	favourite.LayoutOrder = 3
+	favourite.Activated:Connect(function()
+		task.spawn(function()
+			ToastController.show(Community.favourite())
+		end)
+	end)
+	local invite = Ui.button(window.footer, "📨 Invite", Ui.Colors.equip, footerSize)
+	invite.LayoutOrder = 4
 	invite.Activated:Connect(function()
 		task.spawn(function()
 			ToastController.show(Community.invite())

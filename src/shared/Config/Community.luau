@@ -1,13 +1,14 @@
 --!strict
 -- The Hunter's Guild (Giles 2026-11-04): the game's Roblox group. Players join it at the
--- Guild stand by Watcher Square (press E, "Join the Guild!") or from Settings, never from a
--- pop-up. Roblox shows its own Join Group window; the first time a player is in the group
--- they get a one-time gift, and while they're in it the Collector pays them a little more and
--- a purple "Guild" tag floats over their head (server/Services/CommunityService).
+-- Guild stand in front of the shops (press E, "Join the Guild!") or from Settings: Roblox's
+-- own Join Group window opens right there in the game. The first time a player is in the
+-- group they get a one-time gift, and while they're in it the Collector pays them a little
+-- more and a purple "Guild" tag floats over their head (server/Services/CommunityService).
 --
--- Roblox has no way for a game to open the like or favourite button, or to see who liked the
--- game, so the stand only asks players to like it, with no reward (rewarding likes would be
--- bait Roblox doesn't allow).
+-- The stand and Settings also open Roblox's Favourite window for the game. Roblox has no
+-- window for the like (thumbs up) button, so the stand can only ask players to like it on the
+-- game page. Neither gives a reward: Roblox can't tell the game who liked it, and paying for
+-- likes is bait Roblox doesn't allow.
 
 local Community = {}
 
