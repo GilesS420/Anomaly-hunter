@@ -2212,7 +2212,7 @@ do
 	for _, spot in Layout.Landmarks do
 		-- Turned to face the middle along x (WorldBuilder.landmarkFrame), or not turned.
 		local w, d = spot.width / 2, spot.depth / 2
-		if math.abs(spot.x) >= math.abs(spot.z) and spot.x ~= 0 then
+		if math.abs(spot.x) >= math.abs(spot.z) and spot.x ~= 0 and not spot.faceZ then
 			w, d = d, w
 		end
 		table.insert(blocked, { spot.x - w, spot.x + w, spot.z - d, spot.z + d })
