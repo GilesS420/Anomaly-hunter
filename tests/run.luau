@@ -3502,11 +3502,11 @@ do
 		for _, id in ids do
 			local item = Workshop.item(id) :: Shop.Item
 			local key = Robux.productFor(id, item.price) :: string
-			local tier = tonumber(string.match(key, "%d+")) :: number
-			if tier < last then
+			local price = RobuxConfig.Products[key].price
+			if price < last then
 				return false
 			end
-			last = tier
+			last = price
 		end
 		return true
 	end
@@ -3522,11 +3522,28 @@ do
 		"robux: slappers never get cheaper up the line",
 		climbs({ "CobwebMitt", "RubberGlove", "BoneHand", "GhoulClaw", "WitchPaddle", "TitanHand" })
 	)
+	local function robuxPrice(id: string, cash: number): number
+		return RobuxConfig.Products[Robux.productFor(id, cash) :: string].price
+	end
+	check("robux: Eclipse Eclair is the top price", robuxPrice("EclipseEclair", 15_000_000_000) == 399)
+	check("robux: Prism Draught costs 199", robuxPrice("PrismDraught", 1_000_000_000) == 199)
+	-- Items with their own product (for its own picture in the purchase prompt) cost the same
+	-- as the tier they fall back to, and use the tier until their own id is filled in.
+	local ownOk = true
+	for id, key in RobuxConfig.ItemProducts do
+		local own = RobuxConfig.Products[key]
+		local tier = own and own.tier and RobuxConfig.Products[own.tier]
+		ownOk = ownOk
+			and tier ~= nil
+			and own.price == tier.price
+			and Robux.isItemProduct(key)
+			and Robux.productFor(id, 1) == (if own.id == 0 then own.tier else key)
+	end
+	check("robux: own item products fall back to their tier", ownOk)
 	check(
-		"robux: Eclipse Eclair is the top price",
-		Robux.productFor("EclipseEclair", 15_000_000_000) == "ItemTier5"
+		"robux: tiers are item products",
+		Robux.isItemProduct("ItemTier3") and not Robux.isItemProduct("Steal1")
 	)
-	check("robux: Prism Draught costs 199", Robux.productFor("PrismDraught", 1_000_000_000) == "ItemTier4")
 	local named = true
 	for id, key in RobuxConfig.ItemProducts do
 		named = named

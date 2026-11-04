@@ -61,12 +61,23 @@ function Robux.tierFor(cash: number): string?
 end
 
 -- The item product key for a shop item: its own (Config.ItemProducts) or the one its cash price
--- falls in. nil if it isn't sold (free).
+-- falls in. An own product whose id is still 0 hands over to its `tier` product. nil if it
+-- isn't sold (free).
 function Robux.productFor(itemId: string, cash: number): string?
 	if not (cash > 0) then
 		return nil
 	end
-	return Config.ItemProducts[itemId] or Robux.tierFor(cash)
+	local own = Config.ItemProducts[itemId]
+	local product = if own then Config.Products[own] else nil
+	if product then
+		return if product.id == 0 and product.tier then product.tier else own
+	end
+	return Robux.tierFor(cash)
+end
+
+-- True for a product that pays out a shop item (a shared ItemTier or an item's own product).
+function Robux.isItemProduct(key: string): boolean
+	return string.sub(key, 1, 8) == "ItemTier" or Config.ItemProducts[string.sub(key, 5)] == key
 end
 
 -- The product key a dashboard id belongs to, or nil (0, the not-set-up id, never matches).
