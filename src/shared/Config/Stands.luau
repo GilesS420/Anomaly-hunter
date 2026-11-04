@@ -119,7 +119,7 @@ local Stands: { [string]: Stand } = {
 		greeting = "Welcome, hunter. The Guild keeps watch over every mansion in town.",
 		info = {
 			ask = "What is the Hunter's Guild?",
-			answer = "The Guild is the game's Roblox group. Members hear about updates, events and codes first. Join and I'll give you a Gold Bait Bell, once, and the Collector pays Guild members 5% more for every monster.",
+			answer = "The Guild is the game's Roblox group. Members hear about updates, events and codes first. Join and I'll give you a Gold Bait Bell, once. And for as long as you stay in the Guild, the Collector pays you 5% more for every monster and you wear the Guild tag. Leave and those are gone.",
 		},
 		enter = { ask = "Join the Guild!", client = "JoinGroup" },
 		more = {

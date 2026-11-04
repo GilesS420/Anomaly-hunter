@@ -39,14 +39,27 @@ function Perks.variantBoost(player: Player): number
 	return boost
 end
 
--- What the Collector's prices are multiplied by for this player: VIP Hunters and members of
--- the Hunter's Guild group (CommunityService sets InGuild) get more, and the two stack.
-function Perks.sellBoost(player: Player): number
-	local boost = if Perks.has(player, "VIP") then Robux.VipSellBoost else 1
-	if player:GetAttribute("InGuild") == true then
-		boost *= Community.SellBoost
+export type Bonus = { label: string, percent: number }
+
+-- The player's own Collector bonuses, in whole percents (the Collector adds a live Watcher
+-- event's on top and shows them all at the top of the sell window): Roblox friends in this
+-- server, VIP and the Hunter's Guild (CommunityService sets FriendsHere and InGuild).
+function Perks.sellBonuses(player: Player): { Bonus }
+	local list: { Bonus } = {}
+	local friends = tonumber(player:GetAttribute("FriendsHere")) or 0
+	if friends > 0 then
+		table.insert(list, {
+			label = if friends == 1 then "friend bonus (1 friend)" else `friend bonus ({friends} friends)`,
+			percent = math.floor(friends * Community.FriendSellBonus * 100 + 0.5),
+		})
 	end
-	return boost
+	if Perks.has(player, "VIP") then
+		table.insert(list, { label = "VIP", percent = math.floor((Robux.VipSellBoost - 1) * 100 + 0.5) })
+	end
+	if player:GetAttribute("InGuild") == true then
+		table.insert(list, { label = "Guild", percent = math.floor(Community.GuildSellBonus * 100 + 0.5) })
+	end
+	return list
 end
 
 -- What the player's walking speed is multiplied by (Faster walking speed pass).

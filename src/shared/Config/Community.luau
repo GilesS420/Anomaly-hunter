@@ -20,8 +20,14 @@ Community.GroupId = 314237203 -- Hunt a Monster Hunters (Giles 2026-11-04)
 Community.Gift = { GoldBell = 1 } :: { [string]: number }
 Community.GiftText = "a Gold Bait Bell"
 
--- The Collector pays Guild members this much more (stacks with VIP).
-Community.SellBoost = 1.05
+-- Collector bonuses, as fractions added together (Perks.sellBonuses): Guild members get this
+-- for as long as they're in the group, and every Roblox friend in the same server adds
+-- FriendSellBonus (Giles 2026-11-04: 10% per friend; 8 players a server, so +70% at most).
+Community.GuildSellBonus = 0.05
+Community.FriendSellBonus = 0.10
+
+-- Seconds between membership checks, so leaving the group takes the Guild bonus away.
+Community.RecheckSeconds = 300
 
 -- Seconds between two gift checks per player (each one asks Roblox's group list).
 Community.ClaimCooldown = 5
