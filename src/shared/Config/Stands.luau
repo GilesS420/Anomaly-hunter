@@ -4,6 +4,9 @@
 -- bottom of the screen: the stand's greeting, then three choices (four with `extra`). "info" answers in the
 -- dialogue, "enter" opens the stand's window (the shop or the sell window) and "quit" closes.
 -- The ids are the landmark names (Counter.prompt); the Watcher's id is "Watcher".
+-- The Guild stand's enter opens Roblox's own Join Group window instead of a shop (`client`).
+
+export type Choice = { ask: string, answer: string?, client: string? }
 
 export type Stand = {
 	name: string, -- shown above the text
@@ -11,7 +14,11 @@ export type Stand = {
 	info: { ask: string, answer: string },
 	-- Opens the stand's window. With `live`, the Watcher answers in the dialogue instead
 	-- (what's happening right now), since it has no window.
-	enter: { ask: string, live: boolean? },
+	enter: { ask: string, live: boolean?, client: string? },
+	-- More choices after enter (the Guild stand's). One with `answer` answers in the
+	-- dialogue; one with `client` is done on this screen by client/Community ("JoinGroup",
+	-- "Invite"), like enter with `client`.
+	more: { Choice }?,
 	-- A second window at the same stand, offered after enter (the Merger's Variant Machine),
 	-- with its own explanation. `option` is passed to the stand's onEnter on the server
 	-- (server/Counter). With `unlockWings` it stays locked (🔒, `locked` is said instead)
@@ -105,6 +112,23 @@ local Stands: { [string]: Stand } = {
 			answer = "Put a monster from your Backpack in and pick how hard to push it. Gentle is safe but grows a little. Strong and Reckless grow a lot more, but fail more often, and then your monster shrinks. It bubbles for 5 to 20 minutes (longer for bigger growth), even while you're away, then come back to see how it went. Every monster can go in 5 times.",
 		},
 		enter = { ask = "Let's grow a monster!" },
+		quit = "Never mind",
+	},
+	GuildStand = {
+		name = "The Guild Keeper",
+		greeting = "Welcome, hunter. The Guild keeps watch over every mansion in town.",
+		info = {
+			ask = "What is the Hunter's Guild?",
+			answer = "The Guild is the game's Roblox group. Members hear about updates, events and codes first. Join and I'll give you a Gold Bait Bell, once, and the Collector pays Guild members 5% more for every monster.",
+		},
+		enter = { ask = "Join the Guild!", client = "JoinGroup" },
+		more = {
+			{ ask = "Invite my friends", client = "Invite" } :: Choice,
+			{
+				ask = "How can I help the game?",
+				answer = "Tap the 👍 and the ⭐ on the game's page! Likes and favourites help other hunters find us. Telling your friends helps too.",
+			} :: Choice,
+		},
 		quit = "Never mind",
 	},
 	Watcher = {

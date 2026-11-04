@@ -119,6 +119,7 @@ ServerChecks.KnownRemotes = {
 	"RobuxRemotes.Granted",
 	"FeedbackRemotes.Send",
 	"FeedbackRemotes.Admin",
+	"CommunityRemotes.Claim",
 }
 
 local passed = 0
