@@ -5,12 +5,17 @@
 -- an effect, combos, and what happened while you were away), newest at the top, so a toast
 -- you missed can still be read. The server sends each line through
 -- ReplicatedStorage.Remotes.MutationLog (server/Notify.log). Kept for this visit only.
+-- Next to it sits the friend bonus (Giles 2026-11-04): how much more the Collector pays for
+-- the Roblox friends in this server (the FriendsHere attribute, server CommunityService).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
+local Community =
+	require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("Community"))
 local HotbarController = require(script.Parent:WaitForChild("HotbarController"))
+local ToastController = require(script.Parent:WaitForChild("ToastController"))
 local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 local Icons = require(script.Parent.Parent:WaitForChild("Icons"))
@@ -50,6 +55,38 @@ function MutationLogController.start()
 	local caption = Ui.text(icon, "Log", UDim2.fromScale(1, 0.38), Ui.Colors.text, true, 13)
 	caption.Position = UDim2.fromScale(0, 0.62)
 	caption.TextXAlignment = Enum.TextXAlignment.Center
+
+	-- The friend bonus, just right of the Log button (left of it on a phone, toward the edge).
+	local friendWidth = 78
+	local friendLeft = if touch then left - UDim.new(0, friendWidth + 8) else left + UDim.new(0, IconSize + 8)
+	local friend = Ui.button(canvas, "", Ui.Colors.off, UDim2.fromOffset(friendWidth, IconSize))
+	friend.Name = "FriendBonus"
+	friend.AnchorPoint = Vector2.new(0, 1)
+	friend.Position = UDim2.new(friendLeft, UDim.new(1, -lift))
+	Ui.corner(friend, 12)
+	local friendTop = Ui.text(friend, "👥 +0%", UDim2.new(1, -8, 0.6, 0), Ui.Colors.text, true, 20)
+	friendTop.Position = UDim2.fromOffset(4, 2)
+	friendTop.TextXAlignment = Enum.TextXAlignment.Center
+	local friendCaption = Ui.text(friend, "Friends", UDim2.new(1, -8, 0.36, 0), Ui.Colors.muted, true, 13)
+	friendCaption.Position = UDim2.new(0, 4, 0.6, 0)
+	friendCaption.TextXAlignment = Enum.TextXAlignment.Center
+	local perFriend = math.floor(Community.FriendSellBonus * 100 + 0.5)
+	local function showFriends()
+		local count = tonumber(player:GetAttribute("FriendsHere")) or 0
+		friendTop.Text = `👥 +{count * perFriend}%`
+		friendTop.TextColor3 = if count > 0 then Ui.Colors.money else Ui.Colors.muted
+		friend.BackgroundColor3 = if count > 0 then Ui.Colors.buy else Ui.Colors.off
+	end
+	player:GetAttributeChangedSignal("FriendsHere"):Connect(showFriends)
+	showFriends()
+	friend.Activated:Connect(function()
+		local count = tonumber(player:GetAttribute("FriendsHere")) or 0
+		ToastController.show(
+			if count == 0
+				then `Friend bonus: every Roblox friend in this server makes the Collector pay {perFriend}% more. Invite some!`
+				else `Friend bonus: {count} {if count == 1 then "friend" else "friends"} here, so the Collector pays {count * perFriend}% more.`
+		)
+	end)
 
 	-- A red dot with how many new lines came in since the log was last open.
 	local badge = Instance.new("TextLabel")

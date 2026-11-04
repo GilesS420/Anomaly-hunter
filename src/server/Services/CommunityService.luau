@@ -7,15 +7,18 @@
 -- client/Community. Afterwards the client asks here for the gift, and this server checks with
 -- Roblox that the player really is in the group before giving anything.
 --
--- Guild members (checked when they join the server, and again after they join the group):
+-- Guild members (checked when they join the server, after they join the group, and every
+-- Config/Community.RecheckSeconds, so leaving the group takes the perks away):
 --   * get Config/Community.Gift once per save (data.guildGift)
---   * get Config/Community.SellBoost at the Collector (Perks.sellBoost reads InGuild)
+--   * get Config/Community.GuildSellBonus at the Collector for as long as they stay in the
+--     group (Perks.sellBonuses reads InGuild)
 --   * wear a purple "Guild" tag over their head (above the VIP tag if they have one)
 --
 -- Remotes (ReplicatedStorage.CommunityRemotes):
 --   Claim  RemoteFunction ("Guild") -> { ok: boolean, message: string }
 --          ok is true only the one time the gift is given. Anything but "Guild" is junk.
--- Player attributes (set here only, so a client can't fake them): InGuild, GuildGift.
+-- Player attributes (set here only, so a client can't fake them): InGuild, GuildGift, and
+-- FriendsHere (how many of the player's Roblox friends are in this server: the friend bonus).
 
 local GroupService = game:GetService("GroupService")
 local Players = game:GetService("Players")
@@ -73,7 +76,16 @@ end
 local function guildTag(player: Player)
 	local character = player.Character
 	local head = character and character:FindFirstChild("Head")
-	if not head or player:GetAttribute("InGuild") ~= true or head:FindFirstChild("GuildTag") then
+	if not head then
+		return
+	end
+	local old = head:FindFirstChild("GuildTag")
+	if player:GetAttribute("InGuild") ~= true then
+		if old then
+			old:Destroy() -- left the group
+		end
+		return
+	elseif old then
 		return
 	end
 	local tag = Instance.new("BillboardGui")
@@ -121,12 +133,60 @@ local function refresh(player: Player): (boolean?, boolean)
 	if member == nil or not data or player.Parent ~= Players then
 		return member, false
 	end
+	local was = player:GetAttribute("InGuild") == true
 	player:SetAttribute("InGuild", member)
 	if not member then
+		guildTag(player) -- takes it off
+		if was then
+			Notify.toast(
+				player,
+				"You left the Hunter's Guild, so its 5% sell bonus is gone. Join again at the Guild stand!"
+			)
+		end
 		return false, false
 	end
 	guildTag(player)
 	return true, giveGift(player, data)
+end
+
+------------------------------------------------------------------------------------------
+-- Friend bonus (Giles 2026-11-04): every Roblox friend in the same server makes the Collector
+-- pay Config/Community.FriendSellBonus more. FriendsHere (a player attribute) is how many.
+------------------------------------------------------------------------------------------
+
+local friendsOf: { [Player]: { [Player]: boolean } } = {}
+
+local function countFriends(player: Player)
+	local count = 0
+	for other in friendsOf[player] or {} do
+		if other.Parent == Players then
+			count += 1
+		end
+	end
+	if player.Parent == Players then
+		player:SetAttribute("FriendsHere", count)
+	end
+end
+
+-- Checks a newcomer against everyone already here (both ways count the same friendship).
+local function meetEveryone(player: Player)
+	friendsOf[player] = friendsOf[player] or {}
+	for _, other in Players:GetPlayers() do
+		if other ~= player then
+			task.spawn(function()
+				local ok, friends = pcall(player.IsFriendsWith, player, other.UserId)
+				if ok and friends and player.Parent == Players and other.Parent == Players then
+					friendsOf[player] = friendsOf[player] or {}
+					friendsOf[other] = friendsOf[other] or {}
+					friendsOf[player][other] = true
+					friendsOf[other][player] = true
+					countFriends(player)
+					countFriends(other)
+				end
+			end)
+		end
+	end
+	countFriends(player)
 end
 
 local function onClaim(player: Player, which: unknown): ClaimResult
@@ -153,7 +213,7 @@ local function onClaim(player: Player, which: unknown): ClaimResult
 	if given then
 		return {
 			ok = true,
-			message = `Welcome to the Guild! Here's {Config.GiftText}, and the Collector pays you 5% more from now on.`,
+			message = `Welcome to the Guild! Here's {Config.GiftText}, and the Collector pays you 5% more for as long as you stay in the Guild.`,
 		}
 	elseif member == nil then
 		return { ok = false, message = "Roblox didn't answer. Try again in a moment." }
@@ -189,14 +249,43 @@ function CommunityService.start()
 			guildTag(player)
 		end)
 	end
-	Players.PlayerAdded:Connect(watch)
+	Players.PlayerAdded:Connect(function(player)
+		watch(player)
+		meetEveryone(player)
+	end)
 	for _, player in Players:GetPlayers() do
 		watch(player)
+		meetEveryone(player)
 	end
 	Players.PlayerRemoving:Connect(function(player)
 		lastClaim[player] = nil
 		checking[player] = nil
+		for other in friendsOf[player] or {} do
+			local theirs = friendsOf[other]
+			if theirs then
+				theirs[player] = nil
+				countFriends(other)
+			end
+		end
+		friendsOf[player] = nil
 	end)
+
+	-- Guild perks last only while the player stays in the group: look again every few
+	-- minutes, so leaving the group takes the bonus and the tag away during the visit too.
+	if Config.GroupId ~= 0 then
+		task.spawn(function()
+			while true do
+				task.wait(Config.RecheckSeconds)
+				for _, player in Players:GetPlayers() do
+					if DataService.isLoaded(player) and not checking[player] then
+						checking[player] = true
+						refresh(player)
+						checking[player] = nil
+					end
+				end
+			end
+		end)
+	end
 end
 
 return CommunityService

@@ -45,7 +45,8 @@ export type Row = {
 	confirm: boolean, -- rare enough that the window asks "are you sure?" first
 	locked: boolean, -- hearted in the Backpack: shown, but not for sale
 }
-export type Offer = { monsters: { Row }, total: number }
+-- bonuses: every sell bonus going right now, for the top of the window ("+20% friend bonus").
+export type Offer = { monsters: { Row }, total: number, bonuses: { Perks.Bonus } }
 export type Result = { ok: boolean, message: string, offer: Offer? }
 
 local MaxPerSale = 200 -- more uids than any mansion holds is a bad request
@@ -67,8 +68,30 @@ Sell.Parent = remotes
 
 local confirmOrder = Rarities[Shop.ConfirmSellFrom].order
 
--- What the Collector pays: the sell value, raised while a Watcher event with a
--- sellMultiplier is live (Gold Rush) and for VIP Hunters (`boost`, Perks.sellBoost).
+-- Every sell bonus the player has right now (Perks.sellBonuses: friends here, VIP, Guild)
+-- plus a live Watcher event's (Gold Rush), and what they add up to: the bonuses are added
+-- together (+20% and +10% pay 1.3 times), so the line at the top of the window adds up.
+local function bonuses(player: Player): ({ Perks.Bonus }, number)
+	local list = Perks.sellBonuses(player)
+	local event = Events.find(workspace:GetAttribute("WatcherEvent"))
+	local eventMultiplier = if event then event.sellMultiplier or 1 else 1
+	if eventMultiplier ~= 1 then
+		table.insert(
+			list,
+			{
+				label = event and event.name or "event bonus",
+				percent = math.floor((eventMultiplier - 1) * 100 + 0.5),
+			}
+		)
+	end
+	local total = 0
+	for _, bonus in list do
+		total += bonus.percent
+	end
+	return list, 1 + total / 100
+end
+
+-- What the Collector pays: the sell value times all the bonuses added up (`boost`).
 local function price(caught: Value.CaughtMonster, wingsOwned: number, boost: number): number
 	local ok, value = pcall(Value.sellValue, caught, wingsOwned)
 	if not ok then
@@ -76,9 +99,7 @@ local function price(caught: Value.CaughtMonster, wingsOwned: number, boost: num
 		warn(`CollectorService: can't price {caught.monsterId} ({caught.uid}): {value}`)
 		return 0
 	end
-	local event = Events.find(workspace:GetAttribute("WatcherEvent"))
-	local multiplier = if event then event.sellMultiplier or 1 else 1
-	return math.floor(value * multiplier * boost)
+	return math.floor(value * boost)
 end
 
 -- Every monster that can be sold: the unlocked ones in the Backpack (Storage). They're
@@ -96,9 +117,10 @@ end
 local function offerFor(player: Player, data: DataService.Data): Offer
 	local rows: { Row } = {}
 	local total = 0
+	local list, boost = bonuses(player)
 	for _, caught in data.storage do
 		local monster = Monsters[caught.monsterId]
-		local value = price(caught, data.wingsOwned, Perks.sellBoost(player))
+		local value = price(caught, data.wingsOwned, boost)
 		if not monster or not caught.uid or value <= 0 then
 			continue
 		end
@@ -138,7 +160,7 @@ local function offerFor(player: Player, data: DataService.Data): Offer
 		end
 		return if a.price == b.price then a.uid < b.uid else a.price > b.price
 	end)
-	return { monsters = rows, total = total }
+	return { monsters = rows, total = total, bonuses = list }
 end
 
 GetList.OnServerInvoke = function(player: Player): Offer?
@@ -179,9 +201,10 @@ Sell.OnServerInvoke = function(player: Player, uids: unknown): Result
 	local earned = 0
 	local priced: { [string]: number } = {}
 	local selling: { [string]: boolean } = {} -- only unlocked ones, whatever was asked
+	local _, boost = bonuses(player)
 	for _, caught in sellable(data) do
 		if caught.uid and wanted[caught.uid] then
-			priced[caught.uid] = price(caught, data.wingsOwned, Perks.sellBoost(player))
+			priced[caught.uid] = price(caught, data.wingsOwned, boost)
 			selling[caught.uid] = true
 		end
 	end

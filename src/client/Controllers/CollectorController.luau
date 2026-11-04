@@ -29,7 +29,8 @@ type Row = {
 	confirm: boolean,
 	locked: boolean,
 }
-type Offer = { monsters: { Row }, total: number }
+type Bonus = { label: string, percent: number }
+type Offer = { monsters: { Row }, total: number, bonuses: { Bonus }? }
 
 -- Pixel sizes for a computer screen; the window's Scale canvas shrinks them on a phone.
 local Height = 112
@@ -155,6 +156,26 @@ function CollectorController.start()
 			end
 		end
 		local count = #uids
+
+		-- Every sell bonus going right now, at the top of the list (Giles 2026-11-04).
+		local parts = {}
+		for _, bonus in offer.bonuses or {} do
+			table.insert(parts, `+{bonus.percent}% {bonus.label}`)
+		end
+		local banner = Ui.text(
+			window.list,
+			if #parts > 0
+				then `Bonuses: {table.concat(parts, "  ·  ")}`
+				else "No sell bonuses right now. Every friend in your server adds +10%!",
+			UDim2.new(1, 0, 0, 30),
+			if #parts > 0 then Ui.Colors.money else Ui.Colors.muted,
+			true,
+			20
+		)
+		banner.Name = "Bonuses"
+		banner.LayoutOrder = 0
+		banner.TextXAlignment = Enum.TextXAlignment.Center
+
 		if #offer.monsters == 0 then
 			window.status.Text =
 				"Your Backpack has no monsters. Press E next to one in your mansion to pick it up."
