@@ -4,9 +4,13 @@
 -- Locks.guard(button, feature): while that feature is locked a grey cover with a lock sits on
 -- top of the button and swallows clicks and taps. Keys (G, 1 to 9) ask Locks.isLocked.
 -- Locks.glow(feature) makes that feature's buttons pulse, to point at what to press next.
+-- Locks.glow(feature, true) also greys out the whole screen except those buttons (Giles
+-- 2026-11-04: shows players where things really are), for the tour and the unlock tips.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Tutorial =
@@ -27,6 +31,30 @@ type Guarded = {
 local player = Players.LocalPlayer
 local guarded: { Guarded } = {}
 local glowing: string? = nil
+local dimmed = false
+
+-- The grey: four see-through panels round a hole where the glowing buttons are. Over the HUD
+-- (DisplayOrder 6 and below), under the tutorial card (8) and the toasts. Frames that aren't
+-- Active let clicks through, so the game still works under it.
+local DimTransparency = 0.45
+local HolePadding = 8 -- screen pixels of room round the buttons
+local dimGui = Instance.new("ScreenGui")
+dimGui.Name = "TutorialSpotlight"
+dimGui.IgnoreGuiInset = true
+dimGui.ResetOnSpawn = false
+dimGui.DisplayOrder = 7
+dimGui.Enabled = false
+local panels: { Frame } = {}
+for i = 1, 4 do
+	local panel = Instance.new("Frame")
+	panel.Name = `Dim{i}`
+	panel.Active = false
+	panel.BorderSizePixel = 0
+	panel.BackgroundColor3 = Color3.new(0, 0, 0)
+	panel.BackgroundTransparency = DimTransparency
+	panel.Parent = dimGui
+	panels[i] = panel
+end
 
 local function step(): string?
 	local current = player:GetAttribute("Tutorial")
@@ -117,8 +145,102 @@ function Locks.guard(gui: GuiObject, feature: string)
 	refresh(entry)
 end
 
--- Makes this feature's buttons pulse (nil: none).
-function Locks.glow(feature: string?)
+-- Whether a button really shows: it and every frame it sits in are visible.
+local function showing(gui: GuiObject, screen: ScreenGui): boolean
+	local at: Instance? = gui
+	while at and at ~= screen do
+		if at:IsA("GuiObject") and not at.Visible then
+			return false
+		end
+		at = at.Parent
+	end
+	return at == screen and screen.Enabled
+end
+
+-- Where the glowing buttons are on the screen (counting Roblox's top bar), as one box, or
+-- nil if none of them is showing.
+local function holeRect(): (Vector2?, Vector2?)
+	local low: Vector2?, high: Vector2? = nil, nil
+	local inset = GuiService:GetGuiInset()
+	for _, entry in guarded do
+		local gui = entry.gui
+		if entry.feature ~= glowing or entry.cover.Visible then
+			continue
+		end
+		local screen = gui:FindFirstAncestorOfClass("ScreenGui")
+		if not screen or not gui:IsDescendantOf(player.PlayerGui) or not showing(gui, screen) then
+			continue
+		end
+		local at = gui.AbsolutePosition + (if screen.IgnoreGuiInset then Vector2.zero else inset)
+		local size = gui.AbsoluteSize
+		if size.X <= 0 or size.Y <= 0 then
+			continue
+		end
+		local far = at + size
+		low = if low then Vector2.new(math.min(low.X, at.X), math.min(low.Y, at.Y)) else at
+		high = if high then Vector2.new(math.max(high.X, far.X), math.max(high.Y, far.Y)) else far
+	end
+	if not low or not high then
+		return nil, nil
+	end
+	local pad = Vector2.new(HolePadding, HolePadding)
+	return low - pad, high + pad
+end
+
+local function place(panel: Frame, x: number, y: number, w: number, h: number)
+	panel.Position = UDim2.fromOffset(x, y)
+	panel.Size = UDim2.fromOffset(math.max(w, 0), math.max(h, 0))
+end
+
+-- Lays the four panels round the hole (the whole screen grey when there is no hole).
+local function drawDim()
+	local camera = workspace.CurrentCamera
+	local screen = if camera then camera.ViewportSize else Vector2.new(1920, 1080)
+	local low, high = holeRect()
+	if not low or not high then
+		place(panels[1], 0, 0, screen.X, screen.Y)
+		for i = 2, 4 do
+			panels[i].Visible = false
+		end
+		panels[1].Visible = true
+		return
+	end
+	for _, panel in panels do
+		panel.Visible = true
+	end
+	place(panels[1], 0, 0, screen.X, low.Y) -- above
+	place(panels[2], 0, high.Y, screen.X, screen.Y - high.Y) -- below
+	place(panels[3], 0, low.Y, low.X, high.Y - low.Y) -- left
+	place(panels[4], high.X, low.Y, screen.X - high.X, high.Y - low.Y) -- right
+end
+
+local dimConnection: RBXScriptConnection? = nil
+local function setDim(on: boolean)
+	dimmed = on
+	if on and not dimConnection then
+		if not dimGui.Parent then
+			dimGui.Parent = player:WaitForChild("PlayerGui")
+		end
+		drawDim()
+		dimGui.Enabled = true
+		-- Buttons move (the mansion list slides, the screen turns): follow every frame.
+		dimConnection = RunService.RenderStepped:Connect(drawDim)
+	elseif not on then
+		dimGui.Enabled = false
+		if dimConnection then
+			dimConnection:Disconnect()
+			dimConnection = nil
+		end
+	end
+end
+
+-- Makes this feature's buttons pulse (nil: none). With `dim`, the rest of the screen goes
+-- grey too (a dim with no feature greys the whole screen, round the tutorial card).
+function Locks.glow(feature: string?, dim: boolean?)
+	local wantDim = dim == true
+	if wantDim ~= dimmed then
+		setDim(wantDim)
+	end
 	if glowing == feature then
 		return
 	end
