@@ -5,6 +5,9 @@
 -- hint. The last step is a short tour of the buttons; its Next button ends the tutorial
 -- (TutorialRemotes.Finish). Locked buttons are greyed out by client/Locks.
 -- Reads the player attribute Tutorial (the step, nil once done) and TutorialSince.
+-- After the tutorial the same card shows the one-time unlock tutorials (Shared.Util.Tips,
+-- server/Services/TipService): the player attribute Tip is the one to show, and Got it sends
+-- TipRemotes.Seen. A tip with a landmark gets the trail too while you're in the hub.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,6 +16,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Tutorial =
 	require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"):WaitForChild("Tutorial"))
+local Tips = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"):WaitForChild("Tips"))
 local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
@@ -37,6 +41,20 @@ local StepGlow = {
 local function step(): string?
 	local current = player:GetAttribute("Tutorial")
 	return if typeof(current) == "string" then current else nil
+end
+
+-- The unlock tutorial to show (only once the tutorial is done).
+local function tip(): Tips.Tip?
+	local id = player:GetAttribute("Tip")
+	if step() ~= nil or typeof(id) ~= "string" then
+		return nil
+	end
+	return Tips.get(id)
+end
+
+-- A phone or tablet without a keyboard gets "tap" words instead of keys.
+local function isTouch(): boolean
+	return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 end
 
 -- The part to point the trail at: a part itself, or a model's main part.
@@ -178,6 +196,7 @@ function TutorialController.start()
 	local gui, title, body, hint, nextButton = buildCard()
 	local remotes = ReplicatedStorage:WaitForChild("TutorialRemotes")
 	local Finish = remotes:WaitForChild("Finish") :: RemoteEvent
+	local Seen = ReplicatedStorage:WaitForChild("TipRemotes"):WaitForChild("Seen") :: RemoteEvent
 
 	-- The trail: from an attachment on you to one on the target, plus a glow on the target.
 	local trail = Instance.new("Beam")
@@ -253,7 +272,17 @@ function TutorialController.start()
 
 	local function render()
 		local current = step()
-		gui.Enabled = current ~= nil
+		local shownTip = tip()
+		gui.Enabled = current ~= nil or shownTip ~= nil
+		if shownTip then
+			title.Text = shownTip.title
+			body.Text = Tips.textFor(shownTip.id, isTouch())
+			hint.Text = ""
+			nextButton.Visible = true
+			nextButton.Text = "Got it"
+			Locks.glow(nil)
+			return -- the trail follows in the heartbeat below
+		end
 		if not current then
 			hideTrail()
 			Locks.glow(nil)
@@ -263,7 +292,7 @@ function TutorialController.start()
 		title.Text = `Tutorial · {index}/{#Tutorial.Steps}`
 		if current == "Tour" then
 			local stop = Tutorial.Tour[tourIndex]
-			body.Text = if stop then stop.text else Tutorial.Text.Tour
+			body.Text = Tutorial.tourText(tourIndex, isTouch())
 			hint.Text = `{math.min(tourIndex, #Tutorial.Tour)} of {#Tutorial.Tour}`
 			nextButton.Visible = true
 			nextButton.Text = if tourIndex >= #Tutorial.Tour then "Let's hunt!" else "Next"
@@ -272,9 +301,7 @@ function TutorialController.start()
 			return
 		end
 		nextButton.Visible = false
-		-- A phone or tablet without a keyboard gets "tap" words instead of keys.
-		local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-		body.Text = Tutorial.textFor(current, touch)
+		body.Text = Tutorial.textFor(current, isTouch())
 		local since = player:GetAttribute("TutorialSince")
 		local stuck = typeof(since) == "number"
 			and workspace:GetServerTimeNow() - since >= Tutorial.HintSeconds
@@ -283,6 +310,13 @@ function TutorialController.start()
 	end
 
 	nextButton.Activated:Connect(function()
+		local shownTip = tip()
+		if shownTip then
+			Seen:FireServer(shownTip.id)
+			gui.Enabled = false -- straight away; the server clears Tip a moment later
+			hideTrail()
+			return
+		end
 		if step() ~= "Tour" then
 			return
 		end
@@ -298,6 +332,10 @@ function TutorialController.start()
 		tourIndex = 1
 		render()
 	end)
+	player:GetAttributeChangedSignal("Tip"):Connect(function()
+		hideTrail()
+		render()
+	end)
 	render()
 
 	-- The target moves (a monster) or appears late (your mansion, the zone): look again often.
@@ -309,7 +347,13 @@ function TutorialController.start()
 		end
 		waited = 0
 		local current = step()
-		if current then
+		local shownTip = tip()
+		if shownTip and gui.Enabled then
+			follow()
+			local landmark = shownTip.landmark
+			local inHub = player:GetAttribute("Zone") == nil
+			pointAt(if landmark and inHub then path("Hub", "Landmarks", landmark) else nil)
+		elseif current then
 			follow()
 			pointAt(targetFor(current))
 			if current ~= "Tour" and hint.Text == "" then

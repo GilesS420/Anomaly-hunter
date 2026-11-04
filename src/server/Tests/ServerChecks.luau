@@ -110,6 +110,7 @@ ServerChecks.KnownRemotes = {
 	"HotbarRemotes.Set",
 	"SettingsRemotes.Set",
 	"TutorialRemotes.Finish",
+	"TipRemotes.Seen",
 	"GoldenGhostRemotes.Tap",
 	"GoldenGhostRemotes.Progress",
 	"CodexRemotes.GetView",

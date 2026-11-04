@@ -257,6 +257,11 @@ local function onTap(player: Player)
 	flyOn() -- it darts away from the tap
 end
 
+-- Whether a Golden Ghost is out right now (TipService's first-ghost tip).
+function GoldenGhostService.isOut(): boolean
+	return ghost ~= nil
+end
+
 -- Brings the Golden Ghost out now (also the /ghost admin command). False if one is out.
 function GoldenGhostService.spawn(): boolean
 	if ghost then

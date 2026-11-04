@@ -7,6 +7,8 @@
 --   /wings 3          sets how many wings your mansion has (1 to 6) and rebuilds it
 --   /clearmonsters    empties your mansion, Storage and Growth Chamber
 --   /tutorial skip    ends your tutorial now (/tutorial restart starts it again from the gate)
+--   /tips reset       forgets which unlock tutorials you've seen, so they come again (Util/Tips)
+--   /tip <id>         shows one unlock tutorial now, e.g. /tip VariantMachine (/tip lists them)
 --   /reset confirm    wipes the save back to a brand-new player's and kicks them; rejoin to
 --                     start fresh (replay the tutorial and early game). Yours, or one picked
 --                     player's (Giles 2026-10-30), never everyone's at once.
@@ -98,6 +100,8 @@ local MissionService = require(script.Parent.MissionService)
 local Notify = require(script.Parent.Parent.Notify)
 local SpawnService = require(script.Parent.SpawnService)
 local TutorialService = require(script.Parent.TutorialService)
+local TipService = require(script.Parent.TipService)
+local Tips = require(ReplicatedStorage.Shared.Util.Tips)
 local WatcherService = require(script.Parent.WatcherService)
 local Admins = require(script.Parent.Parent.Admins)
 local AdminRestock = require(script.Parent.Parent.AdminRestock)
@@ -185,6 +189,29 @@ commands["/tutorial"] = function(player, argument, tell)
 	else
 		tell("Try: /tutorial skip or /tutorial restart")
 	end
+end
+
+commands["/tips"] = function(player, argument, tell)
+	if string.lower(argument or "") == "reset" then
+		TipService.reset(player)
+		tell("Unlock tutorials forgotten: each one shows again when its moment comes.")
+	else
+		tell("Try: /tips reset")
+	end
+end
+
+commands["/tip"] = function(player, argument, tell)
+	local wanted = string.lower(argument or "")
+	local ids = {}
+	for _, tip in Tips.List do
+		table.insert(ids, tip.id)
+		if string.lower(tip.id) == wanted then
+			TipService.force(player, tip.id)
+			tell(`Showing the {tip.id} unlock tutorial.`)
+			return
+		end
+	end
+	tell(`Try: /tip <id>. The ids: {table.concat(ids, ", ")}`)
 end
 
 -- One player at a time: runForEveryone never sends it to everyone.
@@ -984,7 +1011,7 @@ function DevService.start()
 		return
 	end
 	print(
-		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /charges, /chamber, /missions done|new|reset|set <id>|streak <days>, /calm, /attacks on|off, /respawn, /attack, /restock <items amounts>|end, /announce <text>, /givemonster <monster> [size] [variant] [kg] [effects], /addeffect <uid> <effects>`
+		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /tips reset, /tip <id>, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /charges, /chamber, /missions done|new|reset|set <id>|streak <days>, /calm, /attacks on|off, /respawn, /attack, /restock <items amounts>|end, /announce <text>, /givemonster <monster> [size] [variant] [kg] [effects], /addeffect <uid> <effects>`
 	)
 end
 
