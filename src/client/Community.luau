@@ -78,9 +78,10 @@ function Community.favourite(): string
 	end
 	busy = true
 	local done = Instance.new("BindableEvent")
-	local answer: boolean? = nil
+	local answer = "" -- the AvatarPromptResult's name: Success, PermissionDenied (said no) or Failed
 	local connection = AvatarEditorService.PromptSetFavoriteCompleted:Connect(function(result)
-		answer = result == Enum.AvatarPromptResult.Success
+		answer = if typeof(result) == "EnumItem" then result.Name else tostring(result)
+		print(`Favourite window answered: {answer}`) -- shows in Output (F9 in a live game)
 		done:Fire()
 	end)
 	local ok = pcall(
@@ -102,9 +103,13 @@ function Community.favourite(): string
 	if not ok then
 		return "The Favourite window didn't open. Try again in a moment."
 	end
-	return if answer
-		then "Thank you, hunter! You'll find us in your Favourites now."
-		else "No worries. You can always tap the ⭐ on the game's page later."
+	if string.find(answer, "Success", 1, true) then
+		return "Thank you, hunter! You'll find us in your Favourites now."
+	elseif string.find(answer, "PermissionDenied", 1, true) then
+		return "No worries. You can always tap the ⭐ on the game's page later."
+	end
+	-- Failed, or no answer: Roblox didn't save it (this often happens in a Studio test).
+	return "Roblox couldn't save your favourite just now. Try again in a moment, or tap the ⭐ on the game's page."
 end
 
 -- Opens Roblox's Invite Friends window.

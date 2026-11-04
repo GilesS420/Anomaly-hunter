@@ -376,6 +376,10 @@ local function buildLandmarkModel(landmarks: Instance, spot: Layout.Landmark, re
 	table.insert(built, `Hub.Landmarks.{spot.name}`)
 end
 
+-- Landmarks whose spot in Config/Layout changed after they may have been saved into the
+-- place; only these are rebuilt when found far from their spot, so a shop moved by hand stays.
+local Moved = { GuildStand = true }
+
 local function buildLandmarks(hub: Instance)
 	local landmarks = folderAt(hub, "Landmarks", "Hub.Landmarks")
 	for _, spot in Layout.Landmarks do
@@ -384,6 +388,19 @@ local function buildLandmarks(hub: Instance)
 		if existing and recipe and isPlaceholder(existing) then
 			existing:Destroy()
 			existing = nil
+		end
+		-- A built landmark saved into the place where Config/Layout no longer puts it (the
+		-- Guild stand moved, Giles 2026-11-04): rebuild it at its new spot.
+		if existing and recipe and existing:IsA("Model") and Moved[spot.name] then
+			local center = existing:GetBoundingBox().Position
+			local off = Vector2.new(center.X - spot.x, center.Z - spot.z).Magnitude
+			if off > math.max(spot.width, spot.depth) then
+				warn(
+					`{spot.name}: moved to its new spot in Config/Layout (the saved one was {math.floor(off)} studs away)`
+				)
+				existing:Destroy()
+				existing = nil
+			end
 		end
 		if existing then
 			-- A placeholder saved into the place earlier keeps its old sign: drop the

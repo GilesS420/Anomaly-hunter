@@ -79,13 +79,13 @@ Layout.PlotSpawn = { x = 0, z = -45 }
 Layout.Landmarks = {
 	{ name = "WatcherSquare", label = "Watcher Square", x = 0, z = 0, width = 60, depth = 60, height = 1 },
 	-- The Hunter's Guild stand (Giles 2026-11-04): join the game's group, favourite the game and
-	-- invite friends. In front of the shops at the west end, just north of the Bakery, facing
-	-- the middle of the hub like the shops do.
+	-- invite friends. In the row of shops at the west end, just north of the Bakery, facing
+	-- the middle of the hub like the shops do (Giles 2026-11-04: closer to the shops).
 	{
 		name = "GuildStand",
 		label = "Hunter's Guild",
-		x = -340,
-		z = -88,
+		x = -380,
+		z = -86,
 		width = 16,
 		depth = 8,
 		height = 10,
