@@ -28,19 +28,19 @@ Robux.Products = {
 	-- that item's own picture and name instead of a shared "Shop item" one. While an id is
 	-- still 0 the item is sold through its `tier` product instead, so nothing breaks before
 	-- they're made on the dashboard.
-	ItemPhantomVac = { id = 0, price = 19, name = "Phantom Vac", tier = "ItemTier1" },
-	ItemSpiritSiphon = { id = 0, price = 49, name = "Spirit Siphon", tier = "ItemTier2" },
-	ItemBansheeBlower = { id = 0, price = 99, name = "Banshee Blower", tier = "ItemTier3" },
-	ItemMoonVac = { id = 0, price = 199, name = "Moon Vac", tier = "ItemTier4" },
-	ItemVoidVac = { id = 0, price = 399, name = "Void Vac", tier = "ItemTier5" },
-	ItemCobwebMitt = { id = 0, price = 19, name = "Cobweb Mitt", tier = "ItemTier1" },
-	ItemRubberGlove = { id = 0, price = 19, name = "Rubber Glove", tier = "ItemTier1" },
-	ItemBoneHand = { id = 0, price = 49, name = "Bone Hand", tier = "ItemTier2" },
-	ItemGhoulClaw = { id = 0, price = 99, name = "Ghoul Claw", tier = "ItemTier3" },
-	ItemWitchPaddle = { id = 0, price = 199, name = "Witch's Paddle", tier = "ItemTier4" },
-	ItemTitanHand = { id = 0, price = 399, name = "Titan Hand", tier = "ItemTier5" },
-	ItemEclipseEclair = { id = 0, price = 399, name = "Eclipse Éclair", tier = "ItemTier5" },
-	ItemPrismDraught = { id = 0, price = 199, name = "Prism Draught", tier = "ItemTier4" },
+	ItemPhantomVac = { id = 3728313540, price = 19, name = "Phantom Vac", tier = "ItemTier1" },
+	ItemSpiritSiphon = { id = 3728313835, price = 49, name = "Spirit Siphon", tier = "ItemTier2" },
+	ItemBansheeBlower = { id = 3728314073, price = 99, name = "Banshee Blower", tier = "ItemTier3" },
+	ItemMoonVac = { id = 3728314254, price = 199, name = "Moon Vac", tier = "ItemTier4" },
+	ItemVoidVac = { id = 3728314987, price = 399, name = "Void Vac", tier = "ItemTier5" },
+	ItemCobwebMitt = { id = 3728316774, price = 19, name = "Cobweb Mitt", tier = "ItemTier1" },
+	ItemRubberGlove = { id = 3728317505, price = 19, name = "Rubber Glove", tier = "ItemTier1" },
+	ItemBoneHand = { id = 3728317640, price = 49, name = "Bone Hand", tier = "ItemTier2" },
+	ItemGhoulClaw = { id = 3728317896, price = 99, name = "Ghoul Claw", tier = "ItemTier3" },
+	ItemWitchPaddle = { id = 3728318189, price = 199, name = "Witch's Paddle", tier = "ItemTier4" },
+	ItemTitanHand = { id = 3728318321, price = 399, name = "Titan Hand", tier = "ItemTier5" },
+	ItemEclipseEclair = { id = 3728320070, price = 399, name = "Eclipse Éclair", tier = "ItemTier5" },
+	ItemPrismDraught = { id = 3728320624, price = 199, name = "Prism Draught", tier = "ItemTier4" },
 	-- New Bakery and Workshop stock for the buyer only, until the next restock.
 	ShopReroll = { id = 3723585894, price = 29, name = "Shop Reroll" },
 	-- Swaps every daily mission that isn't done yet (Giles 2026-10-29).
