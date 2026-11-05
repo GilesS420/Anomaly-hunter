@@ -112,6 +112,11 @@ return {
 	KnockbackSpeed = 55, -- studs per second you fly back from a Charge or Shockwave
 	HarmfulFromRarity = 5, -- Legendary and up: every attack costs a heart
 
+	-- Zones (Config/Zones ids) where no monster fights back at all, so new players can learn
+	-- catching in peace (Giles 2026-11-05: players left after ~5 minutes). Hearts are hidden
+	-- there too. Take a zone out of this list to turn its attacks back on.
+	CalmZones = { PumpkinGraveyard = true } :: { [string]: boolean },
+
 	-- Seconds between two attacks by the same monster: rarer ones attack more often.
 	-- Common 10, Uncommon 9, ... Legendary 6, Mythic and Divine 5.
 	CooldownBase = 11,

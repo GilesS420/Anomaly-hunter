@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Attacks = require(Shared:WaitForChild("Util"):WaitForChild("Attacks"))
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
 local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
@@ -238,9 +239,14 @@ function HuntController.start()
 	watchMoney(money)
 
 	local function refresh()
-		local inZone = player:GetAttribute("Zone") ~= nil
+		local zoneId = player:GetAttribute("Zone")
+		local inZone = zoneId ~= nil
 		local count = player:GetAttribute("Hearts")
-		hearts.Text = if inZone and typeof(count) == "number" then string.rep("♥ ", count) else ""
+		-- No hearts in a calm zone: nothing there can take one.
+		local calm = typeof(zoneId) == "string" and Attacks.calmZone(zoneId)
+		hearts.Text = if inZone and not calm and typeof(count) == "number"
+			then string.rep("♥ ", count)
+			else ""
 		hearts.Visible = hearts.Text ~= ""
 
 		local monsterId = player:GetAttribute("Carrying")
