@@ -42,6 +42,8 @@ export type Page = {
 	progress: Codex.Progress,
 	monsters: { MonsterCard },
 	rewards: Rewards,
+	-- Zone pages: catch every monster of a rarity, Common first. Empty on the event page.
+	rarityGoals: { { id: string, color: Color3, found: number, total: number } },
 }
 export type EffectCard = {
 	id: string,
@@ -105,6 +107,9 @@ local function check(player: Player, quiet: boolean)
 		end
 		local page = if reward.page == Codex.EffectsPage then "" else ` on {Format.name(reward.page)}`
 		local goal = if reward.goal == "Found" then "Every monster found" else `Every {reward.goal}`
+		if table.find(Codex.RarityOrder, reward.goal) then
+			goal = `Every {reward.goal} monster`
+		end
 		if reward.goal == "Effects" then
 			goal = "Every effect found"
 		elseif reward.goal == "Combos" then
@@ -160,12 +165,28 @@ local function viewFor(data: DataService.Data): View
 				look = if found then InventoryService.codexLook(id) else nil,
 			})
 		end
+		local progress = Codex.progress(codex, section.monsters)
+		local goals = table.clone(pageGoals)
+		local rarityGoals = {}
+		for _, rarity in Codex.RarityOrder do
+			local counts = progress.rarities[rarity]
+			if counts and Codex.rewardAmount(section.id, rarity) > 0 then
+				table.insert(goals, rarity)
+				table.insert(rarityGoals, {
+					id = rarity,
+					color = MonsterModel.color(rarity),
+					found = counts.found,
+					total = counts.total,
+				})
+			end
+		end
 		table.insert(pages, {
 			id = section.id,
 			title = section.title,
-			progress = Codex.progress(codex, section.monsters),
+			progress = progress,
 			monsters = cards,
-			rewards = rewardsFor(codex, section.id, pageGoals),
+			rewards = rewardsFor(codex, section.id, goals),
+			rarityGoals = rarityGoals,
 		})
 	end
 

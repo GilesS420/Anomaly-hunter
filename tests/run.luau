@@ -3117,9 +3117,18 @@ do
 		Codex.note(codex, { monsterId = id, size = "Normal", effects = {}, familiarity = 0 })
 	end
 	local paid = Codex.newRewards(codex, { page })
+	local paidFound, paidRarities = 0, 0
+	for _, reward in paid do
+		if reward.goal == "Found" and reward.amount == Codex.rewardAmount(page.id, "Found") then
+			paidFound += 1
+		elseif table.find(Codex.RarityOrder, reward.goal) then
+			paidRarities += 1
+		end
+	end
+	check("codex: every monster found pays the Found reward once", paidFound == 1)
 	check(
-		"codex: every monster found pays the Found reward once",
-		#paid == 1 and paid[1].goal == "Found" and paid[1].amount == Codex.rewardAmount(page.id, "Found")
+		"codex: every monster found also pays each rarity on the page",
+		paidRarities == #Codex.RarityOrder and #paid == paidFound + paidRarities
 	)
 	check("codex: a paid reward isn't paid again", #Codex.newRewards(codex, { page }) == 0)
 	check("codex: a paid reward is marked", Codex.claimed(codex, page.id, "Found"))
@@ -3154,6 +3163,32 @@ do
 			and Codex.rewardAmount(Codex.EffectsPage, "Combos") == 2e12
 			and Codex.rewardAmount("Events", "Found") == 50e9
 	)
+	-- Rarity goals: one rarity done pays on its own, before the whole page is found.
+	local partial: { [string]: any } = {}
+	local divineId: string? = nil
+	for _, id in page.monsters do
+		if Monsters[id].rarity == "Divine" then
+			divineId = id
+		end
+	end
+	if divineId then
+		Codex.note(partial, { monsterId = divineId, size = "Normal", effects = {}, familiarity = 0 })
+	end
+	local divinePaid = Codex.newRewards(partial, { page })
+	check(
+		"codex: catching every Divine on a zone pays the Divine goal alone",
+		#divinePaid == 1 and divinePaid[1].goal == "Divine" and divinePaid[1].amount == 25_000_000
+	)
+	check(
+		"codex: rarity rewards grow 4x per zone",
+		Codex.rewardAmount("MurkyBayou", "Common") == 4 * Codex.rewardAmount("PumpkinGraveyard", "Common")
+	)
+	check("codex: the event page has no rarity rewards", Codex.rewardAmount("Events", "Common") == 0)
+	check(
+		"codex: rarer rarity goals pay more",
+		Codex.rewardAmount(page.id, "Divine") > Codex.rewardAmount(page.id, "Mythic")
+			and Codex.rewardAmount(page.id, "Rare") > Codex.rewardAmount(page.id, "Common")
+	)
 	-- A save from before the raise marks a paid goal `true`: it gets only the difference, once.
 	local old: { [string]: any } = { rewards = { [Codex.rewardKey(page.id, "Found")] = true } }
 	for _, id in page.monsters do
@@ -3161,13 +3196,21 @@ do
 	end
 	local was = math.floor(CodexRewards.Old.Pages[page.id] * CodexRewards.Old.Goals.Found)
 	local topUps = Codex.newRewards(old, { page })
+	local foundTopUp = nil
+	for _, reward in topUps do
+		if reward.goal == "Found" then
+			foundTopUp = reward
+		end
+	end
 	if CodexRewards.TopUpOldClaims then
 		check(
 			"codex: an old claim is topped up by the difference",
-			#topUps == 1 and topUps[1].topUp and topUps[1].amount == Codex.rewardAmount(page.id, "Found") - was
+			foundTopUp ~= nil
+				and foundTopUp.topUp
+				and foundTopUp.amount == Codex.rewardAmount(page.id, "Found") - was
 		)
 	else
-		check("codex: an old claim counts as fully paid", #topUps == 0)
+		check("codex: an old claim counts as fully paid", foundTopUp == nil)
 	end
 	check("codex: a top-up isn't paid twice", #Codex.newRewards(old, { page }) == 0)
 	check("codex: a topped-up goal still shows as paid", Codex.claimed(old, page.id, "Found"))

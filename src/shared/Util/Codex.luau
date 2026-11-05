@@ -24,7 +24,12 @@ local Value = require("./Value")
 local Codex = {}
 
 export type Section = { id: string, title: string, monsters: { string } }
-export type Progress = { found: number, total: number, variants: { [string]: number } }
+export type Progress = {
+	found: number,
+	total: number,
+	variants: { [string]: number },
+	rarities: { [string]: { found: number, total: number } }, -- only rarities on the page
+}
 export type Reward = { key: string, page: string, goal: string, amount: number, topUp: boolean }
 export type Found = { kind: "Monster" | "Variant" | "Effect" | "Combo", id: string, variant: string? }
 
@@ -35,6 +40,17 @@ Codex.VariantOrder = {} :: { string }
 for i = #Variants, 1, -1 do
 	table.insert(Codex.VariantOrder, Variants[i].id)
 end
+
+-- The zone rarities as goals, Common first (event-only rarities are left out).
+Codex.RarityOrder = {} :: { string }
+for id, rarity in Rarities do
+	if not rarity.eventOnly then
+		table.insert(Codex.RarityOrder, id)
+	end
+end
+table.sort(Codex.RarityOrder, function(a, b)
+	return Rarities[a].order < Rarities[b].order
+end)
 
 -- Cheapest and commonest first, so a zone's page reads from Common up to Divine.
 local function byRarity(a: string, b: string): boolean
@@ -222,13 +238,25 @@ end
 
 -- How much of a page is done: monsters found, and how many have each variant.
 function Codex.progress(codex: { [string]: any }, monsterIds: { string }): Progress
-	local progress: Progress = { found = 0, total = #monsterIds, variants = {} }
+	local progress: Progress = { found = 0, total = #monsterIds, variants = {}, rarities = {} }
 	for _, variant in Codex.VariantOrder do
 		progress.variants[variant] = 0
 	end
 	for _, id in monsterIds do
+		local monster = Monsters[id]
+		local rarity = if monster then progress.rarities[monster.rarity] else nil
+		if monster and not rarity then
+			rarity = { found = 0, total = 0 }
+			progress.rarities[monster.rarity] = rarity
+		end
+		if rarity then
+			rarity.total += 1
+		end
 		if Codex.has(codex, id) then
 			progress.found += 1
+			if rarity then
+				rarity.found += 1
+			end
 			for _, variant in Codex.VariantOrder do
 				if Codex.has(codex, id, variant) then
 					progress.variants[variant] += 1
@@ -243,6 +271,9 @@ Codex.EffectsPage = "Effects"
 
 -- A goal's reward in a rates table (Config/CodexRewards, or its Old rates).
 local function amountIn(rates: any, page: string, goal: string): number
+	if rates.Rarities and rates.Rarities[goal] then
+		return math.floor(rates.Rarities[goal] * (rates.RarityScale[page] or 0))
+	end
 	if page == Codex.EffectsPage then
 		return if goal == "Effects" then rates.Effects elseif goal == "Combos" then rates.Combos else 0
 	end
@@ -267,10 +298,16 @@ function Codex.paidSoFar(codex: { [string]: any }, page: string, goal: string): 
 	return 0
 end
 
--- The goals of a monster page that are done: "Found" once every monster is caught, then each
--- variant once every monster on the page has it.
+-- The goals of a monster page that are done: each rarity once every monster of it is caught,
+-- "Found" once every monster is caught, then each variant once every monster has it.
 function Codex.goalsDone(progress: Progress): { string }
 	local done = {}
+	for _, rarity in Codex.RarityOrder do
+		local counts = progress.rarities[rarity]
+		if counts and counts.total > 0 and counts.found >= counts.total then
+			table.insert(done, rarity)
+		end
+	end
 	if progress.total == 0 or progress.found < progress.total then
 		return done
 	end
