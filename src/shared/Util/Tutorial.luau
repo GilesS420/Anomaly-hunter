@@ -71,6 +71,7 @@ Tutorial.Unlocks = {
 	Shops = "Buy",
 	Codex = "Tour",
 	Missions = "Tour",
+	Gifts = "Tour", -- playtime gifts (PlaytimeController)
 	Store = "Tour", -- the Robux Store button
 	Settings = "Gate", -- sound and weather settings always work
 } :: { [string]: Step }

@@ -95,6 +95,8 @@ ServerChecks.KnownRemotes = {
 	"MissionRemotes.Claim",
 	"MissionRemotes.Reroll",
 	"MissionRemotes.Changed",
+	"PlaytimeRemotes.GetView",
+	"PlaytimeRemotes.Claim",
 	"InventoryRemotes.GetView",
 	"InventoryRemotes.Move",
 	"InventoryRemotes.Lock",

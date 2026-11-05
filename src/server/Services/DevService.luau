@@ -33,6 +33,8 @@
 --                     3 days and deals a fresh set so the bonus shows; /missions reset starts
 --                     today's missions over (no progress, claimable again); /missions set Merge2
 --                     swaps in that mission (Config/Missions.Pool) for today's of its tier
+--   /playtime 30      adds 30 minutes of play time today (the playtime gifts); /playtime reset
+--                     starts today over (no time, nothing claimed)
 --   /calm             zone monsters leave you alone (type it again to let them attack)
 --   /attacks off      the same, but sets it (/attacks on lets them attack again)
 --   /attack           the closest monster in your zone attacks you right now
@@ -97,6 +99,7 @@ local InventoryService = require(script.Parent.InventoryService)
 local MonsterAiService = require(script.Parent.MonsterAiService)
 local MansionService = require(script.Parent.MansionService)
 local MissionService = require(script.Parent.MissionService)
+local PlaytimeService = require(script.Parent.PlaytimeService)
 local Notify = require(script.Parent.Parent.Notify)
 local SpawnService = require(script.Parent.SpawnService)
 local TutorialService = require(script.Parent.TutorialService)
@@ -367,6 +370,26 @@ commands["/chamber"] = function(player, _, tell)
 			then "Your Growth Chamber is done. Walk up to it to see how it went."
 			else "Nothing is bubbling in your Growth Chamber."
 	)
+end
+
+commands["/playtime"] = function(player, argument, tell)
+	local text = string.lower(string.match(argument or "", "^%s*(%S*)") or "")
+	local minutes = tonumber(text)
+	if text == "reset" then
+		tell(
+			if PlaytimeService.reset(player)
+				then "Playtime starts over today."
+				else "Your save is still loading."
+		)
+	elseif minutes and minutes == minutes and math.abs(minutes) < 100_000 then
+		tell(
+			if PlaytimeService.add(player, minutes)
+				then `Added {minutes} minutes of play time.`
+				else "Your save is still loading."
+		)
+	else
+		tell("Try: /playtime 30 or /playtime reset")
+	end
 end
 
 commands["/missions"] = function(player, argument, tell)
@@ -1011,7 +1034,7 @@ function DevService.start()
 		return
 	end
 	print(
-		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /tips reset, /tip <id>, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /charges, /chamber, /missions done|new|reset|set <id>|streak <days>, /calm, /attacks on|off, /respawn, /attack, /restock <items amounts>|end, /announce <text>, /givemonster <monster> [size] [variant] [kg] [effects], /addeffect <uid> <effects>`
+		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /tips reset, /tip <id>, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /charges, /chamber, /missions done|new|reset|set <id>|streak <days>, /playtime <minutes>|reset, /calm, /attacks on|off, /respawn, /attack, /restock <items amounts>|end, /announce <text>, /givemonster <monster> [size] [variant] [kg] [effects], /addeffect <uid> <effects>`
 	)
 end
 

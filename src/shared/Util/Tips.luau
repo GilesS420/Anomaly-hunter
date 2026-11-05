@@ -24,6 +24,7 @@ export type Facts = {
 	event: boolean, -- a Watcher event is on right now
 	ghost: boolean, -- a Golden Ghost is out right now
 	inHub: boolean, -- in the hub (not in a zone)
+	gift: boolean, -- a playtime gift is waiting (PlaytimeService)
 }
 
 export type Tip = {
@@ -145,6 +146,15 @@ Tips.List = {
 		text = `For your first {Heists.NewPlayerSeconds // 3600} hours nobody could steal from you. Now other hunters can walk into your mansion and buy one of your monsters with Robux, at most {Heists.MaxLossesPerDay} a day and only while you're in the game. Heart (♥) your best monsters so they cost more to steal, and slap a thief to stop them.`,
 		due = function(facts: Facts): boolean
 			return facts.playSeconds >= Heists.NewPlayerSeconds
+		end,
+	},
+	{
+		id = "PlaytimeGift",
+		feature = "Gifts",
+		title = "Playtime gift!",
+		text = "The more you play, the better the gifts. Open the gift button to claim.",
+		due = function(facts: Facts): boolean
+			return facts.gift
 		end,
 	},
 } :: { Tip }

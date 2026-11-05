@@ -4,6 +4,7 @@
 --             BakeryQuest (one-time): the optional cake quest after the tutorial
 --             Comeback (one-time): played on 1, 2, 3, 5, 7, 14 different days
 --             Robux purchase (recurring): prompt shown > paid, per product
+--             Playtime (recurring, one session a day): playtime gifts 1 to 6 claimed
 --   Economy   every Money source (selling, missions...) and sink (shops, wings, fees)
 --   Custom    RobuxSpent (value = Robux paid for a developer product)
 -- Server only: Roblox ignores these from the client and from Studio (Studio prints them in
@@ -137,6 +138,14 @@ function Service.questStep(player: Player, step: number)
 	end
 	send(`{player.Name} quest {step} {name}`, function()
 		AnalyticsService:LogFunnelStepEvent(player, "BakeryQuest", nil :: any, step, name)
+	end)
+end
+
+-- A playtime gift was claimed (step 1 to 6 of Config/Playtime.Steps), in that day's funnel.
+function Service.playtimeGift(player: Player, day: number, step: number, minutes: number)
+	local name = `{minutes} min gift`
+	send(`{player.Name} playtime {step} {name}`, function()
+		AnalyticsService:LogFunnelStepEvent(player, "Playtime", `{player.UserId}-{day}`, step, name)
 	end)
 end
 
