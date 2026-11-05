@@ -18,6 +18,7 @@ local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Robux = require(ReplicatedStorage.Shared.Util.Robux)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
+local Tutorial = require(ReplicatedStorage.Shared.Util.Tutorial)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local AdminRestock = require(script.Parent.Parent.AdminRestock)
 local Counter = require(script.Parent.Parent.Counter)
@@ -76,6 +77,12 @@ local function stockBoost(): (string?, number?)
 	return if event then event.id else nil, if event then event.bakeryStockMultiplier else nil
 end
 
+-- The tutorial's first cake is always in stock while its Bake step is on (a huge restock
+-- chance multiplier), so a new player is never told to come back later.
+local function multiplierFor(data: DataService.Data, item: Shop.Item?, multiplier: number?): number?
+	return if item and item.id == Tutorial.Cake and data.tutorial == "Bake" then math.huge else multiplier
+end
+
 local function countdown(seconds: number): string
 	return string.format("%d:%02d", seconds // 60, seconds % 60)
 end
@@ -92,7 +99,7 @@ local function viewFor(player: Player, data: DataService.Data): View
 		local adminStock = AdminRestock.stock(item.id)
 		local inStock = if adminStock
 			then adminStock > 0
-			else Workshop.inStock(item, slot, eventId, stockMultiplier, salt)
+			else Workshop.inStock(item, slot, eventId, multiplierFor(data, item, stockMultiplier), salt)
 		if item.event and not inStock then
 			continue -- event treats only show up during their event
 		end
@@ -148,7 +155,7 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 		data.inventory,
 		if item then bought[item.id] or 0 else 0,
 		eventId,
-		stockMultiplier,
+		multiplierFor(data, item, stockMultiplier),
 		adminStock,
 		salt
 	)

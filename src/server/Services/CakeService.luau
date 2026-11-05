@@ -40,6 +40,7 @@ type Live = {
 	label: TextLabel,
 	at: Vector3, -- floor point under the cake, in the world
 	coming: string?, -- uid of the monster walking over right now
+	forceNext: boolean?, -- the next bite gives the effect for sure (the tutorial, CakeService.hurry)
 }
 
 local CakeRadius = 1.6 -- studs, matches CakeModel
@@ -275,7 +276,9 @@ local function bite(player: Player, cake: Live, uid: string)
 		return -- stored or sold on the way
 	end
 	local event = Events.find(workspace:GetAttribute("WatcherEvent"))
-	local b = Cakes.bite(cake.saved, caught, random, if event then event.cakeEffectMultiplier else nil)
+	local force = cake.forceNext
+	cake.forceNext = nil
+	local b = Cakes.bite(cake.saved, caught, random, if event then event.cakeEffectMultiplier else nil, force)
 	MansionService.refreshMonsters(player)
 	local name = Format.monsterName(caught)
 	local text = if cake.saved.bitesLeft <= 0
@@ -294,6 +297,26 @@ local function bite(player: Player, cake: Live, uid: string)
 	else
 		cake.label.Text = labelText(cake)
 	end
+end
+
+-- The tutorial (TutorialService, Feed step): the player's cake of this kind gets its next bite
+-- now, and that bite gives its effect for sure. Safe to call again and again. False if they
+-- have no such cake out (or their cakes aren't back on the floor yet).
+function CakeService.hurry(player: Player, itemId: string): boolean
+	local list = live[player]
+	if not list then
+		return false
+	end
+	for _, cake in list do
+		if cake.saved.itemId == itemId then
+			if not cake.forceNext then
+				cake.forceNext = true
+				cake.saved.biteAt = math.min(Cakes.nextBiteAt(cake.saved), os.time())
+			end
+			return true
+		end
+	end
+	return false
 end
 
 -- One check for every cake the player has out (they're online).

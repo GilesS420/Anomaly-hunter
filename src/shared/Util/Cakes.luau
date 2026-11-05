@@ -184,14 +184,15 @@ function Cakes.pickEater(
 end
 
 -- One monster takes a bite: it may get the cake's effect, and does for sure on the last bite
--- if the cake hasn't given one yet.
+-- if the cake hasn't given one yet, or when `forceEffect` is set (the tutorial's bite).
 function Cakes.bite(
 	cake: Placed,
 	caught: Value.CaughtMonster,
 	random: Random?,
-	chanceMultiplier: number?
+	chanceMultiplier: number?,
+	forceEffect: boolean?
 ): Bite
-	local force = cake.bitesLeft <= 1 and not cake.gaveEffect
+	local force = forceEffect == true or (cake.bitesLeft <= 1 and not cake.gaveEffect)
 	cake.bitesLeft -= 1
 	if cake.bitesLeft > 0 then
 		rollBite(cake, random)

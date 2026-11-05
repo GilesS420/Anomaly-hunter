@@ -38,8 +38,9 @@ function Analytics.repair(record: any): Record
 	return { onboard = int(record.onboard), days = int(record.days), lastDay = int(record.lastDay) }
 end
 
--- The Onboarding funnel, in order. Steps 1-8 follow the tutorial (Tutorial.Steps: the step a
+-- The Onboarding funnel, in order. Steps 1-13 follow the tutorial (Tutorial.Steps: the step a
 -- player is ON means they finished the one before it), then the first two wings bought.
+-- The Bakery steps (7-11) came in on 2026-11-05, which moved "Finished tutorial" from 8 to 13.
 Analytics.Onboarding = {
 	"Joined", -- on step Gate: walk to the first zone
 	"Entered first zone", -- Catch
@@ -47,12 +48,17 @@ Analytics.Onboarding = {
 	"Brought it home", -- Pickup
 	"Picked it up", -- Sell
 	"Sold first monster", -- Buy
-	"Bought first vacuum", -- Tour
+	"Bought first vacuum", -- Bake
+	"Bought first cake", -- Place
+	"Set out the cake", -- Hunt
+	"Caught second monster", -- Return
+	"Brought second home", -- Feed
+	"Cake gave an effect", -- Tour
 	"Finished tutorial", -- Done
 	"Bought 1st wing", -- 2 wings owned (Library)
 	"Bought 2nd wing", -- 3 wings owned (Ballroom)
 }
-Analytics.TutorialDone = 8 -- the Onboarding step for "Done"
+Analytics.TutorialDone = #Tutorial.Steps + 1 -- the Onboarding step for "Done"
 
 -- The Onboarding step this save has reached (0 while the tutorial hasn't started).
 function Analytics.onboardStep(tutorial: string, wingsOwned: number): number
