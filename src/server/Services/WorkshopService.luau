@@ -289,21 +289,6 @@ function WorkshopService.start()
 		end)
 	end
 
-	-- Tell everyone when new stock arrives, for the Bakery too since both restock together
-	-- (players with a shop window open refresh by themselves).
-	task.spawn(function()
-		local slot = currentSlot()
-		while true do
-			task.wait(1)
-			local now = currentSlot()
-			if now ~= slot then
-				slot = now
-				if #Players:GetPlayers() > 0 then
-					Notify.toastAll("The Workshop and the Bakery have restocked!")
-				end
-			end
-		end
-	end)
 end
 
 return WorkshopService

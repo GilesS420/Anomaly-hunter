@@ -1,7 +1,7 @@
 --!strict
 -- Little pop-up messages near the top of the screen ("Caught a Big Gravepup!").
 -- The server sends them through ReplicatedStorage.Remotes.Toast (see server/Notify.luau).
--- Up to 3 show at once, newest at the bottom; each fades away after a few seconds.
+-- Up to 2 show at once, newest at the bottom; each fades away after a few seconds.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,7 +14,7 @@ local ToastController = {}
 
 local player = Players.LocalPlayer
 
-local MAX_TOASTS = 3
+local MAX_TOASTS = 2 -- Giles 2026-11-05: fewer pop-ups at once
 local SHOW_SECONDS = 5 -- a short message stays this long (Giles 2026-10-21: 3 was too quick)
 local SECONDS_PER_LETTER = 0.06 -- longer messages stay longer, so there's time to read them
 local MAX_SHOW_SECONDS = 9
@@ -117,16 +117,21 @@ end
 local function show(holder: Frame, text: string)
 	place(holder)
 	-- The same message again (e.g. tapping a locked gate twice): keep the one on screen.
-	local newest = shown[#shown]
-	if newest and newest.text == text then
-		for _, tween in newest.tweens do
+	local same: Toast? = nil
+	for _, toast in shown do
+		if toast.text == text then
+			same = toast
+		end
+	end
+	if same then
+		for _, tween in same.tweens do
 			tween:Cancel() -- stop a fade that already started
 		end
-		newest.tweens = {}
-		newest.frame.BackgroundTransparency = 0.35
-		newest.label.TextTransparency = 0
-		newest.label.TextStrokeTransparency = 0.6
-		scheduleFade(newest)
+		same.tweens = {}
+		same.frame.BackgroundTransparency = 0.35
+		same.label.TextTransparency = 0
+		same.label.TextStrokeTransparency = 0.6
+		scheduleFade(same)
 		return
 	end
 

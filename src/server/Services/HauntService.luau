@@ -24,7 +24,7 @@ local WatcherService = require(script.Parent.WatcherService)
 
 local HauntService = {}
 
-local MaxToasts = 2 -- more new effects than this at once get one summary message
+local MaxToasts = 1 -- more new effects than this at once get one summary message
 
 local random = Random.new()
 
@@ -73,7 +73,7 @@ local function announce(player: Player, gains: Gains): number
 		Notify.log(player, message) -- every one, even when the toast is a summary
 	end
 	if #gains.messages > MaxToasts then
-		Notify.toast(player, `{#gains.messages} of your monsters picked up new haunted effects!`)
+		Notify.toast(player, `{#gains.messages} monsters got new effects (see Log)`)
 	else
 		for _, message in gains.messages do
 			Notify.toast(player, message)

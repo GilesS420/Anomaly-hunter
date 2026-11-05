@@ -204,20 +204,22 @@ local function finish(player: Player, lucky: boolean?)
 		State:FireClient(player, "Ended", { result = "Gone", model = model })
 		return
 	end
-	-- Main-area catches fly straight home; zone catches are carried to the Exit.
-	local afterward = "Now bring it to the Exit."
+	-- Main-area catches fly straight home; zone catches are carried to the Exit. The "what now"
+	-- part is a reminder, so it only shows once per visit, except a full bag or mansion
+	-- (Giles 2026-11-05: too many pop-ups).
+	local afterward = ""
 	if inHub then
-		afterward = if MansionService.addMonster(player, caught) == "Storage"
-			then "Your mansion is full, so it went into Storage (your Backpack)."
-			else "It flew straight home to your mansion!"
+		if MansionService.addMonster(player, caught) == "Storage" then
+			afterward = " Mansion full: it went to your Backpack."
+		end
 	else
 		HuntService.carry(player, caught)
 		local count = player:GetAttribute("CarryingCount")
 		local size = player:GetAttribute("BagSize")
-		if typeof(count) == "number" and typeof(size) == "number" and count < size then
-			afterward = `Bag {count}/{size}: catch another or bring them to the Exit.`
-		elseif typeof(size) == "number" and size > 1 then
-			afterward = "Your bag is full! Bring them to the Exit."
+		if typeof(count) == "number" and typeof(size) == "number" and count >= size and size > 1 then
+			afterward = " Bag full!"
+		elseif Notify.first(player, "BringToExit") then
+			afterward = " Bring it to the Exit!"
 		end
 	end
 
@@ -227,11 +229,11 @@ local function finish(player: Player, lucky: boolean?)
 		for _, effectId in caught.effects do
 			table.insert(names, Format.name(effectId))
 		end
-		bonus = ` Bonus: {table.concat(names, " and ")}!`
+		bonus = ` +{table.concat(names, " +")}`
 	end
 	local variant = if caught.variant then `{caught.variant} ` else ""
 	local perfect = if lucky then "PERFECT CATCH! " else ""
-	Notify.toast(player, `{perfect}Caught a {variant}{caught.size} {hold.name}!{bonus} {afterward}`)
+	Notify.toast(player, `{perfect}Caught a {variant}{caught.size} {hold.name}!{bonus}{afterward}`)
 	MissionService.record(
 		player,
 		"Catch",
@@ -459,7 +461,6 @@ local function missRing(player: Player, hold: Hold, serverNow: number)
 	hold.model:SetAttribute("CatchStart", serverNow - hold.filled)
 	hold.model:SetAttribute("CatchEnd", serverNow - hold.filled + hold.total)
 	State:FireClient(player, "Ringed", { model = hold.model, hit = false })
-	Notify.toast(player, `{hold.name} jerked back! Keep going.`)
 end
 
 local function onStrike(player: Player, tappedAt: unknown)

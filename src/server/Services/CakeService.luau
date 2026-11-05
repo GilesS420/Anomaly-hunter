@@ -284,8 +284,9 @@ local function bite(player: Player, cake: Live, uid: string)
 	local text = if cake.saved.bitesLeft <= 0
 		then `{name} ate the last of your {cake.item.name}{result(data, b)}`
 		else `{name} took a bite of your {cake.item.name}{result(data, b)}`
-	Notify.toast(player, text)
+	-- Only a bite that changed something pops up (Giles 2026-11-05: too many pop-ups).
 	if b.effect or b.combo then
+		Notify.toast(player, text)
 		Notify.log(player, text)
 		MissionService.record(player, "Effect")
 	end

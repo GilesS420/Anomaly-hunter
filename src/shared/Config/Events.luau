@@ -73,7 +73,7 @@ export type MonsterSet = {
 	weight: number,
 	monsters: { [string]: number }, -- monster id -> spawn weight
 	count: number?, -- how many appear (nil: Events.MonstersPerPlayer etc.)
-	announce: string, -- toast everyone sees when the event starts with this set
+	announce: string, -- not shown any more (one toast per event: the event's own announce)
 	noRespawn: boolean?, -- a caught one isn't replaced (the Eldritch jackpot stays one per event)
 	sky: Sky?, -- this set's own sky (nil: the event's sky)
 }
@@ -109,7 +109,7 @@ export type WatcherEvent = {
 	bakeryStockMultiplier: number?, -- Bakery restock chances while live (an item in stock stays in)
 	sellMultiplier: number?, -- the Collector pays this much more while live
 	sky: Sky?,
-	warning: string?, -- toast everyone sees when the warning starts
+	warning: string?, -- not shown any more (Giles 2026-11-05: fewer pop-ups); the sky changing is the warning
 	announce: string?, -- toast everyone sees when it starts
 }
 

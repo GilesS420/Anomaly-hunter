@@ -98,11 +98,7 @@ local function tick(player: Player, data: DataService.Data, seconds: number)
 	local record = data.playtime
 	Playtime.refresh(record, os.time())
 	if data.tutorial == "Done" then
-		local before = Playtime.ready(record)
-		record.seconds += seconds
-		if Playtime.ready(record) > before then
-			Notify.toast(player, "A playtime gift is ready!")
-		end
+		record.seconds += seconds -- a ready gift shows as the dot on Gifts, no pop-up
 	end
 	attributes(player, data)
 end
