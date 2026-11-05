@@ -25,6 +25,7 @@ local RunService = game:GetService("RunService")
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Tutorial = require(ReplicatedStorage.Shared.Util.Tutorial)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 local DataService = require(script.Parent.DataService)
 local HauntService = require(script.Parent.HauntService)
 local HuntService = require(script.Parent.HuntService)
@@ -94,6 +95,7 @@ local function enter(player: Player, data: DataService.Data, state: State)
 	elseif step == "Buy" then
 		local gift = Tutorial.gift(data.money, firstVacuumPrice)
 		if gift > 0 and DataService.addMoney(player, gift) then
+			AnalyticsService.money(player, gift, "Onboarding", "WelcomeGift")
 			Notify.toast(
 				player,
 				`The Collector likes new hunters: {Format.money(gift)} for your first vacuum!`

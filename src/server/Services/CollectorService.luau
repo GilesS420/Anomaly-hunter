@@ -21,6 +21,7 @@ local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Weight = require(ReplicatedStorage.Shared.Util.Weight)
 local Counter = require(script.Parent.Parent.Counter)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 local DataService = require(script.Parent.DataService)
 local InventoryService = require(script.Parent.InventoryService)
 local MansionService = require(script.Parent.MansionService)
@@ -213,7 +214,9 @@ Sell.OnServerInvoke = function(player: Player, uids: unknown): Result
 		earned += priced[caught.uid :: string] or 0
 	end
 	if earned > 0 then
-		DataService.addMoney(player, earned)
+		if DataService.addMoney(player, earned) then
+			AnalyticsService.money(player, earned, "Gameplay", "Sell")
+		end
 		MissionService.record(player, "Sell", { amount = earned })
 	end
 	busy[player] = nil

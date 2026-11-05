@@ -36,6 +36,7 @@ local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Weight = require(ReplicatedStorage.Shared.Util.Weight)
 local WeightConfig = require(ReplicatedStorage.Shared.Config.Weight)
 local Wings = require(ReplicatedStorage.Shared.Config.Wings)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 local DataService = require(script.Parent.DataService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
@@ -891,6 +892,7 @@ local function purchase(state: State, player: Player)
 			`You need {Format.money(wing.price)} to buy the {wing.id} (you have {Format.money(data.money)})`
 		)
 	elseif DataService.addMoney(player, -wing.price) then
+		AnalyticsService.money(player, -wing.price, "Shop", `Wing{wing.id}`)
 		data.wingsOwned += 1
 		buildWings(state, data.wingsOwned)
 		updateSign(state)

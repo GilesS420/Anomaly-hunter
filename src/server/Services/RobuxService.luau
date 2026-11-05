@@ -36,6 +36,7 @@ local Robux = require(ReplicatedStorage.Shared.Util.Robux)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local CakeService = require(script.Parent.CakeService)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 local DataService = require(script.Parent.DataService)
 local HeistService = require(script.Parent.HeistService)
 local HuntService = require(script.Parent.HuntService)
@@ -219,6 +220,7 @@ local function processReceipt(info: { [string]: any }): Enum.ProductPurchaseDeci
 		end
 		Robux.addReceipt(data.robux, purchaseId)
 		data.robux.spent += tonumber(info.CurrencySpent) or 0
+		AnalyticsService.robuxPaid(player, key, tonumber(info.CurrencySpent) or 0)
 		Granted:FireClient(player, key)
 	end
 	-- Only once the save holding this receipt is written; if not, Roblox asks again later and
@@ -237,6 +239,7 @@ local function prompt(player: Player, data: DataService.Data, key: string, pendi
 	end
 	data.robux.pending[key] = pending
 	MarketplaceService:PromptProductPurchase(player, product.id)
+	AnalyticsService.robuxPrompt(player, key)
 	return { ok = true, message = "Check the Robux prompt!" }
 end
 
@@ -334,6 +337,7 @@ Buy.OnServerInvoke = function(player: Player, kind: unknown, arg: unknown): Resu
 			return { ok = false, message = "Robux buying for this isn't set up yet." }
 		end
 		MarketplaceService:PromptGamePassPurchase(player, pass.id)
+		AnalyticsService.robuxPrompt(player, `Pass{arg}`)
 		return { ok = true, message = "Check the Robux prompt!" }
 	end
 	return { ok = false, message = "That isn't for sale." }
@@ -420,6 +424,7 @@ function RobuxService.start()
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, passId, purchased)
 		local pass = Robux.passKey(passId)
 		if purchased and pass then
+			AnalyticsService.robuxPaid(player, `Pass{pass}`, 0)
 			grantPass(player, pass, true)
 			vipTag(player)
 			DataService.saveSoon(player)

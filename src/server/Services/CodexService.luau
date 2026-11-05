@@ -17,6 +17,7 @@ local Codex = require(ReplicatedStorage.Shared.Util.Codex)
 local Effects = require(ReplicatedStorage.Shared.Config.Effects)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 local DataService = require(script.Parent.DataService)
 local InventoryService = require(script.Parent.InventoryService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
@@ -99,7 +100,9 @@ local function check(player: Player, quiet: boolean)
 	end
 	-- Rewards are paid even on the quiet first look, so older saves get what they earned.
 	for _, reward in Codex.newRewards(data.codex, sections) do
-		DataService.addMoney(player, reward.amount)
+		if DataService.addMoney(player, reward.amount) then
+			AnalyticsService.money(player, reward.amount, "Gameplay", "CodexReward")
+		end
 		local page = if reward.page == Codex.EffectsPage then "" else ` on {Format.name(reward.page)}`
 		local goal = if reward.goal == "Found" then "Every monster found" else `Every {reward.goal}`
 		if reward.goal == "Effects" then

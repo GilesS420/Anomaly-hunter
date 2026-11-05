@@ -4,6 +4,7 @@
 -- plots, zones and gates are read).
 
 local DataService = require(script.Services.DataService)
+local AnalyticsService = require(script.Services.AnalyticsService)
 local _Notify = require(script.Notify) -- no start(); made here so the Toast remote exists early
 local _MonsterModel = require(script.MonsterModel) -- no start()
 local _Counter = require(script.Counter) -- no start()
@@ -50,6 +51,7 @@ end
 
 local services: { { name: string, start: () -> ...any } } = {
 	{ name = "DataService", start = DataService.start },
+	{ name = "AnalyticsService", start = AnalyticsService.start },
 	{ name = "WorldBuilder", start = WorldBuilder.start },
 	{ name = "PlotService", start = PlotService.start },
 	{ name = "RoamService", start = RoamService.start },
