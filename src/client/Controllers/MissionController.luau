@@ -3,7 +3,9 @@
 -- mission (Easy, Medium, Hard): what to do, a progress bar, the reward and its buttons (Claim
 -- once it's done; before that Reroll while there's a free reroll left and Skip for Robux),
 -- then the bonus chest for claiming all three and a row to reroll every unfinished mission at
--- once for Robux (server/Services/RobuxService). The status line shows the streak, when new missions come and the rerolls left.
+-- once for Robux (server/Services/RobuxService). Every card has a picture on the left of what
+-- it's about (Giles 2026-11-05), drawn by client/Icons. The status line shows the streak,
+-- when new missions come and the rerolls left.
 -- A red dot on the button means a reward is waiting (player attribute MissionsReady).
 -- Everything comes from the server (MissionRemotes, server/Services/MissionService).
 
@@ -12,6 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local Format = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"):WaitForChild("Format"))
+local Icons = require(script.Parent.Parent:WaitForChild("Icons"))
 local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
 local Robux = require(script.Parent.Parent:WaitForChild("Robux"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
@@ -20,6 +23,7 @@ local MissionController = {}
 
 type Card = {
 	tier: string,
+	kind: string?,
 	text: string,
 	progress: number,
 	target: number,
@@ -45,6 +49,67 @@ local TierColors: { [string]: Color3 } = {
 	Hard = Color3.fromRGB(224, 106, 138),
 }
 local Gold = Color3.fromRGB(255, 211, 107)
+local TileSize = 80
+
+-- The picture on each mission card, by its kind (Config/Missions). Giles 2026-11-05: pictures
+-- instead of text only.
+local KindPictures: { [string]: Icons.Kind } = {
+	Catch = "Vacuum",
+	Sell = "MoneyBag",
+	PlaceCake = "Cake",
+	Effect = "Sparkle",
+	Combo = "Sparkle",
+	Species = "Book",
+	Merge = "Merge",
+	Grow = "Grow",
+	ZoneSet = "Map",
+	GoldenGhost = "Ghost",
+}
+
+-- A square picture tile on the left of a card, tinted in `color`: a drawn picture, or an
+-- image (a product's dashboard picture) when one is given.
+local function tile(parent: Frame, color: Color3, kind: Icons.Kind, image: string?)
+	local box = Instance.new("Frame")
+	box.Name = "Picture"
+	box.AnchorPoint = Vector2.new(0, 0.5)
+	box.Position = UDim2.fromScale(0, 0.5)
+	box.Size = UDim2.fromOffset(TileSize, TileSize)
+	local h, s, v = color:ToHSV()
+	box.BackgroundColor3 = Color3.fromHSV(h, s * 0.75, v * 0.42)
+	box.Parent = parent
+	Ui.corner(box, 12)
+	Ui.rim(box, color, 2)
+	local glow = Instance.new("UIGradient") -- lighter in the middle, like a lamp behind it
+	glow.Rotation = 90
+	glow.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(200, 200, 200)),
+		ColorSequenceKeypoint.new(0.45, Color3.new(1, 1, 1)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 150, 150)),
+	})
+	glow.Parent = box
+	if image then
+		local picture = Instance.new("ImageLabel")
+		picture.BackgroundTransparency = 1
+		picture.Size = UDim2.fromScale(1, 1)
+		picture.Image = image
+		picture.ScaleType = Enum.ScaleType.Crop
+		picture.Parent = box
+		Ui.corner(picture, 12)
+	else
+		Icons.draw(box, kind, 0.12)
+	end
+end
+
+-- The rest of a card, right of its picture tile.
+local function body(parent: Frame): Frame
+	local frame = Instance.new("Frame")
+	frame.Name = "Body"
+	frame.BackgroundTransparency = 1
+	frame.Position = UDim2.fromOffset(TileSize + 12, 0)
+	frame.Size = UDim2.new(1, -(TileSize + 12), 1, 0)
+	frame.Parent = parent
+	return frame
+end
 
 -- 7h 12m, 12m 30s.
 local function countdown(seconds: number): string
@@ -109,25 +174,42 @@ function MissionController.start()
 		render()
 	end
 
-	local function card(order: number, mission: Card, index: number)
-		local color = TierColors[mission.tier] or Ui.Colors.muted
+	-- A card with a picture tile on the left; returns the card and the body to fill.
+	local function shell(order: number, height: number, rim: Color3): (Frame, Frame)
 		local frame = Instance.new("Frame")
 		frame.LayoutOrder = order
-		frame.Size = UDim2.new(1, -8, 0, CardHeight)
+		frame.Size = UDim2.new(1, -8, 0, height)
 		frame.BackgroundColor3 = Ui.Colors.row
 		frame.Parent = window.list
 		Ui.corner(frame, 10)
-		Ui.rim(frame, if mission.done and not mission.claimed then color else Color3.fromRGB(58, 48, 78), 1)
+		Ui.rim(frame, rim, 1)
 		local padding = Instance.new("UIPadding")
-		padding.PaddingLeft = UDim.new(0, 12)
+		padding.PaddingLeft = UDim.new(0, 10)
 		padding.PaddingRight = UDim.new(0, 10)
 		padding.PaddingTop = UDim.new(0, 8)
 		padding.PaddingBottom = UDim.new(0, 8)
 		padding.Parent = frame
+		return frame, body(frame)
+	end
 
-		local tier = Ui.text(frame, string.upper(mission.tier), UDim2.new(0.68, 0, 0, 16), color, true, 15)
+	local function card(order: number, mission: Card, index: number)
+		local color = TierColors[mission.tier] or Ui.Colors.muted
+		local outer, frame = shell(
+			order,
+			CardHeight,
+			if mission.done and not mission.claimed then color else Color3.fromRGB(58, 48, 78)
+		)
+		tile(outer, color, KindPictures[mission.kind or ""] or "Scroll")
+
+		-- The tier as a small coloured pill.
+		local tier =
+			Ui.text(frame, string.upper(mission.tier), UDim2.fromOffset(70, 18), Ui.Colors.panel, true, 14)
+		tier.BackgroundTransparency = 0
+		tier.BackgroundColor3 = color
+		tier.TextXAlignment = Enum.TextXAlignment.Center
+		Ui.corner(tier, 9)
 		local goal = Ui.text(frame, mission.text, UDim2.new(0.68, 0, 0, 40), Ui.Colors.text, true, 20)
-		goal.Position = UDim2.fromOffset(0, 18)
+		goal.Position = UDim2.fromOffset(0, 21)
 		goal.TextWrapped = true
 		goal.TextTruncate = Enum.TextTruncate.None
 		goal.TextYAlignment = Enum.TextYAlignment.Top
@@ -207,13 +289,42 @@ function MissionController.start()
 		end
 	end
 
+	-- A smaller card with a picture, a name, a line under it and room for a button on the
+	-- right (the bonus chest and Reroll all). Returns the frame to put the button in.
+	local function pictureRow(
+		order: number,
+		color: Color3,
+		kind: Icons.Kind,
+		image: string?,
+		name: string,
+		detail: string
+	): Frame
+		local outer, frame = shell(order, TileSize + 16, Color3.fromRGB(58, 48, 78))
+		tile(outer, color, kind, image)
+		local title = Ui.text(frame, name, UDim2.new(0.66, -8, 0, 26), color, true, 22)
+		title.Position = UDim2.fromOffset(0, 8)
+		local line = Ui.text(frame, detail, UDim2.new(0.66, -8, 0, 34), Ui.Colors.muted, false, 16)
+		line.Position = UDim2.fromOffset(0, 36)
+		line.TextWrapped = true
+		line.TextTruncate = Enum.TextTruncate.None
+		line.TextYAlignment = Enum.TextYAlignment.Top
+		local actions = Instance.new("Frame")
+		actions.Name = "Actions"
+		actions.AnchorPoint = Vector2.new(1, 0.5)
+		actions.Position = UDim2.fromScale(1, 0.5)
+		actions.Size = UDim2.new(0.34, 0, 0, 44)
+		actions.BackgroundTransparency = 1
+		actions.Parent = frame
+		return actions
+	end
+
 	local function chestRow(order: number, chest: { reward: number, ready: boolean, claimed: boolean })
 		local detail = if chest.claimed
 			then "Opened. Come back tomorrow!"
 			elseif chest.ready then "Ready to open!"
 			else "Claim all three missions to open it."
-		local _, actions =
-			Ui.row(window.list, order, `Bonus chest: {Format.money(chest.reward)} + a cake`, Gold, detail)
+		local name = `Bonus chest: {Format.money(chest.reward)} + a cake`
+		local actions = pictureRow(order, Gold, "Chest", nil, name, detail)
 		if chest.ready then
 			local open = Ui.button(actions, "Open", Ui.Colors.buy, UDim2.new(1, 0, 1, 0))
 			open.Activated:Connect(function()
@@ -239,11 +350,12 @@ function MissionController.start()
 			open = open or not (mission.done or mission.claimed)
 		end
 		if open then
-			local _, actions = Ui.row(
-				window.list,
+			local actions = pictureRow(
 				11,
-				"Reroll all missions",
 				Ui.Colors.lamp,
+				"Dice",
+				Robux.image("MissionReroll"), -- its dashboard picture, if it has one
+				"Reroll all missions",
 				"Every mission that isn't done yet gets swapped"
 			)
 			local price = Robux.price("MissionReroll")

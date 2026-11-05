@@ -20,13 +20,21 @@ Robux.Color = Color3.fromRGB(0, 140, 90)
 
 -- What this player pays, by product or pass key, as Roblox told this client.
 local mine: { [string]: number } = {}
+-- The picture set for each product or pass on the Creator Dashboard (its image asset id).
+local pictures: { [string]: number } = {}
+local infoLoaded = Instance.new("BindableEvent")
 
 local function ask(key: string, id: number, infoType: Enum.InfoType)
 	local ok, info = pcall(function()
 		return MarketplaceService:GetProductInfoAsync(id, infoType)
 	end)
-	if ok and typeof(info) == "table" and typeof(info.PriceInRobux) == "number" then
-		mine[key] = info.PriceInRobux
+	if ok and typeof(info) == "table" then
+		if typeof(info.PriceInRobux) == "number" then
+			mine[key] = info.PriceInRobux
+		end
+		if typeof(info.IconImageAssetId) == "number" and info.IconImageAssetId > 0 then
+			pictures[key] = info.IconImageAssetId
+		end
 	end
 end
 
@@ -41,7 +49,20 @@ task.spawn(function()
 			ask(key, pass.id, Enum.InfoType.GamePass)
 		end
 	end
+	infoLoaded:Fire()
 end)
+
+-- The picture of a product or pass key as an Image ("rbxassetid://..."), or nil when it has
+-- none (not set up, no picture on the dashboard, or Roblox hasn't answered yet). The Robux
+-- Store and the Missions window show these, so a new picture on the dashboard shows in the
+-- game by itself.
+function Robux.image(key: string): string?
+	local id = pictures[key]
+	return if id then `rbxassetid://{id}` else nil
+end
+
+-- Runs `callback` once Roblox has answered for every product and pass (prices and pictures).
+Robux.infoLoaded = infoLoaded.Event
 
 -- The Robux price of a product or pass key ("ItemTier2", "VIP"), or nil if it isn't set up.
 function Robux.price(key: string): number?
