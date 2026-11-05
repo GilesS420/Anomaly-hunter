@@ -4,15 +4,15 @@
 -- existing players never see it. Each step moves on by itself when the player has done what it
 -- asks, by watching the save and the hunt attributes.
 -- The tutorial (short since 2026-11-05):
---   Catch   they're put straight into Pumpkin Graveyard (HuntService.sendInto, again if they
---           walk out) and catch the Gloomlet that waits there, reserved for them (and a free
---           Return Charm)
+--   Gate    walk into Pumpkin Graveyard
+--   Catch   catch the Gloomlet that waits there, reserved for them (and a free Return Charm)
 --   Home    bring it home (the exit or the charm); it turns Cobwebbed and goes straight into the
 --           Backpack, ready to sell
---   Sell    sell it at the Collector, who then tops their money up to the Phantom Vac's price
+--   Sell    sell it at the Collector (their money has to go up, so an admin restarting the
+--           tutorial with money still has to sell), who then tops it up to the Phantom Vac's price
 --   Buy     buy the Phantom Vac (always in stock for them during this step, WorkshopService)
 --   Tour    the client shows what each button does, then fires Finish
--- Losing the catch (knocked out, or leaving the zone or the game) goes back to Catch. Nothing
+-- Losing the catch (knocked out, or leaving the zone or the game) goes back to Gate. Nothing
 -- attacks a player in the tutorial (MonsterAiService) and fast travel to a locked button is
 -- refused (TravelService). The player attribute Tutorial holds the step (nil once done) and
 -- TutorialSince when it started (server time), for the client's "stuck?" hint.
@@ -56,12 +56,11 @@ type State = {
 	spawnAt: number?, -- os.clock() when to bring (another) one
 	tourEnds: number?, -- os.clock() when an unfinished tour ends by itself
 	feedEnds: number?, -- os.clock() when the Feed step gives the effect anyway
-	sendAt: number?, -- os.clock() when to put them into the tutorial zone (again)
+	sellMoney: number?, -- their money when the Sell step was first checked
 }
 
 local CheckSeconds = 0.5
 local TourTimeout = 180 -- a tour nobody finishes (the window was closed, say) ends anyway
-local SendSeconds = 4 -- between tries to put a player in the hub into the tutorial zone
 
 local states: { [Player]: State } = {}
 
@@ -305,16 +304,17 @@ local function check(player: Player, state: State)
 	local carrying = HuntService.isCarrying(player)
 	local owned = #data.monsters + #data.storage
 
-	if step == "Catch" then
+	if step == "Gate" then
+		if zone == Tutorial.Zone then
+			setStep(player, "Catch", true)
+		end
+	elseif step == "Catch" then
 		if carrying then
 			setStep(player, "Home", true)
-			return
-		end
-		keepMonster(player, state, zone, Tutorial.Monster)
-		if zone == nil and os.clock() >= (state.sendAt or 0) then
-			-- Starts (and after walking out, goes back) inside the zone, no walk to the gate.
-			state.sendAt = os.clock() + SendSeconds
-			HuntService.sendInto(player, Tutorial.Zone)
+		elseif zone ~= Tutorial.Zone then
+			setStep(player, "Gate", true) -- left without it
+		else
+			keepMonster(player, state, zone, Tutorial.Monster)
 		end
 	elseif step == "Home" then
 		if zone == nil and not carrying then
@@ -323,14 +323,17 @@ local function check(player: Player, state: State)
 				storeNewest(player, data)
 				setStep(player, "Sell", true)
 			else
-				setStep(player, "Catch", true) -- knocked out on the way
+				setStep(player, "Gate", true) -- knocked out on the way
 			end
 		end
 	elseif step == "Sell" then
-		if data.money > 0 then
-			setStep(player, "Buy", true)
+		local before = state.sellMoney
+		if not before then
+			state.sellMoney = data.money
+		elseif data.money > before then
+			setStep(player, "Buy", true) -- sold
 		elseif owned == 0 then
-			setStep(player, "Catch", true)
+			setStep(player, "Gate", true)
 		else
 			storeNewest(player, data) -- an older save from the Pickup step
 		end
@@ -392,7 +395,7 @@ local function onLoaded(player: Player, data: DataService.Data)
 			data.wingsOwned,
 			paidItems(data.inventory)
 		)
-		data.tutorial = if fresh then "Catch" else "Done"
+		data.tutorial = if fresh then "Gate" else "Done"
 	end
 	-- A save from the longer tutorial that was in its Bakery part: that's the quest now.
 	local moved = Tutorial.questFor(data.tutorial)
@@ -407,9 +410,8 @@ local function onLoaded(player: Player, data: DataService.Data)
 		if Tutorial.index(step) == 0 then
 			step = Tutorial.Steps[1]
 		end
-		-- The step's start already ran in an earlier visit (the gift), except the tour; the
-		-- catch's only gives a charm they don't have.
-		setStep(player, step, step == "Tour" or step == "Catch")
+		-- The step's start already ran in an earlier visit (the charm, the gift), except the tour.
+		setStep(player, step, step == "Tour")
 		if fresh then
 			Notify.toast(player, "Welcome, hunter! Let's catch your first monster.")
 		end

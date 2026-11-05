@@ -2639,9 +2639,9 @@ end
 do
 	local Tutorial = require("../src/shared/Util/Tutorial")
 	local Zones = require("../src/shared/Config/Zones")
-	-- Short since 2026-11-05: starts inside the zone, the catch goes straight to the Backpack.
-	check("tutorial starts at the catch and ends after the tour", Tutorial.Steps[1] == "Catch")
-	check("tutorial step order", Tutorial.nextStep("Catch") == "Home" and Tutorial.nextStep("Tour") == "Done")
+	-- Short since 2026-11-05: the catch goes straight to the Backpack, then sell and buy.
+	check("tutorial starts at the gate and ends after the tour", Tutorial.Steps[1] == "Gate")
+	check("tutorial step order", Tutorial.nextStep("Gate") == "Catch" and Tutorial.nextStep("Tour") == "Done")
 	check("tutorial: home, then sell", Tutorial.nextStep("Home") == "Sell")
 	check("tutorial: the vacuum, then the tour", Tutorial.nextStep("Buy") == "Tour")
 	check(
@@ -2674,9 +2674,12 @@ do
 		"tutorial: the mansion list opens with the Backpack",
 		Tutorial.Unlocks.MansionList == Tutorial.Unlocks.Backpack
 	)
-	check("tutorial: buttons locked at the start", not Tutorial.isUnlocked("Catch", "Sell"))
-	check("tutorial: Portals works from the first step", Tutorial.isUnlocked("Catch", "Portals"))
-	check("tutorial: hotbar opens for the catch", Tutorial.isUnlocked("Catch", "Hotbar"))
+	check("tutorial: buttons locked at the start", not Tutorial.isUnlocked("Gate", "Sell"))
+	check("tutorial: Portals works from the first step", Tutorial.isUnlocked("Gate", "Portals"))
+	check(
+		"tutorial: hotbar opens for the catch",
+		Tutorial.isUnlocked("Catch", "Hotbar") and not Tutorial.isUnlocked("Gate", "Hotbar")
+	)
 	check(
 		"tutorial: the Backpack opens when the catch is in it",
 		Tutorial.isUnlocked("Sell", "Backpack") and not Tutorial.isUnlocked("Home", "Backpack")
@@ -2721,16 +2724,16 @@ do
 			and not Tutorial.isFresh(0, 0, 0, 1, 1)
 	)
 	check(
-		"tutorial: a lost hunt starts over at the catch",
-		Tutorial.resumeAt("Catch") == "Catch"
-			and Tutorial.resumeAt("Home") == "Catch"
+		"tutorial: a lost hunt starts over at the gate",
+		Tutorial.resumeAt("Catch") == "Gate"
+			and Tutorial.resumeAt("Home") == "Gate"
 			and Tutorial.resumeAt("Sell") == "Sell"
 	)
 	check(
 		"tutorial: saves from the long tutorial pick up in the short one",
-		Tutorial.resumeAt("Gate") == "Catch"
+		Tutorial.resumeAt("Gate") == "Gate"
 			and Tutorial.resumeAt("Pickup") == "Sell"
-			and Tutorial.index(Tutorial.resumeAt("Gate")) > 0
+			and Tutorial.index(Tutorial.resumeAt("Pickup")) > 0
 	)
 	check(
 		"tutorial: welcome gift tops up to the price",
@@ -3069,7 +3072,7 @@ do
 			and Settings.weatherScale("Less") < 1
 			and Settings.weatherScale("Full") == 1
 	)
-	check("settings work during the tutorial", TutorialUtil.isUnlocked("Catch", "Settings"))
+	check("settings work during the tutorial", TutorialUtil.isUnlocked("Gate", "Settings"))
 	check("settings ui size is normal by default", Settings.value("uiSize", nil) == "Normal")
 end
 
@@ -4294,7 +4297,7 @@ end
 do
 	check("analytics: new save is undecided", Analytics.empty().onboard == 0)
 	check("analytics: tutorial not started is step 0", Analytics.onboardStep("New", 1) == 0)
-	check("analytics: on Catch means joined", Analytics.onboardStep("Catch", 1) == 1)
+	check("analytics: on Gate means joined", Analytics.onboardStep("Gate", 1) == 1)
 	local soldStep = Analytics.onboardStep("Buy", 1)
 	check("analytics: on Buy means sold", Analytics.Onboarding[soldStep] == "Sold first monster")
 	check("analytics: tutorial done", Analytics.onboardStep("Done", 1) == Analytics.TutorialDone)
@@ -4304,7 +4307,7 @@ do
 		Analytics.Onboarding[Analytics.TutorialDone] == "Finished tutorial"
 	)
 	check("analytics: never past the last step", Analytics.onboardStep("Done", 6) == #Analytics.Onboarding)
-	check("analytics: wings don't count mid-tutorial", Analytics.onboardStep("Sell", 3) == 3)
+	check("analytics: wings don't count mid-tutorial", Analytics.onboardStep("Sell", 3) == 4)
 	check(
 		"analytics: the Bakery quest funnel",
 		Analytics.questStep("Bake") == 1
