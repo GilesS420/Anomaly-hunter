@@ -110,7 +110,8 @@ local function check(player: Player, quiet: boolean)
 		elseif reward.goal == "Combos" then
 			goal = "Every secret combo made"
 		end
-		Notify.toast(player, `Codex reward! {goal}{page}: +{Format.money(reward.amount)}`)
+		local title = if reward.topUp then "Codex rewards went up!" else "Codex reward!"
+		Notify.toast(player, `{title} {goal}{page}: +{Format.money(reward.amount)}`)
 	end
 	if quiet or #messages == 0 then
 		return

@@ -3057,6 +3057,31 @@ do
 	end
 	check("codex: every page has a reward", launched == #Codex.sections())
 
+	local CodexRewards = require("../src/shared/Config/CodexRewards")
+	check(
+		"codex: Giles's fixed rewards",
+		Codex.rewardAmount(Codex.EffectsPage, "Effects") == 1e12
+			and Codex.rewardAmount(Codex.EffectsPage, "Combos") == 2e12
+			and Codex.rewardAmount("Events", "Found") == 50e9
+	)
+	-- A save from before the raise marks a paid goal `true`: it gets only the difference, once.
+	local old: { [string]: any } = { rewards = { [Codex.rewardKey(page.id, "Found")] = true } }
+	for _, id in page.monsters do
+		Codex.note(old, { monsterId = id, size = "Normal", effects = {}, familiarity = 0 })
+	end
+	local was = math.floor(CodexRewards.Old.Pages[page.id] * CodexRewards.Old.Goals.Found)
+	local topUps = Codex.newRewards(old, { page })
+	if CodexRewards.TopUpOldClaims then
+		check(
+			"codex: an old claim is topped up by the difference",
+			#topUps == 1 and topUps[1].topUp and topUps[1].amount == Codex.rewardAmount(page.id, "Found") - was
+		)
+	else
+		check("codex: an old claim counts as fully paid", #topUps == 0)
+	end
+	check("codex: a top-up isn't paid twice", #Codex.newRewards(old, { page }) == 0)
+	check("codex: a topped-up goal still shows as paid", Codex.claimed(old, page.id, "Found"))
+
 	check("portals: a new player goes to the first zone", Hunt.newestZone(1).index == 1)
 	check("portals: two wings go to the second zone", Hunt.newestZone(2).index == 2)
 	local last = Hunt.newestZone(99)

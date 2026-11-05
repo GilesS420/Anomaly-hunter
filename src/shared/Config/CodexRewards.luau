@@ -5,25 +5,45 @@
 -- amount times the goal's `Goals` multiplier. The effects page pays for finding every effect
 -- and for making every secret combo.
 --
--- Wings cost 8x more each step (Config/Wings), so each zone's page pays about 8x the last.
--- Raised 5x on 2026-10-21 (Giles: "codex rewards need to be higher").
+-- Harder goals pay much more (Giles 2026-11-05): every effect $1T, every combo $2T, the Watcher
+-- event page $50B for Found. A zone page's Found pays 2x that zone's Divine monster, and each
+-- zone pays 4x the last. Variant multipliers follow how rare the colour is to catch.
+-- Table for Giles: https://claude.ai/artifact/XmyH81EdGfPur7JKkbu4KQ
 
 return {
 	Goals = {
 		Found = 1,
-		Silver = 2.5,
-		Gold = 5,
-		Shiny = 15,
-		Rainbow = 50,
+		Silver = 3,
+		Gold = 6,
+		Shiny = 20,
+		Rainbow = 100,
 	} :: { [string]: number },
 	Pages = {
-		PumpkinGraveyard = 500_000,
-		MurkyBayou = 4_000_000,
-		AbandonedCarnival = 32_000_000,
-		SpookySchool = 256_000_000,
-		GhostShip = 2_048_000_000,
-		Events = 10_000_000, -- the Watcher event monsters
+		PumpkinGraveyard = 30_000_000,
+		MurkyBayou = 120_000_000,
+		AbandonedCarnival = 480_000_000,
+		SpookySchool = 1_920_000_000,
+		GhostShip = 7_680_000_000,
+		Events = 50_000_000_000, -- the Watcher event monsters
 	} :: { [string]: number },
-	Effects = 5_000_000, -- every effect found
-	Combos = 25_000_000, -- every secret combo made
+	Effects = 1_000_000_000_000, -- every effect found
+	Combos = 2_000_000_000_000, -- every secret combo made
+
+	-- Saves from before 2026-11-05 mark a paid goal `true` instead of the amount paid. With
+	-- TopUpOldClaims on, such a goal counts as paid at these old amounts and the player gets the
+	-- difference the next time the Codex is checked. Off: `true` counts as fully paid.
+	TopUpOldClaims = true,
+	Old = {
+		Goals = { Found = 1, Silver = 2.5, Gold = 5, Shiny = 15, Rainbow = 50 } :: { [string]: number },
+		Pages = {
+			PumpkinGraveyard = 500_000,
+			MurkyBayou = 4_000_000,
+			AbandonedCarnival = 32_000_000,
+			SpookySchool = 256_000_000,
+			GhostShip = 2_048_000_000,
+			Events = 10_000_000,
+		} :: { [string]: number },
+		Effects = 5_000_000,
+		Combos = 25_000_000,
+	},
 }
