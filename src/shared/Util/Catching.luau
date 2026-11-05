@@ -13,12 +13,14 @@ local Catching = {}
 
 local vacuumTiers: { [string]: number } = {}
 local vacuumRanks: { [string]: number } = {} -- 1 for the Dust Buster, up the shop's order
+local vacuumOrder: { string } = {} -- vacuum ids, weakest first
 local rank = 0
 for _, item in Shop.Workshop do
 	if item.kind == "Vacuum" then
 		vacuumTiers[item.id] = item.tier or 1
 		rank += 1
 		vacuumRanks[item.id] = rank
+		table.insert(vacuumOrder, item.id)
 	end
 end
 
@@ -62,6 +64,20 @@ end
 function Catching.canVacuum(vacuumId: string, sizeId: string, rarityId: string, monsterId: string?): boolean
 	return Catching.vacuumTier(vacuumId) >= Catching.requiredTier(sizeId, rarityId)
 		and Catching.strongEnough(vacuumId, monsterId)
+end
+
+-- The weakest vacuum (in shop order) that can catch this monster, or nil when this vacuum
+-- already can. Names the vacuum in the "Too strong!" toast, and lets the client skip the meter.
+function Catching.vacuumNeeded(vacuumId: string, sizeId: string, rarityId: string, monsterId: string?): string?
+	if Catching.canVacuum(vacuumId, sizeId, rarityId, monsterId) then
+		return nil
+	end
+	for _, id in vacuumOrder do
+		if Catching.canVacuum(id, sizeId, rarityId, monsterId) then
+			return id
+		end
+	end
+	return vacuumOrder[#vacuumOrder]
 end
 
 -- Seconds of holding needed to catch this rarity with this vacuum (math.huge if unknown).

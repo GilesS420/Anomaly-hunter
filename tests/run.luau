@@ -187,6 +187,13 @@ check("Dust Buster can't hold a Big monster", not Catching.canVacuum("DustBuster
 check("Phantom Vac holds a Huge Epic", Catching.canVacuum("PhantomVac", "Huge", "Epic"))
 check("Mythic needs the Void Vac", not Catching.canVacuum("PhantomVac", "Tiny", "Mythic"))
 check("Void Vac holds a Colossal Divine", Catching.canVacuum("VoidVac", "Colossal", "Divine"))
+check("A Mythic names the Void Vac", Catching.vacuumNeeded("DustBuster", "Tiny", "Mythic") == "VoidVac")
+check("A Big monster names the Phantom Vac", Catching.vacuumNeeded("DustBuster", "Big", "Common") == "PhantomVac")
+check("A strong enough vacuum needs nothing", Catching.vacuumNeeded("VoidVac", "Colossal", "Divine") == nil)
+check(
+	"An event monster names its own vacuum",
+	Catching.vacuumNeeded("PhantomVac", "Normal", "Phantom", "CrimsonWisp") == "BansheeBlower"
+)
 
 -- Every catch has quick time struggles; rarer and bigger monsters are harder (Giles 2026-10-21).
 do
