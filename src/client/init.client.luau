@@ -24,6 +24,7 @@ local CakeController = require(script.Controllers.CakeController)
 local HotbarController = require(script.Controllers.HotbarController)
 local CarryController = require(script.Controllers.CarryController)
 local PickupController = require(script.Controllers.PickupController)
+local OwnerPromptController = require(script.Controllers.OwnerPromptController)
 local MonsterLabelController = require(script.Controllers.MonsterLabelController)
 local SkyController = require(script.Controllers.SkyController)
 local EventIconController = require(script.Controllers.EventIconController)
@@ -68,6 +69,7 @@ local controllers: { { start: () -> () } } = {
 	HotbarController,
 	CarryController,
 	PickupController,
+	OwnerPromptController,
 	MonsterLabelController,
 	SkyController,
 	EventIconController,

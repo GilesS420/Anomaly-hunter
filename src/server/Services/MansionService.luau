@@ -9,11 +9,15 @@
 --     OwnerSign   "<name>'s Mansion" and "3/8 monsters", floating above the Foyer
 --     WorthSign   a wooden sign left of the front gate: what all the monsters inside are worth
 --     Trophy      a stone stand right of the front gate with the owner's best monster on top
+--     ExpandSign  a big glowing sign at the front of the yard: the next wing and its price,
+--                 with a hold-to-buy prompt only the owner sees (client/OwnerPromptController);
+--                 "Mansion complete" once every wing is owned
 --     Monsters    the owner's caught monsters, roaming around the owned wings (each label
 --                 says how familiar it is, see CareService)
 -- Wings are bought in order (the Foyer is free). Each one makes room for more monsters and
 -- opens a new zone. Nothing here needs building in Studio.
 
+local CollectionService = game:GetService("CollectionService")
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -59,9 +63,21 @@ type State = {
 	worthLabels: { TextLabel }, -- the amount on both faces of the worth sign
 	trophy: BasePart, -- the stand's top; the best monster stands on it
 	trophyKey: string?, -- what the monster on the stand was built from (uid and look)
+	expand: ExpandSign, -- the sign out front that sells the next wing
 	group: string, -- RoamService group shared by this mansion's monsters
 	rects: { Roam.Rect }, -- floor areas the monsters may roam (one per owned wing)
 	generation: number, -- goes up whenever the monsters are cleared, cancelling waiting spawns
+}
+
+-- The expand sign's parts that change after a purchase.
+type ExpandSign = {
+	headings: { TextLabel }, -- both faces
+	names: { TextLabel },
+	prices: { TextLabel },
+	prompt: ProximityPrompt,
+	glow: { BasePart }, -- neon trim, green while there's a wing to buy
+	light: PointLight,
+	arrow: BillboardGui, -- the bobbing "EXPAND" marker above it
 }
 
 -- A room part as it stands in the world, with the recipe key (Rooms.key) it was built from.
@@ -76,6 +92,11 @@ local SpawnRetrySeconds = 1 -- no free spot right now: try again after the other
 -- plot-local (see Layout.Wings.Foyer and Layout.PlotSpawn).
 local WorthSignSpot = { x = -13, z = -37 }
 local TrophySpot = { x = 13, z = -37 }
+-- The expand sign stands at the front of the yard, left of where the owner spawns, so it's
+-- the first thing they see coming home or stepping out (Layout.PlotSpawn is at 0, -45).
+local ExpandSignSpot = { x = -26, z = -47 }
+local ExpandGreen = Color3.fromRGB(90, 255, 130)
+local ExpandGrey = Color3.fromRGB(150, 150, 160)
 
 local wingColors: { [string]: Color3 } = {
 	Foyer = Color3.fromRGB(150, 110, 80),
@@ -320,6 +341,25 @@ end
 
 local buyNext: (state: State, who: Player) -> ()
 
+-- Makes a buy prompt that only the mansion's owner sees (client/OwnerPromptController hides it
+-- for everyone else; buyNext still checks who pressed it).
+local function ownerPrompt(state: State, parent: Instance, name: string): ProximityPrompt
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = name
+	prompt.HoldDuration = 0.5
+	prompt.MaxActivationDistance = 14
+	prompt.RequiresLineOfSight = false
+	prompt:SetAttribute("OwnerId", state.player.UserId)
+	CollectionService:AddTag(prompt, "OwnerPrompt")
+	prompt.Triggered:Connect(function(who)
+		buyNext(state, who)
+	end)
+	prompt.Parent = parent
+	return prompt
+end
+
+local updateExpandSign: (state: State, wingsOwned: number) -> ()
+
 -- The wing that can be bought next: a see-through floor and a sign with a buy prompt.
 local function buildNextWing(state: State, wing: Wings.Wing)
 	local spot = Layout.Wings[wing.id]
@@ -374,17 +414,9 @@ local function buildNextWing(state: State, wing: Wings.Wing)
 		signText(board, `{wing.id} wing`, `{Format.money(wing.price)}{opens}`)
 
 		-- Hold E, click or tap the prompt to buy (works with mouse, keyboard, touch and gamepad).
-		local prompt = Instance.new("ProximityPrompt")
-		prompt.Name = "BuyPrompt"
+		local prompt = ownerPrompt(state, board, "BuyPrompt")
 		prompt.ActionText = `Buy {wing.id}`
 		prompt.ObjectText = Format.money(wing.price)
-		prompt.HoldDuration = 0.5
-		prompt.MaxActivationDistance = 14
-		prompt.RequiresLineOfSight = false
-		prompt.Triggered:Connect(function(who)
-			buyNext(state, who)
-		end)
-		prompt.Parent = board
 	else
 		signText(board, `{wing.id} — coming soon`, "Opens in a future update")
 	end
@@ -423,6 +455,7 @@ local function buildWings(state: State, wingsOwned: number)
 	end
 	state.rects = roamRects(state, wingsOwned)
 	RoamService.setRectsForGroup(state.group, state.rects)
+	updateExpandSign(state, wingsOwned)
 end
 
 local updateShowcase: (state: State) -> ()
@@ -802,6 +835,135 @@ local function buildTrophy(plot: PlotService.Plot, model: Model): BasePart
 	return top
 end
 
+-- Three lines of text on one face of the expand sign: heading, wing name, price.
+local function expandText(board: BasePart, face: Enum.NormalId): (TextLabel, TextLabel, TextLabel)
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = face
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 40
+	gui.LightInfluence = 0
+	local heading = textLine(gui, "EXPAND YOUR MANSION", Color3.fromRGB(230, 215, 190), 0.07, 0.22)
+	local name = textLine(gui, "", Color3.new(1, 1, 1), 0.33, 0.3)
+	local price = textLine(gui, "", ExpandGreen, 0.67, 0.25)
+	for _, text in { heading, name, price } do
+		text.Position = UDim2.fromScale(0.06, text.Position.Y.Scale)
+		text.Size = UDim2.fromScale(0.88, text.Size.Y.Scale)
+	end
+	gui.Parent = board
+	return heading, name, price
+end
+
+-- The big sign at the front of the yard that sells the next wing. Readable from both sides:
+-- from the hub path and from the owner's spawn. updateExpandSign fills in the text.
+local function buildExpandSign(state: State, model: Model): ExpandSign
+	local plot = state.plot
+	local folder = folderIn(model, "ExpandSign")
+	local wood = Color3.fromRGB(62, 36, 30)
+	for i, side in { -1, 1 } do
+		yardPart(
+			plot,
+			`Post{i}`,
+			Vector3.new(0.8, 11, 0.8),
+			ExpandSignSpot,
+			Vector3.new(side * 7.4, 0, 0),
+			wood,
+			Enum.Material.Wood,
+			folder
+		)
+	end
+	local board = yardPart(
+		plot,
+		"Board",
+		Vector3.new(14, 7, 0.5),
+		ExpandSignSpot,
+		Vector3.new(0, 3.5, 0),
+		Color3.fromRGB(40, 26, 24),
+		Enum.Material.Wood,
+		folder
+	)
+	-- Neon trim above and below the board, so it stands out at night.
+	local glow: { BasePart } = {}
+	for i, y in { 3.2, 10.7 } do
+		local trim = yardPart(
+			plot,
+			`Glow{i}`,
+			Vector3.new(14.6, 0.3, 0.7),
+			ExpandSignSpot,
+			Vector3.new(0, y, 0),
+			ExpandGreen,
+			Enum.Material.Neon,
+			folder
+		)
+		ghost(trim)
+		table.insert(glow, trim)
+	end
+	local light = Instance.new("PointLight")
+	light.Range = 16
+	light.Brightness = 1.2
+	light.Color = ExpandGreen
+	light.Parent = board
+
+	local h1, n1, p1 = expandText(board, Enum.NormalId.Front)
+	local h2, n2, p2 = expandText(board, Enum.NormalId.Back)
+
+	-- A floating marker above the sign that catches the eye from across the yard (hidden once
+	-- there is nothing left to buy).
+	local arrow = billboard(anchorAt(board, board.Position + Vector3.new(0, 7, 0)), 10, 3, 120)
+	arrow.Name = "Marker"
+	local marker = textLine(arrow, "▼ EXPAND ▼", ExpandGreen, 0, 1)
+	marker.Name = "Text"
+
+	local prompt = ownerPrompt(state, board, "ExpandPrompt")
+	prompt.MaxActivationDistance = 16
+
+	return {
+		headings = { h1, h2 },
+		names = { n1, n2 },
+		prices = { p1, p2 },
+		prompt = prompt,
+		glow = glow,
+		light = light,
+		arrow = arrow,
+	}
+end
+
+-- Shows the next wing on the expand sign, or "Mansion complete" when there's none left.
+updateExpandSign = function(state: State, wingsOwned: number)
+	local sign = state.expand
+	if not sign then
+		return -- still being built (buildWings runs again once it is)
+	end
+	local wing = Mansion.nextWing(wingsOwned)
+	local heading, name, price, buyable
+	if not wing then
+		heading, name, price, buyable = "MANSION COMPLETE", "Every wing owned!", "Fully expanded", false
+	elseif not wing.launch then
+		heading, name, price, buyable = "NEXT WING", `{wing.id} wing`, "Coming in a future update", false
+	else
+		local zone = if wing.unlocksZone then Hunt.zoneByIndex(wing.unlocksZone) else nil
+		local opens = if zone and zone.launch then ` · opens {zone.name}` else " · more room"
+		heading, name, price, buyable =
+			"EXPAND YOUR MANSION", `Next: {wing.id} wing`, `{Format.money(wing.price)}{opens}`, true
+	end
+	for i = 1, 2 do
+		sign.headings[i].Text = heading
+		sign.names[i].Text = name
+		sign.prices[i].Text = price
+		sign.prices[i].TextColor3 = if buyable then ExpandGreen else ExpandGrey
+	end
+	local color = if buyable then ExpandGreen elseif wing then ExpandGrey else Color3.fromRGB(255, 210, 90)
+	for _, part in sign.glow do
+		part.Color = color
+	end
+	sign.light.Color = color
+	sign.arrow.Enabled = buyable
+	sign.prompt.Enabled = buyable
+	if wing and buyable then
+		sign.prompt.ActionText = `Buy {wing.id}`
+		sign.prompt.ObjectText = Format.money(wing.price)
+	end
+end
+
 -- Builds the mansion once the player has both a loaded save and a plot.
 local function tryBuild(player: Player)
 	if mansions[player] or player.Parent ~= Players then
@@ -859,11 +1021,13 @@ local function tryBuild(player: Player)
 		worthLabels = buildWorthSign(plot, model),
 		trophy = buildTrophy(plot, model),
 		trophyKey = nil,
+		expand = nil :: any, -- built just below (it needs the state for its prompt)
 		group = `Mansion:{player.UserId}`,
 		rects = {},
 		generation = 0,
 	}
 	mansions[player] = state
+	state.expand = buildExpandSign(state, model)
 
 	buildWings(state, data.wingsOwned)
 	model.Parent = mansionsFolder()
