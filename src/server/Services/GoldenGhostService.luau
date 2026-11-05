@@ -22,6 +22,7 @@ local GoldenGhost = require(ReplicatedStorage.Shared.Util.GoldenGhost)
 local Rng = require(ReplicatedStorage.Shared.Util.Rng)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local CakeService = require(script.Parent.CakeService)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 local DataService = require(script.Parent.DataService)
 local MissionService = require(script.Parent.MissionService)
 local Notify = require(script.Parent.Parent.Notify)
@@ -217,7 +218,9 @@ local function award(player: Player)
 		CakeService.syncTools(player)
 		prize = `a {cake.name}`
 	else
-		DataService.addMoney(player, cash)
+		if DataService.addMoney(player, cash) then
+			AnalyticsService.money(player, cash, "Gameplay", "GoldenGhost")
+		end
 		prize = Format.money(cash)
 	end
 	DataService.saveSoon(player)

@@ -24,6 +24,7 @@ local Tutorial = require(ReplicatedStorage.Shared.Util.Tutorial)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local AdminRestock = require(script.Parent.Parent.AdminRestock)
 local Counter = require(script.Parent.Parent.Counter)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 local DataService = require(script.Parent.DataService)
 local HuntService = require(script.Parent.HuntService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
@@ -189,6 +190,7 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 
 	local message
 	if check == "Ok" and item and DataService.addMoney(player, -item.price) then
+		AnalyticsService.money(player, -item.price, "Shop", item.id)
 		data.inventory[item.id] = (data.inventory[item.id] or 0) + 1
 		bought[item.id] = (bought[item.id] or 0) + 1
 		local equipSlot = Workshop.equipSlot(item)
@@ -267,6 +269,7 @@ local function refundRetired(player: Player, data: DataService.Data)
 	end
 	local refund = Workshop.refundRetired(data.inventory)
 	if refund > 0 and DataService.addMoney(player, refund) then
+		AnalyticsService.money(player, refund, "Gameplay", "FlashlightRefund")
 		Notify.toast(
 			player,
 			`Flashlights are gone: vacuums do it all now. You got {Format.money(refund)} back for yours!`

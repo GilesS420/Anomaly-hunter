@@ -10,6 +10,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Analytics = require(ReplicatedStorage.Shared.Util.Analytics)
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Feedback = require(ReplicatedStorage.Shared.Util.Feedback)
 local Heists = require(ReplicatedStorage.Shared.Util.Heists)
@@ -54,6 +55,7 @@ export type Data = {
 	feedback: Feedback.Record, -- how many feedback notes they sent today, and when (FeedbackService)
 	guildGift: boolean, -- got the one-time Hunter's Guild gift for joining the group (CommunityService)
 	tips: { [string]: boolean }, -- unlock tutorials already seen, by Util/Tips id (TipService)
+	analytics: Analytics.Record, -- funnel steps already sent to Creator Hub (AnalyticsService)
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -87,6 +89,7 @@ DataService.Template = {
 	feedback = Feedback.empty(),
 	guildGift = false,
 	tips = {},
+	analytics = Analytics.empty(),
 } :: Data
 
 local store = ProfileStore.New(
@@ -186,6 +189,7 @@ local function loadPlayer(player: Player)
 	end
 	data.robux = Robux.repair(data.robux)
 	data.heist = Heists.repair(data.heist)
+	data.analytics = Analytics.repair(data.analytics)
 
 	profiles[player] = profile
 	makeLeaderstats(player, data)

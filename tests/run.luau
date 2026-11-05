@@ -41,6 +41,7 @@ local Weight = require("../src/shared/Util/Weight")
 local WeightConfig = require("../src/shared/Config/Weight")
 local Movement = require("../src/shared/Util/Movement")
 local MovementConfig = require("../src/shared/Config/Movement")
+local Analytics = require("../src/shared/Util/Analytics")
 
 local failures = 0
 local function check(name: string, ok: boolean)
@@ -4162,6 +4163,29 @@ do
 		#cut == FeedbackConfig.InboxSize and cut[1].id == "newest"
 	)
 	check("feedback: time ago reads well", Feedback.ago(5) == "just now" and Feedback.ago(7200) == "2 h ago")
+end
+
+-- Analytics funnels (Util/Analytics).
+do
+	check("analytics: new save is undecided", Analytics.empty().onboard == 0)
+	check("analytics: tutorial not started is step 0", Analytics.onboardStep("New", 1) == 0)
+	check("analytics: on Gate means joined", Analytics.onboardStep("Gate", 1) == 1)
+	local soldStep = Analytics.onboardStep("Buy", 1)
+	check("analytics: on Buy means sold", Analytics.Onboarding[soldStep] == "Sold first monster")
+	check("analytics: tutorial done", Analytics.onboardStep("Done", 1) == Analytics.TutorialDone)
+	check("analytics: first wing", Analytics.onboardStep("Done", 2) == 9)
+	check("analytics: never past the last step", Analytics.onboardStep("Done", 6) == #Analytics.Onboarding)
+	check("analytics: wings don't count mid-tutorial", Analytics.onboardStep("Sell", 3) == 5)
+	check("analytics: under 100 steps", #Analytics.Onboarding <= 100 and #Analytics.ComebackDays <= 100)
+	check("analytics: day 1 is a milestone", Analytics.comebackStep(1) == 1)
+	check("analytics: day 2 is a milestone", Analytics.comebackStep(2) == 2)
+	check("analytics: day 4 is not a milestone", Analytics.comebackStep(4) == nil)
+	check("analytics: day 1 name", Analytics.comebackName(1) == "Played day 1")
+	check("analytics: day 7 name", Analytics.comebackName(5) == "Played on 7 days")
+	check("analytics: UTC days", Analytics.day(86399) == 0 and Analytics.day(86400) == 1)
+	local fixed = Analytics.repair({ onboard = 3.7, days = 0 / 0 })
+	check("analytics: repair", fixed.onboard == 3 and fixed.days == 0 and fixed.lastDay == 0)
+	check("analytics: repair junk", Analytics.repair("x").onboard == 0)
 end
 
 if failures > 0 then

@@ -18,6 +18,7 @@ local Config = require(ReplicatedStorage.Shared.Config.Missions)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Missions = require(ReplicatedStorage.Shared.Util.Missions)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 local DataService = require(script.Parent.DataService)
 local Notify = require(script.Parent.Parent.Notify)
 local Perks = require(script.Parent.Parent.Perks)
@@ -346,7 +347,9 @@ Claim.OnServerInvoke = function(player: Player, index: unknown): Result
 		if not cash then
 			return { ok = false, message = "Claim all three missions first.", view = viewFor(state) }
 		end
-		DataService.addMoney(player, cash)
+		if DataService.addMoney(player, cash) then
+			AnalyticsService.money(player, cash, "TimedReward", "MissionChest")
+		end
 		local cakes = Missions.chestCakes(cash)
 		local cake = cakes[random:NextInteger(1, math.max(1, #cakes))]
 		if cake then
@@ -363,7 +366,9 @@ Claim.OnServerInvoke = function(player: Player, index: unknown): Result
 		if not reward then
 			return { ok = false, message = "That mission isn't done yet.", view = viewFor(state) }
 		end
-		DataService.addMoney(player, reward)
+		if DataService.addMoney(player, reward) then
+			AnalyticsService.money(player, reward, "TimedReward", "DailyMission")
+		end
 		message = `Mission reward: +{Format.money(reward)}!`
 	end
 	DataService.saveSoon(player)

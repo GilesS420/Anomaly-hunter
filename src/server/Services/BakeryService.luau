@@ -22,6 +22,7 @@ local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local AdminRestock = require(script.Parent.Parent.AdminRestock)
 local Counter = require(script.Parent.Parent.Counter)
 local CakeService = require(script.Parent.CakeService)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 local DataService = require(script.Parent.DataService)
 local InventoryService = require(script.Parent.InventoryService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
@@ -154,6 +155,7 @@ Buy.OnServerInvoke = function(player: Player, itemId: unknown): Result
 
 	local message
 	if check == "Ok" and item and DataService.addMoney(player, -item.price) then
+		AnalyticsService.money(player, -item.price, "Shop", item.id)
 		data.inventory[item.id] = (data.inventory[item.id] or 0) + 1
 		bought[item.id] = (bought[item.id] or 0) + 1
 		message =

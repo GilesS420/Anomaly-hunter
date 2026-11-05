@@ -24,6 +24,7 @@ local Storage = require(ReplicatedStorage.Shared.Util.Storage)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Weight = require(ReplicatedStorage.Shared.Util.Weight)
 local Counter = require(script.Parent.Parent.Counter)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 local DataService = require(script.Parent.DataService)
 local InventoryService = require(script.Parent.InventoryService)
 local MissionService = require(script.Parent.MissionService)
@@ -203,7 +204,9 @@ GrowRemote.OnServerInvoke = function(player: Player, uid: unknown, modeId: unkno
 	end
 	local value = valueOf(monster, data.wingsOwned)
 	local fee = Growth.fee(value, mode)
-	if not DataService.addMoney(player, -fee) then
+	if DataService.addMoney(player, -fee) then
+		AnalyticsService.money(player, -fee, "Gameplay", `Growth{mode.id}`)
+	else
 		local message =
 			`Not enough money! {mode.name} costs {Format.money(fee)} and you have {Format.money(data.money)}.`
 		Notify.toast(player, message)

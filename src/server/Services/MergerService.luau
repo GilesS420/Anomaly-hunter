@@ -27,6 +27,7 @@ local MachineConfig = require(ReplicatedStorage.Shared.Config.VariantMachine)
 local Weight = require(ReplicatedStorage.Shared.Util.Weight)
 local CareService = require(script.Parent.CareService)
 local Counter = require(script.Parent.Parent.Counter)
+local AnalyticsService = require(script.Parent.AnalyticsService)
 local DataService = require(script.Parent.DataService)
 local InventoryService = require(script.Parent.InventoryService)
 local MansionService = require(script.Parent.MansionService)
@@ -244,6 +245,7 @@ MergeRemote.OnServerInvoke = function(player: Player, mainUid: unknown, donorUid
 	if not DataService.addMoney(player, -fee) then
 		return { ok = false, message = `You need {Format.money(fee)} for the fee.`, view = viewFor(data) }
 	end
+	AnalyticsService.money(player, -fee, "Gameplay", "MergerFee")
 
 	busy[player] = true
 	local name = Format.monsterName(main)
@@ -306,6 +308,7 @@ PullRemote.OnServerInvoke = function(player: Player, uid: unknown): PullResult
 	if not DataService.addMoney(player, -fee) then
 		return { ok = false, message = `You need {Format.money(fee)} for the fee.`, view = viewFor(data) }
 	end
+	AnalyticsService.money(player, -fee, "Gameplay", "VariantMachineFee")
 
 	busy[player] = true
 	local name = Format.monsterName(caught)
