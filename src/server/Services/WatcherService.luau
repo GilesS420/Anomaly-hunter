@@ -693,10 +693,9 @@ local function startEvent(
 	current = event
 	upcoming = nil
 	endsAt = ends
+	-- One line per event (Giles 2026-11-05: too many pop-ups); the sky and the event icon say
+	-- the rest, so no warning or "is over" message either.
 	Notify.toastAll(event.announce or `{event.name} has begun!`)
-	if set then
-		Notify.toastAll(set.announce)
-	end
 	workspace:SetAttribute("WatcherMonsterSet", if set then set.id else nil)
 
 	local handler = handlers[event.id]
@@ -767,7 +766,6 @@ local function endEvent()
 			task.spawn(fadeOut, model)
 		end
 	end
-	Notify.toastAll(`{event.name} is over. The sky calms down.`)
 
 	phase = "Calm"
 	summoned = false
@@ -783,7 +781,6 @@ local function startWarning(event: Events.WatcherEvent, set: Events.MonsterSet?,
 	workspace:SetAttribute("WatcherMonsterSet", if set then set.id else nil)
 	applySky(event, set, math.max(startsAt - now(), 1))
 	workspace:SetAttribute("WatcherSkyAt", startsAt)
-	Notify.toastAll(event.warning or "The Watcher stirs...")
 end
 
 local function tick()

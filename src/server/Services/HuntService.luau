@@ -163,31 +163,22 @@ end
 local function goHome(player: Player, deliver: boolean)
 	local bag = carrying[player]
 	if bag and deliver then
-		local home, stored, lost = 0, 0, 0
+		local stored, lost = 0, 0
 		for _, caught in bag do
 			local where = MansionService.addMonster(player, caught)
-			if where == "Mansion" then
-				home += 1
-			elseif where == "Storage" then
+			if where == "Storage" then
 				stored += 1
-			else
+			elseif where ~= "Mansion" then
 				lost += 1
 			end
 		end
 		-- In the tutorial the guide card says where the catch went (straight to the Backpack).
 		if player:GetAttribute("Tutorial") == nil then
-			if home == #bag then
-				Notify.toast(
-					player,
-					`{bagName(bag)} {if #bag == 1 then "is" else "are"} home in your mansion!`
-				)
-			elseif lost == 0 then
-				Notify.toast(player, `Your mansion is full, so {stored} went into Storage (your Backpack).`)
-			else
-				Notify.toast(
-					player,
-					`Your mansion and Storage are full! {lost} got away. Sell some at the Collector or buy a new wing.`
-				)
+			-- All home: no message, the monster walking in says it (Giles 2026-11-05).
+			if lost > 0 then
+				Notify.toast(player, `Mansion and Storage full! {lost} got away.`)
+			elseif stored > 0 then
+				Notify.toast(player, `Mansion full: {stored} went to your Backpack.`)
 			end
 		end
 	end
@@ -454,15 +445,15 @@ local function enterZone(player: Player, zone: Zones.Zone, arrival: BasePart, fa
 	player:SetAttribute("Hearts", Zones.MaxHearts)
 	lastPortal[player] = os.clock()
 	lastSpot[player] = nil
-	Notify.toast(
+	-- One short line, on the first trip to each zone per visit (Giles 2026-11-05: two messages on
+	-- every portal was too much; the tutorial already teaches catching).
+	Notify.once(
 		player,
+		`Zone:{zone.id}`,
 		if Attacks.calmZone(zone.id)
-			then `Entering {zone.name}: a safe zone, monsters here don't fight back`
-			else `Entering {zone.name}: careful, monsters here fight back!`
+			then `{zone.name}: safe zone`
+			else `{zone.name}: monsters fight back!`
 	)
-	if player:GetAttribute("Tutorial") == nil then -- the tutorial card says it already
-		Notify.toast(player, "Hold your vacuum (hotbar), then click or tap a monster to catch it!")
-	end
 	PlotService.teleport(player, standAbove(arrival, facing))
 end
 

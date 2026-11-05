@@ -1324,7 +1324,7 @@ function MansionService.grow(player: Player, spurts: number?)
 			table.insert(news, `Your {Format.monsterName(caught)} grew {caught.size}!`)
 		end
 	end
-	if #news > 2 then
+	if #news > 1 then
 		Notify.toast(player, `{#news} of your monsters grew bigger!`)
 	else
 		for _, text in news do

@@ -15,7 +15,7 @@
 -- Everything shown comes from the server: player attributes Zone / Hearts / Carrying /
 -- CarryingSize / CarryingCount / BagSize / ReturnCharms / BaitBells / SilverBells / GoldBells and
 -- leaderstats.Money.
--- Messages ("Entering Murky Bayou") are toasts now, see ToastController.
+-- Messages are toasts, see ToastController (zone entry: one line on the first trip per visit).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

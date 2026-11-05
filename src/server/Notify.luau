@@ -48,6 +48,35 @@ function Notify.toast(player: Player, text: string)
 	Toast:FireClient(player, text)
 end
 
+-- Keys of the once-per-visit messages each player has seen (cleared when they leave).
+local seenOnce: { [Player]: { [string]: true } } = {}
+Players.PlayerRemoving:Connect(function(player)
+	seenOnce[player] = nil
+end)
+
+-- True the first time it's asked about this key for this player this visit, false after
+-- that (until they rejoin). For reminders that only need saying once (Giles 2026-11-05: too
+-- many pop-ups).
+function Notify.first(player: Player, key: string): boolean
+	local seen = seenOnce[player]
+	if not seen then
+		seen = {}
+		seenOnce[player] = seen
+	end
+	if seen[key] then
+		return false
+	end
+	seen[key] = true
+	return true
+end
+
+-- Shows the text only the first time for this key per visit ("Sunken Swamp: safe zone").
+function Notify.once(player: Player, key: string, text: string)
+	if Notify.first(player, key) then
+		Notify.toast(player, text)
+	end
+end
+
 -- Adds a line to the player's mutation log (a monster got an effect or combo). Doesn't toast:
 -- callers toast as well, or a summary when there's a lot at once.
 function Notify.log(player: Player, text: string)

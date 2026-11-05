@@ -299,7 +299,6 @@ local function tick()
 		-- It stays out its full time even if an event starts meanwhile (Giles 2026-10-24).
 		if os.clock() >= endsAt then
 			remove()
-			Notify.toastAll("The Golden Ghost got away...")
 		elseif head and (head.Position - (mover :: AlignPosition).Position).Magnitude < 4 then
 			flyOn()
 		end
