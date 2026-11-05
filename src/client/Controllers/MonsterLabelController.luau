@@ -105,7 +105,7 @@ function MonsterLabelController.start()
 	card.BackgroundTransparency = 0.08
 	card.Parent = canvas
 	Ui.corner(card, 10)
-	local rim = Ui.rim(card, Ui.Colors.rim, 2)
+	local rim = Ui.rim(card, Ui.Style.line, 1)
 	local padding = Instance.new("UIPadding")
 	padding.PaddingLeft = UDim.new(0, 10)
 	padding.PaddingRight = UDim.new(0, 10)

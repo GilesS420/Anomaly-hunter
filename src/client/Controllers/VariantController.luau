@@ -66,7 +66,7 @@ local function card(
 	row.BackgroundColor3 = Ui.Colors.row
 	row.Parent = list
 	Ui.corner(row, 10)
-	Ui.rim(row, highlight or Color3.fromRGB(58, 48, 78), if highlight then 2 else 1)
+	Ui.rim(row, highlight or Ui.Style.line, if highlight then 2 else 1)
 	ShopCards.pad(row)
 
 	ShopCards.pictureBox(row, inner, monster.color, monster.look)
@@ -191,7 +191,7 @@ function VariantController.start()
 		end
 		local monsters = view.monsters
 		if #monsters == 0 then
-			window.status.Text = "Your Backpack has no monsters. Pick some up in your mansion first."
+			window.status.Text = "Backpack empty. Pick up monsters in your mansion."
 			return
 		end
 
@@ -199,7 +199,7 @@ function VariantController.start()
 		if not picked then
 			-- Step 1: pick a monster. Ones that can go in first, most valuable first.
 			pickedUid = nil
-			window.status.Text = "Pick a monster. Each try eats one of its effects, but it always comes back."
+			window.status.Text = "Pick a monster."
 			local sorted = table.clone(monsters)
 			table.sort(sorted, function(a, b)
 				if (a.pullProblem == nil) ~= (b.pullProblem == nil) then

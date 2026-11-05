@@ -206,7 +206,7 @@ local function input(
 	limit.MaxTextSize = 16
 	limit.Parent = box
 	Ui.corner(box, 8)
-	Ui.rim(box, Ui.Colors.rim, 1)
+	Ui.rim(box, Ui.Style.line, 1)
 	box.Parent = line
 	local function read(): string?
 		local text = string.match(box.Text, "^%s*(.-)%s*$")
@@ -253,7 +253,7 @@ local function buildPopup(gui: Frame)
 	popup.Visible = false
 	popup.Parent = gui
 	Ui.corner(popup, 8)
-	Ui.rim(popup, Ui.Colors.rim, 2)
+	Ui.rim(popup, Ui.Style.line, 1)
 	local layout = Instance.new("UIListLayout")
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = popup
@@ -373,7 +373,7 @@ local function modal(canvas: Frame, titleText: string, maxSize: Vector2): Modal
 	frame.Visible = false
 	frame.Parent = canvas
 	Ui.corner(frame, 14)
-	Ui.rim(frame, Ui.Colors.lamp, 2)
+	Ui.rim(frame, Ui.Style.line, 1)
 	local limit = Instance.new("UISizeConstraint")
 	limit.MaxSize = maxSize
 	limit.Parent = frame
@@ -927,7 +927,7 @@ local function build()
 	switch.BackgroundColor3 = Ui.Colors.row
 	switch.Parent = attackRow
 	Ui.corner(switch, RowHeight)
-	Ui.rim(switch, Ui.Colors.rim, 2)
+	Ui.rim(switch, Ui.Style.line, 1)
 	local knob = Instance.new("Frame")
 	knob.AnchorPoint = Vector2.new(0, 0.5)
 	knob.Size = UDim2.fromOffset(RowHeight - 8, RowHeight - 8)
@@ -1721,7 +1721,7 @@ local function build()
 	messageBox.TextYAlignment = Enum.TextYAlignment.Top
 	messageBox.ClearTextOnFocus = false
 	Ui.corner(messageBox, 8)
-	Ui.rim(messageBox, Ui.Colors.rim, 1)
+	Ui.rim(messageBox, Ui.Style.line, 1)
 	local messagePadding = Instance.new("UIPadding")
 	messagePadding.PaddingLeft = UDim.new(0, 8)
 	messagePadding.PaddingTop = UDim.new(0, 6)

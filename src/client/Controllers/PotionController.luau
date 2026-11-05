@@ -60,7 +60,7 @@ function PotionController.start()
 	tip.Visible = false
 	tip.Parent = icon
 	Ui.corner(tip, 8)
-	Ui.rim(tip, Ui.Colors.rim, 2)
+	Ui.rim(tip, Ui.Style.line, 1)
 	local name = Ui.text(tip, "", UDim2.new(1, -16, 0, 22), Ui.Colors.lamp, true, 18)
 	name.Position = UDim2.fromOffset(8, 4)
 	name.TextXAlignment = Enum.TextXAlignment.Center

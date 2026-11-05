@@ -103,7 +103,7 @@ function MansionListController.start()
 	panel.BackgroundTransparency = 0.08
 	panel.Parent = drawer
 	Ui.corner(panel, 10)
-	Ui.rim(panel, Ui.Colors.rim, 2)
+	Ui.rim(panel, Ui.Style.line, 1)
 	local padding = Instance.new("UIPadding")
 	padding.PaddingLeft = UDim.new(0, 8)
 	padding.PaddingRight = UDim.new(0, 8)

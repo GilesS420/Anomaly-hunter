@@ -74,7 +74,7 @@ local VariantColor = {
 	Shiny = Color3.fromRGB(120, 235, 255),
 	Rainbow = Color3.fromRGB(255, 120, 210),
 } :: { [string]: Color3 }
-local Unfound = Color3.fromRGB(58, 48, 78)
+local Unfound = Ui.Style.line
 local CardColor = Color3.fromRGB(26, 21, 36)
 local Line = Color3.fromRGB(52, 44, 68) -- thin card and tab edges
 local Gap = 8 -- between cards, and the margin round the content
@@ -411,7 +411,7 @@ function CodexController.start()
 					pickDetails.Text = table.concat(parts, "   ")
 				else
 					pickDetails.Text = if page.id == "Events"
-						then "Not caught yet. It drifts through the hub during a Watcher event."
+						then "Not caught yet. Appears during Watcher events."
 						else `Not caught yet. It lives in {page.title}.`
 				end
 			end
@@ -428,7 +428,7 @@ function CodexController.start()
 		end
 		chip(1, 1, `Effects found {found}/{total}`, rewardText(rewards, "Effects"), Ui.Colors.lamp, false)
 		window.status.Text =
-			"Effects make a monster worth more. Two of the right ones on one monster make a combo."
+			"Effects raise a monster's worth."
 		local order = 0
 		for _, effect in effects do
 			if effect.combo then
@@ -467,7 +467,7 @@ function CodexController.start()
 		end
 		chip(1, 1, `Combos made {made}/{total}`, rewardText(rewards, "Combos"), ComboColor, false)
 		window.status.Text =
-			"A combo forms when one monster has both of its effects at once. The two merge into one stronger effect."
+			"Two effects on one monster merge into a combo."
 		local order = 0
 		for _, effect in effects do
 			if not effect.combo then
@@ -498,9 +498,9 @@ function CodexController.start()
 					local known = effect.known or 0
 					pickName.Text = `Secret combo · {bonusText(effect.multiplier)}`
 					pickDetails.Text = if known >= 2
-						then "You've found both of its effects! Get them onto the same monster."
+						then "Both found! Get them on one monster."
 						elseif known == 1 then "Two effects make it. You've found 1 of them so far."
-						else "Two effects make it. You haven't found either of them yet."
+						else "Neither effect found yet."
 				end
 			end
 		end

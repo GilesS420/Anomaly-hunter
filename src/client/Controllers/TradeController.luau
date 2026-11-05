@@ -80,7 +80,7 @@ local function tile(parent: Instance, order: number, row: Row, size: Vector2, di
 	button.BackgroundTransparency = if dim then 0.55 else 0
 	button.Parent = parent
 	Ui.corner(button, 10)
-	Ui.rim(button, if badge == "✓" then Teal else Color3.fromRGB(58, 48, 78), if badge == "✓" then 2 else 1)
+	Ui.rim(button, if badge == "✓" then Teal else Ui.Style.line, if badge == "✓" then 2 else 1)
 	local side = size.X - 12
 	local box = ShopCards.pictureBox(button, side, row.color, row.look)
 	box.Position = UDim2.fromOffset(6, 6)
@@ -201,13 +201,13 @@ function TradeController.start()
 		local offers = grid(column, OfferTile, false)
 		offers.Position = UDim2.fromOffset(0, 48)
 		offers.Size = UDim2.new(1, 0, 1, -48)
-		Ui.rim(offers, color, 2)
+		Ui.rim(offers, color, 1)
 		return heading, total, offers
 	end
 	local myHeading, myTotal, myTable = side(false, Teal)
 	local theirHeading, theirTotal, theirTable = side(true, Pink)
 
-	local packLabel = Ui.text(body, "Your Backpack: tap a monster to put it in or take it out", UDim2.new(1, 0, 0, 22), Ui.Colors.muted, false, 17)
+	local packLabel = Ui.text(body, "Your Backpack: tap to add or remove", UDim2.new(1, 0, 0, 22), Ui.Colors.muted, false, 17)
 	packLabel.Position = UDim2.fromScale(0, 0.6)
 	local pack = grid(body, PackTile, true)
 	pack.Position = UDim2.new(0, 0, 0.6, 26)
@@ -236,7 +236,7 @@ function TradeController.start()
 		elseif s.theirReady and not s.myReady then
 			return `{s.partner} is ready. Check their side, then press Ready.`
 		end
-		return "Put monsters in, check what they offer, then both press Ready."
+		return "Add monsters, then both press Ready."
 	end
 
 	local function sendOffer(uids: { string })
@@ -295,7 +295,7 @@ function TradeController.start()
 
 		clearTiles(pack)
 		if #s.backpack == 0 then
-			local empty = Ui.text(pack, "Your Backpack is empty. Pick up monsters in your mansion first.", UDim2.fromOffset(PackTile.X * 3, 30), Ui.Colors.muted, false, 16)
+			local empty = Ui.text(pack, "Backpack empty.", UDim2.fromOffset(PackTile.X * 3, 30), Ui.Colors.muted, false, 16)
 			empty.TextWrapped = true
 		end
 		for i, row in s.backpack do
@@ -303,7 +303,7 @@ function TradeController.start()
 			local badge = if row.locked then "♥" elseif chosen then "✓" else nil
 			tile(pack, i, row, PackTile, row.locked or chosen, badge).Activated:Connect(function()
 				if row.locked then
-					note = "Hearted (♥) monsters can't be traded. Un-heart it in your Backpack first."
+					note = "Hearted (♥) monsters can't be traded."
 					window.status.Text = note
 					return
 				end
@@ -398,7 +398,7 @@ function TradeController.start()
 	card.Visible = false
 	card.Parent = canvas
 	Ui.corner(card, 14)
-	Ui.rim(card, Pink, 2)
+	Ui.rim(card, Ui.Style.line, 1)
 	ShopCards.pad(card)
 	gui.Parent = player:WaitForChild("PlayerGui")
 

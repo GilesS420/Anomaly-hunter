@@ -46,7 +46,7 @@ local function card(list: ScrollingFrame, order: number, monster: Row, sell: () 
 	row.BackgroundColor3 = Ui.Colors.row
 	row.Parent = list
 	Ui.corner(row, 10)
-	Ui.rim(row, Color3.fromRGB(58, 48, 78), 1)
+	Ui.rim(row, Ui.Style.line, 1)
 	ShopCards.pad(row)
 
 	ShopCards.pictureBox(row, inner, monster.color, monster.look)
@@ -79,7 +79,7 @@ local function card(list: ScrollingFrame, order: number, monster: Row, sell: () 
 	box.BackgroundColor3 = Color3.fromRGB(14, 11, 20)
 	box.Parent = effects
 	Ui.corner(box, 6)
-	Ui.rim(box, Color3.fromRGB(58, 48, 78), 1)
+	Ui.rim(box, Ui.Style.line, 1)
 	local boxPadding = Instance.new("UIPadding")
 	boxPadding.PaddingLeft = UDim.new(0, 8)
 	boxPadding.PaddingRight = UDim.new(0, 8)
@@ -168,7 +168,7 @@ function CollectorController.start()
 			window.list,
 			if #parts > 0
 				then `Bonuses: {table.concat(parts, "  ·  ")}`
-				else "No sell bonuses right now. Every friend in your server adds +10%!",
+				else "No bonus yet. Each friend here adds +10%",
 			UDim2.new(1, 0, 0, 30),
 			if #parts > 0 then Ui.Colors.money else Ui.Colors.muted,
 			true,
@@ -180,11 +180,11 @@ function CollectorController.start()
 
 		if #offer.monsters == 0 then
 			window.status.Text =
-				"Your Backpack has no monsters. Press E next to one in your mansion to pick it up."
+				"Backpack empty. Pick up monsters in your mansion (E)."
 			return
 		end
 		window.status.Text = if count == 0
-			then "Every monster here is hearted (♥ Kept). Un-heart one in your Backpack to sell it."
+			then "All hearted (♥). Un-heart one to sell it."
 			else `{count} to sell · worth {Format.money(offer.total)} · most valuable first`
 
 		for i, monster in offer.monsters do

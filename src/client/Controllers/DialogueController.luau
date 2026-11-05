@@ -78,7 +78,7 @@ function DialogueController.start()
 	box.BorderSizePixel = 0
 	box.Parent = canvas
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
+	corner.CornerRadius = Ui.radius(8)
 	corner.Parent = box
 	local padding = Instance.new("UIPadding")
 	padding.PaddingTop = UDim.new(0, 12)

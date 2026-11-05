@@ -52,7 +52,7 @@ function BakeryController.start()
 
 	local function updateStatus()
 		window.status.Text =
-			`New stock in {countdown(restockAt - os.clock())} · You have {Format.money(money)}`
+			`Restock in {countdown(restockAt - os.clock())} · {Format.money(money)}`
 	end
 
 	-- One request at a time; shows the view that comes back.

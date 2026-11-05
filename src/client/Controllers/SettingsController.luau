@@ -135,7 +135,7 @@ function SettingsController.start()
 		row.BackgroundColor3 = Ui.Colors.row
 		row.Parent = window.list
 		Ui.corner(row, 10)
-		Ui.rim(row, Color3.fromRGB(58, 48, 78), 1)
+		Ui.rim(row, Ui.Style.line, 1)
 		local padding = Instance.new("UIPadding")
 		padding.PaddingLeft = UDim.new(0, 10)
 		padding.PaddingRight = UDim.new(0, 10)

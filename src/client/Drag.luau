@@ -76,7 +76,7 @@ function Drag.attach(
 				made.TextScaled = true
 				made.Text = label()
 				local corner = Instance.new("UICorner")
-				corner.CornerRadius = UDim.new(0, 8)
+				corner.CornerRadius = UDim.new(0, 4)
 				corner.Parent = made
 				made.Parent = ghostLayer()
 				ghost = made

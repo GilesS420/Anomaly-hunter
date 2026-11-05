@@ -1,9 +1,13 @@
 --!strict
 -- Building blocks for the shop windows (Workshop, Bakery, Collector) and the other buttons:
 -- a window in the middle of the screen with a title, a status line, a scrolling list, a
--- footer and a close button. The look matches the haunted hub: near-black purple panels,
--- lantern-orange spooky titles and dark buttons rimmed in their colour. Each window is drawn
--- in a Scale canvas, so it shrinks to fit a phone; every button works with a click or a tap.
+-- footer and a close button. Each window is drawn in a Scale canvas, so it shrinks to fit a
+-- phone; every button works with a click or a tap.
+--
+-- Style rules (Giles 2026-11-05): flat and minimal. Small corners (Ui.corner caps them), solid
+-- buttons in one colour (Ui.paint), no glowing rims, shine or mist gradients, no outlines on
+-- text, and as few words as possible. New UI should use Ui.corner / Ui.paint / Ui.rim /
+-- Ui.Style instead of making its own UICorner, UIStroke or UIGradient.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -12,10 +16,17 @@ local Scale = require(script.Parent:WaitForChild("Scale"))
 
 local Ui = {}
 
+-- Shared look for every menu. Change it here, not in each controller.
+Ui.Style = {
+	maxRadius = 6, -- no card or button gets rounder than this (pixels)
+	panelRadius = 7, -- the window itself
+	line = Color3.fromRGB(58, 50, 76), -- the one thin outline colour for panels, rows and boxes
+}
+
 Ui.Colors = {
 	panel = Color3.fromRGB(18, 14, 26),
 	row = Color3.fromRGB(32, 26, 44),
-	rim = Color3.fromRGB(96, 74, 140), -- panel and row outlines
+	rim = Color3.fromRGB(70, 60, 92), -- panel and row outlines (kept dim: flat, no glow)
 	lamp = Color3.fromRGB(255, 176, 84), -- titles, like the lanterns
 	text = Color3.new(1, 1, 1),
 	muted = Color3.fromRGB(190, 180, 210),
@@ -62,10 +73,17 @@ function Ui.anyWindowOpen(except: string?): boolean
 	return false
 end
 
-function Ui.corner(parent: Instance, pixels: number)
+-- Small corners: the radius asked for is halved and capped at Ui.Style.maxRadius, so old calls
+-- (8, 10, 12, 14...) all come out at 4-6 pixels.
+function Ui.radius(pixels: number): UDim
+	return UDim.new(0, math.clamp(math.floor(pixels / 2 + 0.5), 2, Ui.Style.maxRadius))
+end
+
+function Ui.corner(parent: Instance, pixels: number): UICorner
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, pixels)
+	corner.CornerRadius = Ui.radius(pixels)
 	corner.Parent = parent
+	return corner
 end
 
 function Ui.text(
@@ -96,33 +114,28 @@ end
 -- Fredoka One for all other text.
 Ui.TitleFont = Enum.Font.LuckiestGuy
 
--- A thin outline round a frame or button.
+-- A thin outline round a frame or button. Flat style: 1 pixel for a plain outline, 2 at
+-- most for something picked or highlighted.
 function Ui.rim(parent: Instance, color: Color3, thickness: number): UIStroke
 	local stroke = Instance.new("UIStroke")
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	stroke.Color = color
-	stroke.Thickness = thickness
+	stroke.Thickness = if thickness >= 2 then 2 else 1
 	stroke.Parent = parent
 	return stroke
 end
 
--- Gives a button the hub look: a dark body tinted with its colour, a rim in the colour and
--- a soft shine from the top. Call again after changing the colour (Ui.paint).
+-- Gives a button the flat look: one solid colour, no rim, no shine. Call again after
+-- changing the colour.
 function Ui.paint(button: GuiButton, color: Color3)
 	local h, sat, v = color:ToHSV()
-	button.BackgroundColor3 = Color3.fromHSV(h, math.min(sat * 1.1, 1), v * 0.45)
-	local stroke = button:FindFirstChild("Rim") :: UIStroke?
-	if not stroke then
-		stroke = Ui.rim(button, color, 2);
-		(stroke :: UIStroke).Name = "Rim"
-	end
-	(stroke :: UIStroke).Color = Color3.fromHSV(h, sat * 0.8, math.min(v * 1.25, 1))
-	if not button:FindFirstChild("Shine") then
-		local shine = Instance.new("UIGradient")
-		shine.Name = "Shine"
-		shine.Rotation = 90
-		shine.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(150, 140, 165))
-		shine.Parent = button
+	button.BackgroundColor3 = Color3.fromHSV(h, sat * 0.9, v * 0.85)
+	-- Old looks drawn before this rule: take them off.
+	for _, name in { "Rim", "Shine" } do
+		local old = button:FindFirstChild(name)
+		if old then
+			old:Destroy()
+		end
 	end
 end
 
@@ -132,7 +145,7 @@ function Ui.button(parent: Instance, text: string, color: Color3, size: UDim2): 
 	button.Font = Enum.Font.FredokaOne
 	button.Text = text
 	button.TextColor3 = Ui.Colors.text
-	button.TextStrokeTransparency = 0.6
+	button.TextStrokeTransparency = 1
 	button.TextScaled = true
 	button.AutoButtonColor = true
 	Ui.corner(button, 8)
@@ -155,8 +168,6 @@ end
 function Ui.confirmButton(button: TextButton, question: string, action: () -> ())
 	local armed = false
 	local text, color = button.Text, button.BackgroundColor3
-	local rim = button:FindFirstChild("Rim")
-	local rimColor = if rim and rim:IsA("UIStroke") then rim.Color else color
 	button.Activated:Connect(function()
 		if armed then
 			armed = false
@@ -171,10 +182,6 @@ function Ui.confirmButton(button: TextButton, question: string, action: () -> ()
 				armed = false
 				button.Text = text
 				button.BackgroundColor3 = color
-				local rim = button:FindFirstChild("Rim")
-				if rim and rim:IsA("UIStroke") then
-					rim.Color = rimColor
-				end
 			end
 		end)
 	end)
@@ -254,13 +261,9 @@ function Ui.window(name: string, titleText: string): Window
 	panel.BackgroundTransparency = 0.04
 	panel.Active = true -- clicks in the gaps between rows stop here, not in the world behind
 	panel.Parent = canvas
-	Ui.corner(panel, 14)
-	Ui.rim(panel, Ui.Colors.rim, 2)
-	-- A faint purple mist rising from the bottom, like the hub at night.
-	local mist = Instance.new("UIGradient")
-	mist.Rotation = 90
-	mist.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(200, 170, 255))
-	mist.Parent = panel
+	local panelCorner = Ui.corner(panel, 14)
+	panelCorner.CornerRadius = UDim.new(0, Ui.Style.panelRadius)
+	Ui.rim(panel, Ui.Style.line, 1)
 	local limit = Instance.new("UISizeConstraint")
 	limit.MaxSize = Vector2.new(560, 600)
 	limit.Parent = panel
@@ -273,19 +276,13 @@ function Ui.window(name: string, titleText: string): Window
 
 	local title = Ui.text(panel, titleText, UDim2.new(1, -54, 0, 34), Ui.Colors.lamp, true, 34)
 	title.Font = Ui.TitleFont
-	title.TextStrokeTransparency = 0.4
-	title.TextStrokeColor3 = Color3.fromRGB(60, 20, 0)
 
 	local status = Ui.text(panel, "", UDim2.new(1, 0, 0, 22), Ui.Colors.muted, false, 18)
 	status.Position = UDim2.fromOffset(0, 38)
 
-	local close = Ui.button(panel, "X", Ui.Colors.off, UDim2.fromOffset(44, 44))
+	local close = Ui.button(panel, "X", Ui.Colors.off, UDim2.fromOffset(40, 40))
 	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.new(1, 0, 0, -4)
-	local round = close:FindFirstChildOfClass("UICorner")
-	if round then
-		round.CornerRadius = UDim.new(0.5, 0)
-	end
+	close.Position = UDim2.new(1, 0, 0, -2)
 
 	local list = Instance.new("ScrollingFrame")
 	list.Name = "List"
@@ -302,6 +299,13 @@ function Ui.window(name: string, titleText: string): Window
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Padding = UDim.new(0, 6)
 	layout.Parent = list
+	-- A little room on every side, so outlines on the first/last rows aren't cut off by the
+	-- list's edge (the Send feedback box was clipped on the left, player report 2026-11-04).
+	local listPadding = Instance.new("UIPadding")
+	listPadding.PaddingLeft = UDim.new(0, 3)
+	listPadding.PaddingTop = UDim.new(0, 3)
+	listPadding.PaddingBottom = UDim.new(0, 3)
+	listPadding.Parent = list
 
 	local footer = Instance.new("Frame")
 	footer.Name = "Footer"
@@ -390,7 +394,6 @@ function Ui.row(
 	row.BackgroundColor3 = Ui.Colors.row
 	row.Parent = list
 	Ui.corner(row, 10)
-	Ui.rim(row, Color3.fromRGB(58, 48, 78), 1)
 	local padding = Instance.new("UIPadding")
 	padding.PaddingLeft = UDim.new(0, 10)
 	padding.PaddingRight = UDim.new(0, 8)

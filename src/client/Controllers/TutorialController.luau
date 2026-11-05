@@ -165,7 +165,7 @@ local function buildCard(): (ScreenGui, TextLabel, TextLabel, TextLabel, TextBut
 	card.BackgroundTransparency = 0.08
 	card.Parent = canvas
 	Ui.corner(card, 12)
-	Ui.rim(card, Ui.Colors.lamp, 2)
+	Ui.rim(card, Ui.Style.line, 1)
 	local limit = Instance.new("UISizeConstraint")
 	limit.MinSize = Vector2.new(220, 0)
 	limit.MaxSize = Vector2.new(340, math.huge)
