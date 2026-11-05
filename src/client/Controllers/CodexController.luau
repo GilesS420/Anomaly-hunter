@@ -81,6 +81,12 @@ local Gap = 8 -- between cards, and the margin round the content
 local CardTarget = 112 -- cards are about this wide, then stretched to fill the row
 
 -- A rainbow across a dot or chip.
+-- Effect bonuses add up on a monster (Util/Value): x3 and x3 make x5, not x9. So the Codex
+-- shows what each one adds ("+200%") rather than an "x3" that reads like it multiplies.
+local function bonusText(multiplier: number): string
+	return `+{math.floor((multiplier - 1) * 100 + 0.5)}%`
+end
+
 local function rainbow(parent: Instance)
 	local gradient = Instance.new("UIGradient")
 	gradient.Color = ColorSequence.new({
@@ -439,7 +445,7 @@ function CodexController.start()
 				if effect.found then effect.name else "???"
 			)
 			if selected == key then
-				pickName.Text = `{if effect.found then effect.name else "???"} · x{effect.multiplier}`
+				pickName.Text = `{if effect.found then effect.name else "???"} · {bonusText(effect.multiplier)}`
 				pickName.TextColor3 = Ui.Colors.lamp
 				local usedIn = effect.usedIn or {}
 				pickDetails.Text = if #usedIn > 0
@@ -485,12 +491,12 @@ function CodexController.start()
 			if selected == key then
 				pickName.TextColor3 = ComboColor
 				if effect.found and recipe then
-					pickName.Text = `{effect.name} · x{effect.multiplier}`
+					pickName.Text = `{effect.name} · {bonusText(effect.multiplier)}`
 					pickDetails.Text =
-						`{recipe[1]} + {recipe[2]} on one monster turns into {effect.name} (x{effect.multiplier})`
+						`{recipe[1]} + {recipe[2]} on one monster turns into {effect.name} ({bonusText(effect.multiplier)})`
 				else
 					local known = effect.known or 0
-					pickName.Text = `Secret combo · x{effect.multiplier}`
+					pickName.Text = `Secret combo · {bonusText(effect.multiplier)}`
 					pickDetails.Text = if known >= 2
 						then "You've found both of its effects! Get them onto the same monster."
 						elseif known == 1 then "Two effects make it. You've found 1 of them so far."
