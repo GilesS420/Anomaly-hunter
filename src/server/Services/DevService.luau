@@ -427,7 +427,7 @@ end
 
 commands["/attack"] = function(player, _, tell)
 	if not MonsterAiService.provoke(player) then
-		tell("Go into a zone first, with a monster in it.")
+		tell("Go into a zone where monsters fight back (not the Pumpkin Graveyard), with a monster in it.")
 	end
 end
 

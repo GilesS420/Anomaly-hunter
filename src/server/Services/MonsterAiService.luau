@@ -8,8 +8,9 @@
 -- A monster you're catching is stunned by your vacuum's beam and can't attack, but the others
 -- can, and a hit that costs a heart makes the catch get away. They keep attacking while you
 -- carry a catch; at 0 hearts you drop it and go home (HuntService.damage).
--- Players with the attribute Calm (Studio: /calm) or in the tutorial are left alone, and
--- Bait Bell monsters never attack. Studio /attack makes the closest monster attack you now (provoke).
+-- Players with the attribute Calm (Studio: /calm) or in the tutorial are left alone, Bait
+-- Bell monsters never attack, and nothing attacks in a calm zone (Config/Attacks.CalmZones,
+-- Pumpkin Graveyard). Studio /attack makes the closest monster attack you now (provoke).
 --
 -- Remotes in ReplicatedStorage.AttackRemotes:
 --   Warn  server -> clients in the zone (Warning)   draw the warning shape until hitTime
@@ -315,6 +316,11 @@ local function step()
 		if not attack or not zone then
 			continue
 		end
+		if Attacks.calmZone(zone.id) then
+			brain.windup = nil
+			brain.target = nil
+			continue
+		end
 		local hunters = byZone[zone.id]
 
 		-- Caught in a vacuum beam: no attacking, and a moment to recover once let go.
@@ -402,7 +408,7 @@ function MonsterAiService.provoke(player: Player): boolean
 	local zone = Hunt.zoneById(player:GetAttribute("Zone"))
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if not zone or not root or not root:IsA("BasePart") then
+	if not zone or Attacks.calmZone(zone.id) or not root or not root:IsA("BasePart") then
 		return false
 	end
 	local hunter: Target = { player = player, x = root.Position.X, z = root.Position.Z }

@@ -41,6 +41,11 @@ function Attacks.forMonster(monsterId: string, rarityOrder: number): Attack?
 	}
 end
 
+-- True if monsters in this zone (a Config/Zones id) never attack (Config/Attacks.CalmZones).
+function Attacks.calmZone(zoneId: string?): boolean
+	return zoneId ~= nil and AttackConfig.CalmZones[zoneId] == true
+end
+
 -- Seconds between two attacks by one monster (rarer attacks more often).
 function Attacks.cooldown(rarityOrder: number): number
 	return math.max(AttackConfig.CooldownMin, AttackConfig.CooldownBase - rarityOrder)

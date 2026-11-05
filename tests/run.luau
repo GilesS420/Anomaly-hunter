@@ -1727,6 +1727,14 @@ do
 	end
 	check("every attack belongs to a monster", noStrays)
 	check("event monsters don't attack (yet)", Attacks.forMonster("Flickerwick", 8) == nil)
+	check("the Pumpkin Graveyard is a calm zone", Attacks.calmZone("PumpkinGraveyard"))
+	check("the second zone still fights back", not Attacks.calmZone("MurkyBayou"))
+	check("being home is not a calm zone", not Attacks.calmZone(nil))
+	local calmKnown = true
+	for id in AttackConfig.CalmZones do
+		calmKnown = calmKnown and Hunt.zoneById(id) ~= nil
+	end
+	check("every calm zone is a real zone", calmKnown)
 
 	local gravepup = Attacks.forMonster("Gravepup", 3)
 	local wispJack = Attacks.forMonster("WispJack", 2)

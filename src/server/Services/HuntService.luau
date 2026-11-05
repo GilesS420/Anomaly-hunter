@@ -24,6 +24,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Attacks = require(ReplicatedStorage.Shared.Util.Attacks)
 local Catching = require(ReplicatedStorage.Shared.Util.Catching)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
@@ -447,7 +448,12 @@ local function enterZone(player: Player, zone: Zones.Zone, arrival: BasePart, fa
 	player:SetAttribute("Hearts", Zones.MaxHearts)
 	lastPortal[player] = os.clock()
 	lastSpot[player] = nil
-	Notify.toast(player, `Entering {zone.name}`)
+	Notify.toast(
+		player,
+		if Attacks.calmZone(zone.id)
+			then `Entering {zone.name}: a safe zone, monsters here don't fight back`
+			else `Entering {zone.name}: careful, monsters here fight back!`
+	)
 	Notify.toast(player, "Hold your vacuum (hotbar), then click or tap a monster to catch it!")
 	PlotService.teleport(player, standAbove(arrival, facing))
 end
