@@ -27,6 +27,7 @@ local MissionService = {}
 
 export type Card = {
 	tier: string,
+	kind: string, -- Config/Missions kind ("Catch", "PlaceCake"...), for the card's picture
 	text: string,
 	progress: number,
 	target: number,
@@ -90,6 +91,7 @@ local function viewFor(state: Missions.State): View
 		local def = Missions.def(saved.id)
 		table.insert(cards, {
 			tier = if def then def.tier else "",
+			kind = if def then def.kind else "",
 			text = Missions.text(saved),
 			progress = saved.progress,
 			target = saved.target,
