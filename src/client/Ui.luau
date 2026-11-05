@@ -11,6 +11,7 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local Scale = require(script.Parent:WaitForChild("Scale"))
 
@@ -84,6 +85,70 @@ function Ui.corner(parent: Instance, pixels: number): UICorner
 	corner.CornerRadius = Ui.radius(pixels)
 	corner.Parent = parent
 	return corner
+end
+
+-- How many rewards wait behind a side button (Codex, Missions, Gifts), from a number
+-- attribute on the player: a red circle with the count on the button's top-right corner
+-- (Giles 2026-11-05: make them more obvious). It pops when the count goes up and pulses
+-- slowly while anything waits. A circle on purpose: the one round shape the flat style keeps.
+function Ui.countBadge(button: GuiObject, attribute: string): TextLabel
+	local player = Players.LocalPlayer
+	local badge = Instance.new("TextLabel")
+	badge.Name = "Ready"
+	badge.AnchorPoint = Vector2.new(0.5, 0.5)
+	badge.Position = UDim2.new(1, -6, 0, 6)
+	badge.Size = UDim2.fromOffset(28, 28)
+	badge.BackgroundColor3 = Color3.fromRGB(235, 45, 55)
+	badge.Font = Enum.Font.FredokaOne
+	badge.TextColor3 = Color3.new(1, 1, 1)
+	badge.TextSize = 17
+	badge.ZIndex = 10
+	badge.Visible = false
+	badge.Parent = button
+	local round = Instance.new("UICorner")
+	round.CornerRadius = UDim.new(0.5, 0)
+	round.Parent = badge
+	local edge = Instance.new("UIStroke")
+	edge.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	edge.Color = Color3.new(1, 1, 1)
+	edge.Thickness = 2
+	edge.Parent = badge
+	local scale = Instance.new("UIScale")
+	scale.Parent = badge
+	local pulse = TweenService:Create(
+		scale,
+		TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+		{ Scale = 1.15 }
+	)
+	local shown = 0
+	local function show()
+		local ready = player:GetAttribute(attribute)
+		local count = if typeof(ready) == "number" then math.max(math.floor(ready), 0) else 0
+		badge.Visible = count > 0
+		badge.Text = if count > 99 then "99+" else tostring(count)
+		if count > shown then
+			pulse:Cancel()
+			scale.Scale = 1.5 -- pop, then settle back into the slow pulse
+			local pop = TweenService:Create(
+				scale,
+				TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+				{ Scale = 1 }
+			)
+			pop.Completed:Once(function()
+				if badge.Visible then
+					pulse:Play()
+				end
+			end)
+			pop:Play()
+		elseif count == 0 then
+			pulse:Cancel()
+			scale.Scale = 1
+		end
+		shown = count
+	end
+	player:GetAttributeChangedSignal(attribute):Connect(show)
+	show()
+	return badge
 end
 
 function Ui.text(

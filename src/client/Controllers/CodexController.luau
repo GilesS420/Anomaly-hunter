@@ -770,28 +770,7 @@ function CodexController.start()
 	button.Activated:Connect(toggle)
 	Locks.guard(button, "Codex") -- greyed out until the tutorial is done
 
-	-- How many Codex rewards wait to be claimed, in a red circle like the log's.
-	local badge = Instance.new("TextLabel")
-	badge.Name = "Ready"
-	badge.AnchorPoint = Vector2.new(0.5, 0.5)
-	badge.Position = UDim2.new(1, -5, 0, 5) -- top-right corner of the square button
-	badge.Size = UDim2.fromOffset(22, 22)
-	badge.BackgroundColor3 = Color3.fromRGB(230, 50, 60)
-	badge.Font = Enum.Font.FredokaOne
-	badge.TextColor3 = Color3.new(1, 1, 1)
-	badge.TextSize = 13
-	badge.ZIndex = 5
-	badge.Parent = button
-	Ui.corner(badge, 11)
-	Ui.rim(badge, Color3.new(1, 1, 1), 1.5)
-	local function showBadge()
-		local ready = player:GetAttribute("CodexReady")
-		local count = if typeof(ready) == "number" then ready else 0
-		badge.Visible = count > 0
-		badge.Text = if count > 99 then "99+" else tostring(count)
-	end
-	player:GetAttributeChangedSignal("CodexReady"):Connect(showBadge)
-	showBadge()
+	Ui.countBadge(button, "CodexReady") -- how many Codex rewards wait to be claimed
 end
 
 return CodexController
