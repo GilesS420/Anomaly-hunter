@@ -62,6 +62,7 @@ local function factsFor(player: Player, data: DataService.Data): Tips.Facts
 		event = workspace:GetAttribute("WatcherEvent") ~= nil,
 		ghost = GoldenGhostService.isOut(),
 		inHub = player:GetAttribute("Zone") == nil,
+		gift = (tonumber(player:GetAttribute("PlaytimeReady")) or 0) > 0,
 	}
 end
 

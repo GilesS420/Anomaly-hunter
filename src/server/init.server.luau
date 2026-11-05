@@ -36,6 +36,7 @@ local RookieService = require(script.Services.RookieService)
 local TipService = require(script.Services.TipService)
 local CodexService = require(script.Services.CodexService)
 local MissionService = require(script.Services.MissionService)
+local PlaytimeService = require(script.Services.PlaytimeService)
 local RobuxService = require(script.Services.RobuxService)
 local SettingsService = require(script.Services.SettingsService)
 local HotbarService = require(script.Services.HotbarService)
@@ -81,6 +82,7 @@ local services: { { name: string, start: () -> ...any } } = {
 	{ name = "TipService", start = TipService.start },
 	{ name = "CodexService", start = CodexService.start },
 	{ name = "MissionService", start = MissionService.start },
+	{ name = "PlaytimeService", start = PlaytimeService.start },
 	{ name = "RobuxService", start = RobuxService.start },
 	{ name = "SettingsService", start = SettingsService.start },
 	{ name = "HotbarService", start = HotbarService.start },

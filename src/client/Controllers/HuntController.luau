@@ -2,8 +2,8 @@
 -- Hunt HUD. Your money sits big in the top-left corner, just under Roblox's own menu buttons
 -- (Giles 2026-10-29). Under it, from the top down, a stack of square picture buttons is always
 -- there: a backpack (G, your items and monsters, InventoryController), a book (C,
--- CodexController), a scroll (J, MissionController), a gear (SettingsController) and a coin (the
--- Robux Store, StoreController), in Hud.Menu. Right of that stack, in Hud.Side: your hearts
+-- CodexController), a scroll (J, MissionController), a gift (playtime gifts, PlaytimeController),
+-- a gear (SettingsController) and a coin (the Robux Store, StoreController), in Hud.Menu. Right of that stack, in Hud.Side: your hearts
 -- while you're in a zone, the monster you're carrying, a "Return Charm" button (tap or click
 -- it; R works too on a keyboard) that takes you home, and in a zone a button per kind of Bait
 -- Bell (Bait, Silver, Gold; B rings the cheapest you own) that brings a rarer monster to you.
@@ -48,6 +48,7 @@ local MenuButtons: { { name: string, icon: Icons.Kind, key: string?, color: Colo
 	{ name = "Backpack", icon = "Backpack", key = "G", color = Color3.fromRGB(110, 90, 170) },
 	{ name = "Codex", icon = "Book", key = "C", color = Color3.fromRGB(180, 115, 60) },
 	{ name = "Missions", icon = "Scroll", key = "J", color = Color3.fromRGB(210, 160, 50) },
+	{ name = "Gifts", icon = "Gift", key = nil, color = Color3.fromRGB(200, 80, 110) },
 	{ name = "Settings", icon = "Gear", key = nil, color = Color3.fromRGB(130, 130, 150) },
 	{ name = "Store", icon = "Coin", key = nil, color = Color3.fromRGB(0, 140, 90) },
 }

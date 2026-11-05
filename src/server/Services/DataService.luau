@@ -15,6 +15,7 @@ local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Feedback = require(ReplicatedStorage.Shared.Util.Feedback)
 local Heists = require(ReplicatedStorage.Shared.Util.Heists)
 local Missions = require(ReplicatedStorage.Shared.Util.Missions)
+local Playtime = require(ReplicatedStorage.Shared.Util.Playtime)
 local Robux = require(ReplicatedStorage.Shared.Util.Robux)
 local Trading = require(ReplicatedStorage.Shared.Util.Trading)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
@@ -63,6 +64,7 @@ export type Data = {
 	-- The optional Bakery quest after the tutorial (TutorialService, Util/Tutorial.QuestSteps):
 	-- "" never offered (older saves), else the quest step, "Done" or "Skipped".
 	quest: string,
+	playtime: Playtime.Record, -- today's play time and the playtime gifts claimed (PlaytimeService)
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -99,6 +101,7 @@ DataService.Template = {
 	analytics = Analytics.empty(),
 	rookie = { decided = false, secondsLeft = 0, hunts = 0, lucky = false },
 	quest = "",
+	playtime = Playtime.empty(),
 } :: Data
 
 local store = ProfileStore.New(
@@ -198,6 +201,7 @@ local function loadPlayer(player: Player)
 	end
 	data.robux = Robux.repair(data.robux)
 	data.heist = Heists.repair(data.heist)
+	data.playtime = Playtime.repair(data.playtime)
 	data.analytics = Analytics.repair(data.analytics)
 
 	profiles[player] = profile

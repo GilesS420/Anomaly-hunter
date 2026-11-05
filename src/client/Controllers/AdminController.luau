@@ -984,6 +984,17 @@ local function build()
 	end
 	note(you, "Reset missions: today's missions start over (no progress, claimable again).")
 
+	-- Playtime gifts (PlaytimeService): skip ahead to test them.
+	local playRow = row(you, "Playtime")
+	for _, minutes in { "5", "20", "60" } do
+		button(playRow, `+{minutes} min`, Ui.Colors.buy, 90, function()
+			send("/playtime", minutes)
+		end)
+	end
+	button(playRow, "Reset", Ui.Colors.off, 90, function()
+		send("/playtime", "reset")
+	end)
+
 	-- The missions pop-up: one dropdown per tier; Set swaps in that mission.
 	note(
 		missionModal.body,

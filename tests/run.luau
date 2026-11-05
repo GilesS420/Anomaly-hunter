@@ -42,6 +42,9 @@ local WeightConfig = require("../src/shared/Config/Weight")
 local Movement = require("../src/shared/Util/Movement")
 local MovementConfig = require("../src/shared/Config/Movement")
 local Analytics = require("../src/shared/Util/Analytics")
+local Playtime = require("../src/shared/Util/Playtime")
+local PlaytimeConfig = require("../src/shared/Config/Playtime")
+local MissionsUtil = require("../src/shared/Util/Missions")
 
 local failures = 0
 local function check(name: string, ok: boolean)
@@ -2859,6 +2862,7 @@ do
 			event = false,
 			ghost = false,
 			inHub = true,
+			gift = false,
 		}
 		for key, value in changes or {} do
 			(base :: any)[key] = value
@@ -4396,6 +4400,85 @@ do
 	end
 	check("rookie: the first zone has a lucky monster", rare)
 	check("rookie: the bonus is a real bonus", RookieConfig.SellBonusPercent > 0 and RookieConfig.Minutes > 0)
+end
+
+-- Playtime gifts (Util/Playtime).
+do
+	local now = 1_800_000_000
+	local record = Playtime.empty()
+	check(
+		"playtime: a new day starts over",
+		Playtime.refresh(record, now) and record.day == MissionsUtil.day(now)
+	)
+	check("playtime: same day keeps going", not Playtime.refresh(record, now + 10))
+	check(
+		"playtime: nothing ready at 0",
+		Playtime.ready(record) == 0 and Playtime.nextIn(record) == PlaytimeConfig.Steps[1].minutes * 60
+	)
+	check("playtime: can't claim early", not Playtime.claim(record, 1))
+	record.seconds = PlaytimeConfig.Steps[2].minutes * 60
+	check("playtime: two ready after 5 min", Playtime.ready(record) == 2)
+	check(
+		"playtime: claim once",
+		Playtime.claim(record, 1) and not Playtime.claim(record, 1) and Playtime.ready(record) == 1
+	)
+	check(
+		"playtime: junk index refused",
+		not Playtime.claim(record, 1.5)
+			and not Playtime.claim(record, "2" :: any)
+			and not Playtime.claim(record, 99)
+	)
+	record.seconds = 999_999
+	check("playtime: nothing after the last", Playtime.nextIn(record) == nil)
+	Playtime.refresh(record, now + 86_400)
+	check("playtime: next day clears", record.seconds == 0 and next(record.claimed) == nil)
+	check(
+		"playtime: repair junk",
+		Playtime.repair(nil).seconds == 0 and Playtime.repair({ seconds = -5 }).seconds == 0
+	)
+	local small = Playtime.reward(1, 0, 1)
+	check(
+		"playtime: cash floor for a new hunter",
+		small ~= nil and small.cash == PlaytimeConfig.Steps[1].floor
+	)
+	local big = Playtime.reward(1, 1_000_000_000, 4)
+	check("playtime: cash grows with worth", big ~= nil and big.cash == 20_000_000)
+	local bellNew = Playtime.reward(2, 0, 1)
+	local bellLate = Playtime.reward(2, 0, PlaytimeConfig.SilverBellWings)
+	check(
+		"playtime: bell gets better with zones",
+		bellNew ~= nil and bellNew.item == "BaitBell" and bellLate ~= nil and bellLate.item == "SilverBell"
+	)
+	local cakeNew = Playtime.reward(3, 0, 1)
+	local cakeRich = Playtime.reward(3, 10_000_000_000, 6)
+	local priceOf: { [string]: number } = {}
+	for _, item in Shop.Bakery do
+		priceOf[item.id] = item.price
+	end
+	check(
+		"playtime: cake follows worth",
+		cakeNew ~= nil
+			and cakeRich ~= nil
+			and cakeNew.kind == "Food"
+			and priceOf[cakeRich.item :: string] > priceOf[cakeNew.item :: string]
+	)
+	local last = Playtime.reward(#PlaytimeConfig.Steps, 0, 1)
+	check(
+		"playtime: last gift is a Gold Bell + cash",
+		last ~= nil and last.item == "GoldBell" and last.cash > 0
+	)
+	check(
+		"playtime: tools and wings count",
+		Playtime.invested({ PhantomVac = 1, BaitBell = 3 }, 2) == 1_050_000
+			and Playtime.base(100, 1_000_000) == 100 + 1_000_000 * PlaytimeConfig.InvestShare
+	)
+	for index in PlaytimeConfig.Steps do
+		local reward = Playtime.reward(index, 5_000_000, 3)
+		check(
+			`playtime: gift {index} gives something`,
+			reward ~= nil and (reward.cash > 0 or reward.item ~= nil)
+		)
+	end
 end
 
 if failures > 0 then
