@@ -38,18 +38,18 @@ function Analytics.repair(record: any): Record
 	return { onboard = int(record.onboard), days = int(record.days), lastDay = int(record.lastDay) }
 end
 
--- The Onboarding funnel, in order. Steps 1-6 follow the tutorial (Tutorial.Steps: the step a
+-- The Onboarding funnel, in order. Steps 1-5 follow the tutorial (Tutorial.Steps: the step a
 -- player is ON means they finished the one before it), then the first two wings bought.
 -- Numbering history: 8 steps to "Finished tutorial" until 2026-11-05, then 13 with the Bakery
--- steps, then 7 with the short tutorial (the Bakery is its own BakeryQuest funnel now).
+-- steps, then 7 with the short tutorial (the Bakery is its own BakeryQuest funnel now), then
+-- 6 without the button tour (buying the Phantom Vac finishes it).
 Analytics.Onboarding = {
 	"Joined", -- on step Gate: walk to the first zone
 	"Entered first zone", -- Catch
 	"Caught first monster", -- Home
 	"Brought it home", -- Sell
 	"Sold first monster", -- Buy
-	"Bought first vacuum", -- Tour
-	"Finished tutorial", -- Done
+	"Finished tutorial", -- Done: bought the first vacuum
 	"Bought 1st wing", -- 2 wings owned (Library)
 	"Bought 2nd wing", -- 3 wings owned (Ballroom)
 }

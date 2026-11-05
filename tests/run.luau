@@ -2640,10 +2640,10 @@ do
 	local Tutorial = require("../src/shared/Util/Tutorial")
 	local Zones = require("../src/shared/Config/Zones")
 	-- Short since 2026-11-05: the catch goes straight to the Backpack, then sell and buy.
-	check("tutorial starts at the gate and ends after the tour", Tutorial.Steps[1] == "Gate")
-	check("tutorial step order", Tutorial.nextStep("Gate") == "Catch" and Tutorial.nextStep("Tour") == "Done")
+	check("tutorial starts at the gate and ends at the vacuum", Tutorial.Steps[1] == "Gate")
+	check("tutorial step order", Tutorial.nextStep("Gate") == "Catch" and Tutorial.nextStep("Buy") == "Done")
 	check("tutorial: home, then sell", Tutorial.nextStep("Home") == "Sell")
-	check("tutorial: the vacuum, then the tour", Tutorial.nextStep("Buy") == "Tour")
+	check("tutorial: no button tour, old tour saves are done", Tutorial.resumeAt("Tour") == "Done")
 	check(
 		"tutorial and quest: every step has words and a hint",
 		(function()
@@ -2667,7 +2667,7 @@ do
 			end
 			return Tutorial.textFor("Catch", true) == Tutorial.TouchText.Catch
 				and Tutorial.textFor("Catch", false) == Tutorial.Text.Catch
-				and Tutorial.textFor("Tour", true) == Tutorial.Text.Tour
+				and Tutorial.textFor("Sell", true) == Tutorial.Text.Sell
 		end)()
 	)
 	check(
@@ -2686,9 +2686,9 @@ do
 	)
 	check(
 		"tutorial: Sell opens at the sell step and stays open",
-		Tutorial.isUnlocked("Sell", "Sell") and Tutorial.isUnlocked("Tour", "Sell")
+		Tutorial.isUnlocked("Sell", "Sell") and Tutorial.isUnlocked("Buy", "Sell")
 	)
-	check("tutorial: unlisted features wait for the end", not Tutorial.isUnlocked("Tour", "Something"))
+	check("tutorial: unlisted features wait for the end", not Tutorial.isUnlocked("Buy", "Something"))
 	check(
 		"tutorial: everything works once done",
 		Tutorial.isUnlocked(nil, "Something") and Tutorial.isUnlocked("Done", "Sell")
@@ -2826,7 +2826,7 @@ do
 	check("a forced bite always gives the effect", forced.effect == Tutorial.CakeEffect)
 end
 
--- The tour at the end of the tutorial, and the one-time unlock tutorials (Util/Tips).
+-- The one-time unlock tutorials (Util/Tips).
 do
 	local Tutorial = require("../src/shared/Util/Tutorial")
 	local Tips = require("../src/shared/Util/Tips")
@@ -2836,21 +2836,17 @@ do
 	local HeistsConfig = require("../src/shared/Config/Heists")
 
 	check(
-		"tour: every glowing card names a button the tutorial unlocks by the tour",
+		"tutorial: the guide card stays short",
 		(function()
-			for _, stop in Tutorial.Tour do
-				if stop.feature and not Tutorial.isUnlocked("Tour", stop.feature) then
-					return false
+			for _, words in { Tutorial.Text, Tutorial.TouchText } do
+				for _, text in words do
+					if #text > 100 then
+						return false
+					end
 				end
 			end
 			return true
 		end)()
-	)
-	check(
-		"tour: phone words where they differ",
-		Tutorial.tourText(5, true) ~= Tutorial.tourText(5, false)
-			and Tutorial.tourText(1, true) == Tutorial.tourText(1, false)
-			and Tutorial.tourText(99, false) == Tutorial.Text.Tour
 	)
 
 	local function facts(changes: { [string]: any }?): Tips.Facts

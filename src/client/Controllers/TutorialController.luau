@@ -2,8 +2,8 @@
 -- Draws the first-timer tutorial (the server runs it, server/Services/TutorialService): a
 -- guide card on the right saying what to do, a glowing trail from you to where to go (with
 -- the target lit up), the button to press pulsing, and after 2 minutes on one step a bigger
--- hint. The last step is a short tour of the buttons; its Next button ends the tutorial
--- (TutorialRemotes.Finish). Locked buttons are greyed out by client/Locks.
+-- hint. Kept small: one short line per step (Giles 2026-11-05). Locked buttons are greyed
+-- out by client/Locks.
 -- Reads the player attribute Tutorial (the step, nil once done) and TutorialSince.
 -- After the tutorial the same card shows the one-time unlock tutorials (Shared.Util.Tips,
 -- server/Services/TipService): the player attribute Tip is the one to show, and Got it sends
@@ -32,7 +32,7 @@ local TargetCheckSeconds = 0.5
 local EdgeGap = 12 -- pixels between the card and the mansion list's tab (or open list)
 local TrailColor = Color3.fromRGB(255, 176, 84) -- lantern orange, like the shop titles
 
--- The button that pulses during each step (the tour picks its own).
+-- The button that pulses during each step.
 local StepGlow = {
 	Gate = "Portals",
 	Catch = "Hotbar",
@@ -174,7 +174,7 @@ local function buildCard(): (ScreenGui, TextLabel, TextLabel, TextLabel, TextBut
 	Ui.rim(card, Ui.Style.line, 1)
 	local limit = Instance.new("UISizeConstraint")
 	limit.MinSize = Vector2.new(220, 0)
-	limit.MaxSize = Vector2.new(340, math.huge)
+	limit.MaxSize = Vector2.new(300, math.huge)
 	limit.Parent = card
 	local padding = Instance.new("UIPadding")
 	padding.PaddingLeft = UDim.new(0, 12)
@@ -202,7 +202,7 @@ local function buildCard(): (ScreenGui, TextLabel, TextLabel, TextLabel, TextBut
 		label.Parent = card
 		return label
 	end
-	local title = line(1, Ui.Colors.lamp, 26, Ui.TitleFont)
+	local title = line(1, Ui.Colors.lamp, 20, Ui.TitleFont)
 	local body = line(2, Ui.Colors.text, 17, Enum.Font.FredokaOne)
 	local hint = line(3, Ui.Colors.muted, 14, Enum.Font.FredokaOne)
 	local nextButton = Ui.button(card, "Next", Ui.Colors.buy, UDim2.new(0, 110, 0, 40))
@@ -215,7 +215,6 @@ end
 function TutorialController.start()
 	local gui, title, body, hint, nextButton = buildCard()
 	local remotes = ReplicatedStorage:WaitForChild("TutorialRemotes")
-	local Finish = remotes:WaitForChild("Finish") :: RemoteEvent
 	local SkipQuest = remotes:WaitForChild("SkipQuest") :: RemoteEvent
 	local Seen = ReplicatedStorage:WaitForChild("TipRemotes"):WaitForChild("Seen") :: RemoteEvent
 
@@ -242,8 +241,6 @@ function TutorialController.start()
 	highlight.FillTransparency = 0.7
 	highlight.OutlineColor = TrailColor
 	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-
-	local tourIndex = 1
 
 	-- Keeps the card left of the mansion list on the right edge (MansionListController): just
 	-- past its tab when shut, past the whole list when open. The drawer says how wide it
@@ -319,17 +316,6 @@ function TutorialController.start()
 		else
 			title.Text = `Tutorial · {Tutorial.index(current)}/{#Tutorial.Steps}`
 		end
-		if current == "Tour" then
-			local stop = Tutorial.Tour[tourIndex]
-			body.Text = Tutorial.tourText(tourIndex, isTouch())
-			hint.Text = `{math.min(tourIndex, #Tutorial.Tour)} of {#Tutorial.Tour}`
-			nextButton.Visible = true
-			nextButton.Text = if tourIndex >= #Tutorial.Tour then "Let's hunt!" else "Next"
-			Locks.glow(if stop then stop.feature else nil, true) -- the rest of the screen greys out
-			Locks.point(nil)
-			hideTrail()
-			return
-		end
 		nextButton.Visible = quest ~= nil -- the quest is optional
 		nextButton.Text = "Skip quest"
 		body.Text = Tutorial.textFor(current, isTouch())
@@ -356,21 +342,10 @@ function TutorialController.start()
 			hideTrail()
 			Locks.glow(nil)
 			Locks.point(nil)
-			return
 		end
-		if step() ~= "Tour" then
-			return
-		end
-		if tourIndex >= #Tutorial.Tour then
-			Finish:FireServer()
-			return
-		end
-		tourIndex += 1
-		render()
 	end)
 
 	player:GetAttributeChangedSignal("Tutorial"):Connect(function()
-		tourIndex = 1
 		render()
 	end)
 	player:GetAttributeChangedSignal("Quest"):Connect(function()
@@ -401,7 +376,7 @@ function TutorialController.start()
 		elseif current then
 			follow()
 			pointAt(targetFor(current))
-			if current ~= "Tour" and hint.Text == "" then
+			if hint.Text == "" then
 				render() -- the 2 minute hint
 			end
 		end
