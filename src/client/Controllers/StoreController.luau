@@ -43,6 +43,14 @@ function StoreController.start()
 	-- The cards sit side by side in a strip that scrolls sideways (Giles 2026-11-05), in the
 	-- window list's place.
 	window.list.Visible = false
+	-- Wider than the other windows (Giles 2026-11-05): it takes 92% of the screen's width, up
+	-- to room for all six cards, so a wide screen shows every card and a phone scrolls.
+	local limit = window.panel:FindFirstChildOfClass("UISizeConstraint")
+	if limit then
+		local cards = #Config.PassOrder + 1 -- the passes and the Starter Pack
+		local width = cards * (CardWidth + 10) - 10 + 4 + 28 -- gaps, strip edges, panel padding
+		limit.MaxSize = Vector2.new(width, limit.MaxSize.Y)
+	end
 	local strip = Instance.new("ScrollingFrame")
 	strip.Name = "Cards"
 	strip.Position = window.list.Position
