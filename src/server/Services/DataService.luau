@@ -56,6 +56,10 @@ export type Data = {
 	guildGift: boolean, -- got the one-time Hunter's Guild gift for joining the group (CommunityService)
 	tips: { [string]: boolean }, -- unlock tutorials already seen, by Util/Tips id (TipService)
 	analytics: Analytics.Record, -- funnel steps already sent to Creator Hub (AnalyticsService)
+	-- The rookie hour after the tutorial (RookieService, Config/Rookie). decided: the first load
+	-- looked whether this save gets it (older saves don't); secondsLeft: rookie play time left;
+	-- hunts: trips into a zone since the tutorial; lucky: the lucky monster came.
+	rookie: { decided: boolean, secondsLeft: number, hunts: number, lucky: boolean },
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -90,6 +94,7 @@ DataService.Template = {
 	guildGift = false,
 	tips = {},
 	analytics = Analytics.empty(),
+	rookie = { decided = false, secondsLeft = 0, hunts = 0, lucky = false },
 } :: Data
 
 local store = ProfileStore.New(

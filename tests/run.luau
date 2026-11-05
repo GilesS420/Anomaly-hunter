@@ -4275,6 +4275,38 @@ do
 	check("analytics: repair junk", Analytics.repair("x").onboard == 0)
 end
 
+-- The "Next goal" bar and the rookie hour (Giles 2026-11-05).
+do
+	local Goals = require("../src/shared/Util/Goals")
+	local RookieConfig = require("../src/shared/Config/Rookie")
+	local fresh = Goals.next({}, 1)
+	check("goal: a new player saves up for the Phantom Vac", fresh ~= nil and fresh.id == "PhantomVac")
+	local afterVac = Goals.next({ PhantomVac = 1 }, 1)
+	check("goal: then the Spirit Siphon", afterVac ~= nil and afterVac.id == "SpiritSiphon")
+	local afterSiphon = Goals.next({ PhantomVac = 1, SpiritSiphon = 1 }, 1)
+	check(
+		"goal: then the Library, named with the zone it opens",
+		afterSiphon ~= nil
+			and afterSiphon.id == "Library"
+			and string.find(afterSiphon.name, "Sunken Swamp") ~= nil
+	)
+	local everything: { [string]: number } = {}
+	for _, item in Shop.Workshop do
+		everything[item.id] = 1
+	end
+	check("goal: nothing left once everything is owned", Goals.next(everything, 99) == nil)
+	check(
+		"goal: progress stays between 0 and 1",
+		Goals.progress(500, 1000) == 0.5 and Goals.progress(5000, 1000) == 1 and Goals.progress(-1, 10) == 0
+	)
+	local rare = false
+	for _, m in Monsters do
+		rare = rare or (m.zone == 1 and m.rarity == RookieConfig.LuckyRarity)
+	end
+	check("rookie: the first zone has a lucky monster", rare)
+	check("rookie: the bonus is a real bonus", RookieConfig.SellBonusPercent > 0 and RookieConfig.Minutes > 0)
+end
+
 if failures > 0 then
 	error(`{failures} check(s) failed`)
 end

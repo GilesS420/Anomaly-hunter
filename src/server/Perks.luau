@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CakeConfig = require(ReplicatedStorage.Shared.Config.Cakes)
 local Community = require(ReplicatedStorage.Shared.Config.Community)
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.Inventory)
+local Rookie = require(ReplicatedStorage.Shared.Config.Rookie)
 local Robux = require(ReplicatedStorage.Shared.Config.Robux)
 
 local Perks = {}
@@ -43,7 +44,8 @@ export type Bonus = { label: string, percent: number }
 
 -- The player's own Collector bonuses, in whole percents (the Collector adds a live Watcher
 -- event's on top and shows them all at the top of the sell window): Roblox friends in this
--- server, VIP and the Hunter's Guild (CommunityService sets FriendsHere and InGuild).
+-- server, VIP, the Hunter's Guild (CommunityService sets FriendsHere and InGuild) and the
+-- rookie hour right after the tutorial (RookieService sets RookieSeconds).
 function Perks.sellBonuses(player: Player): { Bonus }
 	local list: { Bonus } = {}
 	local friends = tonumber(player:GetAttribute("FriendsHere")) or 0
@@ -58,6 +60,10 @@ function Perks.sellBonuses(player: Player): { Bonus }
 	end
 	if player:GetAttribute("InGuild") == true then
 		table.insert(list, { label = "Guild", percent = math.floor(Community.GuildSellBonus * 100 + 0.5) })
+	end
+	local rookie = player:GetAttribute("RookieSeconds")
+	if typeof(rookie) == "number" and rookie > 0 then
+		table.insert(list, { label = "rookie hour", percent = Rookie.SellBonusPercent })
 	end
 	return list
 end
