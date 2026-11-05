@@ -193,6 +193,8 @@ local function portalLabel(part: BasePart, title: string, subtitle: string?, hei
 	label(part, title, subtitle, height, 200)
 	local billboard = part:FindFirstChild("Label") :: BillboardGui
 	billboard.AlwaysOnTop = true
+	-- Drawn in screen pixels, so the client shrinks it on a phone (PortalLabelController).
+	game:GetService("CollectionService"):AddTag(billboard, "PortalLabel")
 end
 
 -- The hub floor: an oval of dark slate, the same stone family as the cobbled paths and a shade
