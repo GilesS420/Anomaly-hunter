@@ -70,8 +70,21 @@ local function handFree(): boolean
 	return tool == nil or tool:GetAttribute("VacuumId") ~= nil
 end
 
--- Whether the server will most likely start this catch: a vacuum in hand and the monster
--- within its reach. Only decides whether the meter shows before the answer comes.
+-- Whether this vacuum is too weak for the monster (from the size and rarity on its model).
+local function tooWeak(model: Model, vacuumId: string): boolean
+	local sizeId = model:GetAttribute("Size")
+	local rarityId = model:GetAttribute("Rarity")
+	local monsterId = model:GetAttribute("MonsterId")
+	if typeof(sizeId) ~= "string" or typeof(rarityId) ~= "string" then
+		return false
+	end
+	local id = if typeof(monsterId) == "string" then monsterId else nil
+	return Catching.vacuumNeeded(vacuumId, sizeId, rarityId, id) ~= nil
+end
+
+-- Whether the server will most likely start this catch: a vacuum in hand, the monster within
+-- its reach, and a vacuum strong enough for it. Only decides whether the meter shows before
+-- the answer comes; the server still decides (and sends the "Too strong!" toast).
 local function likelyCatch(model: Model): boolean
 	local character = player.Character
 	local tool = if character then character:FindFirstChildOfClass("Tool") else nil
@@ -81,7 +94,10 @@ local function likelyCatch(model: Model): boolean
 	if typeof(vacuumId) ~= "string" or not root or not root:IsA("BasePart") or not body then
 		return false
 	end
-	return (root.Position - body.Position).Magnitude <= Catching.reach(vacuumId)
+	if (root.Position - body.Position).Magnitude > Catching.reach(vacuumId) then
+		return false
+	end
+	return not tooWeak(model, vacuumId)
 end
 
 -- A quick flash on the clicked monster, so the click shows the moment it lands.
@@ -463,9 +479,10 @@ function CatchController.start()
 		end
 		target = model
 		StartCatch:FireServer(model)
-		-- Show it straight away instead of after the server's answer.
-		flash(model)
+		-- Show it straight away instead of after the server's answer. A vacuum that's too weak
+		-- shows nothing here: the server's "Too strong!" toast is the only answer.
 		if likelyCatch(model) then
+			flash(model)
 			local monsterId = model:GetAttribute("MonsterId")
 			local name = if typeof(monsterId) == "string" then Format.name(monsterId) else model.Name
 			holdText = `Catching {name}...`
