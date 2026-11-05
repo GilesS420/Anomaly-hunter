@@ -63,8 +63,6 @@ local lastLocked: { [Player]: number } = {}
 local lastSpot: { [Player]: Vector3 } = {} -- where each hunter stood at the last walk check
 local strayingSince: { [Player]: number } = {}
 local arrivals: { [string]: BasePart } = {} -- each wired zone's Arrival, by zone id
--- Each wired zone's way in, by zone id, for HuntService.sendInto.
-local entries: { [string]: { zone: Zones.Zone, arrival: BasePart, facing: Vector3? } } = {}
 
 -- Every gate and exit part, with what walking through it does.
 type Portal = { part: BasePart, use: (Player) -> () }
@@ -584,7 +582,6 @@ local function wireZone(zone: Zones.Zone)
 	if gate and arrival then
 		arrivals[zone.id] = arrival
 		local facing = zoneMiddle(zone, zoneFolder)
-		entries[zone.id] = { zone = zone, arrival = arrival, facing = facing }
 		wire(gateInstance, function(player)
 			if player:GetAttribute("Zone") == nil and portalReady(player) then
 				enterZone(player, zone, arrival, facing)
@@ -619,21 +616,6 @@ local function checkStray(player: Player, position: Vector3)
 		player:SetAttribute("Zone", nil)
 		player:SetAttribute("Hearts", Zones.MaxHearts)
 	end
-end
-
--- Puts a player in the hub straight into a zone, as if they walked through its gate (the
--- tutorial starts new players inside Pumpkin Graveyard). False when they can't go right now.
-function HuntService.sendInto(player: Player, zoneId: string): boolean
-	local entry = entries[zoneId]
-	local character = player.Character
-	if not entry or not character or not character:FindFirstChild("HumanoidRootPart") then
-		return false
-	end
-	if player:GetAttribute("Zone") ~= nil or HuntService.isCarrying(player) then
-		return false
-	end
-	enterZone(player, entry.zone, entry.arrival, entry.facing)
-	return player:GetAttribute("Zone") == zoneId
 end
 
 -- The backup for Touched: did anyone walk through a gate or exit since the last check?

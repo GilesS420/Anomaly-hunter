@@ -34,6 +34,7 @@ local TrailColor = Color3.fromRGB(255, 176, 84) -- lantern orange, like the shop
 
 -- The button that pulses during each step (the tour picks its own).
 local StepGlow = {
+	Gate = "Portals",
 	Catch = "Hotbar",
 	Sell = "Sell",
 	Buy = "Shops",
@@ -124,7 +125,9 @@ end
 
 -- What the trail points at during this step, if anything.
 local function targetFor(current: string?): Instance?
-	if current == "Catch" then
+	if current == "Gate" then
+		return path("Hub", "ZoneGates", Tutorial.Zone)
+	elseif current == "Catch" then
 		return tutorialMonster()
 	elseif current == "Home" then
 		return path("Zones", Tutorial.Zone, "Exit")

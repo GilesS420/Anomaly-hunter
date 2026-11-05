@@ -1,7 +1,7 @@
 --!strict
 -- The first-timer tutorial: the steps in order, what each one unlocks, and the words shown
 -- for each. Kept short (Giles 2026-11-05, after the funnel showed most new players never
--- finished the long one): a new player starts inside Pumpkin Graveyard, catches a Gloomlet,
+-- finished the long one): a new player walks into Pumpkin Graveyard, catches a Gloomlet,
 -- runs back out (it turns Cobwebbed and lands straight in the Backpack), sells it and buys the
 -- Phantom Vac. Then a short tour of the buttons. Until the tutorial is done every button that
 -- isn't unlocked yet is greyed out.
@@ -36,9 +36,9 @@ export type Step =
 	| "Feed"
 	| "Tour"
 
--- Gate and Pickup were steps before 2026-11-05; old saves at them pick up in the new list
--- (resumeAt), so their names stay in the type.
-Tutorial.Steps = { "Catch", "Home", "Sell", "Buy", "Tour" } :: { Step }
+-- Pickup was a step before 2026-11-05; old saves at it pick up at Sell (resumeAt), so its
+-- name stays in the type.
+Tutorial.Steps = { "Gate", "Catch", "Home", "Sell", "Buy", "Tour" } :: { Step }
 
 -- The optional Bakery quest after the tutorial, in order.
 Tutorial.QuestSteps = { "Bake", "Place", "Hunt", "Return", "Feed" } :: { Step }
@@ -62,8 +62,8 @@ Tutorial.HintSeconds = 120 -- stuck on one step this long: a bigger hint shows
 -- The fast-travel features match Config/Travel's destination ids. Anything not listed is
 -- locked until the tutorial is done.
 Tutorial.Unlocks = {
-	Home = "Catch", -- the Mansion fast-travel button
-	Portals = "Catch",
+	Home = "Gate", -- the Mansion fast-travel button
+	Portals = "Gate",
 	Hotbar = "Catch",
 	Backpack = "Sell",
 	MansionList = "Sell", -- the arrow tab on the right edge, with a Pick up button per monster
@@ -72,7 +72,7 @@ Tutorial.Unlocks = {
 	Codex = "Tour",
 	Missions = "Tour",
 	Store = "Tour", -- the Robux Store button
-	Settings = "Catch", -- sound and weather settings always work
+	Settings = "Gate", -- sound and weather settings always work
 } :: { [string]: Step }
 
 -- The exact cards and buttons that pulse during a step (client/Locks.point), on top of the
@@ -87,7 +87,8 @@ Tutorial.Point = {
 -- What the guide card says for each step, with a keyboard (Text) or on a phone or tablet
 -- without one (TouchText, where it differs).
 Tutorial.Text = {
-	Catch = `Welcome to the Pumpkin Graveyard! Press 1 to hold your vacuum, then click the {Monster}. When it struggles, click or press F while the needle is in the green.`,
+	Gate = "Follow the glowing trail to the Pumpkin Graveyard gate, or press Portals at the top.",
+	Catch = `Press 1 to hold your vacuum, then click the {Monster}. When it struggles, click or press F while the needle is in the green.`,
 	Home = "Got it! Follow the trail back to the exit, or press R to use your free Return Charm.",
 	Sell = `Your {Monster} turned Cobwebbed (effects make monsters worth more) and is in your Backpack. Press Sell at the top, press E at the Collector, pick "I want to sell my monsters." and sell it.`,
 	Buy = 'The Collector gave you a welcome gift! Press Shops, then press E at the Vacuum Vault (the middle shop), pick "Show me the vacuums." and buy the Phantom Vac.',
@@ -100,7 +101,8 @@ Tutorial.Text = {
 } :: { [Step]: string }
 
 Tutorial.TouchText = {
-	Catch = `Welcome to the Pumpkin Graveyard! Tap the first hotbar slot to hold your vacuum, then tap the {Monster}. When it struggles, tap while the needle is in the green.`,
+	Gate = "Follow the glowing trail to the Pumpkin Graveyard gate, or tap Portals at the top.",
+	Catch = `Tap the first hotbar slot to hold your vacuum, then tap the {Monster}. When it struggles, tap while the needle is in the green.`,
 	Home = "Got it! Follow the trail back to the exit, or tap Return Charm to jump home.",
 	Sell = `Your {Monster} turned Cobwebbed (effects make monsters worth more) and is in your Backpack. Tap Sell at the top, tap Talk at the Collector, pick "I want to sell my monsters." and sell it.`,
 	Buy = 'The Collector gave you a welcome gift! Tap Shops, then tap Talk at the Vacuum Vault (the middle shop), pick "Show me the vacuums." and buy the Phantom Vac.',
@@ -112,6 +114,7 @@ Tutorial.TouchText = {
 
 -- Shown under the guide card after HintSeconds on one step.
 Tutorial.Hints = {
+	Gate = "The Zone Gates are at the far end of the hub. Press Portals to jump there.",
 	Catch = "Hold your vacuum (the first hotbar slot) and stay close. Each struggle is one click, tap or F while the needle crosses the green zone; miss and it breaks free for a moment, so just try again.",
 	Home = "Walk back through the exit arch you came in by.",
 	Sell = `Talk to the Collector (E or tap Talk) and pick "I want to sell my monsters.", then press Sell on your {Monster}.`,
@@ -245,11 +248,11 @@ function Tutorial.isFresh(
 end
 
 -- The step a returning player picks up at. A hunt can't survive leaving the game (the
--- catch is lost), so the hunting steps start over at the catch. Saves from the longer
--- tutorial: Gate starts at the catch and Pickup at the sell step.
+-- catch is lost), so the hunting steps start over at the gate. Saves from the longer
+-- tutorial: Pickup goes on at the sell step.
 function Tutorial.resumeAt(step: string): string
-	if step == "Gate" or step == "Catch" or step == "Home" then
-		return "Catch"
+	if step == "Catch" or step == "Home" then
+		return "Gate"
 	elseif step == "Pickup" then
 		return "Sell"
 	end
