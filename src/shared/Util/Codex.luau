@@ -5,7 +5,8 @@
 --   monsters  [monsterId] = { Plain = true, Gold = true, ... }  (Plain: caught without a variant)
 --   effects   [effectId] = true
 --   combos    [comboId] = true
---   rewards   ["PumpkinGraveyard:Gold"] = true  (Codex rewards already paid, see Config/CodexRewards)
+--   rewards   ["PumpkinGraveyard:Gold"] = 180000000  (Codex reward paid: the amount, or `true` in
+--             saves from before 2026-11-05, see Config/CodexRewards)
 -- Only launch content is listed (zones and events that are in the game). Pure functions so
 -- they can be tested outside Roblox; the server fills it (CodexService), the client draws it
 -- (CodexController).
@@ -24,7 +25,7 @@ local Codex = {}
 
 export type Section = { id: string, title: string, monsters: { string } }
 export type Progress = { found: number, total: number, variants: { [string]: number } }
-export type Reward = { key: string, page: string, goal: string, amount: number }
+export type Reward = { key: string, page: string, goal: string, amount: number, topUp: boolean }
 export type Found = { kind: "Monster" | "Variant" | "Effect" | "Combo", id: string, variant: string? }
 
 Codex.Plain = "Plain"
@@ -240,15 +241,30 @@ end
 
 Codex.EffectsPage = "Effects"
 
+-- A goal's reward in a rates table (Config/CodexRewards, or its Old rates).
+local function amountIn(rates: any, page: string, goal: string): number
+	if page == Codex.EffectsPage then
+		return if goal == "Effects" then rates.Effects elseif goal == "Combos" then rates.Combos else 0
+	end
+	return math.floor((rates.Pages[page] or 0) * (rates.Goals[goal] or 0))
+end
+
 -- What finishing a goal on a page pays (0 if that goal pays nothing).
 function Codex.rewardAmount(page: string, goal: string): number
-	if page == Codex.EffectsPage then
-		return if goal == "Effects"
-			then CodexRewards.Effects
-			elseif goal == "Combos" then CodexRewards.Combos
-			else 0
+	return amountIn(CodexRewards, page, goal)
+end
+
+-- How much of a goal's reward is paid already. A save from before the 2026-11-05 raise holds
+-- `true`: that's the old amount when old claims get topped up, otherwise all of it.
+function Codex.paidSoFar(codex: { [string]: any }, page: string, goal: string): number
+	local rewards = codex.rewards
+	local mark = if typeof(rewards) == "table" then rewards[Codex.rewardKey(page, goal)] else nil
+	if typeof(mark) == "number" then
+		return mark
+	elseif mark == true then
+		return if CodexRewards.TopUpOldClaims then amountIn(CodexRewards.Old, page, goal) else math.huge
 	end
-	return math.floor((CodexRewards.Pages[page] or 0) * (CodexRewards.Goals[goal] or 0))
+	return 0
 end
 
 -- The goals of a monster page that are done: "Found" once every monster is caught, then each
@@ -289,10 +305,11 @@ end
 -- Whether this goal's reward has been paid.
 function Codex.claimed(codex: { [string]: any }, page: string, goal: string): boolean
 	local rewards = codex.rewards
-	return typeof(rewards) == "table" and rewards[Codex.rewardKey(page, goal)] == true
+	return typeof(rewards) == "table" and rewards[Codex.rewardKey(page, goal)] ~= nil
 end
 
--- Every goal finished but not paid yet, marked as paid now. The caller pays them out.
+-- Every goal finished but not fully paid yet, marked as paid now. The caller pays them out.
+-- A goal paid at an older, smaller amount pays only the difference (`topUp` is true).
 function Codex.newRewards(codex: { [string]: any }, sections: { Section }): { Reward }
 	local reached: { { page: string, goal: string } } = {}
 	for _, section in sections do
@@ -313,9 +330,16 @@ function Codex.newRewards(codex: { [string]: any }, sections: { Section }): { Re
 	for _, entry in reached do
 		local key = Codex.rewardKey(entry.page, entry.goal)
 		local amount = Codex.rewardAmount(entry.page, entry.goal)
-		if not rewards[key] and amount > 0 then
-			rewards[key] = true
-			table.insert(paid, { key = key, page = entry.page, goal = entry.goal, amount = amount })
+		local before = Codex.paidSoFar(codex, entry.page, entry.goal)
+		if amount > before then
+			rewards[key] = amount
+			table.insert(paid, {
+				key = key,
+				page = entry.page,
+				goal = entry.goal,
+				amount = amount - before,
+				topUp = before > 0,
+			})
 		end
 	end
 	return paid
