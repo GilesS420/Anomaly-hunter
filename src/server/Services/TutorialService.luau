@@ -9,11 +9,18 @@
 --   Pickup  pick it up into the Backpack (E next to it)
 --   Sell    sell it at the Collector, who then tops their money up to the Phantom Vac's price
 --   Buy     buy the Phantom Vac (always in stock for them during this step, WorkshopService)
+--   Bake    the Baker tops their money up to a Pumpkin Candy; buy it (always in stock, BakeryService)
+--   Place   set it out in the mansion
+--   Hunt    go back to Pumpkin Graveyard and catch a second monster (a Skittercrow waits there)
+--   Return  bring it home
+--   Feed    it walks to the cake, and the bite gives Pumpkin Head for sure (CakeService.hurry;
+--           after Tutorial.FeedSeconds it gets the effect anyway)
 --   Tour    the client shows what each button does, then fires Finish
--- Losing the catch (knocked out, or leaving the zone or the game) goes back to Gate. Nothing
--- attacks a player in the tutorial (MonsterAiService) and fast travel to a locked button
--- is refused (TravelService). The player attribute Tutorial holds the step (nil once done)
--- and TutorialSince when it started (server time), for the client's "stuck?" hint.
+-- Losing the catch (knocked out, or leaving the zone or the game) goes back to Gate (the
+-- second one to Hunt). Nothing attacks a player in the tutorial (MonsterAiService) and fast
+-- travel to a locked button is refused (TravelService). The player attribute Tutorial holds
+-- the step (nil once done) and TutorialSince when it started (server time), for the client's
+-- "stuck?" hint.
 --
 -- Remotes in ReplicatedStorage.TutorialRemotes:
 --   Finish   client -> server ()   the tour is over
@@ -26,6 +33,7 @@ local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Tutorial = require(ReplicatedStorage.Shared.Util.Tutorial)
 local AnalyticsService = require(script.Parent.AnalyticsService)
+local CakeService = require(script.Parent.CakeService)
 local DataService = require(script.Parent.DataService)
 local HauntService = require(script.Parent.HauntService)
 local HuntService = require(script.Parent.HuntService)
@@ -36,9 +44,10 @@ local TutorialService = {}
 
 type State = {
 	step: string,
-	monster: Model?, -- the Gloomlet waiting in the zone (Catch)
+	monster: Model?, -- the Gloomlet (Catch) or Skittercrow (Hunt) waiting in the zone
 	spawnAt: number?, -- os.clock() when to bring (another) one
 	tourEnds: number?, -- os.clock() when an unfinished tour ends by itself
+	feedEnds: number?, -- os.clock() when the Feed step gives the effect anyway
 }
 
 local CheckSeconds = 0.5
@@ -58,6 +67,12 @@ for _, item in Shop.Workshop do
 		firstVacuumPrice = item.price
 	end
 end
+local cakePrice = 0
+for _, item in Shop.Bakery do
+	if item.id == Tutorial.Cake then
+		cakePrice = item.price
+	end
+end
 
 -- Shop items that cost something (the free starter vacuum doesn't count as owning anything).
 local function paidItems(inventory: { [string]: number }): number
@@ -70,6 +85,26 @@ local function paidItems(inventory: { [string]: number }): number
 		end
 	end
 	return count
+end
+
+-- Whether the tutorial's cake is out in their mansion.
+local function hasCakeOut(data: DataService.Data): boolean
+	for _, cake in data.cakes do
+		if cake.itemId == Tutorial.Cake then
+			return true
+		end
+	end
+	return false
+end
+
+-- Whether a monster at home has the cake's effect (the Feed step is done).
+local function fedOne(data: DataService.Data): boolean
+	for _, caught in data.monsters do
+		if table.find(caught.effects, Tutorial.CakeEffect) then
+			return true
+		end
+	end
+	return false
 end
 
 local function removeMonster(state: State)
@@ -101,6 +136,20 @@ local function enter(player: Player, data: DataService.Data, state: State)
 				`The Collector likes new hunters: {Format.money(gift)} for your first vacuum!`
 			)
 		end
+	elseif step == "Bake" then
+		local gift = Tutorial.gift(data.money, cakePrice)
+		if gift > 0 and DataService.addMoney(player, gift) then
+			AnalyticsService.money(player, gift, "Onboarding", "BakerGift")
+			Notify.toast(
+				player,
+				`The Baker wants you to try a cake: {Format.money(gift)} for a Pumpkin Candy!`
+			)
+		end
+	elseif step == "Hunt" then
+		data.tips.Cake = true -- they just learned cakes here: no "Your first cake" card later
+		state.spawnAt = os.clock() + 1
+	elseif step == "Feed" then
+		state.feedEnds = os.clock() + Tutorial.FeedSeconds
 	elseif step == "Tour" then
 		state.tourEnds = os.clock() + TourTimeout
 	end
@@ -136,10 +185,10 @@ local function setStep(player: Player, step: string, run: boolean)
 	end
 end
 
--- Brings the tutorial's Gloomlet to the player, marked so their client can point at it.
-local function bringMonster(player: Player, state: State)
+-- Brings the tutorial's monster to the player, marked so their client can point at it.
+local function bringMonster(player: Player, state: State, monsterId: string)
 	state.spawnAt = nil
-	local ok, _, model = SpawnService.spawnFor(player, Tutorial.Monster, "Normal")
+	local ok, _, model = SpawnService.spawnFor(player, monsterId, "Normal")
 	if ok and model then
 		model:SetAttribute("TutorialFor", player.UserId)
 		state.monster = model
@@ -178,7 +227,7 @@ local function check(player: Player, state: State)
 				if not at then
 					state.spawnAt = os.clock() + Tutorial.RespawnSeconds
 				elseif os.clock() >= at then
-					bringMonster(player, state)
+					bringMonster(player, state, Tutorial.Monster)
 				end
 			end
 		end
@@ -200,7 +249,57 @@ local function check(player: Player, state: State)
 		end
 	elseif step == "Buy" then
 		if (data.inventory[Tutorial.FirstVacuum] or 0) > 0 then
+			setStep(player, "Bake", true)
+		end
+	elseif step == "Bake" then
+		if hasCakeOut(data) then
+			setStep(player, "Hunt", true)
+		elseif (data.inventory[Tutorial.Cake] or 0) > 0 then
+			setStep(player, "Place", true)
+		end
+	elseif step == "Place" then
+		if hasCakeOut(data) then
+			setStep(player, "Hunt", true)
+		elseif (data.inventory[Tutorial.Cake] or 0) == 0 then
+			setStep(player, "Bake", true) -- it's gone somehow: buy another
+		end
+	elseif step == "Hunt" then
+		if carrying then
+			setStep(player, "Return", true)
+		elseif zone ~= Tutorial.Zone then
+			removeMonster(state) -- left without it; a fresh one waits next time
+			state.spawnAt = nil
+		else
+			local monster = state.monster
+			if monster and not monster.Parent then
+				state.monster = nil
+			end
+			if not state.monster then
+				local at = state.spawnAt
+				if not at then
+					state.spawnAt = os.clock() + 1 -- just walked in (or it wandered off)
+				elseif os.clock() >= at then
+					bringMonster(player, state, Tutorial.SecondMonster)
+				end
+			end
+		end
+	elseif step == "Return" then
+		if zone == nil and not carrying then
+			setStep(player, if #data.monsters > 0 then "Feed" else "Hunt", true)
+		end
+	elseif step == "Feed" then
+		if fedOne(data) then
 			setStep(player, "Tour", true)
+		elseif #data.monsters > 0 then
+			CakeService.hurry(player, Tutorial.Cake)
+			local ends = state.feedEnds
+			if not ends then
+				state.feedEnds = os.clock() + Tutorial.FeedSeconds -- came back to this step
+			elseif os.clock() >= ends then
+				HauntService.give(player, Tutorial.CakeEffect) -- the bite never came: no waiting forever
+			end
+		elseif owned == 0 then
+			setStep(player, "Hunt", true) -- sold it before the bite
 		end
 	elseif step == "Tour" then
 		local ends = state.tourEnds

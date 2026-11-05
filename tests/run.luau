@@ -2742,6 +2742,34 @@ do
 		"tutorial vacuum is always in stock with the tutorial boost",
 		Workshop.inStock(Workshop.item(Tutorial.FirstVacuum), 12345, nil, math.huge)
 	)
+	-- The Bakery part (Giles 2026-11-05): buy the cake, set it out, a second catch eats it.
+	local cake = Cakes.item(Tutorial.Cake)
+	check("tutorial cake is a Bakery cake", cake ~= nil and cake.kind == "Food")
+	check("tutorial cake gives the tutorial effect", cake ~= nil and cake.grantsEffect == Tutorial.CakeEffect)
+	check(
+		"tutorial cake is always in stock with the tutorial boost",
+		cake ~= nil and Workshop.inStock(cake, 12345, nil, math.huge)
+	)
+	check(
+		"tutorial second monster lives in the first zone",
+		Monsters[Tutorial.SecondMonster] ~= nil and Monsters[Tutorial.SecondMonster].zone == 1
+	)
+	check(
+		"tutorial: the Bakery comes after the vacuum, then the tour",
+		Tutorial.nextStep("Buy") == "Bake" and Tutorial.nextStep("Feed") == "Tour"
+	)
+	check("tutorial: a lost second hunt starts over at Hunt", Tutorial.resumeAt("Return") == "Hunt")
+	check("tutorial: Shops are open for the Bakery", Tutorial.isUnlocked("Bake", "Shops"))
+	local fresh: any = { uid = "a", monsterId = Tutorial.SecondMonster, effects = {} }
+	local placed = Cakes.new(Tutorial.Cake, 0, 0, 0, 0)
+	-- Rolls everything high (a miss), so only the force can give the effect.
+	local unlucky: any = {
+		NextNumber = function()
+			return 0.999
+		end,
+	}
+	local forced = Cakes.bite(placed, fresh, unlucky, nil, true)
+	check("a forced bite always gives the effect", forced.effect == Tutorial.CakeEffect)
 end
 
 -- The tour at the end of the tutorial, and the one-time unlock tutorials (Util/Tips).
@@ -4213,7 +4241,11 @@ do
 	local soldStep = Analytics.onboardStep("Buy", 1)
 	check("analytics: on Buy means sold", Analytics.Onboarding[soldStep] == "Sold first monster")
 	check("analytics: tutorial done", Analytics.onboardStep("Done", 1) == Analytics.TutorialDone)
-	check("analytics: first wing", Analytics.onboardStep("Done", 2) == 9)
+	check("analytics: first wing", Analytics.onboardStep("Done", 2) == Analytics.TutorialDone + 1)
+	check(
+		"analytics: one funnel step per tutorial step",
+		Analytics.Onboarding[Analytics.TutorialDone] == "Finished tutorial"
+	)
 	check("analytics: never past the last step", Analytics.onboardStep("Done", 6) == #Analytics.Onboarding)
 	check("analytics: wings don't count mid-tutorial", Analytics.onboardStep("Sell", 3) == 5)
 	check("analytics: under 100 steps", #Analytics.Onboarding <= 100 and #Analytics.ComebackDays <= 100)

@@ -36,6 +36,9 @@ local StepGlow = {
 	Pickup = "MansionList",
 	Sell = "Sell",
 	Buy = "Shops",
+	Bake = "Shops",
+	Place = "Home",
+	Hunt = "Portals",
 } :: { [string]: string }
 
 local function step(): string?
@@ -79,7 +82,7 @@ local function path(...: string): Instance?
 	return at
 end
 
--- The Gloomlet waiting for you in the zone (TutorialService marks it with your UserId).
+-- The monster waiting for you in the zone (TutorialService marks it with your UserId).
 local function tutorialMonster(): Model?
 	local folder = path("Zones", Tutorial.Zone, "Monsters")
 	if not folder then
@@ -126,6 +129,17 @@ local function targetFor(current: string?): Instance?
 		return path("Hub", "Landmarks", "Collector")
 	elseif current == "Buy" then
 		return path("Hub", "Landmarks", "VacuumVault")
+	elseif current == "Bake" then
+		return path("Hub", "Landmarks", "Bakery")
+	elseif current == "Hunt" then
+		if player:GetAttribute("Zone") == Tutorial.Zone then
+			return tutorialMonster()
+		end
+		return path("Hub", "ZoneGates", Tutorial.Zone)
+	elseif current == "Return" then
+		return path("Zones", Tutorial.Zone, "Exit")
+	elseif current == "Feed" then
+		return myMansionMonster()
 	end
 	return nil
 end

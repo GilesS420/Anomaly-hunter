@@ -1,8 +1,10 @@
 --!strict
 -- The first-timer tutorial: the steps in order, what each one unlocks, and the words shown
 -- for each. A new player walks into Pumpkin Graveyard, catches a Gloomlet, takes it home
--- where it turns Cobwebbed, picks it up, sells it, buys the Phantom Vac and gets a short tour
--- of the buttons. Until the tutorial is done every button that isn't unlocked yet is greyed
+-- where it turns Cobwebbed, picks it up, sells it and buys the Phantom Vac. Then the Bakery
+-- (Giles 2026-11-05): buy a Pumpkin Candy, set it out at home, catch a second monster (a
+-- Skittercrow), bring it home and watch it eat the cake and turn Pumpkin Head. Last, a short
+-- tour of the buttons. Until the tutorial is done every button that isn't unlocked yet is greyed
 -- out. The server runs the steps (server/Services/TutorialService), the client draws them
 -- (client/Controllers/TutorialController). Pure functions so they can be tested outside Roblox.
 --
@@ -14,15 +16,44 @@ local Names = require("../Config/Names")
 
 local Tutorial = {}
 
-export type Step = "Gate" | "Catch" | "Home" | "Pickup" | "Sell" | "Buy" | "Tour"
+export type Step =
+	"Gate"
+	| "Catch"
+	| "Home"
+	| "Pickup"
+	| "Sell"
+	| "Buy"
+	| "Bake"
+	| "Place"
+	| "Hunt"
+	| "Return"
+	| "Feed"
+	| "Tour"
 
-Tutorial.Steps = { "Gate", "Catch", "Home", "Pickup", "Sell", "Buy", "Tour" } :: { Step }
+Tutorial.Steps = {
+	"Gate",
+	"Catch",
+	"Home",
+	"Pickup",
+	"Sell",
+	"Buy",
+	"Bake",
+	"Place",
+	"Hunt",
+	"Return",
+	"Feed",
+	"Tour",
+} :: { Step }
 
 Tutorial.Zone = "PumpkinGraveyard" -- where the first hunt goes
 Tutorial.Monster = "Gloomlet" -- the tutorial's own monster, only the player can catch it
 local Monster = Names[Tutorial.Monster] -- what the guide card calls it
 Tutorial.Effect = "Cobwebbed" -- the cheapest effect, shown off as soon as it's home
 Tutorial.FirstVacuum = "PhantomVac" -- the first thing bought in the shop (Giles 2026-10-21)
+Tutorial.Cake = "PumpkinCandy" -- the first cake, bought with the Baker's gift
+Tutorial.CakeEffect = "PumpkinHead" -- what the Pumpkin Candy gives
+Tutorial.SecondMonster = "Skittercrow" -- the second catch, the one that eats the cake
+Tutorial.FeedSeconds = 45 -- no bite by then (it got stuck, say): it gets Pumpkin Head anyway
 Tutorial.RespawnSeconds = 5 -- a tutorial monster that vanished comes back after this long
 Tutorial.HintSeconds = 120 -- stuck on one step this long: a bigger hint shows
 
@@ -52,6 +83,11 @@ Tutorial.Text = {
 	Pickup = `Your {Monster} is home and turned Cobwebbed: effects make monsters worth more! Press E next to it, or open the mansion list (the arrow on the right edge) and press Pick up.`,
 	Sell = `The Collector only buys monsters from your Backpack. Press Sell at the top, then press E at the Collector, pick "I want to sell my monsters." and sell your {Monster}.`,
 	Buy = 'The Collector gave you a welcome gift! Press Shops, then press E at the Vacuum Vault (the middle shop), pick "Show me the vacuums." and buy the Phantom Vac.',
+	Bake = 'Cakes give monsters effects! The Baker gave you money for a Pumpkin Candy. Follow the trail to the Haunted Bakery, press E, pick "I want to buy cakes!" and buy the Pumpkin Candy.',
+	Place = "Press Mansion at the top to go home. Hold the Pumpkin Candy from your hotbar and click the floor inside your mansion to set it out.",
+	Hunt = "Your cake needs a hungry monster! Press Portals, go back to the Pumpkin Graveyard and catch the Skittercrow.",
+	Return = "Got it! Bring it home: follow the trail to the exit, or press R if you still have a Return Charm.",
+	Feed = "Your Skittercrow smells the cake! Watch it walk over, take a bite and turn Pumpkin Head.",
 	Tour = "You're ready! Here's what the buttons do.",
 } :: { [Step]: string }
 
@@ -62,6 +98,10 @@ Tutorial.TouchText = {
 	Pickup = `Your {Monster} is home and turned Cobwebbed: effects make monsters worth more! Tap the prompt next to it, or open the mansion list (the arrow on the right edge) and tap Pick up.`,
 	Sell = `The Collector only buys monsters from your Backpack. Tap Sell at the top, then tap Talk at the Collector, pick "I want to sell my monsters." and sell your {Monster}.`,
 	Buy = 'The Collector gave you a welcome gift! Tap Shops, then tap Talk at the Vacuum Vault (the middle shop), pick "Show me the vacuums." and buy the Phantom Vac.',
+	Bake = 'Cakes give monsters effects! The Baker gave you money for a Pumpkin Candy. Follow the trail to the Haunted Bakery, tap Talk, pick "I want to buy cakes!" and buy the Pumpkin Candy.',
+	Place = "Tap Mansion at the top to go home. Tap the Pumpkin Candy in your hotbar, then tap the floor inside your mansion to set it out.",
+	Hunt = "Your cake needs a hungry monster! Tap Portals, go back to the Pumpkin Graveyard and catch the Skittercrow.",
+	Return = "Got it! Bring it home: follow the trail to the exit, or tap Return Charm if you still have one.",
 } :: { [Step]: string }
 
 -- Shown under the guide card after HintSeconds on one step.
@@ -72,6 +112,11 @@ Tutorial.Hints = {
 	Pickup = `Press Mansion at the top to go home, then stand next to the {Monster} and press E (or tap the prompt).`,
 	Sell = `Talk to the Collector (E or tap Talk) and pick "I want to sell my monsters.", then press Sell on your {Monster}.`,
 	Buy = 'Talk to the Vacuum Vault (between the Bakery and the Workshop) and pick "Show me the vacuums.", then press the Phantom Vac card and Buy.',
+	Bake = 'Press Shops and talk to the Haunted Bakery (the pink striped shop). Pick "I want to buy cakes!", then press the Pumpkin Candy card and Buy.',
+	Place = "Stand inside your mansion, hold the Pumpkin Candy (it's in your hotbar) and click or tap the floor in front of you.",
+	Hunt = "Press Portals to jump to the Zone Gates, walk into the Pumpkin Graveyard and follow the trail to the Skittercrow.",
+	Return = "Walk back through the exit arch you came in by.",
+	Feed = "Leave the Skittercrow in your mansion (don't pick it up) and stay close to the cake.",
 	Tour = "Press Next to see the next button.",
 } :: { [Step]: string }
 
@@ -184,11 +229,14 @@ end
 function Tutorial.resumeAt(step: string): string
 	if step == "Catch" or step == "Home" then
 		return "Gate"
+	elseif step == "Return" then
+		return "Hunt"
 	end
 	return step
 end
 
--- The Collector's one-time welcome gift: enough to afford the first vacuum, never negative.
+-- A one-time gift: enough to afford the first vacuum (the Collector) or the first cake (the
+-- Baker), never negative.
 function Tutorial.gift(money: number, price: number): number
 	return math.max(price - money, 0)
 end
