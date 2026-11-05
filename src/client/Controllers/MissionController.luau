@@ -6,7 +6,7 @@
 -- once for Robux (server/Services/RobuxService). Every card has a picture on the left of what
 -- it's about (Giles 2026-11-05), drawn by client/Icons. The status line shows the streak,
 -- when new missions come and the rerolls left.
--- A red dot on the button means a reward is waiting (player attribute MissionsReady).
+-- A red number on the button counts the rewards waiting (player attribute MissionsReady).
 -- Everything comes from the server (MissionRemotes, server/Services/MissionService).
 
 local Players = game:GetService("Players")
@@ -424,23 +424,7 @@ function MissionController.start()
 	button.Activated:Connect(toggle)
 	Locks.guard(button, "Missions") -- greyed out until the tutorial is done
 
-	-- The red dot: a reward is waiting.
-	local dot = Instance.new("Frame")
-	dot.Name = "Dot"
-	dot.AnchorPoint = Vector2.new(0.5, 0.5)
-	dot.Position = UDim2.new(1, -5, 0, 5) -- top-right corner of the square button
-	dot.Size = UDim2.fromOffset(16, 16)
-	dot.BackgroundColor3 = Color3.fromRGB(230, 50, 60)
-	dot.ZIndex = 5
-	dot.Parent = button
-	Ui.corner(dot, 8)
-	Ui.rim(dot, Color3.new(1, 1, 1), 1.5)
-	local function showDot()
-		local ready = player:GetAttribute("MissionsReady")
-		dot.Visible = typeof(ready) == "number" and ready > 0
-	end
-	player:GetAttributeChangedSignal("MissionsReady"):Connect(showDot)
-	showDot()
+	Ui.countBadge(button, "MissionsReady") -- how many mission rewards wait
 end
 
 return MissionController

@@ -192,15 +192,7 @@ function PlaytimeController.start()
 	timer.ZIndex = 2
 	Ui.corner(timer, 4)
 
-	local dot = Instance.new("Frame")
-	dot.Name = "Dot"
-	dot.AnchorPoint = Vector2.new(0.5, 0.5)
-	dot.Position = UDim2.new(1, -5, 0, 5)
-	dot.Size = UDim2.fromOffset(16, 16)
-	dot.BackgroundColor3 = Color3.fromRGB(230, 50, 60)
-	dot.ZIndex = 5
-	dot.Parent = button
-	Ui.corner(dot, 8)
+	Ui.countBadge(button, "PlaytimeReady") -- how many gifts wait
 
 	-- PlaytimeNext only moves every few seconds on the server; count down between updates.
 	local nextAt: number? = nil
@@ -209,8 +201,6 @@ function PlaytimeController.start()
 		nextAt = if typeof(left) == "number" then os.clock() + left else nil
 	end
 	local function showDot()
-		local ready = player:GetAttribute("PlaytimeReady")
-		dot.Visible = typeof(ready) == "number" and ready > 0
 		if window.isOpen() and not busy then
 			load()
 			render()
