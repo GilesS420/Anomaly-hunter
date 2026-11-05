@@ -26,6 +26,25 @@ return {
 		GhostShip = 7_680_000_000,
 		Events = 50_000_000_000, -- the Watcher event monsters
 	} :: { [string]: number },
+	-- Zone pages also pay for catching every monster of one rarity there (Giles 2026-11-05),
+	-- whatever its colour. Amounts are for Pumpkin Graveyard; RarityScale multiplies them per
+	-- zone (4x each zone, like monster values). The Watcher event page has no rarity goals.
+	Rarities = {
+		Common = 20_000,
+		Uncommon = 50_000,
+		Rare = 150_000,
+		Epic = 500_000,
+		Legendary = 2_000_000,
+		Mythic = 8_000_000,
+		Divine = 25_000_000,
+	} :: { [string]: number },
+	RarityScale = {
+		PumpkinGraveyard = 1,
+		MurkyBayou = 4,
+		AbandonedCarnival = 16,
+		SpookySchool = 64,
+		GhostShip = 256,
+	} :: { [string]: number },
 	Effects = 1_000_000_000_000, -- every effect found
 	Combos = 2_000_000_000_000, -- every secret combo made
 

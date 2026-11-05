@@ -3,8 +3,8 @@
 -- for each. Kept short (Giles 2026-11-05, after the funnel showed most new players never
 -- finished the long one): a new player walks into Pumpkin Graveyard, catches a Gloomlet,
 -- runs back out (it turns Cobwebbed and lands straight in the Backpack), sells it and buys the
--- Phantom Vac. Then a short tour of the buttons. Until the tutorial is done every button that
--- isn't unlocked yet is greyed out.
+-- Phantom Vac. Until the tutorial is done every button that isn't unlocked yet is greyed out.
+-- The card says as little as possible (Giles 2026-11-05: less text popping up).
 --
 -- After it, an optional quest, "Baker's first cake" (QuestSteps): buy a Pumpkin Candy with
 -- the Baker's gift, set it out at home, catch a second monster (a Skittercrow, shown as Grave
@@ -17,7 +17,6 @@
 -- `tutorial` field ("Done" once it's done); the quest's is the attribute Quest and the save's
 -- `quest` field.
 
-local Community = require("../Config/Community")
 local Names = require("../Config/Names")
 
 local Tutorial = {}
@@ -38,7 +37,9 @@ export type Step =
 
 -- Pickup was a step before 2026-11-05; old saves at it pick up at Sell (resumeAt), so its
 -- name stays in the type.
-Tutorial.Steps = { "Gate", "Catch", "Home", "Sell", "Buy", "Tour" } :: { Step }
+-- The button tour that ended it until 2026-11-05 is gone (Giles: players don't need every
+-- button explained); saves at "Tour" count as done (resumeAt).
+Tutorial.Steps = { "Gate", "Catch", "Home", "Sell", "Buy" } :: { Step }
 
 -- The optional Bakery quest after the tutorial, in order.
 Tutorial.QuestSteps = { "Bake", "Place", "Hunt", "Return", "Feed" } :: { Step }
@@ -69,10 +70,6 @@ Tutorial.Unlocks = {
 	MansionList = "Sell", -- the arrow tab on the right edge, with a Pick up button per monster
 	Sell = "Sell",
 	Shops = "Buy",
-	Codex = "Tour",
-	Missions = "Tour",
-	Gifts = "Tour", -- playtime gifts (PlaytimeController)
-	Store = "Tour", -- the Robux Store button
 	Settings = "Gate", -- sound and weather settings always work
 } :: { [string]: Step }
 
@@ -88,29 +85,22 @@ Tutorial.Point = {
 -- What the guide card says for each step, with a keyboard (Text) or on a phone or tablet
 -- without one (TouchText, where it differs).
 Tutorial.Text = {
-	Gate = "Follow the glowing trail to the Pumpkin Graveyard gate, or press Portals at the top.",
-	Catch = `Press 1 to hold your vacuum, then click the {Monster}. When it struggles, click or press F while the needle is in the green.`,
-	Home = "Got it! Follow the trail back to the exit, or press R to use your free Return Charm.",
-	Sell = `Your {Monster} turned Cobwebbed (effects make monsters worth more) and is in your Backpack. Press Sell at the top, press E at the Collector, pick "I want to sell my monsters." and sell it.`,
-	Buy = 'The Collector gave you a welcome gift! Press Shops, then press E at the Vacuum Vault (the middle shop), pick "Show me the vacuums." and buy the Phantom Vac.',
-	Bake = 'Cakes give monsters effects! The Baker gave you money for a Pumpkin Candy. Follow the trail to the Haunted Bakery, press E, pick "I want to buy cakes!" and buy the Pumpkin Candy.',
-	Place = "Press Mansion at the top to go home. Hold the Pumpkin Candy from your hotbar and click the floor inside your mansion to set it out.",
-	Hunt = `Your cake needs a hungry monster! Press Portals, go back to the Pumpkin Graveyard and catch the {Second}.`,
-	Return = "Got it! Bring it home: follow the trail to the exit, or press R if you still have a Return Charm.",
-	Feed = `Your {Second} smells the cake! Watch it walk over, take a bite and turn Pumpkin Head.`,
-	Tour = "You're ready! Here's what the buttons do.",
+	Gate = "Walk to the Pumpkin Graveyard gate.",
+	Catch = `Press 1 for your vacuum and click the {Monster}. Click when the needle is in the green!`,
+	Home = "Got it! Walk back out, or press R.",
+	Sell = `Your {Monster} is in your Backpack. Sell it at the Collector.`,
+	Buy = "Here's a gift! Buy the Phantom Vac at the Vacuum Vault.",
+	Bake = "The Baker paid for a Pumpkin Candy. Buy it at the Bakery!",
+	Place = "Hold the Pumpkin Candy and click your mansion floor.",
+	Hunt = `Catch the {Second} in the Pumpkin Graveyard.`,
+	Return = "Got it! Bring it home.",
+	Feed = "Watch it eat the cake!",
 } :: { [Step]: string }
 
 Tutorial.TouchText = {
-	Gate = "Follow the glowing trail to the Pumpkin Graveyard gate, or tap Portals at the top.",
-	Catch = `Tap the first hotbar slot to hold your vacuum, then tap the {Monster}. When it struggles, tap while the needle is in the green.`,
-	Home = "Got it! Follow the trail back to the exit, or tap Return Charm to jump home.",
-	Sell = `Your {Monster} turned Cobwebbed (effects make monsters worth more) and is in your Backpack. Tap Sell at the top, tap Talk at the Collector, pick "I want to sell my monsters." and sell it.`,
-	Buy = 'The Collector gave you a welcome gift! Tap Shops, then tap Talk at the Vacuum Vault (the middle shop), pick "Show me the vacuums." and buy the Phantom Vac.',
-	Bake = 'Cakes give monsters effects! The Baker gave you money for a Pumpkin Candy. Follow the trail to the Haunted Bakery, tap Talk, pick "I want to buy cakes!" and buy the Pumpkin Candy.',
-	Place = "Tap Mansion at the top to go home. Tap the Pumpkin Candy in your hotbar, then tap the floor inside your mansion to set it out.",
-	Hunt = `Your cake needs a hungry monster! Tap Portals, go back to the Pumpkin Graveyard and catch the {Second}.`,
-	Return = "Got it! Bring it home: follow the trail to the exit, or tap Return Charm if you still have one.",
+	Catch = `Tap slot 1 for your vacuum and tap the {Monster}. Tap when the needle is in the green!`,
+	Home = "Got it! Walk back out, or tap Return Charm.",
+	Place = "Hold the Pumpkin Candy and tap your mansion floor.",
 } :: { [Step]: string }
 
 -- Shown under the guide card after HintSeconds on one step.
@@ -125,69 +115,7 @@ Tutorial.Hints = {
 	Hunt = `Press Portals to jump to the Zone Gates, walk into the Pumpkin Graveyard and follow the trail to the {Second}.`,
 	Return = "Walk back through the exit arch you came in by.",
 	Feed = `Leave the {Second} in your mansion (don't pick it up). It gets Pumpkin Head in a few seconds.`,
-	Tour = "Press Next to see the next button.",
 } :: { [Step]: string }
-
--- The tour at the end: one card per button, in this order. `feature` makes that button glow
--- (none: nothing to point at), `touch` is the phone wording where it differs. Things a player
--- only gets later (cakes, bells, slappers, events...) are explained once when they first get
--- them instead (Util/Tips).
-Tutorial.Tour = {
-	{
-		feature = "Home",
-		text = "Mansion takes you straight home. Your monsters roam every wing, and each wing you buy opens a new zone.",
-	},
-	{
-		feature = "Portals",
-		text = "Portals takes you to the gate of the newest zone you've opened.",
-	},
-	{
-		feature = "Shops",
-		text = "Shops takes you to the Haunted Bakery (cakes), the Vacuum Vault (vacuums) and the Hunter's Workshop (Bait Bells, Return Charms, Name Tags, luck potions and slappers).",
-	},
-	{
-		feature = "Sell",
-		text = `Sell takes you to the Collector. Only monsters in your Backpack can be sold. Every Roblox friend in your server makes the Collector pay you {math.round(Community.FriendSellBonus * 100)}% more.`,
-	},
-	{
-		feature = "Backpack",
-		text = "The backpack button on the left opens your Backpack: your monsters, cakes and tools. Drag a card onto the hotbar to hold it, and tap the heart on a monster to keep it safe. Hold a monster and hold E next to another hunter to give it to them.",
-		touch = "The backpack button on the left opens your Backpack: your monsters, cakes and tools. Drag a card onto the hotbar to hold it, and tap the heart on a monster to keep it safe. Hold a monster and hold the Give button next to another hunter to give it to them.",
-	},
-	{
-		feature = "MansionList",
-		text = "The arrow on the right edge lists the monsters in your mansion, sorted by price, rarity or name, each with a Pick up button.",
-	},
-	{
-		text = "Around the hub are more stands: the Merger (two monsters into one), the Growth Chamber (makes monsters bigger), the Trading Booth (swap with other hunters) and the Hunter's Guild. Press E at any stand to talk to it.",
-		touch = "Around the hub are more stands: the Merger (two monsters into one), the Growth Chamber (makes monsters bigger), the Trading Booth (swap with other hunters) and the Hunter's Guild. Tap Talk at any stand to talk to it.",
-	},
-	{
-		feature = "Codex",
-		text = "The book button opens your Codex: it lists every monster you've caught. Catch each one in Silver, Gold, Shiny and Rainbow too, for money rewards!",
-	},
-	{
-		feature = "Missions",
-		text = "The scroll button opens your Missions: three new missions every day. Finish them for money that grows with your mansion, and come back each day for a streak bonus.",
-	},
-	{
-		feature = "Store",
-		text = "The coin button opens the Store, with game passes and Robux items.",
-	},
-	{
-		feature = "Settings",
-		text = "The gear button opens Settings: music and sound volume, weather, UI size if the buttons look too big or small, and Feedback to tell us what you think.",
-	},
-} :: { { feature: string?, text: string, touch: string? } }
-
--- The words for a tour card on this device.
-function Tutorial.tourText(index: number, touch: boolean): string
-	local stop = Tutorial.Tour[index]
-	if not stop then
-		return Tutorial.Text.Tour
-	end
-	return if touch and stop.touch then stop.touch else stop.text
-end
 
 -- The words for a step on this device: the touch version when there's no keyboard.
 function Tutorial.textFor(step: string, touch: boolean): string
@@ -256,6 +184,8 @@ function Tutorial.resumeAt(step: string): string
 		return "Gate"
 	elseif step == "Pickup" then
 		return "Sell"
+	elseif step == "Tour" then
+		return "Done"
 	end
 	return step
 end

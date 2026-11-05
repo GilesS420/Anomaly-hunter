@@ -113,7 +113,6 @@ ServerChecks.KnownRemotes = {
 	"TravelRemotes.FastTravel",
 	"HotbarRemotes.Set",
 	"SettingsRemotes.Set",
-	"TutorialRemotes.Finish",
 	"TutorialRemotes.SkipQuest",
 	"TipRemotes.Seen",
 	"GoldenGhostRemotes.Tap",

@@ -11,7 +11,6 @@
 --   Sell    sell it at the Collector (their money has to go up, so an admin restarting the
 --           tutorial with money still has to sell), who then tops it up to the Phantom Vac's price
 --   Buy     buy the Phantom Vac (always in stock for them during this step, WorkshopService)
---   Tour    the client shows what each button does, then fires Finish
 -- Losing the catch (knocked out, or leaving the zone or the game) goes back to Gate. Nothing
 -- attacks a player in the tutorial (MonsterAiService) and fast travel to a locked button is
 -- refused (TravelService). The player attribute Tutorial holds the step (nil once done) and
@@ -27,7 +26,6 @@
 -- The attribute Quest holds its step (nil when there's none) and QuestSince.
 --
 -- Remotes in ReplicatedStorage.TutorialRemotes:
---   Finish     client -> server ()   the tour is over
 --   SkipQuest  client -> server ()   no Bakery quest, thanks
 
 local Players = game:GetService("Players")
@@ -54,21 +52,16 @@ type State = {
 	step: string,
 	monster: Model?, -- the Gloomlet (Catch) or Skittercrow (Hunt) waiting in the zone
 	spawnAt: number?, -- os.clock() when to bring (another) one
-	tourEnds: number?, -- os.clock() when an unfinished tour ends by itself
 	feedEnds: number?, -- os.clock() when the Feed step gives the effect anyway
 	sellMoney: number?, -- their money when the Sell step was first checked
 }
 
 local CheckSeconds = 0.5
-local TourTimeout = 180 -- a tour nobody finishes (the window was closed, say) ends anyway
 
 local states: { [Player]: State } = {}
 
 local remotes = Instance.new("Folder")
 remotes.Name = "TutorialRemotes"
-local Finish = Instance.new("RemoteEvent")
-Finish.Name = "Finish"
-Finish.Parent = remotes
 local SkipQuest = Instance.new("RemoteEvent")
 SkipQuest.Name = "SkipQuest"
 SkipQuest.Parent = remotes
@@ -139,27 +132,17 @@ local function enter(player: Player, data: DataService.Data, state: State)
 	elseif step == "Buy" then
 		local gift = Tutorial.gift(data.money, firstVacuumPrice)
 		if gift > 0 and DataService.addMoney(player, gift) then
-			AnalyticsService.money(player, gift, "Onboarding", "WelcomeGift")
-			Notify.toast(
-				player,
-				`The Collector likes new hunters: {Format.money(gift)} for your first vacuum!`
-			)
+			AnalyticsService.money(player, gift, "Onboarding", "WelcomeGift") -- the card says so
 		end
 	elseif step == "Bake" then
 		local gift = Tutorial.gift(data.money, cakePrice)
 		if gift > 0 and DataService.addMoney(player, gift) then
-			AnalyticsService.money(player, gift, "Onboarding", "BakerGift")
-			Notify.toast(
-				player,
-				`The Baker wants you to try a cake: {Format.money(gift)} for a Pumpkin Candy!`
-			)
+			AnalyticsService.money(player, gift, "Onboarding", "BakerGift") -- the card says so
 		end
 	elseif step == "Hunt" then
 		data.tips.Cake = true -- they just learned cakes here: no "Your first cake" card later
 	elseif step == "Feed" then
 		state.feedEnds = os.clock() + Tutorial.FeedSeconds
-	elseif step == "Tour" then
-		state.tourEnds = os.clock() + TourTimeout
 	end
 end
 
@@ -182,8 +165,8 @@ local function setStep(player: Player, step: string, run: boolean)
 		states[player] = nil
 		player:SetAttribute("Tutorial", nil)
 		player:SetAttribute("TutorialSince", nil)
+		-- No "complete" toast: RookieService says the rookie hour started, and the quest card shows.
 		if run then
-			Notify.toast(player, "Tutorial complete! Everything is unlocked. Happy hunting!")
 			if data.quest == "" then
 				setQuest(player, Tutorial.QuestSteps[1], true)
 			end
@@ -339,11 +322,6 @@ local function check(player: Player, state: State)
 		end
 	elseif step == "Buy" then
 		if (data.inventory[Tutorial.FirstVacuum] or 0) > 0 then
-			setStep(player, "Tour", true)
-		end
-	elseif step == "Tour" then
-		local ends = state.tourEnds
-		if ends and os.clock() >= ends then
 			setStep(player, "Done", true)
 		end
 	elseif step == "Bake" then
@@ -407,14 +385,15 @@ local function onLoaded(player: Player, data: DataService.Data)
 	end
 	if data.tutorial ~= "Done" then
 		local step = Tutorial.resumeAt(data.tutorial)
-		if Tutorial.index(step) == 0 then
+		if step == "Done" then
+			setStep(player, "Done", true) -- was on the old button tour: on to the quest
+			return
+		elseif Tutorial.index(step) == 0 then
 			step = Tutorial.Steps[1]
 		end
-		-- The step's start already ran in an earlier visit (the charm, the gift), except the tour.
-		setStep(player, step, step == "Tour")
-		if fresh then
-			Notify.toast(player, "Welcome, hunter! Let's catch your first monster.")
-		end
+		-- The step's start already ran in an earlier visit (the charm, the gift); no welcome
+		-- toast, the guide card says what to do.
+		setStep(player, step, false)
 		return
 	end
 	if Tutorial.questIndex(data.quest) > 0 then
@@ -456,17 +435,10 @@ function TutorialService.start()
 	remotes.Parent = ReplicatedStorage
 	DataService.onLoaded(onLoaded)
 
-	Finish.OnServerEvent:Connect(function(player)
-		local state = states[player]
-		if state and state.step == "Tour" then
-			setStep(player, "Done", true)
-		end
-	end)
 	SkipQuest.OnServerEvent:Connect(function(player)
 		local state = states[player]
 		if state and state.quest then
 			setQuest(player, "Skipped", true)
-			Notify.toast(player, "Quest skipped. The Bakery is always open if you change your mind!")
 		end
 	end)
 

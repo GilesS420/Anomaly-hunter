@@ -40,7 +40,15 @@ type MonsterCard = {
 	look: string?,
 }
 type Rewards = { [string]: { amount: number, claimed: boolean } }
-type Page = { id: string, title: string, progress: Progress, monsters: { MonsterCard }, rewards: Rewards? }
+type RarityGoal = { id: string, color: Color3, found: number, total: number }
+type Page = {
+	id: string,
+	title: string,
+	progress: Progress,
+	monsters: { MonsterCard },
+	rewards: Rewards?,
+	rarityGoals: { RarityGoal }?,
+}
 type EffectCard = {
 	id: string,
 	name: string,
@@ -164,10 +172,21 @@ function CodexController.start()
 	stripLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	stripLayout.Parent = strip
 
+	-- A second row on zone pages: catch every monster of one rarity.
+	local rarityStrip = strip:Clone()
+	rarityStrip.Name = "RarityGoals"
+	rarityStrip.Position = UDim2.fromOffset(left, top + stripHeight + Gap)
+	rarityStrip.Visible = false
+	rarityStrip.Parent = panel
+
 	local list = window.list
-	local listTop = top + stripHeight + Gap
-	list.Position = UDim2.fromOffset(left, listTop)
-	list.Size = UDim2.new(1, -left, 1, -listTop - footerHeight - Gap)
+	-- The cards start under one goal row, or two when the rarity row is showing.
+	local function placeList(rows: number)
+		local listTop = top + (stripHeight + Gap) * rows
+		list.Position = UDim2.fromOffset(left, listTop)
+		list.Size = UDim2.new(1, -left, 1, -listTop - footerHeight - Gap)
+	end
+	placeList(1)
 	list.ScrollBarThickness = 4
 	local oldLayout = list:FindFirstChildOfClass("UIListLayout")
 	if oldLayout then
@@ -228,13 +247,14 @@ function CodexController.start()
 		text: string,
 		reward: string,
 		color: Color3,
-		isRainbow: boolean
+		isRainbow: boolean,
+		row: Frame?
 	)
 		local frame = Instance.new("Frame")
 		frame.LayoutOrder = order
 		frame.Size = UDim2.new(1 / cells, -Gap * (cells - 1) / cells, 1, 0)
 		frame.BackgroundColor3 = CardColor
-		frame.Parent = strip
+		frame.Parent = row or strip
 		Ui.corner(frame, 4)
 		local swatch = Instance.new("Frame")
 		swatch.BorderSizePixel = 0
@@ -262,11 +282,15 @@ function CodexController.start()
 	end
 
 	local function clearStrip()
-		for _, child in strip:GetChildren() do
-			if child:IsA("GuiObject") then
-				child:Destroy()
+		for _, row in { strip, rarityStrip } do
+			for _, child in row:GetChildren() do
+				if child:IsA("GuiObject") then
+					child:Destroy()
+				end
 			end
 		end
+		rarityStrip.Visible = false
+		placeList(1)
 	end
 
 	-- A square card: its number in the corner, the picture (or a big "?"), the name under it
@@ -389,6 +413,22 @@ function CodexController.start()
 				VariantColor[variant] or Ui.Colors.muted,
 				variant == "Rainbow"
 			)
+		end
+		local rarityGoals = page.rarityGoals or {}
+		if #rarityGoals > 0 then
+			rarityStrip.Visible = true
+			placeList(2)
+			for i, goal in rarityGoals do
+				chip(
+					i,
+					#rarityGoals,
+					`{goal.id} {goal.found}/{goal.total}`,
+					rewardText(page.rewards, goal.id),
+					goal.color,
+					false,
+					rarityStrip
+				)
+			end
 		end
 		window.status.Text = if progress.found < progress.total
 			then `{page.title}: catch them all, then find each one in every colour`

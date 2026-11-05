@@ -2643,10 +2643,10 @@ do
 	local Tutorial = require("../src/shared/Util/Tutorial")
 	local Zones = require("../src/shared/Config/Zones")
 	-- Short since 2026-11-05: the catch goes straight to the Backpack, then sell and buy.
-	check("tutorial starts at the gate and ends after the tour", Tutorial.Steps[1] == "Gate")
-	check("tutorial step order", Tutorial.nextStep("Gate") == "Catch" and Tutorial.nextStep("Tour") == "Done")
+	check("tutorial starts at the gate and ends at the vacuum", Tutorial.Steps[1] == "Gate")
+	check("tutorial step order", Tutorial.nextStep("Gate") == "Catch" and Tutorial.nextStep("Buy") == "Done")
 	check("tutorial: home, then sell", Tutorial.nextStep("Home") == "Sell")
-	check("tutorial: the vacuum, then the tour", Tutorial.nextStep("Buy") == "Tour")
+	check("tutorial: no button tour, old tour saves are done", Tutorial.resumeAt("Tour") == "Done")
 	check(
 		"tutorial and quest: every step has words and a hint",
 		(function()
@@ -2670,7 +2670,7 @@ do
 			end
 			return Tutorial.textFor("Catch", true) == Tutorial.TouchText.Catch
 				and Tutorial.textFor("Catch", false) == Tutorial.Text.Catch
-				and Tutorial.textFor("Tour", true) == Tutorial.Text.Tour
+				and Tutorial.textFor("Sell", true) == Tutorial.Text.Sell
 		end)()
 	)
 	check(
@@ -2689,9 +2689,9 @@ do
 	)
 	check(
 		"tutorial: Sell opens at the sell step and stays open",
-		Tutorial.isUnlocked("Sell", "Sell") and Tutorial.isUnlocked("Tour", "Sell")
+		Tutorial.isUnlocked("Sell", "Sell") and Tutorial.isUnlocked("Buy", "Sell")
 	)
-	check("tutorial: unlisted features wait for the end", not Tutorial.isUnlocked("Tour", "Something"))
+	check("tutorial: unlisted features wait for the end", not Tutorial.isUnlocked("Buy", "Something"))
 	check(
 		"tutorial: everything works once done",
 		Tutorial.isUnlocked(nil, "Something") and Tutorial.isUnlocked("Done", "Sell")
@@ -2829,7 +2829,7 @@ do
 	check("a forced bite always gives the effect", forced.effect == Tutorial.CakeEffect)
 end
 
--- The tour at the end of the tutorial, and the one-time unlock tutorials (Util/Tips).
+-- The one-time unlock tutorials (Util/Tips).
 do
 	local Tutorial = require("../src/shared/Util/Tutorial")
 	local Tips = require("../src/shared/Util/Tips")
@@ -2839,21 +2839,17 @@ do
 	local HeistsConfig = require("../src/shared/Config/Heists")
 
 	check(
-		"tour: every glowing card names a button the tutorial unlocks by the tour",
+		"tutorial: the guide card stays short",
 		(function()
-			for _, stop in Tutorial.Tour do
-				if stop.feature and not Tutorial.isUnlocked("Tour", stop.feature) then
-					return false
+			for _, words in { Tutorial.Text, Tutorial.TouchText } do
+				for _, text in words do
+					if #text > 100 then
+						return false
+					end
 				end
 			end
 			return true
 		end)()
-	)
-	check(
-		"tour: phone words where they differ",
-		Tutorial.tourText(5, true) ~= Tutorial.tourText(5, false)
-			and Tutorial.tourText(1, true) == Tutorial.tourText(1, false)
-			and Tutorial.tourText(99, false) == Tutorial.Text.Tour
 	)
 
 	local function facts(changes: { [string]: any }?): Tips.Facts
@@ -3121,9 +3117,18 @@ do
 		Codex.note(codex, { monsterId = id, size = "Normal", effects = {}, familiarity = 0 })
 	end
 	local paid = Codex.newRewards(codex, { page })
+	local paidFound, paidRarities = 0, 0
+	for _, reward in paid do
+		if reward.goal == "Found" and reward.amount == Codex.rewardAmount(page.id, "Found") then
+			paidFound += 1
+		elseif table.find(Codex.RarityOrder, reward.goal) then
+			paidRarities += 1
+		end
+	end
+	check("codex: every monster found pays the Found reward once", paidFound == 1)
 	check(
-		"codex: every monster found pays the Found reward once",
-		#paid == 1 and paid[1].goal == "Found" and paid[1].amount == Codex.rewardAmount(page.id, "Found")
+		"codex: every monster found also pays each rarity on the page",
+		paidRarities == #Codex.RarityOrder and #paid == paidFound + paidRarities
 	)
 	check("codex: a paid reward isn't paid again", #Codex.newRewards(codex, { page }) == 0)
 	check("codex: a paid reward is marked", Codex.claimed(codex, page.id, "Found"))
@@ -3158,6 +3163,32 @@ do
 			and Codex.rewardAmount(Codex.EffectsPage, "Combos") == 2e12
 			and Codex.rewardAmount("Events", "Found") == 50e9
 	)
+	-- Rarity goals: one rarity done pays on its own, before the whole page is found.
+	local partial: { [string]: any } = {}
+	local divineId: string? = nil
+	for _, id in page.monsters do
+		if Monsters[id].rarity == "Divine" then
+			divineId = id
+		end
+	end
+	if divineId then
+		Codex.note(partial, { monsterId = divineId, size = "Normal", effects = {}, familiarity = 0 })
+	end
+	local divinePaid = Codex.newRewards(partial, { page })
+	check(
+		"codex: catching every Divine on a zone pays the Divine goal alone",
+		#divinePaid == 1 and divinePaid[1].goal == "Divine" and divinePaid[1].amount == 25_000_000
+	)
+	check(
+		"codex: rarity rewards grow 4x per zone",
+		Codex.rewardAmount("MurkyBayou", "Common") == 4 * Codex.rewardAmount("PumpkinGraveyard", "Common")
+	)
+	check("codex: the event page has no rarity rewards", Codex.rewardAmount("Events", "Common") == 0)
+	check(
+		"codex: rarer rarity goals pay more",
+		Codex.rewardAmount(page.id, "Divine") > Codex.rewardAmount(page.id, "Mythic")
+			and Codex.rewardAmount(page.id, "Rare") > Codex.rewardAmount(page.id, "Common")
+	)
 	-- A save from before the raise marks a paid goal `true`: it gets only the difference, once.
 	local old: { [string]: any } = { rewards = { [Codex.rewardKey(page.id, "Found")] = true } }
 	for _, id in page.monsters do
@@ -3165,13 +3196,21 @@ do
 	end
 	local was = math.floor(CodexRewards.Old.Pages[page.id] * CodexRewards.Old.Goals.Found)
 	local topUps = Codex.newRewards(old, { page })
+	local foundTopUp = nil
+	for _, reward in topUps do
+		if reward.goal == "Found" then
+			foundTopUp = reward
+		end
+	end
 	if CodexRewards.TopUpOldClaims then
 		check(
 			"codex: an old claim is topped up by the difference",
-			#topUps == 1 and topUps[1].topUp and topUps[1].amount == Codex.rewardAmount(page.id, "Found") - was
+			foundTopUp ~= nil
+				and foundTopUp.topUp
+				and foundTopUp.amount == Codex.rewardAmount(page.id, "Found") - was
 		)
 	else
-		check("codex: an old claim counts as fully paid", #topUps == 0)
+		check("codex: an old claim counts as fully paid", foundTopUp == nil)
 	end
 	check("codex: a top-up isn't paid twice", #Codex.newRewards(old, { page }) == 0)
 	check("codex: a topped-up goal still shows as paid", Codex.claimed(old, page.id, "Found"))
