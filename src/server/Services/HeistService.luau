@@ -156,7 +156,31 @@ function HeistService.paid(thief: Player, data: DataService.Data, key: string, p
 	)
 end
 
+-- The StealShield attribute: whole seconds of new-player shield left (nil when over, or in a
+-- Studio test with the shield off). Everyone's client shows it: a shield over the player's
+-- head and on their monsters' Steal prompts, and a countdown in the player's own HUD.
+local function shieldAttribute(player: Player, data: DataService.Data)
+	local left = Heists.shieldLeft(data.heist.playSeconds)
+	local on = (Config.ShieldInStudio or not RunService:IsStudio()) and left > 0
+	player:SetAttribute("StealShield", if on then math.ceil(left) else nil)
+end
+
 function HeistService.start()
+	local function watch(player: Player)
+		task.spawn(function()
+			while player.Parent and not DataService.get(player) do
+				task.wait(1)
+			end
+			local data = DataService.get(player)
+			if data then
+				shieldAttribute(player, data)
+			end
+		end)
+	end
+	Players.PlayerAdded:Connect(watch)
+	for _, player in Players:GetPlayers() do
+		watch(player)
+	end
 	local waited = 0
 	RunService.Heartbeat:Connect(function(dt)
 		waited += dt
@@ -165,6 +189,7 @@ function HeistService.start()
 				local data = DataService.get(player)
 				if data then
 					data.heist.playSeconds += waited
+					shieldAttribute(player, data) -- the Tips card says when it's over
 				end
 			end
 			waited = 0

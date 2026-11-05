@@ -117,6 +117,8 @@ local function buildGoal(column: Frame)
 	amount.TextStrokeTransparency = 0.3
 
 	local rookie = label("Rookie", 1, Ui.Colors.lamp, column)
+	-- The new-hunter steal shield (StealShield, server/Services/HeistService): hours:minutes left.
+	local shield = label("StealShield", 1, Color3.fromRGB(150, 200, 255), column)
 
 	local function refresh()
 		local name = player:GetAttribute("GoalName")
@@ -139,7 +141,15 @@ local function buildGoal(column: Frame)
 			local clock = string.format("%d:%02d", whole // 60, whole % 60)
 			rookie.Text = `Rookie hour: x{times} sell money ({clock})`
 		end
+
+		local guard = player:GetAttribute("StealShield")
+		shield.Visible = typeof(guard) == "number" and guard > 0 and player:GetAttribute("Tutorial") == nil
+		if typeof(guard) == "number" and guard > 0 then
+			local minutes = math.ceil(guard / 60)
+			shield.Text = string.format("🛡 Steal shield %dh %02dm", minutes // 60, minutes % 60)
+		end
 	end
+	player:GetAttributeChangedSignal("StealShield"):Connect(refresh)
 	player:GetAttributeChangedSignal("GoalName"):Connect(refresh)
 	player:GetAttributeChangedSignal("GoalPrice"):Connect(refresh)
 	player:GetAttributeChangedSignal("RookieSeconds"):Connect(refresh)
