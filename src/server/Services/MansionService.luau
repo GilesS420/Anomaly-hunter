@@ -9,7 +9,7 @@
 --     OwnerSign   "<name>'s Mansion" and "3/8 monsters", floating above the Foyer
 --     WorthSign   a wooden sign left of the front gate: what all the monsters inside are worth
 --     Trophy      a stone stand right of the front gate with the owner's best monster on top
---     ExpandSign  a big glowing sign at the front of the yard: the next wing and its price,
+--     ExpandSign  a wooden sign next to the worth sign: "Expand Mansion", the next wing's price and what it unlocks,
 --                 with a hold-to-buy prompt only the owner sees (client/OwnerPromptController);
 --                 "Mansion complete" once every wing is owned
 --     Monsters    the owner's caught monsters, roaming around the owned wings (each label
@@ -72,12 +72,10 @@ type State = {
 -- The expand sign's parts that change after a purchase.
 type ExpandSign = {
 	headings: { TextLabel }, -- both faces
-	names: { TextLabel },
 	prices: { TextLabel },
+	unlocks: { TextLabel },
 	prompt: ProximityPrompt,
-	glow: { BasePart }, -- neon trim, green while there's a wing to buy
-	light: PointLight,
-	arrow: BillboardGui, -- the bobbing "EXPAND" marker above it
+	arrow: BillboardGui, -- the small "EXPAND" marker above it
 }
 
 -- A room part as it stands in the world, with the recipe key (Rooms.key) it was built from.
@@ -92,9 +90,9 @@ local SpawnRetrySeconds = 1 -- no free spot right now: try again after the other
 -- plot-local (see Layout.Wings.Foyer and Layout.PlotSpawn).
 local WorthSignSpot = { x = -13, z = -37 }
 local TrophySpot = { x = 13, z = -37 }
--- The expand sign stands at the front of the yard, left of where the owner spawns, so it's
--- the first thing they see coming home or stepping out (Layout.PlotSpawn is at 0, -45).
-local ExpandSignSpot = { x = -26, z = -47 }
+-- The expand sign stands right next to the worth sign, on its far side from the path
+-- (Giles 2026-11-05).
+local ExpandSignSpot = { x = -25, z = -37 }
 local ExpandGreen = Color3.fromRGB(90, 255, 130)
 local ExpandGrey = Color3.fromRGB(150, 150, 160)
 
@@ -835,26 +833,28 @@ local function buildTrophy(plot: PlotService.Plot, model: Model): BasePart
 	return top
 end
 
--- Three lines of text on one face of the expand sign: heading, wing name, price.
+-- Three lines on one face of the expand sign, laid out like the worth sign's: a heading,
+-- the price, and what it unlocks.
 local function expandText(board: BasePart, face: Enum.NormalId): (TextLabel, TextLabel, TextLabel)
 	local gui = Instance.new("SurfaceGui")
 	gui.Face = face
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 	gui.PixelsPerStud = 40
 	gui.LightInfluence = 0
-	local heading = textLine(gui, "EXPAND YOUR MANSION", Color3.fromRGB(230, 215, 190), 0.07, 0.22)
-	local name = textLine(gui, "", Color3.new(1, 1, 1), 0.33, 0.3)
-	local price = textLine(gui, "", ExpandGreen, 0.67, 0.25)
-	for _, text in { heading, name, price } do
-		text.Position = UDim2.fromScale(0.06, text.Position.Y.Scale)
-		text.Size = UDim2.fromScale(0.88, text.Size.Y.Scale)
+	local heading = textLine(gui, "EXPAND MANSION", Color3.fromRGB(230, 215, 190), 0.08, 0.24)
+	local price = textLine(gui, "", ExpandGreen, 0.34, 0.38)
+	local unlocks = textLine(gui, "", Color3.fromRGB(230, 215, 190), 0.74, 0.18)
+	-- A margin either side so the outlined letters never touch the board's edges.
+	for _, text in { heading, price, unlocks } do
+		text.Position = UDim2.fromScale(0.07, text.Position.Y.Scale)
+		text.Size = UDim2.fromScale(0.86, text.Size.Y.Scale)
 	end
 	gui.Parent = board
-	return heading, name, price
+	return heading, price, unlocks
 end
 
--- The big sign at the front of the yard that sells the next wing. Readable from both sides:
--- from the hub path and from the owner's spawn. updateExpandSign fills in the text.
+-- The wooden sign right next to the worth sign (same size and style) that sells the next
+-- wing, readable from both sides. updateExpandSign fills in the text.
 local function buildExpandSign(state: State, model: Model): ExpandSign
 	local plot = state.plot
 	local folder = folderIn(model, "ExpandSign")
@@ -863,9 +863,9 @@ local function buildExpandSign(state: State, model: Model): ExpandSign
 		yardPart(
 			plot,
 			`Post{i}`,
-			Vector3.new(0.8, 11, 0.8),
+			Vector3.new(0.6, 8, 0.6),
 			ExpandSignSpot,
-			Vector3.new(side * 7.4, 0, 0),
+			Vector3.new(side * 5.3, 0, 0),
 			wood,
 			Enum.Material.Wood,
 			folder
@@ -874,55 +874,41 @@ local function buildExpandSign(state: State, model: Model): ExpandSign
 	local board = yardPart(
 		plot,
 		"Board",
-		Vector3.new(14, 7, 0.5),
+		Vector3.new(10, 4.5, 0.4),
 		ExpandSignSpot,
-		Vector3.new(0, 3.5, 0),
-		Color3.fromRGB(40, 26, 24),
+		Vector3.new(0, 3.6, 0),
+		Color3.fromRGB(48, 30, 26),
 		Enum.Material.Wood,
 		folder
 	)
-	-- Neon trim above and below the board, so it stands out at night.
-	local glow: { BasePart } = {}
-	for i, y in { 3.2, 10.7 } do
-		local trim = yardPart(
-			plot,
-			`Glow{i}`,
-			Vector3.new(14.6, 0.3, 0.7),
-			ExpandSignSpot,
-			Vector3.new(0, y, 0),
-			ExpandGreen,
-			Enum.Material.Neon,
-			folder
-		)
-		ghost(trim)
-		table.insert(glow, trim)
-	end
-	local light = Instance.new("PointLight")
-	light.Range = 16
-	light.Brightness = 1.2
-	light.Color = ExpandGreen
-	light.Parent = board
+	yardPart(
+		plot,
+		"Cap",
+		Vector3.new(11.8, 0.4, 0.8),
+		ExpandSignSpot,
+		Vector3.new(0, 8.1, 0),
+		wood,
+		Enum.Material.Wood,
+		folder
+	)
 
-	local h1, n1, p1 = expandText(board, Enum.NormalId.Front)
-	local h2, n2, p2 = expandText(board, Enum.NormalId.Back)
+	local h1, p1, u1 = expandText(board, Enum.NormalId.Front)
+	local h2, p2, u2 = expandText(board, Enum.NormalId.Back)
 
-	-- A floating marker above the sign that catches the eye from across the yard (hidden once
-	-- there is nothing left to buy).
-	local arrow = billboard(anchorAt(board, board.Position + Vector3.new(0, 7, 0)), 10, 3, 120)
+	-- A small floating marker above the cap so the sign catches the eye (hidden once there is
+	-- nothing left to buy).
+	local arrow = billboard(anchorAt(board, board.Position + Vector3.new(0, 5.6, 0)), 6, 1.6, 120)
 	arrow.Name = "Marker"
 	local marker = textLine(arrow, "▼ EXPAND ▼", ExpandGreen, 0, 1)
 	marker.Name = "Text"
 
 	local prompt = ownerPrompt(state, board, "ExpandPrompt")
-	prompt.MaxActivationDistance = 16
 
 	return {
 		headings = { h1, h2 },
-		names = { n1, n2 },
 		prices = { p1, p2 },
+		unlocks = { u1, u2 },
 		prompt = prompt,
-		glow = glow,
-		light = light,
 		arrow = arrow,
 	}
 end
@@ -934,28 +920,26 @@ updateExpandSign = function(state: State, wingsOwned: number)
 		return -- still being built (buildWings runs again once it is)
 	end
 	local wing = Mansion.nextWing(wingsOwned)
-	local heading, name, price, buyable
+	local heading, price, unlocks, buyable
 	if not wing then
-		heading, name, price, buyable = "MANSION COMPLETE", "Every wing owned!", "Fully expanded", false
+		heading, price, unlocks, buyable = "MANSION COMPLETE", "Fully expanded", "(every wing owned)", false
 	elseif not wing.launch then
-		heading, name, price, buyable = "NEXT WING", `{wing.id} wing`, "Coming in a future update", false
+		heading, price, unlocks, buyable = "EXPAND MANSION", "Coming soon", `({wing.id} wing)`, false
 	else
 		local zone = if wing.unlocksZone then Hunt.zoneByIndex(wing.unlocksZone) else nil
-		local opens = if zone and zone.launch then ` · opens {zone.name}` else " · more room"
-		heading, name, price, buyable =
-			"EXPAND YOUR MANSION", `Next: {wing.id} wing`, `{Format.money(wing.price)}{opens}`, true
+		local what = if zone and zone.launch then `{wing.id} + {zone.name}` else `{wing.id} wing`
+		heading, price, unlocks, buyable =
+			"EXPAND MANSION", Format.money(wing.price), `(unlocks {what})`, true
 	end
 	for i = 1, 2 do
 		sign.headings[i].Text = heading
-		sign.names[i].Text = name
 		sign.prices[i].Text = price
-		sign.prices[i].TextColor3 = if buyable then ExpandGreen else ExpandGrey
+		sign.prices[i].TextColor3 = if buyable
+			then ExpandGreen
+			elseif wing then ExpandGrey
+			else Color3.fromRGB(255, 210, 90)
+		sign.unlocks[i].Text = unlocks
 	end
-	local color = if buyable then ExpandGreen elseif wing then ExpandGrey else Color3.fromRGB(255, 210, 90)
-	for _, part in sign.glow do
-		part.Color = color
-	end
-	sign.light.Color = color
 	sign.arrow.Enabled = buyable
 	sign.prompt.Enabled = buyable
 	if wing and buyable then
