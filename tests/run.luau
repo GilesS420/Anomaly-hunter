@@ -4069,6 +4069,12 @@ do
 	o = owner()
 	o.tutorial = true
 	check("steal: owners in the tutorial are safe", Heists.blocked(o, thief()) == "NewPlayer")
+	check(
+		"steal: shield countdown",
+		Heists.shieldLeft(0) == HeistConfig.NewPlayerSeconds
+			and Heists.shieldLeft(HeistConfig.NewPlayerSeconds - 60) == 60
+			and Heists.shieldLeft(HeistConfig.NewPlayerSeconds + 5) == 0
+	)
 
 	o = owner()
 	Heists.rollDay(o.record, 5)

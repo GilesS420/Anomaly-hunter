@@ -26,6 +26,8 @@ local ScriptContext = game:GetService("ScriptContext")
 
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
 local Catching = require(ReplicatedStorage.Shared.Util.Catching)
+local HeistConfig = require(ReplicatedStorage.Shared.Config.Heists)
+local Heists = require(ReplicatedStorage.Shared.Util.Heists)
 local HotbarLayout = require(ReplicatedStorage.Shared.Util.HotbarLayout)
 local RobuxConfig = require(ReplicatedStorage.Shared.Config.Robux)
 local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
@@ -334,6 +336,15 @@ local function checkSave(player: Player)
 		typeof(heist) == "table" and heist.playSeconds >= 0 and heist.lost >= 0,
 		`Steal record is sound ({if typeof(heist) == "table" then heist.lostTotal else "?"} lost in all)`
 	)
+	if typeof(heist) == "table" then
+		local shown = player:GetAttribute("StealShield")
+		local left = Heists.shieldLeft(heist.playSeconds)
+		local on = (HeistConfig.ShieldInStudio or not RunService:IsStudio()) and left > 0
+		check(
+			on == (typeof(shown) == "number"),
+			`new-hunter steal shield shown right ({math.ceil(left / 60)} min left)`
+		)
+	end
 	local cakeLimit = Cakes.limit(data.wingsOwned, Perks.cakesPerWing(player))
 	if #data.cakes > cakeLimit then
 		note(`{#data.cakes} cakes out with room for {cakeLimit} (fine after /wings, odd otherwise)`)

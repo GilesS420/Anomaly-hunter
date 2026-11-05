@@ -107,7 +107,7 @@ export type Thief = {
 function Heists.blocked(owner: Owner, thief: Thief): string?
 	if thief.tutorial then
 		return "ThiefTutorial"
-	elseif owner.tutorial or (owner.shield and owner.playSeconds < Config.NewPlayerSeconds) then
+	elseif owner.tutorial or (owner.shield and Heists.shieldLeft(owner.playSeconds) > 0) then
 		return "NewPlayer"
 	elseif owner.record.lost >= Config.MaxLossesPerDay then
 		return "LostEnough"
@@ -119,12 +119,18 @@ function Heists.blocked(owner: Owner, thief: Thief): string?
 	return nil
 end
 
+-- Seconds of new-player shield left after `playSeconds` of play (0 when it's over). The
+-- server shows it as the StealShield attribute (shield icon + countdown, StealController).
+function Heists.shieldLeft(playSeconds: number): number
+	return math.max(Config.NewPlayerSeconds - playSeconds, 0)
+end
+
 -- What to tell the thief when Heists.blocked says no. `name` is the owner's display name.
 function Heists.message(reason: string, name: string): string
 	if reason == "ThiefTutorial" then
 		return "Finish the tutorial first!"
 	elseif reason == "NewPlayer" then
-		return `{name} is new to the game, so their monsters are protected for now.`
+		return `🛡 {name} is a new hunter: their monsters are shielded from stealing for their first {Config.NewPlayerSeconds // 3600} hours of play.`
 	elseif reason == "LostEnough" then
 		return `{name} was robbed enough today. Try again tomorrow!`
 	elseif reason == "SameThief" then
