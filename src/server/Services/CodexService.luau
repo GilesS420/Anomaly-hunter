@@ -2,13 +2,15 @@
 -- Fills each player's Codex (rules in Shared.Util.Codex) and sends it to the Codex window
 -- (client CodexController). Every few seconds it looks over the monsters in the mansion and
 -- the Backpack, so whatever way a monster, variant or effect turned up (a catch, an event,
--- a cake) it's written down; the first look after joining fills in older saves quietly.
--- New finds get a toast, except combos (HauntService already announces those).
--- Finishing a goal on a page (every monster found, every one in Gold, every effect, ...) pays
--- its Codex reward once (Config/CodexRewards), straight into the player's money.
+-- a cake) it's written down. New finds are quiet (Giles 2026-11-05: too many pop-ups); the
+-- Codex button shows how many rewards wait instead (player attribute CodexReady).
+-- Finishing a goal on a page (every monster found, every one in Gold, every effect, ...) and
+-- every first find of a monster or colour earn a Codex reward (Config/CodexRewards) that the
+-- player claims by tapping it in the Codex. Nothing is paid automatically.
 --
 -- Remotes in ReplicatedStorage.CodexRemotes:
 --   GetView  client -> server () -> View?
+--   Claim    client -> server ({ string } reward keys, or "all") -> (number paid, View?)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,7 +23,6 @@ local AnalyticsService = require(script.Parent.AnalyticsService)
 local DataService = require(script.Parent.DataService)
 local InventoryService = require(script.Parent.InventoryService)
 local MonsterModel = require(script.Parent.Parent.MonsterModel)
-local Notify = require(script.Parent.Parent.Notify)
 
 local CodexService = {}
 
@@ -33,9 +34,13 @@ export type MonsterCard = {
 	found: boolean,
 	variants: { [string]: boolean }, -- Silver, Gold, Shiny, Rainbow
 	look: string?, -- preview in PlayerGui.InventoryPreviews, once found
+	unclaimed: number, -- first-find money waiting on this card (0 when none)
+	claimKeys: { string }, -- the reward keys to claim it with
 }
--- A goal's reward and whether it's been paid, by goal ("Found", "Gold", "Effects", ...).
-export type Rewards = { [string]: { amount: number, claimed: boolean } }
+-- A goal's reward by goal ("Found", "Gold", "Effects", ...): `claimed` once fully paid,
+-- `ready` (with its key and what it pays now) when it waits to be claimed.
+export type Reward = { amount: number, claimed: boolean, ready: number?, key: string }
+export type Rewards = { [string]: Reward }
 export type Page = {
 	id: string,
 	title: string,
@@ -59,88 +64,53 @@ export type EffectCard = {
 export type View = { pages: { Page }, effects: { EffectCard }, effectRewards: Rewards, variants: { string } }
 
 local CheckSeconds = 3
-local MaxToasts = 2 -- more finds than this at once get one summary message
-
-local checked: { [Player]: boolean } = {} -- had their first (quiet) look this visit
+local MaxClaimKeys = 500 -- more keys than this in one Claim are refused
 
 local remotes = Instance.new("Folder")
 remotes.Name = "CodexRemotes"
 local GetView = Instance.new("RemoteFunction")
 GetView.Name = "GetView"
 GetView.Parent = remotes
+local Claim = Instance.new("RemoteFunction")
+Claim.Name = "Claim"
+Claim.Parent = remotes
 
 local sections = Codex.sections()
 
-local function message(find: Codex.Found): string?
-	local name = Format.name(find.id)
-	if find.kind == "Monster" then
-		return `New in your Codex: {name}!`
-	elseif find.kind == "Variant" then
-		return `Codex goal reached: {find.variant} {name}!`
-	elseif find.kind == "Effect" then
-		return `New effect in your Codex: {name}!`
-	end
-	return nil -- combos are announced by HauntService
-end
-
--- Notes everything the player owns right now; tells them what's new unless quiet.
-local function check(player: Player, quiet: boolean)
+-- Notes everything the player owns right now and updates how many rewards wait.
+local function check(player: Player)
 	local data = DataService.get(player)
 	if not data then
 		return
 	end
-	local messages: { string } = {}
 	for _, list in { data.monsters, data.storage } do
 		for _, caught in list do
-			for _, find in Codex.note(data.codex, caught) do
-				local text = message(find)
-				if text then
-					table.insert(messages, text)
-				end
-			end
+			Codex.note(data.codex, caught)
 		end
 	end
-	-- Rewards are paid even on the quiet first look, so older saves get what they earned.
-	for _, reward in Codex.newRewards(data.codex, sections) do
-		if DataService.addMoney(player, reward.amount) then
-			AnalyticsService.money(player, reward.amount, "Gameplay", "CodexReward")
-		end
-		local page = if reward.page == Codex.EffectsPage then "" else ` on {Format.name(reward.page)}`
-		local goal = if reward.goal == "Found" then "Every monster found" else `Every {reward.goal}`
-		if table.find(Codex.RarityOrder, reward.goal) then
-			goal = `Every {reward.goal} monster`
-		end
-		if reward.goal == "Effects" then
-			goal = "Every effect found"
-		elseif reward.goal == "Combos" then
-			goal = "Every secret combo made"
-		end
-		local title = if reward.topUp then "Codex rewards went up!" else "Codex reward!"
-		Notify.toast(player, `{title} {goal}{page}: +{Format.money(reward.amount)}`)
-	end
-	if quiet or #messages == 0 then
-		return
-	end
-	if #messages > MaxToasts then
-		Notify.toast(player, `{#messages} new entries in your Codex!`)
-	else
-		for _, text in messages do
-			Notify.toast(player, text)
-		end
-	end
-end
-
-local function rewardsFor(codex: { [string]: any }, page: string, goals: { string }): Rewards
-	local rewards: Rewards = {}
-	for _, goal in goals do
-		rewards[goal] =
-			{ amount = Codex.rewardAmount(page, goal), claimed = Codex.claimed(codex, page, goal) }
-	end
-	return rewards
+	player:SetAttribute("CodexReady", #Codex.pending(data.codex, sections))
 end
 
 local function viewFor(data: DataService.Data): View
 	local codex = data.codex
+	local waiting: { [string]: Codex.Reward } = {}
+	for _, reward in Codex.pending(codex, sections) do
+		waiting[reward.key] = reward
+	end
+	local function rewardsFor(page: string, goals: { string }): Rewards
+		local rewards: Rewards = {}
+		for _, goal in goals do
+			local key = Codex.rewardKey(page, goal)
+			local ready = waiting[key]
+			rewards[goal] = {
+				amount = Codex.rewardAmount(page, goal),
+				claimed = Codex.claimed(codex, page, goal) and not ready,
+				ready = if ready then ready.amount else nil,
+				key = key,
+			}
+		end
+		return rewards
+	end
 	local pageGoals = { "Found" }
 	for _, variant in Codex.VariantOrder do
 		table.insert(pageGoals, variant)
@@ -152,6 +122,15 @@ local function viewFor(data: DataService.Data): View
 			local monster = Monsters[id]
 			local found = Codex.has(codex, id)
 			local variants: { [string]: boolean } = {}
+			local unclaimed, claimKeys = 0, {}
+			for _, variant in { "", table.unpack(Codex.VariantOrder) } do
+				local key = Codex.findKey(id, if variant == "" then nil else variant)
+				local ready = waiting[key]
+				if ready then
+					unclaimed += ready.amount
+					table.insert(claimKeys, key)
+				end
+			end
 			for _, variant in Codex.VariantOrder do
 				variants[variant] = Codex.has(codex, id, variant)
 			end
@@ -163,6 +142,8 @@ local function viewFor(data: DataService.Data): View
 				found = found,
 				variants = variants,
 				look = if found then InventoryService.codexLook(id) else nil,
+				unclaimed = unclaimed,
+				claimKeys = claimKeys,
 			})
 		end
 		local progress = Codex.progress(codex, section.monsters)
@@ -185,7 +166,7 @@ local function viewFor(data: DataService.Data): View
 			title = section.title,
 			progress = progress,
 			monsters = cards,
-			rewards = rewardsFor(codex, section.id, goals),
+			rewards = rewardsFor(section.id, goals),
 			rarityGoals = rarityGoals,
 		})
 	end
@@ -233,7 +214,7 @@ local function viewFor(data: DataService.Data): View
 	return {
 		pages = pages,
 		effects = effects,
-		effectRewards = rewardsFor(codex, Codex.EffectsPage, { "Effects", "Combos" }),
+		effectRewards = rewardsFor(Codex.EffectsPage, { "Effects", "Combos" }),
 		variants = Codex.VariantOrder,
 	}
 end
@@ -243,9 +224,40 @@ GetView.OnServerInvoke = function(player: Player): View?
 	if not data then
 		return nil
 	end
-	check(player, not checked[player])
-	checked[player] = true
+	check(player)
 	return viewFor(data)
+end
+
+-- Pays the listed waiting rewards (or all of them), once each. Unknown or already claimed
+-- keys are ignored, so a client can't claim anything that isn't really waiting.
+Claim.OnServerInvoke = function(player: Player, keys: any): (number, View?)
+	local data = DataService.get(player)
+	if not data then
+		return 0, nil
+	end
+	local wanted: { [string]: boolean }? = nil -- nil claims everything
+	if keys ~= "all" then
+		if typeof(keys) ~= "table" or #keys > MaxClaimKeys then
+			return 0, nil
+		end
+		local set: { [string]: boolean } = {}
+		for _, key in keys do
+			if typeof(key) == "string" then
+				set[key] = true
+			end
+		end
+		wanted = set
+	end
+	check(player)
+	local total = 0
+	for _, reward in Codex.claim(data.codex, sections, wanted) do
+		total += reward.amount
+	end
+	if total > 0 and DataService.addMoney(player, total) then
+		AnalyticsService.money(player, total, "Gameplay", "CodexReward")
+	end
+	player:SetAttribute("CodexReady", #Codex.pending(data.codex, sections))
+	return total, viewFor(data)
 end
 
 function CodexService.start()
@@ -255,17 +267,13 @@ function CodexService.start()
 			task.wait(CheckSeconds)
 			for _, player in Players:GetPlayers() do
 				if DataService.isLoaded(player) then
-					local ok, err = pcall(check, player, not checked[player])
-					checked[player] = true
+					local ok, err = pcall(check, player)
 					if not ok then
 						warn(`CodexService: checking {player.Name} failed: {err}`)
 					end
 				end
 			end
 		end
-	end)
-	Players.PlayerRemoving:Connect(function(player)
-		checked[player] = nil
 	end)
 end
 

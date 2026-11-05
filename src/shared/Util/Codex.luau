@@ -6,7 +6,8 @@
 --   effects   [effectId] = true
 --   combos    [comboId] = true
 --   rewards   ["PumpkinGraveyard:Gold"] = 180000000  (Codex reward paid: the amount, or `true` in
---             saves from before 2026-11-05, see Config/CodexRewards)
+--             saves from before 2026-11-05, see Config/CodexRewards; first finds use
+--             "Find:Gloomlet" and "Find:Gloomlet:Gold"). Rewards wait until the player claims them.
 -- Only launch content is listed (zones and events that are in the game). Pure functions so
 -- they can be tested outside Roblox; the server fills it (CodexService), the client draws it
 -- (CodexController).
@@ -30,7 +31,17 @@ export type Progress = {
 	variants: { [string]: number },
 	rarities: { [string]: { found: number, total: number } }, -- only rarities on the page
 }
-export type Reward = { key: string, page: string, goal: string, amount: number, topUp: boolean }
+-- A Codex reward: a page goal (goal = "Found", "Gold", "Common", "Effects", ...) or a first
+-- find on a monster's card (goal = "Find" or a variant, `monster` set).
+export type Reward = {
+	key: string,
+	page: string,
+	goal: string,
+	amount: number, -- what claiming it pays now
+	total: number, -- what the save holds once it's paid
+	topUp: boolean,
+	monster: string?,
+}
 export type Found = { kind: "Monster" | "Variant" | "Effect" | "Combo", id: string, variant: string? }
 
 Codex.Plain = "Plain"
@@ -345,9 +356,30 @@ function Codex.claimed(codex: { [string]: any }, page: string, goal: string): bo
 	return typeof(rewards) == "table" and rewards[Codex.rewardKey(page, goal)] ~= nil
 end
 
--- Every goal finished but not fully paid yet, marked as paid now. The caller pays them out.
--- A goal paid at an older, smaller amount pays only the difference (`topUp` is true).
-function Codex.newRewards(codex: { [string]: any }, sections: { Section }): { Reward }
+-- First-find rewards: catching a monster for the first time ("Find"), and catching it in
+-- each colour for the first time (the variant's id). Keyed apart from the page goals.
+function Codex.findKey(monsterId: string, variant: string?): string
+	return if variant then `Find:{monsterId}:{variant}` else `Find:{monsterId}`
+end
+
+function Codex.findAmount(monsterId: string, variant: string?): number
+	local monster = Monsters[monsterId]
+	if not monster then
+		return 0
+	end
+	local multiplier = 1
+	for _, entry in Variants do
+		if entry.id == variant then
+			multiplier = entry.multiplier
+		end
+	end
+	return math.floor(monster.baseValue * CodexRewards.FindShare * multiplier)
+end
+
+-- Every reward waiting to be claimed; nothing is marked. Goals done but not fully paid come
+-- first (one paid at an older, smaller amount waits with only the difference: `topUp`), then
+-- first finds unless `withFinds` is false. `total` is what the save holds once it's claimed.
+function Codex.pending(codex: { [string]: any }, sections: { Section }, withFinds: boolean?): { Reward }
 	local reached: { { page: string, goal: string } } = {}
 	for _, section in sections do
 		for _, goal in Codex.goalsDone(Codex.progress(codex, section.monsters)) do
@@ -362,22 +394,78 @@ function Codex.newRewards(codex: { [string]: any }, sections: { Section }): { Re
 		table.insert(reached, { page = Codex.EffectsPage, goal = "Combos" })
 	end
 
-	local rewards = tableIn(codex, "rewards")
-	local paid: { Reward } = {}
+	local waiting: { Reward } = {}
 	for _, entry in reached do
-		local key = Codex.rewardKey(entry.page, entry.goal)
 		local amount = Codex.rewardAmount(entry.page, entry.goal)
 		local before = Codex.paidSoFar(codex, entry.page, entry.goal)
 		if amount > before then
-			rewards[key] = amount
-			table.insert(paid, {
-				key = key,
+			table.insert(waiting, {
+				key = Codex.rewardKey(entry.page, entry.goal),
 				page = entry.page,
 				goal = entry.goal,
 				amount = amount - before,
+				total = amount,
 				topUp = before > 0,
 			})
 		end
+	end
+	if withFinds == false then
+		return waiting
+	end
+	local rewards = if typeof(codex.rewards) == "table" then codex.rewards else {}
+	for _, section in sections do
+		for _, id in section.monsters do
+			if Codex.has(codex, id) then
+				local goals: { string } = { "Find" }
+				for _, variant in Codex.VariantOrder do
+					if Codex.has(codex, id, variant) then
+						table.insert(goals, variant)
+					end
+				end
+				for i, goal in goals do
+					local variant = if i == 1 then nil else goal
+					local key = Codex.findKey(id, variant)
+					local amount = Codex.findAmount(id, variant)
+					if rewards[key] == nil and amount > 0 then
+						table.insert(waiting, {
+							key = key,
+							page = section.id,
+							goal = goal,
+							amount = amount,
+							total = amount,
+							topUp = false,
+							monster = id,
+						})
+					end
+				end
+			end
+		end
+	end
+	return waiting
+end
+
+local function markPaid(codex: { [string]: any }, reward: Reward)
+	tableIn(codex, "rewards")[reward.key] = reward.total
+end
+
+-- Claims the waiting rewards whose keys are listed (every one when `keys` is nil): marks them
+-- paid and returns them, so the caller pays them out. Keys that aren't waiting do nothing.
+function Codex.claim(codex: { [string]: any }, sections: { Section }, keys: { [string]: boolean }?): { Reward }
+	local paid: { Reward } = {}
+	for _, reward in Codex.pending(codex, sections) do
+		if keys == nil or keys[reward.key] then
+			markPaid(codex, reward)
+			table.insert(paid, reward)
+		end
+	end
+	return paid
+end
+
+-- Claims every waiting page goal (not first finds) at once. Used by the tests.
+function Codex.newRewards(codex: { [string]: any }, sections: { Section }): { Reward }
+	local paid = Codex.pending(codex, sections, false)
+	for _, reward in paid do
+		markPaid(codex, reward)
 	end
 	return paid
 end

@@ -7,6 +7,10 @@
 --                  monster in that colour. The strip above the cards counts how many you've
 --                  found and how many of each variant, the extra goals for every page, with
 --                  the money each goal pays once it's done (a tick once it's paid).
+--                  Rewards wait to be claimed (Giles 2026-11-05): a finished goal and a card
+--                  with a new find get a red "!" in the corner; tap it to claim. "Claim all"
+--                  takes everything at once. The HUD's Codex button shows how many wait
+--                  (player attribute CodexReady).
 --   Effects        every effect (unfound ones say where they come from, found ones which
 --                  combos you've made with them).
 --   Combos         the secret combos, kept apart from the effects (Giles 2026-10-24): two
@@ -38,8 +42,10 @@ type MonsterCard = {
 	found: boolean,
 	variants: { [string]: boolean },
 	look: string?,
+	unclaimed: number?,
+	claimKeys: { string }?,
 }
-type Rewards = { [string]: { amount: number, claimed: boolean } }
+type Rewards = { [string]: { amount: number, claimed: boolean, ready: number?, key: string? } }
 type RarityGoal = { id: string, color: Color3, found: number, total: number }
 type Page = {
 	id: string,
@@ -62,13 +68,41 @@ type EffectCard = {
 }
 type View = { pages: { Page }, effects: { EffectCard }, effectRewards: Rewards?, variants: { string } }
 
--- "$250K" for a goal still to do, "✓ paid" once it's paid, "" for no reward.
+-- "$250K" for a goal still to do, "Claim $250K" once it's done, "✓ paid" once it's claimed,
+-- "" for no reward.
 local function rewardText(rewards: Rewards?, goal: string): string
 	local reward = rewards and rewards[goal]
 	if not reward or reward.amount <= 0 then
 		return ""
 	end
+	if reward.ready then
+		return `Claim {Format.money(reward.ready)}`
+	end
 	return if reward.claimed then "✓ paid" else Format.money(reward.amount)
+end
+
+-- The key to claim a goal with, when it's waiting.
+local function readyKey(rewards: Rewards?, goal: string): string?
+	local reward = rewards and rewards[goal]
+	return if reward and reward.ready then reward.key else nil
+end
+
+-- The red "!" in the top-right corner of a card or goal with a reward waiting.
+local function claimBadge(parent: GuiObject, size: number)
+	local badge = Instance.new("TextLabel")
+	badge.Name = "ClaimBadge"
+	badge.AnchorPoint = Vector2.new(1, 0)
+	badge.Position = UDim2.new(1, -4, 0, 4)
+	badge.Size = UDim2.fromOffset(size, size)
+	badge.BackgroundColor3 = Color3.fromRGB(230, 50, 60)
+	badge.Font = Enum.Font.FredokaOne
+	badge.Text = "!"
+	badge.TextColor3 = Color3.new(1, 1, 1)
+	badge.TextSize = size - 4
+	badge.ZIndex = 4
+	badge.Parent = parent
+	Ui.corner(badge, size / 2)
+	Ui.rim(badge, Color3.new(1, 1, 1), 1.5)
 end
 
 local EffectsTab = "Effects"
@@ -231,11 +265,19 @@ function CodexController.start()
 	local pickName = Ui.text(footer, "", UDim2.new(1, 0, 0, 26), Ui.Colors.text, true, 22)
 	local pickDetails = Ui.text(footer, "", UDim2.new(1, 0, 0, 20), Ui.Colors.muted, false, 16)
 	pickDetails.Position = UDim2.fromOffset(0, 28)
+	-- Claim every waiting reward at once, bottom right. Shown only while some wait.
+	local claimAll = Ui.button(footer, "Claim all", Ui.Colors.confirm, UDim2.fromOffset(130, 40))
+	claimAll.AnchorPoint = Vector2.new(1, 0.5)
+	claimAll.Position = UDim2.new(1, 0, 0.5, 0)
+	claimAll.Visible = false
+	pickName.Size = UDim2.new(1, -140, 0, 26)
+	pickDetails.Size = UDim2.new(1, -140, 0, 20)
 
 	local view: View? = nil
 	local tab: string? = nil -- a page id, or EffectsTab
 	local selected: string? = nil
 	local render: () -> ()
+	local claim: (keys: { string }?) -> ()
 	local tabButtons: { [string]: TextButton } = {}
 
 	-- One goal: a small colour swatch and a count.
@@ -248,9 +290,12 @@ function CodexController.start()
 		reward: string,
 		color: Color3,
 		isRainbow: boolean,
-		row: Frame?
+		row: Frame?,
+		claimKey: string?
 	)
-		local frame = Instance.new("Frame")
+		local frame = Instance.new("TextButton")
+		frame.Text = ""
+		frame.AutoButtonColor = claimKey ~= nil
 		frame.LayoutOrder = order
 		frame.Size = UDim2.new(1 / cells, -Gap * (cells - 1) / cells, 1, 0)
 		frame.BackgroundColor3 = CardColor
@@ -269,6 +314,13 @@ function CodexController.start()
 		end
 		local count = Ui.text(frame, text, UDim2.new(1, -22, 0, 16), Ui.Colors.text, false, 14)
 		count.Position = UDim2.fromOffset(18, 2)
+		if claimKey then
+			claimBadge(frame, 14)
+			local key = claimKey
+			frame.Activated:Connect(function()
+				claim({ key })
+			end)
+		end
 		local paid = string.sub(reward, 1, 1) == "✓"
 		local money = Ui.text(
 			frame,
@@ -301,7 +353,8 @@ function CodexController.start()
 		accent: Color3?,
 		look: string?,
 		mark: string?,
-		caption: string
+		caption: string,
+		claimKeys: { string }?
 	): TextButton
 		local chosen = selected == key
 		local button = Instance.new("TextButton")
@@ -352,9 +405,17 @@ function CodexController.start()
 		label.AnchorPoint = Vector2.new(0.5, 1)
 		label.Position = UDim2.new(0.5, 0, 1, -18)
 		label.TextXAlignment = Enum.TextXAlignment.Center
+		local keys = if claimKeys and #claimKeys > 0 then claimKeys else nil
+		if keys then
+			claimBadge(button, 18)
+		end
 		button.Activated:Connect(function()
 			selected = key
-			render()
+			if keys then
+				claim(keys) -- claims, then draws the page again
+			else
+				render()
+			end
 		end)
 		return button
 	end
@@ -402,7 +463,9 @@ function CodexController.start()
 			`Found {progress.found}/{progress.total}`,
 			rewardText(page.rewards, "Found"),
 			Ui.Colors.lamp,
-			false
+			false,
+			nil,
+			readyKey(page.rewards, "Found")
 		)
 		for i, variant in variants do
 			chip(
@@ -411,7 +474,9 @@ function CodexController.start()
 				`{variant} {progress.variants[variant] or 0}/{progress.total}`,
 				rewardText(page.rewards, variant),
 				VariantColor[variant] or Ui.Colors.muted,
-				variant == "Rainbow"
+				variant == "Rainbow",
+				nil,
+				readyKey(page.rewards, variant)
 			)
 		end
 		local rarityGoals = page.rarityGoals or {}
@@ -426,7 +491,8 @@ function CodexController.start()
 					rewardText(page.rewards, goal.id),
 					goal.color,
 					false,
-					rarityStrip
+					rarityStrip,
+					readyKey(page.rewards, goal.id)
 				)
 			end
 		end
@@ -435,8 +501,15 @@ function CodexController.start()
 			else `{page.title}: all found! Now catch each one in every colour`
 		for i, monster in page.monsters do
 			local key = `m:{monster.id}`
-			local button =
-				card(i, key, if monster.found then monster.color else nil, monster.look, nil, monster.name)
+			local button = card(
+				i,
+				key,
+				if monster.found then monster.color else nil,
+				monster.look,
+				nil,
+				monster.name,
+				monster.claimKeys
+			)
 			dots(button, variants, monster.variants)
 			if selected == key then
 				pickName.Text = if monster.found
@@ -466,7 +539,16 @@ function CodexController.start()
 				found += if effect.found then 1 else 0
 			end
 		end
-		chip(1, 1, `Effects found {found}/{total}`, rewardText(rewards, "Effects"), Ui.Colors.lamp, false)
+		chip(
+			1,
+			1,
+			`Effects found {found}/{total}`,
+			rewardText(rewards, "Effects"),
+			Ui.Colors.lamp,
+			false,
+			nil,
+			readyKey(rewards, "Effects")
+		)
 		window.status.Text =
 			"Effects raise a monster's worth."
 		local order = 0
@@ -505,7 +587,16 @@ function CodexController.start()
 				made += if effect.found then 1 else 0
 			end
 		end
-		chip(1, 1, `Combos made {made}/{total}`, rewardText(rewards, "Combos"), ComboColor, false)
+		chip(
+			1,
+			1,
+			`Combos made {made}/{total}`,
+			rewardText(rewards, "Combos"),
+			ComboColor,
+			false,
+			nil,
+			readyKey(rewards, "Combos")
+		)
 		window.status.Text =
 			"Two effects on one monster merge into a combo."
 		local order = 0
@@ -626,6 +717,33 @@ function CodexController.start()
 		end
 	end
 
+	local Claim = remotes:WaitForChild("Claim") :: RemoteFunction
+	local claiming = false
+	function claim(keys: { string }?)
+		if claiming then
+			return
+		end
+		claiming = true
+		local ok, paid, result = pcall(Claim.InvokeServer, Claim, keys or "all")
+		claiming = false
+		if ok and result then
+			view = result
+		end
+		render()
+		if ok and typeof(paid) == "number" and paid > 0 then
+			window.status.Text = `Claimed +{Format.money(paid)}!`
+		end
+	end
+	claimAll.Activated:Connect(function()
+		claim(nil)
+	end)
+	local function showClaimAll()
+		local ready = player:GetAttribute("CodexReady")
+		claimAll.Visible = typeof(ready) == "number" and ready > 0
+	end
+	player:GetAttributeChangedSignal("CodexReady"):Connect(showClaimAll)
+	showClaimAll()
+
 	local function toggle()
 		if window.isOpen() then
 			window.close()
@@ -651,6 +769,29 @@ function CodexController.start()
 	local button = hud:WaitForChild("Menu"):WaitForChild("Codex") :: TextButton
 	button.Activated:Connect(toggle)
 	Locks.guard(button, "Codex") -- greyed out until the tutorial is done
+
+	-- How many Codex rewards wait to be claimed, in a red circle like the log's.
+	local badge = Instance.new("TextLabel")
+	badge.Name = "Ready"
+	badge.AnchorPoint = Vector2.new(0.5, 0.5)
+	badge.Position = UDim2.new(1, -5, 0, 5) -- top-right corner of the square button
+	badge.Size = UDim2.fromOffset(22, 22)
+	badge.BackgroundColor3 = Color3.fromRGB(230, 50, 60)
+	badge.Font = Enum.Font.FredokaOne
+	badge.TextColor3 = Color3.new(1, 1, 1)
+	badge.TextSize = 13
+	badge.ZIndex = 5
+	badge.Parent = button
+	Ui.corner(badge, 11)
+	Ui.rim(badge, Color3.new(1, 1, 1), 1.5)
+	local function showBadge()
+		local ready = player:GetAttribute("CodexReady")
+		local count = if typeof(ready) == "number" then ready else 0
+		badge.Visible = count > 0
+		badge.Text = if count > 99 then "99+" else tostring(count)
+	end
+	player:GetAttributeChangedSignal("CodexReady"):Connect(showBadge)
+	showBadge()
 end
 
 return CodexController
