@@ -3,9 +3,10 @@
 -- for each. A new player walks into Pumpkin Graveyard, catches a Gloomlet, takes it home
 -- where it turns Cobwebbed, picks it up, sells it and buys the Phantom Vac. Then the Bakery
 -- (Giles 2026-11-05): buy a Pumpkin Candy, set it out at home, catch a second monster (a
--- Skittercrow), bring it home and watch it eat the cake and turn Pumpkin Head. Last, a short
--- tour of the buttons. Until the tutorial is done every button that isn't unlocked yet is greyed
--- out. The server runs the steps (server/Services/TutorialService), the client draws them
+-- Skittercrow, shown as Grave Raven), bring it home and watch it eat the cake and turn
+-- Pumpkin Head. Last, a short tour of the buttons. Until the tutorial is done every button
+-- that isn't unlocked yet is greyed out. The server runs the steps
+-- (server/Services/TutorialService), the client draws them
 -- (client/Controllers/TutorialController). Pure functions so they can be tested outside Roblox.
 --
 -- The current step is the player attribute Tutorial (nil once it's done) and the save's
@@ -53,6 +54,7 @@ Tutorial.FirstVacuum = "PhantomVac" -- the first thing bought in the shop (Giles
 Tutorial.Cake = "PumpkinCandy" -- the first cake, bought with the Baker's gift
 Tutorial.CakeEffect = "PumpkinHead" -- what the Pumpkin Candy gives
 Tutorial.SecondMonster = "Skittercrow" -- the second catch, the one that eats the cake
+local Second = Names[Tutorial.SecondMonster] or Tutorial.SecondMonster -- shown as Grave Raven
 Tutorial.FeedSeconds = 45 -- no bite by then (it got stuck, say): it gets Pumpkin Head anyway
 Tutorial.RespawnSeconds = 5 -- a tutorial monster that vanished comes back after this long
 Tutorial.HintSeconds = 120 -- stuck on one step this long: a bigger hint shows
@@ -94,9 +96,9 @@ Tutorial.Text = {
 	Buy = 'The Collector gave you a welcome gift! Press Shops, then press E at the Vacuum Vault (the middle shop), pick "Show me the vacuums." and buy the Phantom Vac.',
 	Bake = 'Cakes give monsters effects! The Baker gave you money for a Pumpkin Candy. Follow the trail to the Haunted Bakery, press E, pick "I want to buy cakes!" and buy the Pumpkin Candy.',
 	Place = "Press Mansion at the top to go home. Hold the Pumpkin Candy from your hotbar and click the floor inside your mansion to set it out.",
-	Hunt = "Your cake needs a hungry monster! Press Portals, go back to the Pumpkin Graveyard and catch the Skittercrow.",
+	Hunt = `Your cake needs a hungry monster! Press Portals, go back to the Pumpkin Graveyard and catch the {Second}.`,
 	Return = "Got it! Bring it home: follow the trail to the exit, or press R if you still have a Return Charm.",
-	Feed = "Your Skittercrow smells the cake! Watch it walk over, take a bite and turn Pumpkin Head.",
+	Feed = `Your {Second} smells the cake! Watch it walk over, take a bite and turn Pumpkin Head.`,
 	Tour = "You're ready! Here's what the buttons do.",
 } :: { [Step]: string }
 
@@ -109,7 +111,7 @@ Tutorial.TouchText = {
 	Buy = 'The Collector gave you a welcome gift! Tap Shops, then tap Talk at the Vacuum Vault (the middle shop), pick "Show me the vacuums." and buy the Phantom Vac.',
 	Bake = 'Cakes give monsters effects! The Baker gave you money for a Pumpkin Candy. Follow the trail to the Haunted Bakery, tap Talk, pick "I want to buy cakes!" and buy the Pumpkin Candy.',
 	Place = "Tap Mansion at the top to go home. Tap the Pumpkin Candy in your hotbar, then tap the floor inside your mansion to set it out.",
-	Hunt = "Your cake needs a hungry monster! Tap Portals, go back to the Pumpkin Graveyard and catch the Skittercrow.",
+	Hunt = `Your cake needs a hungry monster! Tap Portals, go back to the Pumpkin Graveyard and catch the {Second}.`,
 	Return = "Got it! Bring it home: follow the trail to the exit, or tap Return Charm if you still have one.",
 } :: { [Step]: string }
 
@@ -123,9 +125,9 @@ Tutorial.Hints = {
 	Buy = 'Talk to the Vacuum Vault (between the Bakery and the Workshop) and pick "Show me the vacuums.", then press the Phantom Vac card and Buy.',
 	Bake = 'Press Shops and talk to the Haunted Bakery (the pink striped shop). Pick "I want to buy cakes!", then press the Pumpkin Candy card and Buy.',
 	Place = "Stand inside your mansion, hold the Pumpkin Candy (it's in your hotbar) and click or tap the floor in front of you.",
-	Hunt = "Press Portals to jump to the Zone Gates, walk into the Pumpkin Graveyard and follow the trail to the Skittercrow.",
+	Hunt = `Press Portals to jump to the Zone Gates, walk into the Pumpkin Graveyard and follow the trail to the {Second}.`,
 	Return = "Walk back through the exit arch you came in by.",
-	Feed = "Leave the Skittercrow in your mansion (don't pick it up) and stay close to the cake.",
+	Feed = `Leave the {Second} in your mansion (don't pick it up) and stay close to the cake.`,
 	Tour = "Press Next to see the next button.",
 } :: { [Step]: string }
 

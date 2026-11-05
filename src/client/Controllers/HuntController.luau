@@ -24,6 +24,8 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Attacks = require(Shared:WaitForChild("Util"):WaitForChild("Attacks"))
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
+local Goals = require(Shared:WaitForChild("Util"):WaitForChild("Goals"))
+local Rookie = require(Shared:WaitForChild("Config"):WaitForChild("Rookie"))
 local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 local Icons = require(script.Parent.Parent:WaitForChild("Icons"))
@@ -68,6 +70,87 @@ local function label(name: string, order: number, color: Color3, parent: Instanc
 	size.Parent = text
 	text.Parent = parent
 	return text
+end
+
+-- The player's money, or nil before the save has loaded.
+local function moneyNow(): number?
+	local stats = player:FindFirstChild("leaderstats")
+	local value = stats and stats:FindFirstChild("Money")
+	return if value and value:IsA("NumberValue") then value.Value else nil
+end
+
+-- The "Next goal" bar at the top of the side column (Giles 2026-11-05): the cheapest vacuum or
+-- wing you don't own yet (the server picks it, Util/Goals, attributes GoalName and GoalPrice),
+-- filling up with your money. Under it, while it lasts, the rookie hour's countdown
+-- (RookieSeconds). Both stay hidden during the tutorial (the server sets nothing then).
+local function buildGoal(column: Frame)
+	local box = Instance.new("Frame")
+	box.Name = "NextGoal"
+	box.LayoutOrder = 0
+	box.Size = UDim2.new(1, 0, 0, 52)
+	box.BackgroundColor3 = Ui.Colors.panel
+	box.BackgroundTransparency = 0.25
+	box.Visible = false
+	box.Parent = column
+	Ui.corner(box, 8)
+	Ui.rim(box, Ui.Colors.rim, 1)
+
+	local title = Ui.text(box, "", UDim2.new(1, -16, 0, 20), Ui.Colors.lamp, true, 18)
+	title.Position = UDim2.fromOffset(8, 4)
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	local track = Instance.new("Frame")
+	track.Name = "Track"
+	track.Position = UDim2.fromOffset(8, 30)
+	track.Size = UDim2.new(1, -16, 0, 16)
+	track.BackgroundColor3 = Ui.Colors.row
+	track.Parent = box
+	Ui.corner(track, 8)
+	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.Size = UDim2.fromScale(0, 1)
+	fill.BackgroundColor3 = Ui.Colors.sell
+	fill.Parent = track
+	Ui.corner(fill, 8)
+	local amount = Ui.text(track, "", UDim2.fromScale(1, 1), Ui.Colors.text, true, 13)
+	amount.ZIndex = 2
+	amount.TextXAlignment = Enum.TextXAlignment.Center
+	amount.TextStrokeTransparency = 0.3
+
+	local rookie = label("Rookie", 1, Ui.Colors.lamp, column)
+
+	local function refresh()
+		local name = player:GetAttribute("GoalName")
+		local price = player:GetAttribute("GoalPrice")
+		local money = moneyNow()
+		box.Visible = typeof(name) == "string" and typeof(price) == "number" and money ~= nil
+		if box.Visible and money and typeof(price) == "number" then
+			local ready = money >= price
+			title.Text = if ready then `Ready to buy: {name}!` else `Next goal: {name}`
+			fill.Size = UDim2.fromScale(Goals.progress(money, price), 1)
+			fill.BackgroundColor3 = if ready then Ui.Colors.buy else Ui.Colors.sell
+			amount.Text = `{Format.money(math.min(money, price))} / {Format.money(price)}`
+		end
+
+		local left = player:GetAttribute("RookieSeconds")
+		rookie.Visible = typeof(left) == "number" and left > 0
+		if typeof(left) == "number" and left > 0 then
+			local whole = math.floor(left)
+			local times = 1 + Rookie.SellBonusPercent / 100
+			local clock = string.format("%d:%02d", whole // 60, whole % 60)
+			rookie.Text = `Rookie hour: x{times} sell money ({clock})`
+		end
+	end
+	player:GetAttributeChangedSignal("GoalName"):Connect(refresh)
+	player:GetAttributeChangedSignal("GoalPrice"):Connect(refresh)
+	player:GetAttributeChangedSignal("RookieSeconds"):Connect(refresh)
+	-- Money changes all the time; check it twice a second rather than hooking leaderstats,
+	-- which may not exist yet.
+	task.spawn(function()
+		while box.Parent do
+			refresh()
+			task.wait(0.5)
+		end
+	end)
 end
 
 -- The kinds of Bait Bell, cheapest first: Workshop id, name, button color.
@@ -116,6 +199,7 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 	if limit then
 		limit:Destroy()
 	end
+	buildGoal(column)
 	local hearts = label("Hearts", 2, Color3.fromRGB(255, 90, 110), column)
 	local carrying = label("Carrying", 3, Color3.new(1, 1, 1), column)
 
