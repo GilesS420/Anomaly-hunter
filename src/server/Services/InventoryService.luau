@@ -29,6 +29,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
+local CarryPose = require(ReplicatedStorage.Shared.Util.CarryPose)
 local Care = require(ReplicatedStorage.Shared.Util.Care)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
@@ -461,9 +462,9 @@ end
 
 -- A copy of the monster at the size it has in the mansion (so a Titan is a Titan in your
 -- hands too, Giles 2026-10-30), carried over your head (every client raises the carrier's
--- arms, CarryController). The Tool has no
--- Handle (so Roblox doesn't put it in one hand with its own hold pose): the copy is welded on
--- top of your head when you take it out, and unwelded when you put it away.
+-- arms straight up, CarryController). The Tool has no
+-- Handle (so Roblox doesn't put it in one hand with its own hold pose): the copy is welded
+-- onto your raised hands when you take it out, and unwelded when you put it away.
 local function monsterTool(player: Player, caught: Value.CaughtMonster, rarity: string): Tool
 	local tool = Instance.new("Tool")
 	tool.CanBeDropped = false
@@ -493,9 +494,14 @@ local function monsterTool(player: Player, caught: Value.CaughtMonster, rarity: 
 		-- bottom is its feet, not the ball's (a Titan's ball hangs well below them).
 		body.Size = Vector3.one * 0.2
 	end
-	local box, boxSize = model:GetBoundingBox()
-	-- where the body sits relative to the bottom middle of the copy
-	local fromBottom = (box * CFrame.new(0, -boxSize.Y / 2, 0)):ToObjectSpace(body.CFrame)
+	-- The bottom middle of what you see of the copy, in Body's space (rests on the hands).
+	local parts: { BasePart } = {}
+	for _, child in model:GetChildren() do
+		if child:IsA("BasePart") then
+			table.insert(parts, child)
+		end
+	end
+	local bottom = CarryPose.bottomOf(body, parts)
 	for _, child in model:GetChildren() do
 		if child:IsA("BasePart") then
 			child.Anchored = false
@@ -540,10 +546,18 @@ local function monsterTool(player: Player, caught: Value.CaughtMonster, rarity: 
 		carrier = character
 		local joint = Instance.new("Weld")
 		joint.Name = "CarryWeld"
-		joint.Part0 = head
+		-- The copy's bottom on your raised hands, centred over your head, facing where you
+		-- face (CarryPose works the hands out from your own rig, so any avatar fits).
+		-- Welded to the torso: the arms hang off it, so the monster moves with your hands.
+		local torso, seat = CarryPose.seat(character)
+		if torso and seat then
+			joint.Part0 = torso
+			joint.C0 = seat * bottom:Inverse()
+		else
+			joint.Part0 = head
+			joint.C0 = CFrame.new(0, head.Size.Y / 2 + 0.6, 0) * bottom:Inverse()
+		end
 		joint.Part1 = body
-		-- the copy's bottom just above the head, facing where you face
-		joint.C0 = CFrame.new(0, head.Size.Y / 2 + 0.6, 0) * fromBottom
 		joint.Parent = body
 		weld = joint
 	end
