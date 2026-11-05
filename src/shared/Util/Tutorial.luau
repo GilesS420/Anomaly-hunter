@@ -1,16 +1,21 @@
 --!strict
 -- The first-timer tutorial: the steps in order, what each one unlocks, and the words shown
--- for each. A new player walks into Pumpkin Graveyard, catches a Gloomlet, takes it home
--- where it turns Cobwebbed, picks it up, sells it and buys the Phantom Vac. Then the Bakery
--- (Giles 2026-11-05): buy a Pumpkin Candy, set it out at home, catch a second monster (a
--- Skittercrow, shown as Grave Raven), bring it home and watch it eat the cake and turn
--- Pumpkin Head. Last, a short tour of the buttons. Until the tutorial is done every button
--- that isn't unlocked yet is greyed out. The server runs the steps
--- (server/Services/TutorialService), the client draws them
--- (client/Controllers/TutorialController). Pure functions so they can be tested outside Roblox.
+-- for each. Kept short (Giles 2026-11-05, after the funnel showed most new players never
+-- finished the long one): a new player starts inside Pumpkin Graveyard, catches a Gloomlet,
+-- runs back out (it turns Cobwebbed and lands straight in the Backpack), sells it and buys the
+-- Phantom Vac. Then a short tour of the buttons. Until the tutorial is done every button that
+-- isn't unlocked yet is greyed out.
 --
+-- After it, an optional quest, "Baker's first cake" (QuestSteps): buy a Pumpkin Candy with
+-- the Baker's gift, set it out at home, catch a second monster (a Skittercrow, shown as Grave
+-- Raven), bring it home and watch it eat the cake and turn Pumpkin Head, for QuestReward.
+-- Nothing is locked during it and it can be skipped.
+--
+-- The server runs both (server/Services/TutorialService), the client draws them
+-- (client/Controllers/TutorialController). Pure functions so they can be tested outside Roblox.
 -- The current step is the player attribute Tutorial (nil once it's done) and the save's
--- `tutorial` field ("Done" once it's done).
+-- `tutorial` field ("Done" once it's done); the quest's is the attribute Quest and the save's
+-- `quest` field.
 
 local Community = require("../Config/Community")
 local Names = require("../Config/Names")
@@ -31,20 +36,14 @@ export type Step =
 	| "Feed"
 	| "Tour"
 
-Tutorial.Steps = {
-	"Gate",
-	"Catch",
-	"Home",
-	"Pickup",
-	"Sell",
-	"Buy",
-	"Bake",
-	"Place",
-	"Hunt",
-	"Return",
-	"Feed",
-	"Tour",
-} :: { Step }
+-- Gate and Pickup were steps before 2026-11-05; old saves at them pick up in the new list
+-- (resumeAt), so their names stay in the type.
+Tutorial.Steps = { "Catch", "Home", "Sell", "Buy", "Tour" } :: { Step }
+
+-- The optional Bakery quest after the tutorial, in order.
+Tutorial.QuestSteps = { "Bake", "Place", "Hunt", "Return", "Feed" } :: { Step }
+Tutorial.QuestName = "Baker's first cake"
+Tutorial.QuestReward = 75_000 -- money when the cake gives its effect
 
 Tutorial.Zone = "PumpkinGraveyard" -- where the first hunt goes
 Tutorial.Monster = "Gloomlet" -- the tutorial's own monster, only the player can catch it
@@ -55,7 +54,7 @@ Tutorial.Cake = "PumpkinCandy" -- the first cake, bought with the Baker's gift
 Tutorial.CakeEffect = "PumpkinHead" -- what the Pumpkin Candy gives
 Tutorial.SecondMonster = "Skittercrow" -- the second catch, the one that eats the cake
 local Second = Names[Tutorial.SecondMonster] or Tutorial.SecondMonster -- shown as Grave Raven
-Tutorial.FeedSeconds = 45 -- no bite by then (it got stuck, say): it gets Pumpkin Head anyway
+Tutorial.FeedSeconds = 15 -- no bite by then (it got stuck, say): it gets Pumpkin Head anyway
 Tutorial.RespawnSeconds = 5 -- a tutorial monster that vanished comes back after this long
 Tutorial.HintSeconds = 120 -- stuck on one step this long: a bigger hint shows
 
@@ -63,17 +62,17 @@ Tutorial.HintSeconds = 120 -- stuck on one step this long: a bigger hint shows
 -- The fast-travel features match Config/Travel's destination ids. Anything not listed is
 -- locked until the tutorial is done.
 Tutorial.Unlocks = {
-	Home = "Gate", -- the Mansion fast-travel button
-	Portals = "Gate",
+	Home = "Catch", -- the Mansion fast-travel button
+	Portals = "Catch",
 	Hotbar = "Catch",
-	Backpack = "Pickup",
-	MansionList = "Pickup", -- the arrow tab on the right edge, with a Pick up button per monster
+	Backpack = "Sell",
+	MansionList = "Sell", -- the arrow tab on the right edge, with a Pick up button per monster
 	Sell = "Sell",
 	Shops = "Buy",
 	Codex = "Tour",
 	Missions = "Tour",
 	Store = "Tour", -- the Robux Store button
-	Settings = "Gate", -- sound and weather settings always work
+	Settings = "Catch", -- sound and weather settings always work
 } :: { [string]: Step }
 
 -- The exact cards and buttons that pulse during a step (client/Locks.point), on top of the
@@ -88,11 +87,9 @@ Tutorial.Point = {
 -- What the guide card says for each step, with a keyboard (Text) or on a phone or tablet
 -- without one (TouchText, where it differs).
 Tutorial.Text = {
-	Gate = "Follow the glowing trail to the Pumpkin Graveyard gate, or press Portals at the top.",
-	Catch = `Press 1 to hold your vacuum, then click the {Monster}. When it struggles, click or press F while the needle is in the green.`,
+	Catch = `Welcome to the Pumpkin Graveyard! Press 1 to hold your vacuum, then click the {Monster}. When it struggles, click or press F while the needle is in the green.`,
 	Home = "Got it! Follow the trail back to the exit, or press R to use your free Return Charm.",
-	Pickup = `Your {Monster} is home and turned Cobwebbed: effects make monsters worth more! Press E next to it, or open the mansion list (the arrow on the right edge) and press Pick up.`,
-	Sell = `The Collector only buys monsters from your Backpack. Press Sell at the top, then press E at the Collector, pick "I want to sell my monsters." and sell your {Monster}.`,
+	Sell = `Your {Monster} turned Cobwebbed (effects make monsters worth more) and is in your Backpack. Press Sell at the top, press E at the Collector, pick "I want to sell my monsters." and sell it.`,
 	Buy = 'The Collector gave you a welcome gift! Press Shops, then press E at the Vacuum Vault (the middle shop), pick "Show me the vacuums." and buy the Phantom Vac.',
 	Bake = 'Cakes give monsters effects! The Baker gave you money for a Pumpkin Candy. Follow the trail to the Haunted Bakery, press E, pick "I want to buy cakes!" and buy the Pumpkin Candy.',
 	Place = "Press Mansion at the top to go home. Hold the Pumpkin Candy from your hotbar and click the floor inside your mansion to set it out.",
@@ -103,11 +100,9 @@ Tutorial.Text = {
 } :: { [Step]: string }
 
 Tutorial.TouchText = {
-	Gate = "Follow the glowing trail to the Pumpkin Graveyard gate, or tap Portals at the top.",
-	Catch = `Tap the first hotbar slot to hold your vacuum, then tap the {Monster}. When it struggles, tap while the needle is in the green.`,
+	Catch = `Welcome to the Pumpkin Graveyard! Tap the first hotbar slot to hold your vacuum, then tap the {Monster}. When it struggles, tap while the needle is in the green.`,
 	Home = "Got it! Follow the trail back to the exit, or tap Return Charm to jump home.",
-	Pickup = `Your {Monster} is home and turned Cobwebbed: effects make monsters worth more! Tap the prompt next to it, or open the mansion list (the arrow on the right edge) and tap Pick up.`,
-	Sell = `The Collector only buys monsters from your Backpack. Tap Sell at the top, then tap Talk at the Collector, pick "I want to sell my monsters." and sell your {Monster}.`,
+	Sell = `Your {Monster} turned Cobwebbed (effects make monsters worth more) and is in your Backpack. Tap Sell at the top, tap Talk at the Collector, pick "I want to sell my monsters." and sell it.`,
 	Buy = 'The Collector gave you a welcome gift! Tap Shops, then tap Talk at the Vacuum Vault (the middle shop), pick "Show me the vacuums." and buy the Phantom Vac.',
 	Bake = 'Cakes give monsters effects! The Baker gave you money for a Pumpkin Candy. Follow the trail to the Haunted Bakery, tap Talk, pick "I want to buy cakes!" and buy the Pumpkin Candy.',
 	Place = "Tap Mansion at the top to go home. Tap the Pumpkin Candy in your hotbar, then tap the floor inside your mansion to set it out.",
@@ -117,17 +112,15 @@ Tutorial.TouchText = {
 
 -- Shown under the guide card after HintSeconds on one step.
 Tutorial.Hints = {
-	Gate = "The Zone Gates are at the far end of the hub. Press Portals to jump there.",
 	Catch = "Hold your vacuum (the first hotbar slot) and stay close. Each struggle is one click, tap or F while the needle crosses the green zone; miss and it breaks free for a moment, so just try again.",
 	Home = "Walk back through the exit arch you came in by.",
-	Pickup = `Press Mansion at the top to go home, then stand next to the {Monster} and press E (or tap the prompt).`,
 	Sell = `Talk to the Collector (E or tap Talk) and pick "I want to sell my monsters.", then press Sell on your {Monster}.`,
 	Buy = 'Talk to the Vacuum Vault (between the Bakery and the Workshop) and pick "Show me the vacuums.", then press the Phantom Vac card and Buy.',
 	Bake = 'Press Shops and talk to the Haunted Bakery (the pink striped shop). Pick "I want to buy cakes!", then press the Pumpkin Candy card and Buy.',
 	Place = "Stand inside your mansion, hold the Pumpkin Candy (it's in your hotbar) and click or tap the floor in front of you.",
 	Hunt = `Press Portals to jump to the Zone Gates, walk into the Pumpkin Graveyard and follow the trail to the {Second}.`,
 	Return = "Walk back through the exit arch you came in by.",
-	Feed = `Leave the {Second} in your mansion (don't pick it up) and stay close to the cake.`,
+	Feed = `Leave the {Second} in your mansion (don't pick it up). It gets Pumpkin Head in a few seconds.`,
 	Tour = "Press Next to see the next button.",
 } :: { [Step]: string }
 
@@ -198,14 +191,24 @@ function Tutorial.textFor(step: string, touch: boolean): string
 	return text or Tutorial.Text[step :: Step] or ""
 end
 
--- Where a step is in the list (0 for an unknown step).
-function Tutorial.index(step: string?): number
-	for index, candidate in Tutorial.Steps do
+-- Where a step is in a list (0 for an unknown step).
+local function indexIn(list: { Step }, step: string?): number
+	for index, candidate in list do
 		if candidate == step then
 			return index
 		end
 	end
 	return 0
+end
+
+-- Where a step is in the tutorial (0 for an unknown step).
+function Tutorial.index(step: string?): number
+	return indexIn(Tutorial.Steps, step)
+end
+
+-- Where a step is in the Bakery quest (0 for an unknown step).
+function Tutorial.questIndex(step: string?): number
+	return indexIn(Tutorial.QuestSteps, step)
 end
 
 -- Whether a button or key works during this step. No step (nil or "Done") means everything works.
@@ -223,6 +226,12 @@ function Tutorial.nextStep(step: string): string
 	return Tutorial.Steps[index + 1] or "Done"
 end
 
+-- The quest step after this one ("Done" after Feed).
+function Tutorial.nextQuestStep(step: string): string
+	local index = Tutorial.questIndex(step)
+	return Tutorial.QuestSteps[index + 1] or "Done"
+end
+
 -- A brand-new save (nothing earned, caught or bought yet) gets the tutorial; any older save
 -- counts as done, so existing players never see it.
 function Tutorial.isFresh(
@@ -236,14 +245,29 @@ function Tutorial.isFresh(
 end
 
 -- The step a returning player picks up at. A hunt can't survive leaving the game (the
--- catch is lost), so the hunting steps start over at the gate.
+-- catch is lost), so the hunting steps start over at the catch. Saves from the longer
+-- tutorial: Gate starts at the catch and Pickup at the sell step.
 function Tutorial.resumeAt(step: string): string
-	if step == "Catch" or step == "Home" then
-		return "Gate"
-	elseif step == "Return" then
-		return "Hunt"
+	if step == "Gate" or step == "Catch" or step == "Home" then
+		return "Catch"
+	elseif step == "Pickup" then
+		return "Sell"
 	end
 	return step
+end
+
+-- The quest step a returning player picks up at: a lost second hunt starts over at Hunt.
+function Tutorial.resumeQuestAt(step: string): string
+	return if step == "Return" then "Hunt" else step
+end
+
+-- A save from the longer tutorial that was in its Bakery part: that part is the quest now,
+-- so the tutorial counts as done and the quest goes on from here. Nil for any other step.
+function Tutorial.questFor(oldStep: string): string?
+	if Tutorial.questIndex(oldStep) == 0 then
+		return nil
+	end
+	return Tutorial.resumeQuestAt(oldStep)
 end
 
 -- A one-time gift: enough to afford the first vacuum (the Collector) or the first cake (the

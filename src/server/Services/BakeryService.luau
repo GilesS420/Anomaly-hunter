@@ -77,10 +77,10 @@ local function stockBoost(): (string?, number?)
 	return if event then event.id else nil, if event then event.bakeryStockMultiplier else nil
 end
 
--- The tutorial's first cake is always in stock while its Bake step is on (a huge restock
+-- The Bakery quest's cake is always in stock while its Bake step is on (a huge restock
 -- chance multiplier), so a new player is never told to come back later.
 local function multiplierFor(data: DataService.Data, item: Shop.Item?, multiplier: number?): number?
-	return if item and item.id == Tutorial.Cake and data.tutorial == "Bake" then math.huge else multiplier
+	return if item and item.id == Tutorial.Cake and data.quest == "Bake" then math.huge else multiplier
 end
 
 local function countdown(seconds: number): string

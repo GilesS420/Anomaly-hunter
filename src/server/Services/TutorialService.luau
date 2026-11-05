@@ -1,34 +1,40 @@
 --!strict
--- The first-timer tutorial (steps, unlocks and words in Shared.Util.Tutorial). A brand-new
--- save starts it; older saves count as done, so existing players never see it. Each step
--- moves on by itself when the player has done what it asks, by watching the save and the
--- hunt attributes:
---   Gate    walk into Pumpkin Graveyard
---   Catch   catch the Gloomlet that waits there, reserved for them (and a free Return Charm)
---   Home    bring it home (the exit or the charm); it picks up Cobwebbed straight away
---   Pickup  pick it up into the Backpack (E next to it)
+-- The first-timer tutorial and the optional Bakery quest after it (steps, unlocks and words in
+-- Shared.Util.Tutorial). A brand-new save starts the tutorial; older saves count as done, so
+-- existing players never see it. Each step moves on by itself when the player has done what it
+-- asks, by watching the save and the hunt attributes.
+-- The tutorial (short since 2026-11-05):
+--   Catch   they're put straight into Pumpkin Graveyard (HuntService.sendInto, again if they
+--           walk out) and catch the Gloomlet that waits there, reserved for them (and a free
+--           Return Charm)
+--   Home    bring it home (the exit or the charm); it turns Cobwebbed and goes straight into the
+--           Backpack, ready to sell
 --   Sell    sell it at the Collector, who then tops their money up to the Phantom Vac's price
 --   Buy     buy the Phantom Vac (always in stock for them during this step, WorkshopService)
+--   Tour    the client shows what each button does, then fires Finish
+-- Losing the catch (knocked out, or leaving the zone or the game) goes back to Catch. Nothing
+-- attacks a player in the tutorial (MonsterAiService) and fast travel to a locked button is
+-- refused (TravelService). The player attribute Tutorial holds the step (nil once done) and
+-- TutorialSince when it started (server time), for the client's "stuck?" hint.
+-- The quest "Baker's first cake" starts when the tour ends. Nothing is locked and it can be
+-- skipped (SkipQuest):
 --   Bake    the Baker tops their money up to a Pumpkin Candy; buy it (always in stock, BakeryService)
 --   Place   set it out in the mansion
 --   Hunt    go back to Pumpkin Graveyard and catch a second monster (a Skittercrow waits there)
---   Return  bring it home
+--   Return  bring it home (lost on the way: back to Hunt)
 --   Feed    it walks to the cake, and the bite gives Pumpkin Head for sure (CakeService.hurry;
---           after Tutorial.FeedSeconds it gets the effect anyway)
---   Tour    the client shows what each button does, then fires Finish
--- Losing the catch (knocked out, or leaving the zone or the game) goes back to Gate (the
--- second one to Hunt). Nothing attacks a player in the tutorial (MonsterAiService) and fast
--- travel to a locked button is refused (TravelService). The player attribute Tutorial holds
--- the step (nil once done) and TutorialSince when it started (server time), for the client's
--- "stuck?" hint.
+--           after Tutorial.FeedSeconds it gets the effect anyway); then Tutorial.QuestReward
+-- The attribute Quest holds its step (nil when there's none) and QuestSince.
 --
 -- Remotes in ReplicatedStorage.TutorialRemotes:
---   Finish   client -> server ()   the tour is over
+--   Finish     client -> server ()   the tour is over
+--   SkipQuest  client -> server ()   no Bakery quest, thanks
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Analytics = require(ReplicatedStorage.Shared.Util.Analytics)
 local Format = require(ReplicatedStorage.Shared.Util.Format)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
 local Tutorial = require(ReplicatedStorage.Shared.Util.Tutorial)
@@ -37,21 +43,25 @@ local CakeService = require(script.Parent.CakeService)
 local DataService = require(script.Parent.DataService)
 local HauntService = require(script.Parent.HauntService)
 local HuntService = require(script.Parent.HuntService)
+local MansionService = require(script.Parent.MansionService)
 local SpawnService = require(script.Parent.SpawnService)
 local Notify = require(script.Parent.Parent.Notify)
 
 local TutorialService = {}
 
 type State = {
+	quest: boolean, -- the Bakery quest, not the tutorial
 	step: string,
 	monster: Model?, -- the Gloomlet (Catch) or Skittercrow (Hunt) waiting in the zone
 	spawnAt: number?, -- os.clock() when to bring (another) one
 	tourEnds: number?, -- os.clock() when an unfinished tour ends by itself
 	feedEnds: number?, -- os.clock() when the Feed step gives the effect anyway
+	sendAt: number?, -- os.clock() when to put them into the tutorial zone (again)
 }
 
 local CheckSeconds = 0.5
 local TourTimeout = 180 -- a tour nobody finishes (the window was closed, say) ends anyway
+local SendSeconds = 4 -- between tries to put a player in the hub into the tutorial zone
 
 local states: { [Player]: State } = {}
 
@@ -60,6 +70,9 @@ remotes.Name = "TutorialRemotes"
 local Finish = Instance.new("RemoteEvent")
 Finish.Name = "Finish"
 Finish.Parent = remotes
+local SkipQuest = Instance.new("RemoteEvent")
+SkipQuest.Name = "SkipQuest"
+SkipQuest.Parent = remotes
 
 local firstVacuumPrice = 0
 for _, item in Shop.Workshop do
@@ -124,9 +137,6 @@ local function enter(player: Player, data: DataService.Data, state: State)
 			data.inventory.ReturnCharm = 1
 			HuntService.refreshItems(player)
 		end
-		state.spawnAt = os.clock() + 1 -- once they've landed in the zone
-	elseif step == "Pickup" then
-		HauntService.give(player, Tutorial.Effect)
 	elseif step == "Buy" then
 		local gift = Tutorial.gift(data.money, firstVacuumPrice)
 		if gift > 0 and DataService.addMoney(player, gift) then
@@ -147,7 +157,6 @@ local function enter(player: Player, data: DataService.Data, state: State)
 		end
 	elseif step == "Hunt" then
 		data.tips.Cake = true -- they just learned cakes here: no "Your first cake" card later
-		state.spawnAt = os.clock() + 1
 	elseif step == "Feed" then
 		state.feedEnds = os.clock() + Tutorial.FeedSeconds
 	elseif step == "Tour" then
@@ -155,7 +164,10 @@ local function enter(player: Player, data: DataService.Data, state: State)
 	end
 end
 
--- Moves the player to this step (or "Done"), saves it and runs the step's start.
+local setQuest: (Player, string, boolean) -> ()
+
+-- Moves the player to this tutorial step (or "Done"), saves it and runs the step's start.
+-- Done with run (they finished it themselves) offers the Bakery quest.
 local function setStep(player: Player, step: string, run: boolean)
 	local data = DataService.get(player)
 	if not data then
@@ -173,15 +185,78 @@ local function setStep(player: Player, step: string, run: boolean)
 		player:SetAttribute("TutorialSince", nil)
 		if run then
 			Notify.toast(player, "Tutorial complete! Everything is unlocked. Happy hunting!")
+			if data.quest == "" then
+				setQuest(player, Tutorial.QuestSteps[1], true)
+			end
 		end
 		return
 	end
-	local state: State = { step = step }
+	local state: State = { quest = false, step = step }
 	states[player] = state
 	player:SetAttribute("Tutorial", step)
 	player:SetAttribute("TutorialSince", workspace:GetServerTimeNow())
 	if run then
 		enter(player, data, state)
+	end
+end
+
+-- Moves the player to this quest step (or "Done" / "Skipped"), like setStep.
+setQuest = function(player: Player, step: string, run: boolean)
+	local data = DataService.get(player)
+	if not data then
+		return
+	end
+	data.quest = step
+	DataService.saveSoon(player)
+	local old = states[player]
+	if old then
+		removeMonster(old)
+	end
+	if run then
+		AnalyticsService.questStep(player, Analytics.questStep(step))
+	end
+	if Tutorial.questIndex(step) == 0 then
+		states[player] = nil
+		player:SetAttribute("Quest", nil)
+		player:SetAttribute("QuestSince", nil)
+		if run and step == "Done" then
+			local reward = Tutorial.QuestReward
+			if DataService.addMoney(player, reward) then
+				AnalyticsService.money(player, reward, "Onboarding", "QuestReward")
+			end
+			Notify.toast(
+				player,
+				`Quest complete: {Tutorial.QuestName}! The Baker pays you {Format.money(reward)}.`
+			)
+		end
+		return
+	end
+	local state: State = { quest = true, step = step }
+	states[player] = state
+	player:SetAttribute("Quest", step)
+	player:SetAttribute("QuestSince", workspace:GetServerTimeNow())
+	if run then
+		enter(player, data, state)
+	end
+end
+
+-- Moves on in whichever list this state is in.
+local function goTo(player: Player, state: State, step: string)
+	if state.quest then
+		setQuest(player, step, true)
+	else
+		setStep(player, step, true)
+	end
+end
+
+-- Puts the newest monster at home into the Backpack, so it can be sold straight away.
+local function storeNewest(player: Player, data: DataService.Data)
+	if #data.storage > 0 then
+		return
+	end
+	local newest = data.monsters[#data.monsters]
+	if newest then
+		MansionService.move(player, newest.uid)
 	end
 end
 
@@ -197,6 +272,28 @@ local function bringMonster(player: Player, state: State, monsterId: string)
 	end
 end
 
+-- Keeps a tutorial monster waiting while the player is in the zone (it can wander off or
+-- time out), and takes it away when they leave.
+local function keepMonster(player: Player, state: State, zone: unknown, monsterId: string)
+	if zone ~= Tutorial.Zone then
+		removeMonster(state) -- not there (yet); a fresh one waits when they walk in
+		state.spawnAt = nil
+		return
+	end
+	local monster = state.monster
+	if monster and not monster.Parent then
+		state.monster = nil
+	end
+	if not state.monster then
+		local at = state.spawnAt
+		if not at then
+			state.spawnAt = os.clock() + 1 -- just walked in (or it wandered off)
+		elseif os.clock() >= at then
+			bringMonster(player, state, monsterId)
+		end
+	end
+end
+
 -- Checks whether the player has done what their step asks, and moves them on.
 local function check(player: Player, state: State)
 	local data = DataService.get(player)
@@ -208,88 +305,69 @@ local function check(player: Player, state: State)
 	local carrying = HuntService.isCarrying(player)
 	local owned = #data.monsters + #data.storage
 
-	if step == "Gate" then
-		if zone == Tutorial.Zone then
-			setStep(player, "Catch", true)
-		end
-	elseif step == "Catch" then
+	if step == "Catch" then
 		if carrying then
 			setStep(player, "Home", true)
-		elseif zone ~= Tutorial.Zone then
-			setStep(player, "Gate", true) -- left without it
-		else
-			local monster = state.monster
-			if monster and not monster.Parent then
-				state.monster = nil -- wandered off or timed out
-			end
-			if not state.monster then
-				local at = state.spawnAt
-				if not at then
-					state.spawnAt = os.clock() + Tutorial.RespawnSeconds
-				elseif os.clock() >= at then
-					bringMonster(player, state, Tutorial.Monster)
-				end
-			end
+			return
+		end
+		keepMonster(player, state, zone, Tutorial.Monster)
+		if zone == nil and os.clock() >= (state.sendAt or 0) then
+			-- Starts (and after walking out, goes back) inside the zone, no walk to the gate.
+			state.sendAt = os.clock() + SendSeconds
+			HuntService.sendInto(player, Tutorial.Zone)
 		end
 	elseif step == "Home" then
 		if zone == nil and not carrying then
-			setStep(player, if owned > 0 then "Pickup" else "Gate", true)
-		end
-	elseif step == "Pickup" then
-		if #data.storage > 0 then
-			setStep(player, "Sell", true)
-		elseif owned == 0 then
-			setStep(player, "Gate", true)
+			if owned > 0 then
+				HauntService.give(player, Tutorial.Effect)
+				storeNewest(player, data)
+				setStep(player, "Sell", true)
+			else
+				setStep(player, "Catch", true) -- knocked out on the way
+			end
 		end
 	elseif step == "Sell" then
 		if data.money > 0 then
 			setStep(player, "Buy", true)
 		elseif owned == 0 then
-			setStep(player, "Gate", true)
+			setStep(player, "Catch", true)
+		else
+			storeNewest(player, data) -- an older save from the Pickup step
 		end
 	elseif step == "Buy" then
 		if (data.inventory[Tutorial.FirstVacuum] or 0) > 0 then
-			setStep(player, "Bake", true)
+			setStep(player, "Tour", true)
+		end
+	elseif step == "Tour" then
+		local ends = state.tourEnds
+		if ends and os.clock() >= ends then
+			setStep(player, "Done", true)
 		end
 	elseif step == "Bake" then
 		if hasCakeOut(data) then
-			setStep(player, "Hunt", true)
+			goTo(player, state, "Hunt")
 		elseif (data.inventory[Tutorial.Cake] or 0) > 0 then
-			setStep(player, "Place", true)
+			goTo(player, state, "Place")
 		end
 	elseif step == "Place" then
 		if hasCakeOut(data) then
-			setStep(player, "Hunt", true)
+			goTo(player, state, "Hunt")
 		elseif (data.inventory[Tutorial.Cake] or 0) == 0 then
-			setStep(player, "Bake", true) -- it's gone somehow: buy another
+			goTo(player, state, "Bake") -- it's gone somehow: buy another
 		end
 	elseif step == "Hunt" then
 		if carrying then
-			setStep(player, "Return", true)
-		elseif zone ~= Tutorial.Zone then
-			removeMonster(state) -- left without it; a fresh one waits next time
-			state.spawnAt = nil
+			goTo(player, state, "Return")
 		else
-			local monster = state.monster
-			if monster and not monster.Parent then
-				state.monster = nil
-			end
-			if not state.monster then
-				local at = state.spawnAt
-				if not at then
-					state.spawnAt = os.clock() + 1 -- just walked in (or it wandered off)
-				elseif os.clock() >= at then
-					bringMonster(player, state, Tutorial.SecondMonster)
-				end
-			end
+			keepMonster(player, state, zone, Tutorial.SecondMonster)
 		end
 	elseif step == "Return" then
 		if zone == nil and not carrying then
-			setStep(player, if #data.monsters > 0 then "Feed" else "Hunt", true)
+			goTo(player, state, if #data.monsters > 0 then "Feed" else "Hunt")
 		end
 	elseif step == "Feed" then
 		if fedOne(data) then
-			setStep(player, "Tour", true)
+			goTo(player, state, "Done")
 		elseif #data.monsters > 0 then
 			CakeService.hurry(player, Tutorial.Cake)
 			local ends = state.feedEnds
@@ -299,54 +377,77 @@ local function check(player: Player, state: State)
 				HauntService.give(player, Tutorial.CakeEffect) -- the bite never came: no waiting forever
 			end
 		elseif owned == 0 then
-			setStep(player, "Hunt", true) -- sold it before the bite
-		end
-	elseif step == "Tour" then
-		local ends = state.tourEnds
-		if ends and os.clock() >= ends then
-			setStep(player, "Done", true)
+			goTo(player, state, "Hunt") -- sold it before the bite
 		end
 	end
 end
 
 local function onLoaded(player: Player, data: DataService.Data)
+	local fresh = false
 	if data.tutorial == "New" then
-		local fresh = Tutorial.isFresh(
+		fresh = Tutorial.isFresh(
 			data.money,
 			#data.monsters,
 			#data.storage,
 			data.wingsOwned,
 			paidItems(data.inventory)
 		)
-		data.tutorial = if fresh then "Gate" else "Done"
+		data.tutorial = if fresh then "Catch" else "Done"
 	end
-	if data.tutorial == "Done" then
+	-- A save from the longer tutorial that was in its Bakery part: that's the quest now.
+	local moved = Tutorial.questFor(data.tutorial)
+	if moved then
+		data.tutorial = "Done"
+		if data.quest == "" then
+			data.quest = moved
+		end
+	end
+	if data.tutorial ~= "Done" then
+		local step = Tutorial.resumeAt(data.tutorial)
+		if Tutorial.index(step) == 0 then
+			step = Tutorial.Steps[1]
+		end
+		-- The step's start already ran in an earlier visit (the gift), except the tour; the
+		-- catch's only gives a charm they don't have.
+		setStep(player, step, step == "Tour" or step == "Catch")
+		if fresh then
+			Notify.toast(player, "Welcome, hunter! Let's catch your first monster.")
+		end
 		return
 	end
-	local step = Tutorial.resumeAt(data.tutorial)
-	if Tutorial.index(step) == 0 then
-		step = "Gate"
-	end
-	-- The step's start already ran in an earlier visit (the charm, the gift), except the tour.
-	setStep(player, step, step == "Tour")
-	if step == "Gate" then
-		Notify.toast(player, "Welcome, hunter! Let's catch your first monster.")
+	if Tutorial.questIndex(data.quest) > 0 then
+		setQuest(player, Tutorial.resumeQuestAt(data.quest), false)
 	end
 end
 
--- The player's step, or nil once they're done (or still loading).
+-- The player's tutorial step, or nil once they're done (or still loading). The Bakery
+-- quest doesn't count.
 function TutorialService.step(player: Player): string?
 	local state = states[player]
-	return if state then state.step else nil
+	return if state and not state.quest then state.step else nil
 end
 
--- Admin commands: skip the rest of the tutorial, or start it again from the first step.
+-- Admin commands: skip the rest of the tutorial (and the quest), or start it again from the
+-- first step (the quest is offered again at the end).
 function TutorialService.skip(player: Player)
+	local data = DataService.get(player)
+	if data and Tutorial.questIndex(data.quest) > 0 then
+		setQuest(player, "Skipped", false)
+	end
 	setStep(player, "Done", false)
+	if data and data.quest == "" then
+		data.quest = "Skipped"
+	end
 end
 
 function TutorialService.restart(player: Player)
-	setStep(player, "Gate", true)
+	local data = DataService.get(player)
+	if data then
+		data.quest = ""
+		player:SetAttribute("Quest", nil)
+		player:SetAttribute("QuestSince", nil)
+	end
+	setStep(player, Tutorial.Steps[1], true)
 end
 
 function TutorialService.start()
@@ -357,6 +458,13 @@ function TutorialService.start()
 		local state = states[player]
 		if state and state.step == "Tour" then
 			setStep(player, "Done", true)
+		end
+	end)
+	SkipQuest.OnServerEvent:Connect(function(player)
+		local state = states[player]
+		if state and state.quest then
+			setQuest(player, "Skipped", true)
+			Notify.toast(player, "Quest skipped. The Bakery is always open if you change your mind!")
 		end
 	end)
 
