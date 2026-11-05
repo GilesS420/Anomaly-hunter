@@ -1,13 +1,17 @@
 --!strict
 -- Hunt HUD. Your money sits big in the top-left corner, just under Roblox's own menu buttons
--- (Giles 2026-10-29). The rest is a column on the left side, halfway down: your hearts while
--- you're in a zone, the monster you're carrying, a big "Return Charm" button (tap or click
--- it; R works too on a keyboard) that takes you home, and in a zone a button per kind of Bait Bell (Bait, Silver,
--- Gold; B rings the cheapest you own) that brings a rarer monster to you. Each button shows
--- only if you own one. Under them a stack of square picture buttons is always there: a
--- backpack (G, your items and monsters, InventoryController), a book (C, CodexController), a
--- scroll (J, MissionController), a gear (SettingsController) and a coin (the Robux Store,
--- StoreController), in Hud.Menu.
+-- (Giles 2026-10-29). Under it, from the top down, a stack of square picture buttons is always
+-- there: a backpack (G, your items and monsters, InventoryController), a book (C,
+-- CodexController), a scroll (J, MissionController), a gear (SettingsController) and a coin (the
+-- Robux Store, StoreController), in Hud.Menu. Right of that stack, in Hud.Side: your hearts
+-- while you're in a zone, the monster you're carrying, a "Return Charm" button (tap or click
+-- it; R works too on a keyboard) that takes you home, and in a zone a button per kind of Bait
+-- Bell (Bait, Silver, Gold; B rings the cheapest you own) that brings a rarer monster to you.
+-- Each button shows only if you own one.
+-- Both stacks hang from the top (they used to be centred on the left edge, so in a zone on a
+-- phone the bells pushed everything up into the money and Roblox's top bar and down into the
+-- Log/Friends buttons; Giles 2026-11-05). Side buttons sit beside the menu, never above it, so
+-- however many show, the menu stays put.
 -- Everything shown comes from the server: player attributes Zone / Hearts / Carrying /
 -- CarryingSize / CarryingCount / BagSize / ReturnCharms / BaitBells / SilverBells / GoldBells and
 -- leaderstats.Money.
@@ -28,9 +32,12 @@ local HuntController = {}
 local player = Players.LocalPlayer
 
 local ROW_HEIGHT = 30
-local HUD_WIDTH = 300
+local HUD_WIDTH = 260 -- the Side stack right of the menu
 local MENU_SIZE = 58 -- the square menu buttons, about a thumb wide on a phone
+local MENU_GAP = 8
+local MONEY_TOP = 6
 local MONEY_HEIGHT = 44 -- text size of the money in the top-left corner
+local ITEM_WIDTH, ITEM_HEIGHT = 180, 42 -- Return Charm and bell buttons
 
 -- The square menu buttons, top to bottom: the name (other controllers find the button by
 -- it), the picture, the key and the colour.
@@ -75,15 +82,22 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 	gui.Name = "HuntUi"
 	gui.ResetOnSpawn = false
 
-	-- One column; hidden rows take no space, so whatever is showing stays packed together.
+	-- Hud: the menu stack and, right of it, the Side stack, both hanging from just under the
+	-- money. Hidden rows take no space, so whatever is showing stays packed together.
+	local hud = Instance.new("Frame")
+	hud.Name = "Hud"
+	hud.Position = UDim2.fromOffset(16, MONEY_TOP + MONEY_HEIGHT + 10)
+	hud.Size = UDim2.fromOffset(MENU_SIZE + 10 + HUD_WIDTH, 0)
+	hud.AutomaticSize = Enum.AutomaticSize.Y
+	hud.BackgroundTransparency = 1
+	hud.Parent = canvas
 	local column = Instance.new("Frame")
-	column.Name = "Hud"
-	column.AnchorPoint = Vector2.new(0, 0.5)
-	column.Position = UDim2.new(0, 16, 0.5, 0)
+	column.Name = "Side"
+	column.Position = UDim2.fromOffset(MENU_SIZE + 10, 0)
 	column.Size = UDim2.fromOffset(HUD_WIDTH, 0)
 	column.AutomaticSize = Enum.AutomaticSize.Y
 	column.BackgroundTransparency = 1
-	column.Parent = canvas
+	column.Parent = hud
 	local list = Instance.new("UIListLayout")
 	list.SortOrder = Enum.SortOrder.LayoutOrder
 	list.Padding = UDim.new(0, 4)
@@ -91,7 +105,7 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 
 	-- Money: top-left, big. The gui leaves Roblox's top bar out, so y = 0 is just under it.
 	local money = label("Money", 1, Color3.fromRGB(140, 255, 140), canvas)
-	money.Position = UDim2.fromOffset(16, 6)
+	money.Position = UDim2.fromOffset(16, MONEY_TOP)
 	money.Size = UDim2.fromOffset(0, MONEY_HEIGHT)
 	money.AutomaticSize = Enum.AutomaticSize.X
 	money.TextScaled = false
@@ -104,12 +118,12 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 	local hearts = label("Hearts", 2, Color3.fromRGB(255, 90, 110), column)
 	local carrying = label("Carrying", 3, Color3.new(1, 1, 1), column)
 
-	-- Big enough to hit with a thumb on a tablet.
+	-- Big enough to hit with a thumb, small enough to leave the view free on a phone.
 	local function itemButton(name: string, order: number, color: Color3, text: string): TextButton
 		local button = Instance.new("TextButton")
 		button.Name = name
 		button.LayoutOrder = order
-		button.Size = UDim2.fromOffset(200, 48)
+		button.Size = UDim2.fromOffset(ITEM_WIDTH, ITEM_HEIGHT)
 		button.BackgroundColor3 = color
 		button.TextColor3 = Color3.new(1, 1, 1)
 		button.Font = Enum.Font.FredokaOne
@@ -123,8 +137,8 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 		local padding = Instance.new("UIPadding")
 		padding.PaddingLeft = UDim.new(0, 10)
 		padding.PaddingRight = UDim.new(0, 10)
-		padding.PaddingTop = UDim.new(0, 8)
-		padding.PaddingBottom = UDim.new(0, 8)
+		padding.PaddingTop = UDim.new(0, 7)
+		padding.PaddingBottom = UDim.new(0, 7)
 		padding.Parent = button
 		button.Parent = column
 		return button
@@ -136,7 +150,7 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 		Color3.fromRGB(120, 70, 200),
 		if keys then "Return Charm (R)" else "Return Charm"
 	)
-	-- LayoutOrder 5.1, 5.2, 5.3: between the charm and the menu buttons.
+	-- LayoutOrder 5.1, 5.2, 5.3: under the charm.
 	local bells: { TextButton } = {}
 	for i, kind in Bells do
 		table.insert(bells, itemButton(kind.id, 5 + i / 10, kind.color, kind.name))
@@ -147,14 +161,14 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 	-- pops up beside it while the mouse is over it.
 	local menu = Instance.new("Frame")
 	menu.Name = "Menu"
-	menu.LayoutOrder = 7
 	menu.Size = UDim2.fromOffset(MENU_SIZE, 0)
 	menu.AutomaticSize = Enum.AutomaticSize.Y
 	menu.BackgroundTransparency = 1
-	menu.Parent = column
+	menu.ZIndex = 2 -- the hover names draw over the Side buttons next to it
+	menu.Parent = hud
 	local stack = Instance.new("UIListLayout")
 	stack.SortOrder = Enum.SortOrder.LayoutOrder
-	stack.Padding = UDim.new(0, 8)
+	stack.Padding = UDim.new(0, MENU_GAP)
 	stack.Parent = menu
 	for order, entry in MenuButtons do
 		local button = Instance.new("TextButton")
