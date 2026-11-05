@@ -174,15 +174,21 @@ local function goHome(player: Player, deliver: boolean)
 				lost += 1
 			end
 		end
-		if home == #bag then
-			Notify.toast(player, `{bagName(bag)} {if #bag == 1 then "is" else "are"} home in your mansion!`)
-		elseif lost == 0 then
-			Notify.toast(player, `Your mansion is full, so {stored} went into Storage (your Backpack).`)
-		else
-			Notify.toast(
-				player,
-				`Your mansion and Storage are full! {lost} got away. Sell some at the Collector or buy a new wing.`
-			)
+		-- In the tutorial the guide card says where the catch went (straight to the Backpack).
+		if player:GetAttribute("Tutorial") == nil then
+			if home == #bag then
+				Notify.toast(
+					player,
+					`{bagName(bag)} {if #bag == 1 then "is" else "are"} home in your mansion!`
+				)
+			elseif lost == 0 then
+				Notify.toast(player, `Your mansion is full, so {stored} went into Storage (your Backpack).`)
+			else
+				Notify.toast(
+					player,
+					`Your mansion and Storage are full! {lost} got away. Sell some at the Collector or buy a new wing.`
+				)
+			end
 		end
 	end
 	setCarrying(player, nil)
@@ -454,7 +460,9 @@ local function enterZone(player: Player, zone: Zones.Zone, arrival: BasePart, fa
 			then `Entering {zone.name}: a safe zone, monsters here don't fight back`
 			else `Entering {zone.name}: careful, monsters here fight back!`
 	)
-	Notify.toast(player, "Hold your vacuum (hotbar), then click or tap a monster to catch it!")
+	if player:GetAttribute("Tutorial") == nil then -- the tutorial card says it already
+		Notify.toast(player, "Hold your vacuum (hotbar), then click or tap a monster to catch it!")
+	end
 	PlotService.teleport(player, standAbove(arrival, facing))
 end
 

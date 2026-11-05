@@ -71,7 +71,9 @@ end
 
 local function check(player: Player)
 	local data = DataService.get(player)
-	if not data or data.tutorial ~= "Done" or TutorialService.step(player) ~= nil then
+	-- No tips during the tutorial or the Bakery quest: one card at a time.
+	local questing = data ~= nil and player:GetAttribute("Quest") ~= nil
+	if not data or data.tutorial ~= "Done" or TutorialService.step(player) ~= nil or questing then
 		if player:GetAttribute("Tip") ~= nil then
 			show(player, nil) -- the tutorial was restarted
 		end
