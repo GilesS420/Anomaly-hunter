@@ -6,6 +6,9 @@
 -- Locks.glow(feature) makes that feature's buttons pulse, to point at what to press next.
 -- Locks.glow(feature, true) also greys out the whole screen except those buttons (Giles
 -- 2026-11-04: shows players where things really are), for the tour and the unlock tips.
+-- Locks.mark(gui, name) tags a card or button that comes and goes (a shop card, the Sell
+-- button on a monster, a dialogue choice) and Locks.point(names) makes the tagged ones pulse
+-- too: the tutorial points at the exact card to sell or buy (Giles 2026-11-05).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,6 +32,9 @@ type Guarded = {
 
 local player = Players.LocalPlayer
 local guarded: { Guarded } = {}
+type Marked = { gui: GuiObject, name: string, glow: { frame: Frame, tween: Tween }? }
+local marked: { Marked } = {}
+local pointing: { [string]: boolean } = {}
 local glowing: string? = nil
 local dimmed = false
 
@@ -92,7 +98,7 @@ local function fill(frame: GuiObject, gui: GuiObject)
 	end
 end
 
-local function stopGlow(entry: Guarded)
+local function stopGlow(entry: Guarded | Marked)
 	local glow = entry.glow
 	if glow then
 		entry.glow = nil
@@ -101,7 +107,7 @@ local function stopGlow(entry: Guarded)
 	end
 end
 
-local function startGlow(entry: Guarded)
+local function startGlow(entry: Guarded | Marked)
 	if entry.glow then
 		return
 	end
@@ -254,6 +260,50 @@ function Locks.glow(feature: string?, dim: boolean?)
 	glowing = feature
 	for _, entry in guarded do
 		refresh(entry)
+	end
+end
+
+local function refreshMark(entry: Marked)
+	if pointing[entry.name] then
+		startGlow(entry)
+	else
+		stopGlow(entry)
+	end
+end
+
+-- Tags a card or button so Locks.point can make it pulse. It's forgotten once destroyed
+-- (shop windows redraw their cards all the time).
+function Locks.mark(gui: GuiObject, name: string)
+	local entry: Marked = { gui = gui, name = name }
+	table.insert(marked, entry)
+	gui.Destroying:Connect(function()
+		local index = table.find(marked, entry)
+		if index then
+			table.remove(marked, index)
+		end
+	end)
+	refreshMark(entry)
+end
+
+-- Makes the cards and buttons tagged with these names pulse (nil or {}: none).
+function Locks.point(names: { string }?)
+	local wanted: { [string]: boolean } = {}
+	for _, name in names or {} do
+		wanted[name] = true
+	end
+	local same = true
+	for name in wanted do
+		same = same and pointing[name] == true
+	end
+	for name in pointing do
+		same = same and wanted[name] == true
+	end
+	if same then
+		return
+	end
+	pointing = wanted
+	for _, entry in marked do
+		refreshMark(entry)
 	end
 end
 

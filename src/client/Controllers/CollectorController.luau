@@ -11,6 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
+local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
 local ShopCards = require(script.Parent.Parent:WaitForChild("ShopCards"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
@@ -114,6 +115,7 @@ local function card(list: ScrollingFrame, order: number, monster: Row, sell: () 
 		Ui.confirmButton(button, "Sure?", sell)
 	else
 		button.Activated:Connect(sell)
+		Locks.mark(button, "SellButton") -- the tutorial's Sell step points here (Locks.point)
 	end
 end
 

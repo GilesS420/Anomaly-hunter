@@ -296,11 +296,13 @@ function TutorialController.start()
 			nextButton.Text = "Got it"
 			-- A tip that points at a button greys out the rest of the screen round it.
 			Locks.glow(shownTip.feature, shownTip.feature ~= nil)
+			Locks.point(nil)
 			return -- the trail follows in the heartbeat below
 		end
 		if not current then
 			hideTrail()
 			Locks.glow(nil)
+			Locks.point(nil)
 			return
 		end
 		local index = Tutorial.index(current)
@@ -312,6 +314,7 @@ function TutorialController.start()
 			nextButton.Visible = true
 			nextButton.Text = if tourIndex >= #Tutorial.Tour then "Let's hunt!" else "Next"
 			Locks.glow(if stop then stop.feature else nil, true) -- the rest of the screen greys out
+			Locks.point(nil)
 			hideTrail()
 			return
 		end
@@ -322,6 +325,7 @@ function TutorialController.start()
 			and workspace:GetServerTimeNow() - since >= Tutorial.HintSeconds
 		hint.Text = if stuck then `Stuck? {Tutorial.Hints[current :: Tutorial.Step] or ""}` else ""
 		Locks.glow(StepGlow[current])
+		Locks.point(Tutorial.Point[current :: Tutorial.Step]) -- the card to sell or buy
 	end
 
 	nextButton.Activated:Connect(function()
