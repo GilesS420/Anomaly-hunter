@@ -1,6 +1,7 @@
 --!strict
 -- Sends Roblox analytics events for Creator Hub > Analytics (rules in Shared.Util.Analytics):
---   Funnels   Onboarding (one-time): join > first zone > first catch > ... > first wings
+--   Funnels   Onboarding (one-time): join > first catch > ... > tutorial done > first wings
+--             BakeryQuest (one-time): the optional cake quest after the tutorial
 --             Comeback (one-time): played on 1, 2, 3, 5, 7, 14 different days
 --             Robux purchase (recurring): prompt shown > paid, per product
 --   Economy   every Money source (selling, missions...) and sink (shops, wings, fees)
@@ -125,6 +126,17 @@ function Service.money(player: Player, delta: number, kind: string, sku: string)
 		local flows = Enum.AnalyticsEconomyFlowType
 		local flow = if source then flows.Source else flows.Sink
 		AnalyticsService:LogEconomyEvent(player, flow, Currency, amount, balance, kind, sku)
+	end)
+end
+
+-- A player reached this step of the Bakery quest (Analytics.questStep).
+function Service.questStep(player: Player, step: number)
+	local name = Analytics.Quest[step]
+	if not name then
+		return
+	end
+	send(`{player.Name} quest {step} {name}`, function()
+		AnalyticsService:LogFunnelStepEvent(player, "BakeryQuest", nil :: any, step, name)
 	end)
 end
 

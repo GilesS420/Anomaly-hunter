@@ -60,6 +60,9 @@ export type Data = {
 	-- looked whether this save gets it (older saves don't); secondsLeft: rookie play time left;
 	-- hunts: trips into a zone since the tutorial; lucky: the lucky monster came.
 	rookie: { decided: boolean, secondsLeft: number, hunts: number, lucky: boolean },
+	-- The optional Bakery quest after the tutorial (TutorialService, Util/Tutorial.QuestSteps):
+	-- "" never offered (older saves), else the quest step, "Done" or "Skipped".
+	quest: string,
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -95,6 +98,7 @@ DataService.Template = {
 	tips = {},
 	analytics = Analytics.empty(),
 	rookie = { decided = false, secondsLeft = 0, hunts = 0, lucky = false },
+	quest = "",
 } :: Data
 
 local store = ProfileStore.New(

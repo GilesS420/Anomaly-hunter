@@ -8,6 +8,9 @@
 -- After the tutorial the same card shows the one-time unlock tutorials (Shared.Util.Tips,
 -- server/Services/TipService): the player attribute Tip is the one to show, and Got it sends
 -- TipRemotes.Seen. A tip with a landmark gets the trail too while you're in the hub.
+-- After the tutorial (and any tip) the same card guides the optional Bakery quest: the player
+-- attribute Quest is its step, QuestSince when it started, and Skip quest sends
+-- TutorialRemotes.SkipQuest.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -31,9 +34,7 @@ local TrailColor = Color3.fromRGB(255, 176, 84) -- lantern orange, like the shop
 
 -- The button that pulses during each step (the tour picks its own).
 local StepGlow = {
-	Gate = "Portals",
 	Catch = "Hotbar",
-	Pickup = "MansionList",
 	Sell = "Sell",
 	Buy = "Shops",
 	Bake = "Shops",
@@ -44,6 +45,12 @@ local StepGlow = {
 local function step(): string?
 	local current = player:GetAttribute("Tutorial")
 	return if typeof(current) == "string" then current else nil
+end
+
+-- The Bakery quest's step (only once the tutorial is done).
+local function questStep(): string?
+	local current = player:GetAttribute("Quest")
+	return if step() == nil and typeof(current) == "string" then current else nil
 end
 
 -- The unlock tutorial to show (only once the tutorial is done).
@@ -117,14 +124,10 @@ end
 
 -- What the trail points at during this step, if anything.
 local function targetFor(current: string?): Instance?
-	if current == "Gate" then
-		return path("Hub", "ZoneGates", Tutorial.Zone)
-	elseif current == "Catch" then
+	if current == "Catch" then
 		return tutorialMonster()
 	elseif current == "Home" then
 		return path("Zones", Tutorial.Zone, "Exit")
-	elseif current == "Pickup" then
-		return myMansionMonster()
 	elseif current == "Sell" then
 		return path("Hub", "Landmarks", "Collector")
 	elseif current == "Buy" then
@@ -210,6 +213,7 @@ function TutorialController.start()
 	local gui, title, body, hint, nextButton = buildCard()
 	local remotes = ReplicatedStorage:WaitForChild("TutorialRemotes")
 	local Finish = remotes:WaitForChild("Finish") :: RemoteEvent
+	local SkipQuest = remotes:WaitForChild("SkipQuest") :: RemoteEvent
 	local Seen = ReplicatedStorage:WaitForChild("TipRemotes"):WaitForChild("Seen") :: RemoteEvent
 
 	-- The trail: from an attachment on you to one on the target, plus a glow on the target.
@@ -285,8 +289,10 @@ function TutorialController.start()
 	end
 
 	local function render()
-		local current = step()
+		local tutorialStep = step()
 		local shownTip = tip()
+		local quest = if shownTip then nil else questStep()
+		local current = tutorialStep or quest
 		gui.Enabled = current ~= nil or shownTip ~= nil
 		if shownTip then
 			title.Text = shownTip.title
@@ -305,8 +311,11 @@ function TutorialController.start()
 			Locks.point(nil)
 			return
 		end
-		local index = Tutorial.index(current)
-		title.Text = `Tutorial · {index}/{#Tutorial.Steps}`
+		if quest then
+			title.Text = `{Tutorial.QuestName} · {Tutorial.questIndex(quest)}/{#Tutorial.QuestSteps}`
+		else
+			title.Text = `Tutorial · {Tutorial.index(current)}/{#Tutorial.Steps}`
+		end
 		if current == "Tour" then
 			local stop = Tutorial.Tour[tourIndex]
 			body.Text = Tutorial.tourText(tourIndex, isTouch())
@@ -318,9 +327,10 @@ function TutorialController.start()
 			hideTrail()
 			return
 		end
-		nextButton.Visible = false
+		nextButton.Visible = quest ~= nil -- the quest is optional
+		nextButton.Text = "Skip quest"
 		body.Text = Tutorial.textFor(current, isTouch())
-		local since = player:GetAttribute("TutorialSince")
+		local since = player:GetAttribute(if quest then "QuestSince" else "TutorialSince")
 		local stuck = typeof(since) == "number"
 			and workspace:GetServerTimeNow() - since >= Tutorial.HintSeconds
 		hint.Text = if stuck then `Stuck? {Tutorial.Hints[current :: Tutorial.Step] or ""}` else ""
@@ -335,6 +345,14 @@ function TutorialController.start()
 			gui.Enabled = false -- straight away; the server clears Tip a moment later
 			hideTrail()
 			Locks.glow(nil)
+			return
+		end
+		if step() == nil and questStep() ~= nil then
+			SkipQuest:FireServer()
+			gui.Enabled = false -- straight away; the server clears Quest a moment later
+			hideTrail()
+			Locks.glow(nil)
+			Locks.point(nil)
 			return
 		end
 		if step() ~= "Tour" then
@@ -352,6 +370,10 @@ function TutorialController.start()
 		tourIndex = 1
 		render()
 	end)
+	player:GetAttributeChangedSignal("Quest"):Connect(function()
+		hideTrail()
+		render()
+	end)
 	player:GetAttributeChangedSignal("Tip"):Connect(function()
 		hideTrail()
 		render()
@@ -366,7 +388,7 @@ function TutorialController.start()
 			return
 		end
 		waited = 0
-		local current = step()
+		local current = step() or questStep()
 		local shownTip = tip()
 		if shownTip and gui.Enabled then
 			follow()

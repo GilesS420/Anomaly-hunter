@@ -38,22 +38,16 @@ function Analytics.repair(record: any): Record
 	return { onboard = int(record.onboard), days = int(record.days), lastDay = int(record.lastDay) }
 end
 
--- The Onboarding funnel, in order. Steps 1-13 follow the tutorial (Tutorial.Steps: the step a
+-- The Onboarding funnel, in order. Steps 1-5 follow the tutorial (Tutorial.Steps: the step a
 -- player is ON means they finished the one before it), then the first two wings bought.
--- The Bakery steps (7-11) came in on 2026-11-05, which moved "Finished tutorial" from 8 to 13.
+-- Numbering history: 8 steps to "Finished tutorial" until 2026-11-05, then 13 with the Bakery
+-- steps, then 6 with the short tutorial (the Bakery is its own BakeryQuest funnel now).
 Analytics.Onboarding = {
-	"Joined", -- on step Gate: walk to the first zone
-	"Entered first zone", -- Catch
+	"Joined", -- on step Catch: starts inside the first zone
 	"Caught first monster", -- Home
-	"Brought it home", -- Pickup
-	"Picked it up", -- Sell
+	"Brought it home", -- Sell
 	"Sold first monster", -- Buy
-	"Bought first vacuum", -- Bake
-	"Bought first cake", -- Place
-	"Set out the cake", -- Hunt
-	"Caught second monster", -- Return
-	"Brought second home", -- Feed
-	"Cake gave an effect", -- Tour
+	"Bought first vacuum", -- Tour
 	"Finished tutorial", -- Done
 	"Bought 1st wing", -- 2 wings owned (Library)
 	"Bought 2nd wing", -- 3 wings owned (Ballroom)
@@ -68,6 +62,24 @@ function Analytics.onboardStep(tutorial: string, wingsOwned: number): number
 		return Analytics.TutorialDone + extra
 	end
 	return Tutorial.index(tutorial)
+end
+
+-- The BakeryQuest funnel (the optional quest after the tutorial, Tutorial.QuestSteps).
+Analytics.Quest = {
+	"Started quest", -- on step Bake
+	"Bought the cake", -- Place
+	"Set out the cake", -- Hunt
+	"Caught second monster", -- Return
+	"Brought it home", -- Feed
+	"Cake gave an effect", -- Done
+}
+
+-- The BakeryQuest step for this quest value (0 for not started or skipped).
+function Analytics.questStep(quest: string): number
+	if quest == "Done" then
+		return #Tutorial.QuestSteps + 1
+	end
+	return Tutorial.questIndex(quest)
 end
 
 -- The Comeback funnel: step i is "played on ComebackDays[i] different days".
