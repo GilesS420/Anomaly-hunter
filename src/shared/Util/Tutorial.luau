@@ -74,6 +74,15 @@ Tutorial.Unlocks = {
 	Settings = "Gate", -- sound and weather settings always work
 } :: { [string]: Step }
 
+-- The exact cards and buttons that pulse during a step (client/Locks.point), on top of the
+-- top-bar button: the stand's "buy" or "sell" choice in the dialogue, then the card to buy
+-- (and its Buy button once opened) or the Sell button (Giles 2026-11-05).
+Tutorial.Point = {
+	Sell = { "Enter:Collector", "SellButton" },
+	Buy = { "Enter:VacuumVault", `Card:{Tutorial.FirstVacuum}` },
+	Bake = { "Enter:Bakery", `Card:{Tutorial.Cake}` },
+} :: { [Step]: { string } }
+
 -- What the guide card says for each step, with a keyboard (Text) or on a phone or tablet
 -- without one (TouchText, where it differs).
 Tutorial.Text = {

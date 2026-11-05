@@ -2759,6 +2759,21 @@ do
 		Tutorial.nextStep("Buy") == "Bake" and Tutorial.nextStep("Feed") == "Tour"
 	)
 	check("tutorial: a lost second hunt starts over at Hunt", Tutorial.resumeAt("Return") == "Hunt")
+	local StandsConfig = require("../src/shared/Config/Stands")
+	local pointOk = true
+	for step, names in Tutorial.Point do
+		pointOk = pointOk and Tutorial.index(step) > 0 and #names > 0
+		for _, name in names do
+			local standId = string.match(name, "^Enter:(.+)$")
+			local itemId = string.match(name, "^Card:(.+)$")
+			if standId then
+				pointOk = pointOk and StandsConfig[standId] ~= nil
+			elseif itemId then
+				pointOk = pointOk and (Workshop.item(itemId) ~= nil or Cakes.item(itemId) ~= nil)
+			end
+		end
+	end
+	check("tutorial: every pointed-at card and stand exists", pointOk)
 	check("tutorial: Shops are open for the Bakery", Tutorial.isUnlocked("Bake", "Shops"))
 	local fresh: any = { uid = "a", monsterId = Tutorial.SecondMonster, effects = {} }
 	local placed = Cakes.new(Tutorial.Cake, 0, 0, 0, 0)

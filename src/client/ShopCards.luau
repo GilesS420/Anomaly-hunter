@@ -9,6 +9,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Locks = require(script.Parent:WaitForChild("Locks"))
 local Robux = require(script.Parent:WaitForChild("Robux"))
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Format = require(Shared:WaitForChild("Util"):WaitForChild("Format"))
@@ -179,6 +180,7 @@ local function draw(list: ScrollingFrame, order: number, card: Card)
 		local action = card.action
 		local main = Ui.button(actions, action.text, action.color, UDim2.new(0.5, -6, 1, 0))
 		main.AutoButtonColor = action.enabled
+		Locks.mark(main, `Card:{card.key}`) -- open: the tutorial points at Buy itself
 		local run = action.run
 		if action.enabled and run then
 			main.Activated:Connect(run)
@@ -196,6 +198,9 @@ local function draw(list: ScrollingFrame, order: number, card: Card)
 		end
 	end
 
+	if not isOpen then
+		Locks.mark(row, `Card:{card.key}`) -- the tutorial points at the card to buy (Locks.point)
+	end
 	row.Activated:Connect(function()
 		opened[list] = if isOpen then nil else card.key
 		ShopCards.show(list, shown[list] or {}, headers[list])

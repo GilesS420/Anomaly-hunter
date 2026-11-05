@@ -20,6 +20,7 @@ local Events = require(ReplicatedStorage.Shared.Config.Events)
 local Stands = require(ReplicatedStorage.Shared.Config.Stands)
 local Watcher = require(ReplicatedStorage.Shared.Util.Watcher)
 local Community = require(script.Parent.Parent:WaitForChild("Community"))
+local Locks = require(script.Parent.Parent:WaitForChild("Locks"))
 local Scale = require(script.Parent.Parent:WaitForChild("Scale"))
 local Ui = require(script.Parent.Parent:WaitForChild("Ui"))
 
@@ -141,7 +142,7 @@ function DialogueController.start()
 		end
 	end
 
-	local function choice(order: number, text: string, picked: () -> ())
+	local function choice(order: number, text: string, picked: () -> ()): TextButton
 		local button = Instance.new("TextButton")
 		button.AutoButtonColor = false
 		button.BackgroundColor3 = Color3.new(1, 1, 1)
@@ -162,6 +163,7 @@ function DialogueController.start()
 		end)
 		button.Activated:Connect(picked)
 		button.Parent = choices
+		return button
 	end
 
 	-- Types out what the stand says, then shows the choices.
@@ -197,14 +199,14 @@ function DialogueController.start()
 			return
 		end
 		local order = 0
-		local function add(text: string, picked: () -> ())
+		local function add(text: string, picked: () -> ()): TextButton
 			order += 1
-			choice(order, text, picked)
+			return choice(order, text, picked)
 		end
 		add(stand.info.ask, function()
 			say(stand.info.answer)
 		end)
-		add(stand.enter.ask, function()
+		local enter = add(stand.enter.ask, function()
 			if stand.enter.live then
 				say(watcherNow())
 			elseif stand.enter.client then
@@ -214,6 +216,7 @@ function DialogueController.start()
 				close()
 			end
 		end)
+		Locks.mark(enter, `Enter:{standId}`) -- the tutorial points at "buy" / "sell" (Locks.point)
 		for _, more in stand.more or {} do
 			add(more.ask, function()
 				if more.client then
