@@ -45,6 +45,10 @@ return {
 		SpookySchool = 64,
 		GhostShip = 256,
 	} :: { [string]: number },
+	-- Every new monster (and every new colour of one) in the Codex pays a small reward too, to
+	-- claim on its card (Giles 2026-11-05): this share of the monster's base value, times the
+	-- colour's sell multiplier (Config/Variants). A new Gloomlet pays $500, a Gold one $2.5K.
+	FindShare = 0.5,
 	Effects = 1_000_000_000_000, -- every effect found
 	Combos = 2_000_000_000_000, -- every secret combo made
 

@@ -118,6 +118,7 @@ ServerChecks.KnownRemotes = {
 	"GoldenGhostRemotes.Tap",
 	"GoldenGhostRemotes.Progress",
 	"CodexRemotes.GetView",
+	"CodexRemotes.Claim",
 	"AttackRemotes.Warn",
 	"AttackRemotes.Hit",
 	"RobuxRemotes.Buy",

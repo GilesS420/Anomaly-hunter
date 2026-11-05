@@ -3163,6 +3163,34 @@ do
 			and Codex.rewardAmount(Codex.EffectsPage, "Combos") == 2e12
 			and Codex.rewardAmount("Events", "Found") == 50e9
 	)
+	-- Rewards wait to be claimed (Giles 2026-11-05), and a first find pays on its card.
+	local fresh: { [string]: any } = {}
+	Codex.note(fresh, { monsterId = "Gloomlet", size = "Normal", effects = {}, familiarity = 0 })
+	Codex.note(
+		fresh,
+		{ monsterId = "Gloomlet", size = "Normal", effects = {}, familiarity = 0, variant = "Gold" }
+	)
+	local waiting = Codex.pending(fresh, { page })
+	check("codex: looking at waiting rewards doesn't claim them", #Codex.pending(fresh, { page }) == #waiting)
+	local keys = {}
+	for _, reward in waiting do
+		keys[reward.key] = reward.amount
+	end
+	check(
+		"codex: a new monster and a new colour of it wait on its card",
+		keys["Find:Gloomlet"] == Codex.findAmount("Gloomlet")
+			and keys["Find:Gloomlet:Gold"] == Codex.findAmount("Gloomlet", "Gold")
+			and Codex.findAmount("Gloomlet", "Gold") > Codex.findAmount("Gloomlet")
+			and Codex.findAmount("LadyOfLanterns") > Codex.findAmount("Gloomlet")
+	)
+	check("codex: claiming a reward that isn't waiting pays nothing", #Codex.claim(fresh, { page }, { ["Find:Nobody"] = true }) == 0)
+	local one = Codex.claim(fresh, { page }, { ["Find:Gloomlet"] = true })
+	check("codex: claiming one key pays only that", #one == 1 and one[1].key == "Find:Gloomlet")
+	check("codex: a claimed find isn't waiting any more", #Codex.pending(fresh, { page }) == #waiting - 1)
+	check("codex: claiming it again pays nothing", #Codex.claim(fresh, { page }, { ["Find:Gloomlet"] = true }) == 0)
+	check("codex: claim all takes the rest", #Codex.claim(fresh, { page }) == #waiting - 1)
+	check("codex: nothing waits after claim all", #Codex.pending(fresh, { page }) == 0)
+
 	-- Rarity goals: one rarity done pays on its own, before the whole page is found.
 	local partial: { [string]: any } = {}
 	local divineId: string? = nil
