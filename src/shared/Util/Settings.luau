@@ -22,7 +22,7 @@ Settings.List = {
 	{
 		key = "music",
 		name = "Music",
-		detail = "The songs everyone in the server hears.",
+		detail = "Server-wide songs.",
 		kind = "Volume",
 		default = 100,
 	},
@@ -36,7 +36,7 @@ Settings.List = {
 	{
 		key = "weather",
 		name = "Event weather",
-		detail = "Snow, rain, coins and candy during events. Less or Off helps slower phones.",
+		detail = "Less or Off helps slower phones.",
 		kind = "Choice",
 		options = { "Full", "Less", "Off" },
 		default = "Full",
@@ -44,7 +44,7 @@ Settings.List = {
 	{
 		key = "flashes",
 		name = "Lightning flashes",
-		detail = "The bright screen flashes in stormy events.",
+		detail = "Bright flashes in stormy events.",
 		kind = "Toggle",
 		default = true,
 	},
@@ -52,14 +52,14 @@ Settings.List = {
 		-- Was "glow" (on by default); a new key so every save starts with it off (Giles 2026-10-21).
 		key = "edgeGlow",
 		name = "Screen edge glow",
-		detail = "The coloured glow round the screen during an event.",
+		detail = "Coloured glow during events.",
 		kind = "Toggle",
 		default = false,
 	},
 	{
 		key = "uiSize",
 		name = "UI size",
-		detail = "How big buttons and windows are. Phones already draw them smaller to fit.",
+		detail = "How big buttons and windows are.",
 		kind = "Choice",
 		options = { "Small", "Normal", "Large" },
 		default = "Normal",

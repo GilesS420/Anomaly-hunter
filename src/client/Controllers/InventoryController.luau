@@ -207,7 +207,7 @@ function InventoryController.start()
 		button.BackgroundColor3 = Ui.Colors.row
 		button.Parent = list
 		Ui.corner(button, 10)
-		Ui.rim(button, if selected == key then Ui.Colors.lamp else rim, if selected == key then 3 else 2)
+		Ui.rim(button, if selected == key then Ui.Colors.lamp else rim, if selected == key then 2 else 1)
 
 		if look or icon then
 			Ui.picture(button, UDim2.new(1, 0, 1, -20), look, icon)

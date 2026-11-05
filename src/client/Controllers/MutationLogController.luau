@@ -83,7 +83,7 @@ function MutationLogController.start()
 		local count = tonumber(player:GetAttribute("FriendsHere")) or 0
 		ToastController.show(
 			if count == 0
-				then `Friend bonus: every Roblox friend in this server makes the Collector pay {perFriend}% more. Invite some!`
+				then `Friend bonus: +{perFriend}% sell per friend here.`
 				else `Friend bonus: {count} {if count == 1 then "friend" else "friends"} here, so the Collector pays {count * perFriend}% more.`
 		)
 	end)
@@ -112,7 +112,7 @@ function MutationLogController.start()
 	panel.Visible = false
 	panel.Parent = canvas
 	Ui.corner(panel, 10)
-	Ui.rim(panel, Ui.Colors.rim, 2)
+	Ui.rim(panel, Ui.Style.line, 1)
 
 	local title = Ui.text(panel, "Mutations", UDim2.new(1, -60, 0, 30), Ui.Colors.lamp, true, 22)
 	title.Font = Ui.TitleFont

@@ -108,20 +108,20 @@ function ShopCards.pill(parent: Instance, text: string, color: Color3, size: UDi
 	pill.BackgroundColor3 = Color3.fromHSV(h, s, v * 0.35)
 	pill.Parent = parent
 	Ui.corner(pill, 6)
-	Ui.rim(pill, color, 2)
 	local label = Ui.text(pill, text, UDim2.fromScale(1, 1), color, true, 16)
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	return pill
 end
 
--- The square on the left of a card with the item's picture, rimmed in its rarity colour.
+-- The square on the left of a card with the item's picture, on a dark tile tinted in its
+-- rarity colour (flat: no rim).
 function ShopCards.pictureBox(parent: Instance, side: number, color: Color3, look: string?, icon: string?)
 	local box = Instance.new("Frame")
 	box.Size = UDim2.fromOffset(side, side)
-	box.BackgroundColor3 = Color3.fromRGB(14, 11, 20)
+	local h, s, v = color:ToHSV()
+	box.BackgroundColor3 = Color3.fromHSV(h, s * 0.6, math.min(v * 0.28, 0.3))
 	box.Parent = parent
 	Ui.corner(box, 8)
-	Ui.rim(box, color, 2)
 	Ui.picture(box, UDim2.fromScale(1, 1), look, icon)
 	return box
 end
@@ -139,7 +139,7 @@ local function draw(list: ScrollingFrame, order: number, card: Card)
 	row.BackgroundColor3 = Ui.Colors.row
 	row.Parent = list
 	Ui.corner(row, 10)
-	Ui.rim(row, if isOpen then Ui.Colors.lamp else Color3.fromRGB(58, 48, 78), if isOpen then 2 else 1)
+	Ui.rim(row, if isOpen then Ui.Colors.lamp else Ui.Style.line, if isOpen then 2 else 1)
 	ShopCards.pad(row)
 
 	ShopCards.pictureBox(row, inner, card.rarityColor, card.look, card.icon)
@@ -215,7 +215,7 @@ function ShopCards.rerollRow(list: ScrollingFrame)
 		0,
 		"Reroll the stock",
 		Ui.Colors.lamp,
-		"New Bakery and Workshop stock, just for you, until the restock"
+		"New stock, just for you"
 	)
 	local price = Robux.price("ShopReroll")
 	local button = Ui.button(

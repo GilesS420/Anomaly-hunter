@@ -109,7 +109,7 @@ function Community.favourite(): string
 		return "No worries. You can always tap the ⭐ on the game's page later."
 	end
 	-- Failed, or no answer: Roblox didn't save it (this often happens in a Studio test).
-	return "Roblox couldn't save your favourite just now. Try again in a moment, or tap the ⭐ on the game's page."
+	return "Couldn't save your favourite. Try again soon."
 end
 
 -- Opens Roblox's Invite Friends window.

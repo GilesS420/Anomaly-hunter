@@ -41,7 +41,7 @@ function NamePrompt.open(uid: string, species: string, current: string?, tags: n
 	box.BackgroundColor3 = Ui.Colors.panel
 	box.Parent = canvas
 	Ui.corner(box, 12)
-	Ui.rim(box, Ui.Colors.lamp, 2)
+	Ui.rim(box, Ui.Style.line, 1)
 	local padding = Instance.new("UIPadding")
 	padding.PaddingLeft = UDim.new(0, 12)
 	padding.PaddingRight = UDim.new(0, 12)

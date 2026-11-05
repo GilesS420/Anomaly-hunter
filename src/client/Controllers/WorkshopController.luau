@@ -59,8 +59,8 @@ function WorkshopController.start()
 
 	local function updateStatus()
 		window.status.Text = if store == "VacuumVault"
-			then `Vacuums are always in stock · You have {Format.money(money)}`
-			else `New stock in {countdown(restockAt - os.clock())} · You have {Format.money(money)}`
+			then `Always in stock · {Format.money(money)}`
+			else `Restock in {countdown(restockAt - os.clock())} · {Format.money(money)}`
 	end
 
 	local function ask(remote: RemoteFunction, itemId: string)

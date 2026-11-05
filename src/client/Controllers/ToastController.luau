@@ -144,7 +144,7 @@ local function show(holder: Frame, text: string)
 	frame.BackgroundTransparency = 0.35
 	frame.BorderSizePixel = 0
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
+	corner.CornerRadius = Ui.radius(10)
 	corner.Parent = frame
 
 	local label = Instance.new("TextLabel")

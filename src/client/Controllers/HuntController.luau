@@ -93,7 +93,7 @@ local function buildGoal(column: Frame)
 	box.Visible = false
 	box.Parent = column
 	Ui.corner(box, 8)
-	Ui.rim(box, Ui.Colors.rim, 1)
+	Ui.rim(box, Ui.Style.line, 1)
 
 	local title = Ui.text(box, "", UDim2.new(1, -16, 0, 20), Ui.Colors.lamp, true, 18)
 	title.Position = UDim2.fromOffset(8, 4)
@@ -217,7 +217,7 @@ local function buildUi(): (TextLabel, TextLabel, TextLabel, TextButton, { TextBu
 		button.Text = text
 		button.Visible = false
 		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(0, 10)
+		corner.CornerRadius = Ui.radius(10)
 		corner.Parent = button
 		local padding = Instance.new("UIPadding")
 		padding.PaddingLeft = UDim.new(0, 10)

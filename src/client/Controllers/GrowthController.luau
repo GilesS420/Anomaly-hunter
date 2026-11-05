@@ -62,7 +62,7 @@ local GrowWidth = 200
 local Win = Color3.fromRGB(140, 230, 140)
 local Lose = Color3.fromRGB(240, 120, 110)
 local Grow = Color3.fromRGB(60, 160, 90)
-local Rim = Color3.fromRGB(58, 48, 78)
+local Rim = Ui.Style.line
 local ModeIcons = { Gentle = "🌱", Strong = "💪", Reckless = "💥" } :: { [string]: string }
 
 type Button = { text: string, color: Color3, enabled: boolean, run: (() -> ())?, confirm: string? }
@@ -310,7 +310,7 @@ function GrowthController.start()
 		clockLabel.TextXAlignment = Enum.TextXAlignment.Center
 		countdown = clockLabel
 		endsAt = os.clock() + chamber.secondsLeft
-		say("Bubbling... You can walk away; it keeps going while you're offline.", Ui.Colors.lamp)
+		say("Bubbling... keeps going while you're away.", Ui.Colors.lamp)
 	end
 
 	-- SUCCESS! or FAILED, before -> after, Try again and Pick up monster.
@@ -389,7 +389,7 @@ function GrowthController.start()
 		end
 
 		if #view.monsters == 0 then
-			say("Your Backpack has no monsters. Pick some up in your mansion first.")
+			say("Backpack empty. Pick up monsters in your mansion.")
 			return
 		end
 
@@ -437,7 +437,7 @@ function GrowthController.start()
 			say(`{monster.name} has been in the chamber {total} times. Pick another.`, Lose)
 			return
 		end
-		say("How hard do you want to push it? Harder grows more, but fails more.")
+		say("Harder grows more, but fails more.")
 		for i, option in monster.options do
 			modeCard(window.list, i + 1, option, function()
 				grow(option.id)

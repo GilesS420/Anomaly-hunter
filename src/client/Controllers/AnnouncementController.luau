@@ -47,7 +47,7 @@ local function build()
 	banner.Visible = false
 	banner.Parent = canvas
 	Ui.corner(banner, 12)
-	Ui.rim(banner, Ui.Colors.lamp, 2)
+	Ui.rim(banner, Ui.Colors.lamp, 1)
 	local limit = Instance.new("UISizeConstraint")
 	limit.MinSize = Vector2.new(300, 0)
 	limit.MaxSize = Vector2.new(720, math.huge)

@@ -67,7 +67,7 @@ function EventIconController.start()
 	tip.BackgroundColor3 = Ui.Colors.panel
 	tip.Visible = false
 	Ui.corner(tip, 8)
-	local rim = Ui.rim(tip, Ui.Colors.rim, 2)
+	local rim = Ui.rim(tip, Ui.Style.line, 1)
 	local title = Ui.text(tip, "", UDim2.new(1, -16, 0, 22), Ui.Colors.lamp, true, 18)
 	title.Position = UDim2.fromOffset(8, 4)
 	title.TextXAlignment = Enum.TextXAlignment.Center

@@ -27,25 +27,11 @@ local function build(): Ui.Window
 	local list = made.list
 	list.ScrollingEnabled = false
 
-	local intro = Ui.text(
-		list,
-		"Found a bug or have an idea? Tell the team! Please don't write passwords or personal info.",
-		UDim2.new(1, -8, 0, 0),
-		Ui.Colors.muted,
-		false,
-		16
-	)
-	intro.LayoutOrder = 1
-	intro.AutomaticSize = Enum.AutomaticSize.Y
-	intro.TextScaled = false
-	intro.TextSize = 16
-	intro.TextWrapped = true
-
 	-- Bug / Idea / Other.
 	local kinds = Instance.new("Frame")
 	kinds.LayoutOrder = 2
 	kinds.BackgroundTransparency = 1
-	kinds.Size = UDim2.new(1, -8, 0, RowHeight)
+	kinds.Size = UDim2.new(1, -11, 0, RowHeight)
 	kinds.Parent = list
 	local kindsLayout = Instance.new("UIListLayout")
 	kindsLayout.FillDirection = Enum.FillDirection.Horizontal
@@ -78,10 +64,10 @@ local function build(): Ui.Window
 
 	local box = Instance.new("TextBox")
 	box.LayoutOrder = 3
-	box.Size = UDim2.new(1, -8, 0, 150)
+	box.Size = UDim2.new(1, -11, 0, 170)
 	box.BackgroundColor3 = Ui.Colors.row
 	box.TextColor3 = Ui.Colors.text
-	box.PlaceholderText = "What happened, or what would make the game better?"
+	box.PlaceholderText = "What happened, or what's your idea?"
 	box.PlaceholderColor3 = Ui.Colors.muted
 	box.Text = ""
 	box.Font = Enum.Font.FredokaOne
@@ -92,11 +78,12 @@ local function build(): Ui.Window
 	box.TextXAlignment = Enum.TextXAlignment.Left
 	box.TextYAlignment = Enum.TextYAlignment.Top
 	Ui.corner(box, 8)
-	Ui.rim(box, Ui.Colors.rim, 1)
+	Ui.rim(box, Ui.Style.line, 1)
 	local padding = Instance.new("UIPadding")
-	padding.PaddingLeft = UDim.new(0, 8)
-	padding.PaddingRight = UDim.new(0, 8)
-	padding.PaddingTop = UDim.new(0, 6)
+	padding.PaddingLeft = UDim.new(0, 12)
+	padding.PaddingRight = UDim.new(0, 12)
+	padding.PaddingTop = UDim.new(0, 10)
+	padding.PaddingBottom = UDim.new(0, 10)
 	padding.Parent = box
 	box.Parent = list
 
@@ -112,7 +99,7 @@ local function build(): Ui.Window
 	letters.LayoutOrder = 1
 	local cancel = Ui.button(made.footer, "Cancel", Ui.Colors.off, UDim2.fromOffset(100, RowHeight))
 	cancel.LayoutOrder = 2
-	local send = Ui.button(made.footer, "📨 Send", Ui.Colors.buy, UDim2.fromOffset(130, RowHeight))
+	local send = Ui.button(made.footer, "Send", Ui.Colors.buy, UDim2.fromOffset(130, RowHeight))
 	send.LayoutOrder = 3
 
 	local function showLetters()
@@ -131,7 +118,7 @@ local function build(): Ui.Window
 		local remotes = ReplicatedStorage:FindFirstChild("FeedbackRemotes")
 		local remote = remotes and remotes:FindFirstChild("Send")
 		if not remote or not remote:IsA("RemoteFunction") then
-			status.Text = "Feedback isn't ready yet. Try again in a moment."
+			status.Text = "Not ready yet. Try again soon."
 			return
 		end
 		busy = true
@@ -141,7 +128,7 @@ local function build(): Ui.Window
 		end)
 		busy = false
 		if not ok or type(answer) ~= "table" then
-			status.Text = "Couldn't send it right now. Try again in a minute."
+			status.Text = "Couldn't send. Try again in a minute."
 			return
 		end
 		status.Text = if type(answer.message) == "string" then answer.message else ""
@@ -164,7 +151,7 @@ function FeedbackController.open()
 		window = build()
 	end
 	local shown = window :: Ui.Window
-	shown.status.Text = `Up to {Config.MaxLength} letters. Only the game's team can read it.`
+	shown.status.Text = "No passwords or personal info."
 	shown.open(nil)
 end
 

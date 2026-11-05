@@ -71,7 +71,7 @@ local function card(
 	row.BackgroundColor3 = Ui.Colors.row
 	row.Parent = list
 	Ui.corner(row, 10)
-	Ui.rim(row, highlight or Color3.fromRGB(58, 48, 78), if highlight then 2 else 1)
+	Ui.rim(row, highlight or Ui.Style.line, if highlight then 2 else 1)
 	ShopCards.pad(row)
 
 	ShopCards.pictureBox(row, inner, color, look, if look then nil else "🧪")
@@ -200,7 +200,7 @@ function MergerController.start()
 		end
 		local monsters = view.monsters
 		if #monsters == 0 then
-			window.status.Text = "Your Backpack has no monsters. Pick some up in your mansion first."
+			window.status.Text = "Backpack empty. Pick up monsters in your mansion."
 			return
 		end
 
@@ -208,7 +208,7 @@ function MergerController.start()
 		if not main then
 			-- Step 1: the one to keep.
 			mainUid = nil
-			window.status.Text = "Pick the monster to keep. It takes in a twin of the same kind."
+			window.status.Text = "Pick the monster to keep."
 			for i, monster in monsters do
 				local hasTwin = monster.twins > 0
 				card(window.list, i, monster.name, monster.color, monster.look, linesFor(monster), {
@@ -240,7 +240,7 @@ function MergerController.start()
 			-- Step 2: a donor of the same kind.
 			donorUid = nil
 			window.status.Text =
-				`Pick the {Format.name(mainRow.monsterId)} to give. It's lost if the merge fails.`
+				`Pick the {Format.name(mainRow.monsterId)} to give. Lost if it fails.`
 			local order = 2
 			for _, monster in monsters do
 				if monster.monsterId ~= mainRow.monsterId or monster.uid == mainRow.uid then

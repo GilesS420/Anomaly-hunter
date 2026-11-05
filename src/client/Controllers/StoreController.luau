@@ -74,17 +74,13 @@ function StoreController.start()
 	edges.PaddingBottom = UDim.new(0, 12)
 	edges.Parent = strip
 
-	-- Round < and > buttons on the strip's edges, for a mouse (a phone just swipes). Each
+	-- < and > buttons on the strip's edges, for a mouse (a phone just swipes). Each
 	-- press slides one card along; a button hides at its end of the strip.
 	local function arrow(text: string, side: number, step: number): TextButton
 		local button = Ui.button(window.panel, text, Ui.Colors.equip, UDim2.fromOffset(40, 40))
 		button.AnchorPoint = Vector2.new(side, 0.5)
 		button.Position = UDim2.new(side, if side == 0 then -6 else 6, 0, 68 + 4 + PictureSize / 2)
 		button.ZIndex = 5
-		local round = button:FindFirstChildOfClass("UICorner")
-		if round then
-			round.CornerRadius = UDim.new(0.5, 0)
-		end
 		button.Activated:Connect(function()
 			-- CanvasPosition is in canvas units; Roblox stops it at the strip's far end.
 			local x = strip.CanvasPosition.X + step * (CardWidth + 10)
@@ -123,7 +119,7 @@ function StoreController.start()
 		frame.BackgroundColor3 = Ui.Colors.row
 		frame.Parent = strip
 		Ui.corner(frame, 12)
-		Ui.rim(frame, if owned then Color3.fromRGB(58, 48, 78) else Color3.fromRGB(78, 64, 104), 1)
+		Ui.rim(frame, Ui.Style.line, 1)
 
 		-- The picture: the one set on the dashboard, or a drawn stand-in on a dark tile.
 		local image = Robux.image(key)
@@ -138,10 +134,6 @@ function StoreController.start()
 		else
 			local tile = Instance.new("Frame")
 			tile.BackgroundColor3 = Color3.fromRGB(46, 30, 74)
-			local glow = Instance.new("UIGradient")
-			glow.Rotation = 90
-			glow.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(120, 100, 150))
-			glow.Parent = tile
 			Icons.draw(tile, StandIns[key] or "Coin", 0.16)
 			picture = tile
 		end
@@ -195,7 +187,7 @@ function StoreController.start()
 				child:Destroy()
 			end
 		end
-		window.status.Text = "Passes are yours forever. Paying only makes things faster."
+		window.status.Text = "Passes are yours forever."
 		for order, key in Config.PassOrder do
 			local pass = Config.Passes[key]
 			local owned = player:GetAttribute(`Pass{key}`) == true

@@ -78,15 +78,6 @@ local function tile(parent: Frame, color: Color3, kind: Icons.Kind, image: strin
 	box.BackgroundColor3 = Color3.fromHSV(h, s * 0.75, v * 0.42)
 	box.Parent = parent
 	Ui.corner(box, 12)
-	Ui.rim(box, color, 2)
-	local glow = Instance.new("UIGradient") -- lighter in the middle, like a lamp behind it
-	glow.Rotation = 90
-	glow.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(200, 200, 200)),
-		ColorSequenceKeypoint.new(0.45, Color3.new(1, 1, 1)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 150, 150)),
-	})
-	glow.Parent = box
 	if image then
 		local picture = Instance.new("ImageLabel")
 		picture.BackgroundTransparency = 1
@@ -197,7 +188,7 @@ function MissionController.start()
 		local outer, frame = shell(
 			order,
 			CardHeight,
-			if mission.done and not mission.claimed then color else Color3.fromRGB(58, 48, 78)
+			if mission.done and not mission.claimed then color else Ui.Style.line
 		)
 		tile(outer, color, KindPictures[mission.kind or ""] or "Scroll")
 
@@ -299,7 +290,7 @@ function MissionController.start()
 		name: string,
 		detail: string
 	): Frame
-		local outer, frame = shell(order, TileSize + 16, Color3.fromRGB(58, 48, 78))
+		local outer, frame = shell(order, TileSize + 16, Ui.Style.line)
 		tile(outer, color, kind, image)
 		local title = Ui.text(frame, name, UDim2.new(0.66, -8, 0, 26), color, true, 22)
 		title.Position = UDim2.fromOffset(0, 8)
