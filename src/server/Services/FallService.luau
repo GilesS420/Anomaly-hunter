@@ -13,6 +13,7 @@ local MovementConfig = require(ReplicatedStorage.Shared.Config.Movement)
 local MovementService = require(script.Parent.MovementService)
 local Zones = require(ReplicatedStorage.Shared.Config.Zones)
 local World = require(script.Parent.Parent.World)
+local Perf = require(script.Parent.Parent.Perf)
 
 local FallService = {}
 
@@ -65,7 +66,7 @@ function FallService.start()
 	task.spawn(function()
 		while true do
 			task.wait(CheckSeconds)
-			check()
+			Perf.run("FallRescue", check)
 		end
 	end)
 end

@@ -26,6 +26,7 @@ local Notify = require(script.Parent.Parent.Notify)
 local Perks = require(script.Parent.Parent.Perks)
 local PlotService = require(script.Parent.PlotService)
 local World = require(script.Parent.Parent.World)
+local Perf = require(script.Parent.Parent.Perf)
 
 local TravelService = {}
 
@@ -231,7 +232,7 @@ function TravelService.start()
 		waited += dt
 		if waited >= SpeedCheckSeconds then
 			waited = 0
-			updateSpeeds()
+			Perf.run("WalkSpeeds", updateSpeeds)
 		end
 	end)
 

@@ -8,6 +8,7 @@ local AnalyticsService = require(script.Services.AnalyticsService)
 local _Notify = require(script.Notify) -- no start(); made here so the Toast remote exists early
 local _MonsterModel = require(script.MonsterModel) -- no start()
 local _Counter = require(script.Counter) -- no start()
+local Perf = require(script.Perf)
 local WorldBuilder = require(script.Services.WorldBuilder)
 local PlotService = require(script.Services.PlotService)
 local RoamService = require(script.Services.RoamService)
@@ -51,6 +52,9 @@ local MovementService = require(script.Services.MovementService)
 if game:GetService("RunService"):IsStudio() then
 	require(script.Tests.ServerChecks).listen()
 end
+
+-- Studio: Output lists the busiest server jobs every 30 s (see Perf).
+Perf.start()
 
 local services: { { name: string, start: () -> ...any } } = {
 	{ name = "DataService", start = DataService.start },

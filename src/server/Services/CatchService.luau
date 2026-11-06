@@ -39,6 +39,7 @@ local MissionService = require(script.Parent.MissionService)
 local RoamService = require(script.Parent.RoamService)
 local SpawnService = require(script.Parent.SpawnService)
 local WatcherService = require(script.Parent.WatcherService)
+local Perf = require(script.Parent.Parent.Perf)
 
 local CatchService = {}
 
@@ -553,7 +554,7 @@ function CatchService.start()
 		end
 	end)
 
-	RunService.Heartbeat:Connect(update)
+	RunService.Heartbeat:Connect(Perf.wrap("Catching", update))
 
 	Players.PlayerRemoving:Connect(function(player)
 		release(player, nil)

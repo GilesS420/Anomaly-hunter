@@ -25,6 +25,7 @@ local Config = require(ReplicatedStorage.Shared.Config.Movement)
 local Movement = require(ReplicatedStorage.Shared.Util.Movement)
 local TravelConfig = require(ReplicatedStorage.Shared.Config.Travel)
 local Perks = require(script.Parent.Parent.Perks)
+local Perf = require(script.Parent.Parent.Perf)
 
 local MovementService = {}
 
@@ -212,10 +213,7 @@ function MovementService.start()
 		local elapsed = waited
 		waited = 0
 		for _, player in Players:GetPlayers() do
-			local ok, err = pcall(check, player, elapsed)
-			if not ok then
-				warn(`MovementService: check failed for {player.Name}: {err}`)
-			end
+			Perf.run("MovementChecks", check, player, elapsed)
 		end
 	end)
 

@@ -35,6 +35,7 @@ local HuntService = require(script.Parent.HuntService)
 local Notify = require(script.Parent.Parent.Notify)
 local RoamService = require(script.Parent.RoamService)
 local SpawnService = require(script.Parent.SpawnService)
+local Perf = require(script.Parent.Parent.Perf)
 
 local MonsterAiService = {}
 
@@ -471,9 +472,7 @@ function MonsterAiService.start()
 		while true do
 			task.wait(TickSeconds)
 			-- One bad monster must never stop the others from fighting back.
-			xpcall(step, function(err)
-				warn(`MonsterAiService: {err}\n{debug.traceback()}`)
-			end)
+			Perf.run("MonsterAttacks", step)
 		end
 	end)
 end

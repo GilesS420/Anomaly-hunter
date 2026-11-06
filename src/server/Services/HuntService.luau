@@ -42,6 +42,7 @@ local PlotService = require(script.Parent.PlotService)
 local SpawnService = require(script.Parent.SpawnService)
 local ToolModel = require(script.Parent.Parent.ToolModel)
 local World = require(script.Parent.Parent.World)
+local Perf = require(script.Parent.Parent.Perf)
 
 local HuntService = {}
 
@@ -667,7 +668,7 @@ function HuntService.start()
 	task.spawn(function()
 		while true do
 			task.wait(WalkCheckSeconds)
-			checkWalks()
+			Perf.run("PortalWalks", checkWalks)
 		end
 	end)
 
