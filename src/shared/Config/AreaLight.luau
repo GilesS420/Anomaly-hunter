@@ -6,7 +6,7 @@
 --              monsters are easy to see. Still Halloween: the purple haze stays.
 --   HubEvent   while a Watcher event is coming or on: the sun sets into a purple twilight, so
 --              the event's own sky (moon, eye, aurora, weather) shows up.
---   Zone       the full moonlit night the whole game used to have, a bit colder and darker.
+--   Zone       a clear, silvery night: bright moonlight without a moon, lots of stars.
 --
 -- Only this client's own Lighting is changed: ClockTime, ExposureCompensation and one
 -- ColorCorrectionEffect ("AreaLight") the server never touches. The server's night
@@ -35,24 +35,30 @@ local Looks: { [string]: Look } = {
 	},
 	HubEvent = {
 		clockTime = 18.5,
-		exposure = 0.35,
+		exposure = 0.5,
 		brightness = 0,
 		contrast = 0.05,
 		saturation = 0,
 		tint = { 255, 255, 255 },
 	},
+	-- Giles 2026-11-06: a lighter night, as if lit by a bright moon you can't see, under
+	-- lots of stars.
 	Zone = {
 		clockTime = 24,
-		exposure = 0.25,
-		brightness = -0.02,
-		contrast = 0.1,
-		saturation = -0.12,
-		tint = { 220, 228, 255 },
+		exposure = 0.6,
+		brightness = 0.04,
+		contrast = 0.06,
+		saturation = -0.05,
+		tint = { 212, 224, 255 },
 	},
 }
 
 return {
 	Looks = Looks,
+	-- The night sky on this client: as many stars as Roblox draws, and no moon disc (the
+	-- moonlight stays). Events still draw their own moons (client/Controllers/SkyController).
+	StarCount = 5000,
+	MoonAngularSize = 0,
 	-- Seconds to go from one look to the next when nothing else says (walking out of an event).
 	FadeSeconds = 6,
 	-- After an event ends the server takes this long to put its own night back

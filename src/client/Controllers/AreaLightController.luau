@@ -5,7 +5,8 @@
 --   into or out of a zone   at once (you've just gone through a portal)
 --   an event coming         over the warning, so the sun has set when the event starts
 --   an event over           after the server's own sky has faded back, over FadeSeconds
--- Only ClockTime, ExposureCompensation and our own "AreaLight" ColorCorrectionEffect are
+-- Also fills the night sky with stars and hides the moon disc (Sky). Only ClockTime,
+-- ExposureCompensation, the Sky's stars and moon and our own "AreaLight" ColorCorrectionEffect are
 -- touched; everything the server sets on Lighting is left alone.
 
 local Lighting = game:GetService("Lighting")
@@ -135,6 +136,11 @@ function AreaLightController.start()
 	effect.Name = "AreaLight"
 	effect.Parent = Lighting
 	current = copy(AreaLight.Looks.Zone)
+	local sky = Lighting:FindFirstChildOfClass("Sky")
+	if sky then
+		sky.StarCount = AreaLight.StarCount
+		sky.MoonAngularSize = AreaLight.MoonAngularSize
+	end
 
 	player:GetAttributeChangedSignal("Zone"):Connect(function()
 		update("zone")
