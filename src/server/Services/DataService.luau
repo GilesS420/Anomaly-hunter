@@ -65,6 +65,7 @@ export type Data = {
 	-- "" never offered (older saves), else the quest step, "Done" or "Skipped".
 	quest: string,
 	playtime: Playtime.Record, -- today's play time and the playtime gifts claimed (PlaytimeService)
+	badges: { [string]: boolean }, -- Roblox badges already given, by Config/Badges key (BadgesService)
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -102,6 +103,7 @@ DataService.Template = {
 	rookie = { decided = false, secondsLeft = 0, hunts = 0, lucky = false },
 	quest = "",
 	playtime = Playtime.empty(),
+	badges = {},
 } :: Data
 
 local store = ProfileStore.New(
