@@ -78,6 +78,18 @@ function MutationLogController.start()
 		friend.BackgroundColor3 = if count > 0 then Ui.Colors.buy else Ui.Colors.off
 	end
 	player:GetAttributeChangedSignal("FriendsHere"):Connect(showFriends)
+	-- A friend request sent, accepted or turned down in game: ask the server to look at our
+	-- friends again right away (CommunityService), instead of waiting for its minute check.
+	Players.FriendRequestEvent:Connect(function(from: Player, to: Player)
+		if from ~= player and to ~= player then
+			return
+		end
+		local remotes = ReplicatedStorage:FindFirstChild("CommunityRemotes")
+		local remote = remotes and remotes:FindFirstChild("FriendsChanged")
+		if remote and remote:IsA("RemoteEvent") then
+			remote:FireServer()
+		end
+	end)
 	showFriends()
 	friend.Activated:Connect(function()
 		local count = tonumber(player:GetAttribute("FriendsHere")) or 0

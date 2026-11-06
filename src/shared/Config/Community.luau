@@ -29,6 +29,14 @@ Community.FriendSellBonus = 0.10
 -- Seconds between membership checks, so leaving the group takes the Guild bonus away.
 Community.RecheckSeconds = 300
 
+-- Friend bonus checks (server/Services/CommunityService). The client tells the server right
+-- away when a friend request is accepted in game; the server then asks Roblox for the
+-- player's friends, and once more FriendLagSeconds later in case Roblox's list was a moment
+-- behind. Friends made outside the game are picked up every FriendRecheckSeconds.
+Community.FriendRecheckSeconds = 60
+Community.FriendLagSeconds = 5
+Community.FriendPingSeconds = 3 -- the fastest a client may ask for a recheck
+
 -- Seconds between two gift checks per player (each one asks Roblox's group list).
 Community.ClaimCooldown = 5
 
