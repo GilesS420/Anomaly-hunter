@@ -55,6 +55,13 @@ Analytics.Onboarding = {
 }
 Analytics.TutorialDone = #Tutorial.Steps + 1 -- the Onboarding step for "Done"
 
+-- Roblox's built-in Onboarding funnel keeps every player ever counted under the step NUMBER,
+-- and shows one name per number, so after the numbering changed it mixed three tutorials
+-- (Giles's screenshot 2026-11-06: "Finished tutorial" at 6, 8 and 13). The same steps also
+-- go to a custom funnel with this name; bump the version whenever Onboarding changes, so the
+-- new funnel only holds players of the current tutorial.
+Analytics.OnboardingFunnel = "NewPlayersV4"
+
 -- The Onboarding step this save has reached (0 while the tutorial hasn't started).
 function Analytics.onboardStep(tutorial: string, wingsOwned: number): number
 	if tutorial == "Done" then

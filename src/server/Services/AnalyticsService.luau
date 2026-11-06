@@ -1,6 +1,7 @@
 --!strict
 -- Sends Roblox analytics events for Creator Hub > Analytics (rules in Shared.Util.Analytics):
 --   Funnels   Onboarding (one-time): join > first catch > ... > tutorial done > first wings
+--             NewPlayersV4 (one-time): the same steps, versioned (Analytics.OnboardingFunnel)
 --             BakeryQuest (one-time): the optional cake quest after the tutorial
 --             Comeback (one-time): played on 1, 2, 3, 5, 7, 14 different days
 --             Robux purchase (recurring): prompt shown > paid, per product
@@ -53,6 +54,8 @@ local function onboardStep(player: Player, step: number)
 	local name = Analytics.Onboarding[step]
 	send(`{player.Name} onboarding {step} {name}`, function()
 		AnalyticsService:LogOnboardingFunnelStepEvent(player, step, name)
+		-- The same step in a versioned funnel (Analytics.OnboardingFunnel), clean of old numbering.
+		AnalyticsService:LogFunnelStepEvent(player, Analytics.OnboardingFunnel, nil :: any, step, name)
 	end)
 end
 

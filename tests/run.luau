@@ -4386,6 +4386,7 @@ do
 			and Analytics.questStep("Skipped") == 0
 			and Analytics.questStep("") == 0
 	)
+	check("analytics: a versioned onboarding funnel", string.match(Analytics.OnboardingFunnel, "V%d+$") ~= nil)
 	check("analytics: under 100 steps", #Analytics.Onboarding <= 100 and #Analytics.ComebackDays <= 100)
 	check("analytics: day 1 is a milestone", Analytics.comebackStep(1) == 1)
 	check("analytics: day 2 is a milestone", Analytics.comebackStep(2) == 2)
