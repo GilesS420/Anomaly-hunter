@@ -4386,7 +4386,10 @@ do
 			and Analytics.questStep("Skipped") == 0
 			and Analytics.questStep("") == 0
 	)
-	check("analytics: a versioned onboarding funnel", string.match(Analytics.OnboardingFunnel, "V%d+$") ~= nil)
+	check(
+		"analytics: a versioned onboarding funnel",
+		string.match(Analytics.OnboardingFunnel, "V%d+$") ~= nil
+	)
 	check("analytics: under 100 steps", #Analytics.Onboarding <= 100 and #Analytics.ComebackDays <= 100)
 	check("analytics: day 1 is a milestone", Analytics.comebackStep(1) == 1)
 	check("analytics: day 2 is a milestone", Analytics.comebackStep(2) == 2)
@@ -4397,6 +4400,27 @@ do
 	local fixed = Analytics.repair({ onboard = 3.7, days = 0 / 0 })
 	check("analytics: repair", fixed.onboard == 3 and fixed.days == 0 and fixed.lastDay == 0)
 	check("analytics: repair junk", Analytics.repair("x").onboard == 0)
+	check("analytics: old records get marks", Analytics.repair({ onboard = 2 }).marks == 0)
+	check(
+		"analytics: first-visit minutes",
+		Analytics.marksReached(0.5) == 0
+			and Analytics.marksReached(1) == 1
+			and Analytics.marksReached(6) == 5
+			and Analytics.marksReached(999) == #Analytics.MinuteMarks
+			and Analytics.markName(1) == "Played 1 min"
+	)
+	check(
+		"analytics: visit length buckets",
+		Analytics.lengthBucket(0.2) == "0-1 min"
+			and Analytics.lengthBucket(4) == "3-5 min"
+			and Analytics.lengthBucket(90) == "40+ min"
+	)
+	check(
+		"analytics: what they were doing",
+		Analytics.stageOf("Catch", "") == "Tutorial: Catch"
+			and Analytics.stageOf("Done", "Place") == "Quest: Place"
+			and Analytics.stageOf("Done", "Skipped") == "Free play"
+	)
 end
 
 -- The "Next goal" bar and the rookie hour (Giles 2026-11-05).
