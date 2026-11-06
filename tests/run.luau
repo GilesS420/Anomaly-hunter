@@ -42,6 +42,8 @@ local WeightConfig = require("../src/shared/Config/Weight")
 local Movement = require("../src/shared/Util/Movement")
 local MovementConfig = require("../src/shared/Config/Movement")
 local Analytics = require("../src/shared/Util/Analytics")
+local Badges = require("../src/shared/Util/Badges")
+local BadgeConfig = require("../src/shared/Config/Badges")
 local Playtime = require("../src/shared/Util/Playtime")
 local PlaytimeConfig = require("../src/shared/Config/Playtime")
 local MissionsUtil = require("../src/shared/Util/Missions")
@@ -4539,6 +4541,71 @@ do
 	end
 end
 
+
+-- Roblox badges (Util/Badges, Config/Badges).
+do
+	local quiet: Badges.Live = { worth = 0, event = nil, friendsHere = 0 }
+	local fresh = { tutorial = "Gate", wingsOwned = 1, codex = {}, analytics = { days = 1 }, missions = { streak = 0 } }
+	check("badges: a new save earns Welcome", Badges.earned("Welcome", fresh, quiet))
+	check("badges: a new save has no catch", not Badges.earned("FirstCatch", fresh, quiet))
+	check("badges: unknown key earns nothing", not Badges.earned("Nope", fresh, quiet))
+	local keys = {}
+	local unique = true
+	for _, badge in BadgeConfig.List do
+		if keys[badge.key] then
+			unique = false
+		end
+		keys[badge.key] = true
+	end
+	check("badges: keys are unique", unique)
+	check("badges: nothing awarded before ids are set", #Badges.toAward(fresh, quiet) == 0)
+	local played = {
+		tutorial = "Done",
+		wingsOwned = 2,
+		codex = { monsters = { Gloomlet = { Plain = true }, TheGroundskeeper = { Rainbow = true } } },
+		analytics = { days = 7 },
+		missions = { streak = 7 },
+	}
+	local busy: Badges.Live = { worth = 1_000_000, event = "WatcherAwakens", friendsHere = 1 }
+	for _, key in
+		{
+			"FirstCatch",
+			"ReadyToHunt",
+			"BackAgain",
+			"OneWeek",
+			"MissionStreak",
+			"NewWing",
+			"Millionaire",
+			"Legendary",
+			"Rainbow",
+			"WatcherAwakens",
+			"HuntingParty",
+		}
+	do
+		check(`badges: {key} earned`, Badges.earned(key, played, busy))
+		check(`badges: {key} not earned on a new save`, not Badges.earned(key, fresh, quiet))
+	end
+	check("badges: Legendary is not Mythic", not Badges.earned("Mythic", played, busy))
+	played.codex.monsters.TheHeadlessRider = { Plain = true }
+	check("badges: Mythic earned", Badges.earned("Mythic", played, busy))
+	check("badges: every key is a real badge", (function()
+		for _, badge in BadgeConfig.List do
+			if badge.key ~= "Welcome" and not Badges.earned(badge.key, played, busy) then
+				return false
+			end
+		end
+		return true
+	end)())
+	-- Once an id is set, an earned badge is awarded, and not again once given.
+	local first = BadgeConfig.List[1]
+	local oldId = first.id
+	first.id = 123
+	local list = Badges.toAward(played, busy)
+	played.badges = { [first.key] = true }
+	local again = Badges.toAward(played, busy)
+	first.id = oldId
+	check("badges: awarded once an id is set", #list == 1 and list[1].key == first.key)
+	check("badges: not awarded twice", #again == 0)
 do
 	local AreaLight = require("../src/shared/Config/AreaLight")
 	check(
