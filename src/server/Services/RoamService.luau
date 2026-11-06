@@ -17,6 +17,7 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Roam = require(ReplicatedStorage.Shared.Util.Roam)
+local Perf = require(script.Parent.Parent.Perf)
 
 local RoamService = {}
 
@@ -438,9 +439,7 @@ function RoamService.start()
 		while true do
 			task.wait(TickSeconds)
 			-- One bad roamer must never stop every monster from moving.
-			xpcall(step, function(err)
-				warn(`RoamService: {err}\n{debug.traceback()}`)
-			end)
+			Perf.run("Roaming", step)
 		end
 	end)
 end

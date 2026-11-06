@@ -29,6 +29,7 @@ local PlotService = require(script.Parent.PlotService)
 local RoamService = require(script.Parent.RoamService)
 local Notify = require(script.Parent.Parent.Notify)
 local Perks = require(script.Parent.Parent.Perks)
+local Perf = require(script.Parent.Parent.Perf)
 
 local CakeService = {}
 
@@ -476,12 +477,7 @@ function CakeService.start()
 		while true do
 			task.wait(CakeConfig.CheckSeconds)
 			for player in live do
-				local ok, err = pcall(function()
-					check(player)
-				end)
-				if not ok then
-					warn(`CakeService: checking {player.Name}'s cakes failed: {err}`)
-				end
+				Perf.run("CakeBites", check, player)
 			end
 		end
 	end)

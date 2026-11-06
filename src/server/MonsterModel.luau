@@ -23,6 +23,7 @@ local Spawning = require(ReplicatedStorage.Shared.Util.Spawning)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local Weight = require(ReplicatedStorage.Shared.Util.Weight)
 local WeightConfig = require(ReplicatedStorage.Shared.Config.Weight)
+local Perf = require(script.Parent.Perf)
 
 local MonsterModel = {}
 
@@ -187,7 +188,7 @@ local function queueDress(model: Model, info: Info)
 				and next.PrimaryPart
 				and next:GetAttribute("LookKey") ~= lookKey(latest)
 			then
-				dressModel(next, latest)
+				Perf.run("MonsterRebuilds", dressModel, next, latest)
 			end
 		end
 		if #queue == 0 and worker then

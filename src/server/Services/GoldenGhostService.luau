@@ -27,6 +27,7 @@ local DataService = require(script.Parent.DataService)
 local MissionService = require(script.Parent.MissionService)
 local Notify = require(script.Parent.Parent.Notify)
 local World = require(script.Parent.Parent.World)
+local Perf = require(script.Parent.Parent.Perf)
 
 local GoldenGhostService = {}
 
@@ -318,9 +319,7 @@ function GoldenGhostService.start()
 	task.spawn(function()
 		while true do
 			task.wait(0.25)
-			xpcall(tick, function(err)
-				warn(`GoldenGhostService: {err}\n{debug.traceback()}`)
-			end)
+			Perf.run("GoldenGhost", tick)
 		end
 	end)
 end

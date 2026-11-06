@@ -51,6 +51,7 @@ local MonsterModel = require(script.Parent.Parent.MonsterModel)
 local Notify = require(script.Parent.Parent.Notify)
 local RoamService = require(script.Parent.RoamService)
 local World = require(script.Parent.Parent.World)
+local Perf = require(script.Parent.Parent.Perf)
 
 local WatcherService = {}
 
@@ -1169,9 +1170,7 @@ function WatcherService.start()
 		while true do
 			task.wait(1)
 			-- One bad second must never stop the Watcher for good.
-			xpcall(tick, function(err)
-				warn(`WatcherService: {err}\n{debug.traceback()}`)
-			end)
+			Perf.run("WatcherEvents", tick)
 		end
 	end)
 end

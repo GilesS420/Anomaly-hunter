@@ -50,6 +50,7 @@ local PlotService = require(script.Parent.PlotService)
 local Recipe = require(script.Parent.Parent.Recipe)
 local RoamService = require(script.Parent.RoamService)
 local World = require(script.Parent.Parent.World)
+local Perf = require(script.Parent.Parent.Perf)
 
 local MansionService = {}
 
@@ -684,10 +685,7 @@ local function spawnSoon(state: State, caught: Value.CaughtMonster, replace: boo
 			if not entry then
 				break
 			end
-			local ok, err = pcall(runQueued, entry)
-			if not ok then
-				warn(`MansionService: spawning a monster failed: {err}`)
-			end
+			Perf.run("MansionSpawns", runQueued, entry)
 		end
 		if #spawnQueue == 0 and spawnWorker then
 			spawnWorker:Disconnect()
@@ -1439,7 +1437,7 @@ function MansionService.start()
 		while true do
 			task.wait(WeightConfig.GrowthTickSeconds)
 			for player in mansions do
-				MansionService.grow(player)
+				Perf.run("MansionGrowth", MansionService.grow, player)
 			end
 		end
 	end)

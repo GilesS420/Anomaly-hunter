@@ -52,6 +52,7 @@ local TextFilter = require(script.Parent.Parent.TextFilter)
 local RoamService = require(script.Parent.RoamService)
 local ToolModel = require(script.Parent.Parent.ToolModel)
 local WorkshopService = require(script.Parent.WorkshopService)
+local Perf = require(script.Parent.Parent.Perf)
 
 local InventoryService = {}
 
@@ -794,13 +795,8 @@ function InventoryService.start()
 		while true do
 			task.wait(SyncSeconds)
 			for _, player in Players:GetPlayers() do
-				local ok, err = pcall(function()
-					InventoryService.syncMonsterTools(player)
-					InventoryService.syncPreviews(player)
-				end)
-				if not ok then
-					warn(`InventoryService: syncing {player.Name}'s monster tools failed: {err}`)
-				end
+				Perf.run("InventorySync", InventoryService.syncMonsterTools, player)
+				Perf.run("InventoryPreviews", InventoryService.syncPreviews, player)
 			end
 		end
 	end)

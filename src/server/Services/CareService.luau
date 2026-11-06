@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Care = require(ReplicatedStorage.Shared.Util.Care)
 local DataService = require(script.Parent.DataService)
 local MansionService = require(script.Parent.MansionService)
+local Perf = require(script.Parent.Parent.Perf)
 
 local CareService = {}
 
@@ -46,12 +47,7 @@ function CareService.start()
 		while true do
 			task.wait(RefreshSeconds)
 			for _, player in Players:GetPlayers() do
-				local ok, err = pcall(function()
-					CareService.refresh(player)
-				end)
-				if not ok then
-					warn(`CareService: refreshing {player.Name} failed: {err}`)
-				end
+				Perf.run("FamiliarityRefresh", CareService.refresh, player)
 			end
 		end
 	end)
