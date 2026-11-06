@@ -23,7 +23,7 @@ local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 
-local SkipAfter = 15 -- seconds before the "Enter anyway" button appears
+local SkipAfter = 8 -- seconds before the "Enter anyway" button appears
 local GiveUpAfter = 45 -- seconds before it fades out whatever is still missing
 local SettleSeconds = 0.75 -- a moment for the last parts to land before fading out
 local FadeSeconds = 1.2

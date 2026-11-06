@@ -380,8 +380,9 @@ function InventoryController.start()
 				end
 			end
 			if tab == "Monsters" then
+				local how = if UserInputService.KeyboardEnabled then "Press E" else "Tap Pick up"
 				window.status.Text =
-					`{current.storageCount}/{current.storageCapacity} · Press E on a monster in your mansion to pick it up`
+					`{current.storageCount}/{current.storageCapacity} · {how} on a monster in your mansion to pick it up`
 			else
 				window.status.Text = if #rows > 0
 					then "The Collector never sells these"

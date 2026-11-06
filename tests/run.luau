@@ -4438,6 +4438,11 @@ do
 			and afterSiphon.id == "Library"
 			and string.find(afterSiphon.name, "Sunken Swamp") ~= nil
 	)
+	local voidOnly = Goals.next({ VoidVac = 1 }, 99)
+	check(
+		"goal: no cheaper vacuum suggested to someone with the Void Vac",
+		voidOnly == nil or (voidOnly.id ~= "PhantomVac" and voidOnly.id ~= "SpiritSiphon")
+	)
 	local everything: { [string]: number } = {}
 	for _, item in Shop.Workshop do
 		everything[item.id] = 1
