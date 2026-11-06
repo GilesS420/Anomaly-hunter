@@ -21,6 +21,7 @@ local CollectionService = game:GetService("CollectionService")
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Away = require(ReplicatedStorage.Shared.Util.Away)
 local Care = require(ReplicatedStorage.Shared.Util.Care)
@@ -86,6 +87,10 @@ local PillarHeight = 12
 local EdgeInset = 1.5 -- keeps roaming orbs off the floor edges and away from the pillars
 local MaxWings = #Wings.List
 local SpawnRetrySeconds = 1 -- no free spot right now: try again after the others moved on
+-- A full mansion is ~70 monsters of a hundred-odd parts each. Building them all in one frame
+-- (a player joining, a growth tick) stalled the whole server for a moment and sent every
+-- client one huge burst, so they wait in a queue and this many are built each frame.
+local SpawnsPerFrame = 3
 -- Where the worth sign and the trophy stand go: either side of the path to the Foyer gate,
 -- plot-local (see Layout.Wings.Foyer and Layout.PlotSpawn).
 local WorthSignSpot = { x = -13, z = -37 }
@@ -610,10 +615,102 @@ local function clearMonsters(state: State)
 	end
 end
 
+-- Monsters waiting to be built (see SpawnsPerFrame). `replace`: an older orb of the same
+-- monster is still out and is swapped for the new one in the same frame (it grew).
+type QueuedSpawn = {
+	state: State,
+	caught: Value.CaughtMonster,
+	generation: number,
+	replace: boolean,
+}
+local spawnQueue: { QueuedSpawn } = {}
+-- Old orbs of monsters that grew, about to be swapped: no point re-dressing them first.
+local regrowing: { [Instance]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+local spawnWorker: RBXScriptConnection? = nil
+
+local function orbsOf(state: State, uid: string?): { Instance }
+	local found = {}
+	for _, child in state.monsters:GetChildren() do
+		if child:GetAttribute("Uid") == uid then
+			table.insert(found, child)
+		end
+	end
+	return found
+end
+
+local function runQueued(entry: QueuedSpawn)
+	local state, caught = entry.state, entry.caught
+	if mansions[state.player] ~= state or state.generation ~= entry.generation then
+		return -- the owner left, or the monsters were cleared since
+	end
+	local data = DataService.get(state.player)
+	if not data or not table.find(data.monsters, caught) then
+		return -- sold, stored or stolen while it waited
+	end
+	local old = orbsOf(state, caught.uid)
+	if entry.replace then
+		for _, child in old do
+			regrowing[child] = nil
+			if child:IsA("Model") then
+				RoamService.remove(child)
+			end
+			child:Destroy()
+		end
+	elseif #old > 0 then
+		return -- already out (it was placed again while this waited)
+	end
+	spawnMonster(state, caught)
+end
+
+-- Builds the monster within the next few frames instead of right now.
+local function spawnSoon(state: State, caught: Value.CaughtMonster, replace: boolean?)
+	if replace then
+		for _, child in orbsOf(state, caught.uid) do
+			regrowing[child] = true
+		end
+	end
+	table.insert(spawnQueue, {
+		state = state,
+		caught = caught,
+		generation = state.generation,
+		replace = replace == true,
+	})
+	if spawnWorker then
+		return
+	end
+	spawnWorker = RunService.Heartbeat:Connect(function()
+		for _ = 1, SpawnsPerFrame do
+			local entry = table.remove(spawnQueue, 1)
+			if not entry then
+				break
+			end
+			local ok, err = pcall(runQueued, entry)
+			if not ok then
+				warn(`MansionService: spawning a monster failed: {err}`)
+			end
+		end
+		if #spawnQueue == 0 and spawnWorker then
+			spawnWorker:Disconnect()
+			spawnWorker = nil
+		end
+	end)
+end
+
+-- How many of the save's monsters get an orb (unknown ids stay in the save, unseen).
+local function shownCount(data: DataService.Data): number
+	local count = 0
+	for _, caught in data.monsters do
+		if Monsters[caught.monsterId] then
+			count += 1
+		end
+	end
+	return count
+end
+
 local function spawnAll(state: State, data: DataService.Data)
 	clearMonsters(state)
 	for _, caught in data.monsters do
-		spawnMonster(state, caught)
+		spawnSoon(state, caught)
 	end
 end
 
@@ -1019,7 +1116,7 @@ local function tryBuild(player: Player)
 	updateSign(state)
 	-- The joining player's loading screen (ReplicatedFirst) waits for these: the mansion is
 	-- built, and this many monsters have to reach their client before it fades out.
-	player:SetAttribute("MansionMonsters", #state.monsters:GetChildren())
+	player:SetAttribute("MansionMonsters", if #state.rects > 0 then shownCount(data) else 0)
 	player:SetAttribute("MansionReady", true)
 end
 
@@ -1268,7 +1365,7 @@ function MansionService.refreshMonsters(player: Player)
 		local uid = child:GetAttribute("Uid")
 		local caught = if typeof(uid) == "string" then byUid[uid] else nil
 		local monster = if caught then Monsters[caught.monsterId] else nil
-		if child:IsA("Model") and caught and monster then
+		if child:IsA("Model") and caught and monster and not regrowing[child] then
 			MonsterModel.refresh(child, infoFor(player, caught, monster.rarity))
 		end
 	end
@@ -1332,15 +1429,7 @@ function MansionService.grow(player: Player, spurts: number?)
 		end
 	end
 	for _, caught in grown do
-		for _, child in state.monsters:GetChildren() do
-			if child:GetAttribute("Uid") == caught.uid then
-				if child:IsA("Model") then
-					RoamService.remove(child)
-				end
-				child:Destroy()
-			end
-		end
-		spawnMonster(state, caught)
+		spawnSoon(state, caught, true) -- the old orb stays until its bigger one is built
 	end
 	MansionService.refreshMonsters(player) -- the weights and price tags of the others
 end
