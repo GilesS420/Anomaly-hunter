@@ -63,6 +63,9 @@ local ExactSlack = 0.25 -- the same on exact open ground (only rounding)
 
 local random = Random.new()
 local roamers: { [Model]: Roamer } = {}
+-- The same roamers by group, so a new leg only looks through its own mansion or zone
+-- (with 8 full mansions that's ~70 orbs instead of ~600).
+local byGroup: { [string]: { [Model]: Roamer } } = {}
 local started = false
 
 local function now(): number
@@ -146,6 +149,7 @@ end
 local function startLeg(roamer: Roamer, at: number): boolean
 	local here = roamer.to
 	local others = RoamService.bodies(roamer.group, roamer.model)
+	local reach = MaxLeg + roamer.radius + Roam.Gap
 
 	-- If it already overlaps something (only when a mansion is over capacity and orbs had to
 	-- be stacked), ignore those so it can walk out instead of being stuck forever.
@@ -163,13 +167,25 @@ local function startLeg(roamer: Roamer, at: number): boolean
 	-- it. One that's somehow off it already may walk back on.
 	local offFloor = not Roam.inside(roamer.paths, here.X, here.Z, -roamer.slack)
 	local close = nearby(roamer.rects, here.X, here.Z, roamer.radius)
+	-- A short hop stays inside the box of MaxLeg around here (target and the straight path to
+	-- it), so only bodies near that box can block it. Checking just those is the same answer
+	-- for far less work: a full mansion has ~1,500 bodies, a box around one orb a few dozen.
+	local near: { Roam.Body } = {}
+	for _, body in blocking do
+		local limit = reach + body.radius
+		if math.abs(body.x - here.X) < limit and math.abs(body.z - here.Z) < limit then
+			table.insert(near, body)
+		end
+	end
 	for attempt = 1, Candidates do
 		-- Mostly short hops; the last tries look anywhere, so a crowded corner can't trap it.
-		local pool = if attempt <= Candidates - 2 and #close > 0 then close else roamer.rects
-		local point = Roam.findFreePoint(pool, roamer.radius, blocking, random, 12)
+		local short = attempt <= Candidates - 2 and #close > 0
+		local pool = if short then close else roamer.rects
+		local against = if short then near else blocking
+		local point = Roam.findFreePoint(pool, roamer.radius, against, random, 12)
 		if
 			point
-			and Roam.pathClear(here.X, here.Z, point.x, point.z, roamer.radius, blocking)
+			and Roam.pathClear(here.X, here.Z, point.x, point.z, roamer.radius, against)
 			and (offFloor or Roam.lineInside(roamer.paths, here.X, here.Z, point.x, point.z, roamer.slack))
 		then
 			local target = Vector3.new(point.x, point.y + roamer.radius + 0.5, point.z)
@@ -238,6 +254,12 @@ function RoamService.add(model: Model, opts: Options)
 		end),
 	}
 	roamers[model] = roamer
+	local group = byGroup[opts.group]
+	if not group then
+		group = {}
+		byGroup[opts.group] = group
+	end
+	group[model] = roamer
 	settle(roamer, start)
 	publish(roamer)
 	CollectionService:AddTag(model, Tag)
@@ -250,6 +272,13 @@ function RoamService.remove(model: Model)
 		return
 	end
 	roamers[model] = nil
+	local group = byGroup[roamer.group]
+	if group then
+		group[model] = nil
+		if next(group) == nil then
+			byGroup[roamer.group] = nil
+		end
+	end
 	roamer.destroying:Disconnect()
 	CollectionService:RemoveTag(model, Tag)
 end
@@ -271,10 +300,8 @@ end
 
 -- New floor area for every roamer in a group (e.g. a mansion got a new wing).
 function RoamService.setRectsForGroup(group: string, rects: { Roam.Rect })
-	for _, roamer in roamers do
-		if roamer.group == group then
-			setRects(roamer, rects)
-		end
+	for _, roamer in byGroup[group] or {} do
+		setRects(roamer, rects)
 	end
 end
 
@@ -394,8 +421,8 @@ end
 function RoamService.bodies(group: string, except: Model?): { Roam.Body }
 	local at = now()
 	local out: { Roam.Body } = {}
-	for model, roamer in roamers do
-		if roamer.group == group and model ~= except then
+	for model, roamer in byGroup[group] or {} do
+		if model ~= except then
 			addBodiesOf(roamer, at, out)
 		end
 	end
