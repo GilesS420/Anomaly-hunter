@@ -4601,6 +4601,27 @@ do
 	first.id = oldId
 	check("badges: awarded once an id is set", #list == 1 and list[1].key == first.key)
 	check("badges: not awarded twice", #again == 0)
+do
+	local AreaLight = require("../src/shared/Config/AreaLight")
+	check(
+		"area light: hub, event, zone",
+		AreaLight.lookFor(false, false) == "Hub"
+			and AreaLight.lookFor(false, true) == "HubEvent"
+			and AreaLight.lookFor(true, true) == "Zone"
+			and AreaLight.lookFor(true, false) == "Zone"
+	)
+	for name, look in AreaLight.Looks do
+		check(
+			`area light: {name} look is sane`,
+			look.clockTime >= 0 and look.clockTime <= 24 and #look.tint == 3 and math.abs(look.brightness) < 0.3
+		)
+	end
+	-- The hub is daylight, the event sets the sun, zones are night.
+	check(
+		"area light: hub brighter than zones",
+		AreaLight.Looks.Hub.clockTime < AreaLight.Looks.HubEvent.clockTime
+			and AreaLight.Looks.HubEvent.clockTime < AreaLight.Looks.Zone.clockTime
+	)
 end
 
 if failures > 0 then

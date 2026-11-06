@@ -580,7 +580,8 @@ end
 -- A foggy, moonlit night, bright enough to see the hub by. Applied once per version
 -- (Lighting's "NightVersion" attribute); raise NightVersion to roll out new values. Its own
 -- Atmosphere, Sky, Bloom and ColorCorrection are tagged "Night" and updated; ones made by
--- hand are left as they are.
+-- hand are left as they are. Each client then sets its own ClockTime and exposure (a bright
+-- hub, dark zones: client/Controllers/AreaLightController, Config/AreaLight).
 local NightVersion = 2
 local function setNight()
 	if Lighting:GetAttribute("NightVersion") == NightVersion then
