@@ -126,6 +126,7 @@ ServerChecks.KnownRemotes = {
 	"FeedbackRemotes.Send",
 	"FeedbackRemotes.Admin",
 	"CommunityRemotes.Claim",
+	"CommunityRemotes.FriendsChanged",
 }
 
 local passed = 0

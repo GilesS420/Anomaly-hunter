@@ -17,6 +17,9 @@
 -- Remotes (ReplicatedStorage.CommunityRemotes):
 --   Claim  RemoteFunction ("Guild") -> { ok: boolean, message: string }
 --          ok is true only the one time the gift is given. Anything but "Guild" is junk.
+--   FriendsChanged  RemoteEvent (no args): the client saw a friend request accepted (or a
+--          friend removed) in game, so the server looks at the player's friends again soon.
+--          It only ever recounts from Roblox's own list, so spamming it can't add friends.
 -- Player attributes (set here only, so a client can't fake them): InGuild, GuildGift, and
 -- FriendsHere (how many of the player's Roblox friends are in this server: the friend bonus).
 
@@ -39,6 +42,9 @@ remotes.Name = "CommunityRemotes"
 local Claim = Instance.new("RemoteFunction")
 Claim.Name = "Claim"
 Claim.Parent = remotes
+local FriendsChanged = Instance.new("RemoteEvent")
+FriendsChanged.Name = "FriendsChanged"
+FriendsChanged.Parent = remotes
 
 local lastClaim: { [Player]: number } = {}
 local checking: { [Player]: boolean } = {}
@@ -168,25 +174,95 @@ local function countFriends(player: Player)
 	end
 end
 
--- Checks a newcomer against everyone already here (both ways count the same friendship).
-local function meetEveryone(player: Player)
+-- The player's Roblox friends as a set of user ids, asked fresh from Roblox
+-- (Players:GetFriendsAsync). Player:IsFriendsWith is cached for the visit, so two players
+-- who become friends in game would keep looking like strangers there. nil if Roblox didn't
+-- answer.
+local function friendIds(player: Player): { [number]: boolean }?
+	local ok, pages = pcall(Players.GetFriendsAsync, Players, player.UserId)
+	if not ok or not pages then
+		return nil
+	end
+	local ids: { [number]: boolean } = {}
+	while true do
+		for _, friend in (pages :: any):GetCurrentPage() do
+			if typeof(friend) == "table" and typeof(friend.Id) == "number" then
+				ids[friend.Id] = true
+			end
+		end
+		if (pages :: any).IsFinished then
+			break
+		end
+		if not pcall((pages :: any).AdvanceToNextPageAsync, pages) then
+			return nil
+		end
+	end
+	return ids
+end
+
+-- Looks at the player's friends again and fixes FriendsHere for them and for everyone here
+-- they became (or stopped being) friends with.
+local function recheckFriends(player: Player)
+	local ids = friendIds(player)
+	if not ids or player.Parent ~= Players then
+		return
+	end
 	friendsOf[player] = friendsOf[player] or {}
 	for _, other in Players:GetPlayers() do
 		if other ~= player then
-			task.spawn(function()
-				local ok, friends = pcall(player.IsFriendsWith, player, other.UserId)
-				if ok and friends and player.Parent == Players and other.Parent == Players then
-					friendsOf[player] = friendsOf[player] or {}
-					friendsOf[other] = friendsOf[other] or {}
-					friendsOf[player][other] = true
-					friendsOf[other][player] = true
-					countFriends(player)
-					countFriends(other)
-				end
-			end)
+			local now = ids[other.UserId] == true
+			if (friendsOf[player][other] == true) ~= now then
+				friendsOf[other] = friendsOf[other] or {}
+				friendsOf[player][other] = if now then true else nil
+				friendsOf[other][player] = if now then true else nil
+				countFriends(other)
+			end
 		end
 	end
 	countFriends(player)
+end
+
+-- One recheck at a time per player, and at most one every FriendPingSeconds when the client
+-- asks, so the remote can't be used to flood Roblox's friends API.
+local friendBusy: { [Player]: boolean } = {}
+local friendAgain: { [Player]: boolean } = {} -- asked again while a recheck was running
+local lastFriendPing: { [Player]: number } = {}
+
+local function recheckSoon(player: Player)
+	if friendBusy[player] then
+		friendAgain[player] = true
+		return
+	end
+	friendBusy[player] = true
+	task.spawn(function()
+		repeat
+			friendAgain[player] = nil
+			recheckFriends(player)
+			-- Roblox's friends list can lag a moment behind the accept, so look once more.
+			task.wait(Config.FriendLagSeconds)
+			if player.Parent == Players then
+				recheckFriends(player)
+			end
+		until not friendAgain[player] or player.Parent ~= Players
+		friendBusy[player] = nil
+		friendAgain[player] = nil
+	end)
+end
+
+local function onFriendsChanged(player: Player)
+	local now = os.clock()
+	if now - (lastFriendPing[player] or -math.huge) < Config.FriendPingSeconds then
+		return
+	end
+	lastFriendPing[player] = now
+	recheckSoon(player)
+end
+
+-- Checks a newcomer against everyone already here (both ways count the same friendship).
+local function meetEveryone(player: Player)
+	friendsOf[player] = friendsOf[player] or {}
+	countFriends(player)
+	recheckSoon(player)
 end
 
 local function onClaim(player: Player, which: unknown): ClaimResult
@@ -226,6 +302,7 @@ end
 function CommunityService.start()
 	remotes.Parent = ReplicatedStorage
 	Claim.OnServerInvoke = onClaim
+	FriendsChanged.OnServerEvent:Connect(onFriendsChanged)
 
 	-- The stand only talks: joining happens in the dialogue on the client.
 	Counter.prompt("GuildStand", "Hunter's Guild", function() end)
@@ -260,6 +337,9 @@ function CommunityService.start()
 	Players.PlayerRemoving:Connect(function(player)
 		lastClaim[player] = nil
 		checking[player] = nil
+		friendBusy[player] = nil
+		friendAgain[player] = nil
+		lastFriendPing[player] = nil
 		for other in friendsOf[player] or {} do
 			local theirs = friendsOf[other]
 			if theirs then
@@ -268,6 +348,25 @@ function CommunityService.start()
 			end
 		end
 		friendsOf[player] = nil
+	end)
+
+	-- Friends can also be added or removed outside the game (the website, the app), which no
+	-- event tells the server about: look at everyone's friends again every so often.
+	task.spawn(function()
+		while true do
+			task.wait(Config.FriendRecheckSeconds)
+			for _, player in Players:GetPlayers() do
+				if not friendBusy[player] then
+					friendBusy[player] = true
+					recheckFriends(player)
+					friendBusy[player] = nil
+					if friendAgain[player] then
+						recheckSoon(player) -- a ping came in meanwhile
+					end
+				end
+				task.wait(1) -- spread the calls out
+			end
+		end
 	end)
 
 	-- Guild perks last only while the player stays in the group: look again every few
