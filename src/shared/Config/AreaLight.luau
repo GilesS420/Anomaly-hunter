@@ -26,12 +26,13 @@ export type Look = {
 
 local Looks: { [string]: Look } = {
 	Hub = {
-		clockTime = 16.6,
-		exposure = 0.15,
-		brightness = 0.04,
-		contrast = 0.06,
-		saturation = 0.12,
-		tint = { 255, 242, 226 },
+		-- Giles 2026-11-06: 16.6 looked like plain daylight; a lower sun, more orange.
+		clockTime = 17.65,
+		exposure = 0.1,
+		brightness = 0.02,
+		contrast = 0.08,
+		saturation = 0.2,
+		tint = { 255, 214, 168 },
 	},
 	HubEvent = {
 		clockTime = 18.5,
