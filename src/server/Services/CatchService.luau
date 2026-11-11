@@ -36,6 +36,7 @@ local MansionService = require(script.Parent.MansionService)
 local Notify = require(script.Parent.Parent.Notify)
 local Perks = require(script.Parent.Parent.Perks)
 local MissionService = require(script.Parent.MissionService)
+local RareCatchService = require(script.Parent.RareCatchService)
 local RoamService = require(script.Parent.RoamService)
 local SpawnService = require(script.Parent.SpawnService)
 local WatcherService = require(script.Parent.WatcherService)
@@ -235,6 +236,8 @@ local function finish(player: Player, lucky: boolean?)
 	local variant = if caught.variant then `{caught.variant} ` else ""
 	local perfect = if lucky then "PERFECT CATCH! " else ""
 	Notify.toast(player, `{perfect}Caught a {variant}{caught.size} {hold.name}!{bonus}{afterward}`)
+	-- Epic and up get a reveal card; Mythic, Divine and Rainbow are told to the server too.
+	RareCatchService.caught(player, caught)
 	MissionService.record(
 		player,
 		"Catch",

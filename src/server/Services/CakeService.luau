@@ -373,6 +373,29 @@ local function check(player: Player)
 	end
 end
 
+-- Rebirth: every cake standing out goes back into the hotbar as one whole cake (the mansion
+-- floor it stood on is about to go). Returns how many came back.
+function CakeService.packUp(player: Player): number
+	local data = DataService.get(player)
+	if not data then
+		return 0
+	end
+	local count = 0
+	for _, saved in data.cakes do
+		if Cakes.item(saved.itemId) then
+			data.inventory[saved.itemId] = (data.inventory[saved.itemId] or 0) + 1
+			count += 1
+		end
+	end
+	local standing: { Live } = live[player] or {}
+	for _, cake in table.clone(standing) do
+		remove(player, cake)
+	end
+	table.clear(data.cakes)
+	CakeService.syncTools(player)
+	return count
+end
+
 -- When the player is back: plays back what their cakes did while they were away, then puts
 -- the ones still going on the floor.
 local function restore(player: Player)

@@ -641,6 +641,11 @@ local function removePlank()
 	end
 end
 
+-- True while the player has a trade window open with someone (RebirthService waits for it).
+function TradeService.isTrading(player: Player): boolean
+	return sessions[player] ~= nil
+end
+
 function TradeService.start()
 	remotes.Parent = ReplicatedStorage
 	PriceLevels.start()

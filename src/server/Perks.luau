@@ -10,6 +10,7 @@ local CakeConfig = require(ReplicatedStorage.Shared.Config.Cakes)
 local Community = require(ReplicatedStorage.Shared.Config.Community)
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.Inventory)
 local Rookie = require(ReplicatedStorage.Shared.Config.Rookie)
+local Rebirth = require(ReplicatedStorage.Shared.Util.Rebirth)
 local Robux = require(ReplicatedStorage.Shared.Config.Robux)
 
 local Perks = {}
@@ -60,6 +61,14 @@ function Perks.sellBonuses(player: Player): { Bonus }
 	end
 	if player:GetAttribute("InGuild") == true then
 		table.insert(list, { label = "Guild", percent = math.floor(Community.GuildSellBonus * 100 + 0.5) })
+	end
+	-- RebirthService keeps the Rebirths attribute in step with the save.
+	local rebirths = Rebirth.count(player:GetAttribute("Rebirths"))
+	if rebirths > 0 then
+		table.insert(list, {
+			label = if rebirths == 1 then "rebirth" else `{rebirths} rebirths`,
+			percent = Rebirth.bonusPercent(rebirths),
+		})
 	end
 	local rookie = player:GetAttribute("RookieSeconds")
 	if typeof(rookie) == "number" and rookie > 0 then

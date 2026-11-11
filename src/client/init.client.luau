@@ -39,6 +39,8 @@ local CodexController = require(script.Controllers.CodexController)
 local MissionController = require(script.Controllers.MissionController)
 local PlaytimeController = require(script.Controllers.PlaytimeController)
 local SpinController = require(script.Controllers.SpinController)
+local RareCatchController = require(script.Controllers.RareCatchController)
+local RebirthController = require(script.Controllers.RebirthController)
 local StoreController = require(script.Controllers.StoreController)
 local SettingsController = require(script.Controllers.SettingsController)
 local AwayBookController = require(script.Controllers.AwayBookController)
@@ -88,6 +90,8 @@ local controllers: { { start: () -> () } } = {
 	MissionController,
 	PlaytimeController,
 	SpinController,
+	RareCatchController,
+	RebirthController,
 	StoreController,
 	SettingsController,
 	AwayBookController,
