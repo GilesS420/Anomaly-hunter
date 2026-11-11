@@ -7626,4 +7626,10 @@ Looks.BarrelMimic = {
 	},
 }
 
+-- Zone 4 (Spooky School) lives in its own file.
+for id, look in require("./LooksSchool") :: { [string]: Look } do
+	assert(Looks[id] == nil, "duplicate look " .. id)
+	Looks[id] = look
+end
+
 return Looks

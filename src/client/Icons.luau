@@ -30,6 +30,7 @@ export type Kind =
 	| "Clover"
 	| "Boot"
 	| "Gift"
+	| "Wheel"
 
 local Ink = Color3.fromRGB(30, 20, 36) -- the dark outline round the mission and store pictures
 
@@ -304,6 +305,24 @@ local draw: { [Kind]: (Frame) -> () } = {
 		piece(box, 0.5, 0.6, 0.14, 0.62, ribbon)
 		edge(piece(box, 0.38, 0.24, 0.2, 0.16, ribbon, 0.5, -20), 1.5) -- the bow
 		edge(piece(box, 0.62, 0.24, 0.2, 0.16, ribbon, 0.5, 20), 1.5)
+	end,
+
+	-- The Lucky Spin: a prize wheel in four colours with a hub, and a red pointer on top.
+	Wheel = function(box)
+		local colors = {
+			Color3.fromRGB(90, 170, 110),
+			Color3.fromRGB(220, 120, 160),
+			Color3.fromRGB(110, 150, 230),
+			Color3.fromRGB(255, 211, 107),
+		}
+		edge(piece(box, 0.5, 0.55, 0.84, 0.84, Color3.fromRGB(60, 44, 80), 0.5))
+		for i, spot in { { 0.36, 0.41 }, { 0.64, 0.41 }, { 0.64, 0.69 }, { 0.36, 0.69 } } do
+			piece(box, spot[1], spot[2], 0.26, 0.26, colors[i], 0.5)
+		end
+		piece(box, 0.5, 0.55, 0.06, 0.76, Color3.fromRGB(60, 44, 80))
+		piece(box, 0.5, 0.55, 0.76, 0.06, Color3.fromRGB(60, 44, 80))
+		edge(piece(box, 0.5, 0.55, 0.18, 0.18, Color3.fromRGB(255, 240, 200), 0.5), 1.5)
+		edge(piece(box, 0.5, 0.12, 0.16, 0.16, Color3.fromRGB(225, 70, 70), 0.15, 45), 1.5)
 	end,
 }
 

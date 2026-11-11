@@ -10,13 +10,24 @@ export type Zone = {
 	name: string,
 	wing: string,
 	launch: boolean,
+	-- Left out of Breach Storm's monster mix (newer zones are worth 4x more each, so a storm
+	-- would pay far more than the other events).
+	noBreach: boolean?,
 }
 
 local Zones: { Zone } = {
 	{ id = "PumpkinGraveyard", index = 1, name = "Pumpkin Graveyard", wing = "Foyer", launch = true },
 	{ id = "MurkyBayou", index = 2, name = Names.MurkyBayou, wing = "Library", launch = true },
 	{ id = "AbandonedCarnival", index = 3, name = "Abandoned Carnival", wing = "Ballroom", launch = true },
-	{ id = "SpookySchool", index = 4, name = "Spooky School", wing = "Attic", launch = false },
+	-- Opened 2026-11-11 (thread "Add fresh content to match the market").
+	{
+		id = "SpookySchool",
+		index = 4,
+		name = "Spooky School",
+		wing = "Attic",
+		launch = true,
+		noBreach = true,
+	},
 	{ id = "GhostShip", index = 5, name = "Ghost Ship", wing = "Crypt", launch = false },
 }
 

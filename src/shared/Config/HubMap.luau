@@ -372,6 +372,10 @@ function HubMap.parts(): { Part }
 	end
 	local back = Layout.ReturnPoint
 	take(back.x - 8, back.x + 8, back.z - 8, back.z + 8)
+	local board = Layout.LeaderboardSize.width / 2 + 4
+	for _, spot in Layout.Leaderboards do
+		take(spot.x - board, spot.x + board, spot.z - 6, spot.z + 6)
+	end
 	-- The shops stand behind their plaza.
 	take(-410, ShopPlaza.x0, -75, 75)
 

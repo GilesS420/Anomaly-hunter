@@ -182,12 +182,12 @@ function Watcher.pickSet(event: Events.WatcherEvent, random: Random?): Events.Mo
 	end, random)
 end
 
--- Breach Storm's monsters: every monster of the launch zones by its zone spawn weight, with
--- Legendary and rarer `rareMultiplier` times as likely.
+-- Breach Storm's monsters: every monster of the launch zones (but not the noBreach ones) by
+-- its zone spawn weight, with Legendary and rarer `rareMultiplier` times as likely.
 function Watcher.zoneWeights(rareMultiplier: number): { [string]: number }
 	local open: { [number]: boolean } = {}
 	for _, zone in Zones.List do
-		if zone.launch then
+		if zone.launch and not zone.noBreach then
 			open[zone.index] = true
 		end
 	end

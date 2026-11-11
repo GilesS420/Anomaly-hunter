@@ -73,7 +73,7 @@ local Monsters: { [string]: MonsterAttack } = {
 	BigTopTerror = { kind = "Shockwave", text = "swallowed you for a moment" },
 	GoldenCarousel = { kind = "Shockwave", text = "spun up a whirlwind" },
 
-	-- Zone 4: Spooky School (not in the launch)
+	-- Zone 4: Spooky School
 	Chalkling = { kind = "Blind", text = "puffed a chalk dust cloud" },
 	Paperbat = { kind = "Charge", text = "swooped at you" },
 	LunchGhoul = { kind = "Slow", text = "spat jello that slows you" },

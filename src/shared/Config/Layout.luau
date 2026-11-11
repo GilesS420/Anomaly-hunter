@@ -163,6 +163,14 @@ Layout.Landmarks = {
 	},
 } :: { Landmark }
 
+-- The two leaderboards (server/Services/LeaderboardService), either side of the path from the
+-- landing spot to Watcher Square, their fronts facing the landing spot (+z).
+Layout.Leaderboards = {
+	{ id = "Worth", title = "Richest Hunters", x = -62, z = 22 },
+	{ id = "Finds", title = "Top Collectors", x = 62, z = 22 },
+} :: { { id: string, title: string, x: number, z: number } }
+Layout.LeaderboardSize = { width = 14, height = 12, post = 4 } -- board, and posts under it
+
 -- Where hunters land in the hub when they have no plot (fallback).
 Layout.ReturnPoint = { x = 0, z = 40 }
 

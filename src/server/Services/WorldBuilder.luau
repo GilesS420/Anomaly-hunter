@@ -66,6 +66,12 @@ local themes: { [string]: Theme } = {
 		wall = Color3.fromRGB(96, 56, 130),
 		glow = Color3.fromRGB(180, 90, 255),
 	},
+	SpookySchool = {
+		floor = Color3.fromRGB(52, 58, 46),
+		floorMaterial = Enum.Material.Grass,
+		wall = Color3.fromRGB(112, 58, 50),
+		glow = Color3.fromRGB(255, 214, 120),
+	},
 }
 local defaultTheme: Theme = {
 	floor = Color3.fromRGB(70, 70, 70),
@@ -282,6 +288,12 @@ local function buildArches(hub: Instance)
 	local size = Layout.GateSize
 	for _, zone in Zones.List do
 		local spot = Layout.Gates[zone.index]
+		-- A zone that opened since its boarded-up arch was built (and saved in the place) gets
+		-- its real arch.
+		local old = World.find(arches, zone.id)
+		if old and zone.launch and old:FindFirstChild("Padlock", true) then
+			old:Destroy()
+		end
 		if spot and not World.find(arches, zone.id) then
 			local ground = Vector3.new(spot.x, GroundTop, spot.z)
 			local parts = Scenery.Arch(zone.id, size.width, size.height, size.thickness, not zone.launch)

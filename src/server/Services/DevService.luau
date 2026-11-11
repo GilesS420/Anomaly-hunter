@@ -33,6 +33,7 @@
 --                     3 days and deals a fresh set so the bonus shows; /missions reset starts
 --                     today's missions over (no progress, claimable again); /missions set Merge2
 --                     swaps in that mission (Config/Missions.Pool) for today's of its tier
+--   /spins            gives back today's used Lucky Spins
 --   /playtime 30      adds 30 minutes of play time today (the playtime gifts); /playtime reset
 --                     starts today over (no time, nothing claimed)
 --   /calm             zone monsters leave you alone (type it again to let them attack)
@@ -100,6 +101,7 @@ local MonsterAiService = require(script.Parent.MonsterAiService)
 local MansionService = require(script.Parent.MansionService)
 local MissionService = require(script.Parent.MissionService)
 local PlaytimeService = require(script.Parent.PlaytimeService)
+local SpinService = require(script.Parent.SpinService)
 local Notify = require(script.Parent.Parent.Notify)
 local SpawnService = require(script.Parent.SpawnService)
 local TutorialService = require(script.Parent.TutorialService)
@@ -390,6 +392,10 @@ commands["/playtime"] = function(player, argument, tell)
 	else
 		tell("Try: /playtime 30 or /playtime reset")
 	end
+end
+
+commands["/spins"] = function(player, _, tell)
+	tell(if SpinService.reset(player) then "Today's Lucky Spins are back." else "Your save is still loading.")
 end
 
 commands["/missions"] = function(player, argument, tell)
@@ -1034,7 +1040,7 @@ function DevService.start()
 		return
 	end
 	print(
-		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /tips reset, /tip <id>, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /charges, /chamber, /missions done|new|reset|set <id>|streak <days>, /playtime <minutes>|reset, /calm, /attacks on|off, /respawn, /attack, /restock <items amounts>|end, /announce <text>, /givemonster <monster> [size] [variant] [kg] [effects], /addeffect <uid> <effects>`
+		`DevService (admins, F2 opens the panel): /money <amount>, /wings <1-{MaxWings}>, /clearmonsters, /tutorial skip|restart, /tips reset, /tip <id>, /reset confirm, /give <item> [count], /summon, /event <name> [set], /stopevent, /skip <hours>, /haunt, /charges, /chamber, /missions done|new|reset|set <id>|streak <days>, /playtime <minutes>|reset, /spins, /calm, /attacks on|off, /respawn, /attack, /restock <items amounts>|end, /announce <text>, /givemonster <monster> [size] [variant] [kg] [effects], /addeffect <uid> <effects>`
 	)
 end
 

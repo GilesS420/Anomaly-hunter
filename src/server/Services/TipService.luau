@@ -63,6 +63,7 @@ local function factsFor(player: Player, data: DataService.Data): Tips.Facts
 		ghost = GoldenGhostService.isOut(),
 		inHub = player:GetAttribute("Zone") == nil,
 		gift = (tonumber(player:GetAttribute("PlaytimeReady")) or 0) > 0,
+		spin = (tonumber(player:GetAttribute("SpinLeft")) or 0) > 0,
 	}
 end
 

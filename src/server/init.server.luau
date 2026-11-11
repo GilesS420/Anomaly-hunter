@@ -38,12 +38,15 @@ local TipService = require(script.Services.TipService)
 local CodexService = require(script.Services.CodexService)
 local MissionService = require(script.Services.MissionService)
 local PlaytimeService = require(script.Services.PlaytimeService)
+local SpinService = require(script.Services.SpinService)
+local CodesService = require(script.Services.CodesService)
 local RobuxService = require(script.Services.RobuxService)
 local SettingsService = require(script.Services.SettingsService)
 local HotbarService = require(script.Services.HotbarService)
 local FeedbackService = require(script.Services.FeedbackService)
 local CommunityService = require(script.Services.CommunityService)
 local BadgesService = require(script.Services.BadgesService)
+local LeaderboardService = require(script.Services.LeaderboardService)
 local DevService = require(script.Services.DevService)
 local FallService = require(script.Services.FallService)
 local MovementService = require(script.Services.MovementService)
@@ -88,12 +91,15 @@ local services: { { name: string, start: () -> ...any } } = {
 	{ name = "CodexService", start = CodexService.start },
 	{ name = "MissionService", start = MissionService.start },
 	{ name = "PlaytimeService", start = PlaytimeService.start },
+	{ name = "SpinService", start = SpinService.start },
+	{ name = "CodesService", start = CodesService.start },
 	{ name = "RobuxService", start = RobuxService.start },
 	{ name = "SettingsService", start = SettingsService.start },
 	{ name = "HotbarService", start = HotbarService.start },
 	{ name = "FeedbackService", start = FeedbackService.start },
 	{ name = "CommunityService", start = CommunityService.start },
 	{ name = "BadgesService", start = BadgesService.start },
+	{ name = "LeaderboardService", start = LeaderboardService.start },
 	{ name = "DevService", start = DevService.start },
 	{ name = "FallService", start = FallService.start },
 	{ name = "MovementService", start = MovementService.start },

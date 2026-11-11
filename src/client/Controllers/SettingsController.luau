@@ -5,7 +5,8 @@
 -- tapping another saves it straight away, see client/Settings). At the bottom, "Feedback"
 -- opens the feedback window (FeedbackController), and "Join group", "Favourite" and "Invite"
 -- open Roblox's own Join Group, Favourite and Invite Friends windows (client/Community, same
--- as the Guild stand).
+-- as the Guild stand). At the top, a Codes box: type a reward code (Config/Codes) and press
+-- Redeem (server/Services/CodesService).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -185,6 +186,69 @@ function SettingsController.start()
 	end
 
 	Settings.changed(paint)
+
+	-- Reward codes, first in the list (thread "Add fresh content to match the market").
+	do
+		local remotes = ReplicatedStorage:WaitForChild("CodesRemotes")
+		local Redeem = remotes:WaitForChild("Redeem") :: RemoteFunction
+		local row = Instance.new("Frame")
+		row.Name = "Codes"
+		row.LayoutOrder = 0
+		row.Size = UDim2.new(1, -8, 0, 64)
+		row.BackgroundColor3 = Ui.Colors.row
+		row.Parent = window.list
+		Ui.corner(row, 10)
+		Ui.rim(row, Ui.Style.line, 1)
+		local padding = Instance.new("UIPadding")
+		padding.PaddingLeft = UDim.new(0, 10)
+		padding.PaddingRight = UDim.new(0, 10)
+		padding.Parent = row
+		local name = Ui.text(row, "Codes", UDim2.new(0, 70, 1, 0), Ui.Colors.text, true, 20)
+		name.Position = UDim2.fromOffset(0, 0)
+		local box = Instance.new("TextBox")
+		box.Name = "CodeBox"
+		box.AnchorPoint = Vector2.new(0, 0.5)
+		box.Position = UDim2.new(0, 76, 0.5, 0)
+		box.Size = UDim2.new(1, -76 - 112, 0, 40)
+		box.BackgroundColor3 = Ui.Colors.panel
+		box.ClearTextOnFocus = false
+		box.PlaceholderText = "Enter code"
+		box.PlaceholderColor3 = Ui.Colors.muted
+		box.Text = ""
+		box.TextColor3 = Ui.Colors.text
+		box.Font = Enum.Font.FredokaOne
+		box.TextSize = 20
+		box.Parent = row
+		Ui.corner(box, 6)
+		Ui.rim(box, Ui.Style.line, 1)
+		local redeem = Ui.button(row, "Redeem", Ui.Colors.buy, UDim2.fromOffset(104, 40))
+		redeem.AnchorPoint = Vector2.new(1, 0.5)
+		redeem.Position = UDim2.new(1, 0, 0.5, 0)
+		local busy = false
+		local function send()
+			local code = box.Text
+			if busy or code == "" then
+				return
+			end
+			busy = true
+			task.spawn(function()
+				local ok, result = pcall(Redeem.InvokeServer, Redeem, code)
+				busy = false
+				if ok and typeof(result) == "table" and typeof(result.message) == "string" then
+					ToastController.show(result.message)
+					if result.ok then
+						box.Text = ""
+					end
+				end
+			end)
+		end
+		redeem.Activated:Connect(send)
+		box.FocusLost:Connect(function(enter: boolean)
+			if enter then
+				send()
+			end
+		end)
+	end
 
 	-- Bottom of the window: write to the team (FeedbackController, Giles 2026-11-03), join
 	-- the Hunter's Guild group or invite friends (client/Community, Giles 2026-11-04).
