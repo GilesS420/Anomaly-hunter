@@ -994,6 +994,9 @@ local function build()
 	button(playRow, "Reset", Ui.Colors.off, 90, function()
 		send("/playtime", "reset")
 	end)
+	button(playRow, "Spins back", Ui.Colors.equip, 110, function()
+		send("/spins", "")
+	end)
 
 	-- The missions pop-up: one dropdown per tier; Set swaps in that mission.
 	note(

@@ -169,6 +169,32 @@ local ArchStyles: { [string]: ArchStyle } = {
 	},
 }
 
+ArchStyles.SpookySchool = {
+	pillar = { { 112, 58, 50 }, { 196, 186, 160 } },
+	material = "Slate",
+	trim = { 46, 44, 54 },
+	glow = { 255, 214, 120 },
+	crown = function(parts, top)
+		-- A little bell tower: a brick box, an open belfry with a brass bell, a pointed roof.
+		part(parts, "TowerBase", { 5, 3, 3 }, { 0, top + 1.5, 0 }, { 82, 42, 38 }, "Slate", true)
+		for _, side in { -1, 1 } do
+			local tag = if side < 0 then "Left" else "Right"
+			part(
+				parts,
+				`Belfry{tag}`,
+				{ 0.6, 2.6, 0.6 },
+				{ side * 2, top + 4.3, 0 },
+				{ 112, 58, 50 },
+				"Slate"
+			)
+		end
+		local bell = part(parts, "Bell", { 1.8, 1.8, 1.8 }, { 0, top + 4.2, 0 }, { 205, 155, 60 }, "Metal")
+		bell.shape = "Ball"
+		part(parts, "BelfryRoof", { 5, 0.6, 3 }, { 0, top + 5.9, 0 }, { 46, 44, 54 }, "Slate", true)
+		part(parts, "Spire", { 2.4, 1.8, 1.6 }, { 0, top + 7.1, 0 }, { 46, 44, 54 }, "Slate", true)
+	end,
+}
+
 local LockedStyle: ArchStyle = {
 	pillar = { StoneDark },
 	material = "Slate",
@@ -1693,6 +1719,258 @@ local function abandonedCarnival(): { Part }
 	return parts
 end
 
+------------------------------------------------------------------------------------------
+-- Zone 4: Spooky School
+------------------------------------------------------------------------------------------
+
+local Brick = { 112, 58, 50 }
+local BrickDark = { 82, 42, 38 }
+local SchoolTrim = { 196, 186, 160 }
+local Roof = { 46, 44, 54 }
+local WindowLit = { 255, 214, 120 }
+local WindowDark = { 26, 28, 40 }
+local BusYellow = { 214, 168, 40 }
+local Asphalt = { 58, 58, 64 }
+local DeskWood = { 150, 110, 70 }
+local LockerBlue = { 60, 92, 140 }
+local Board = { 34, 62, 46 }
+local Chalk = { 235, 235, 225 }
+
+-- A school desk with its chair behind it, `turn` degrees round.
+local function desk(parts: { Part }, name: string, x: number, z: number, turn: number)
+	local d = group(parts, { x, 0, z }, turn, 0)
+	d(name .. "Top", { 3, 0.25, 2 }, { 0, 2.6, 0 }, DeskWood, "Wood", true)
+	for i, c in { { -1, -1 }, { -1, 1 }, { 1, -1 }, { 1, 1 } } do
+		d(`{name}Leg{i}`, { 0.2, 2.5, 0.2 }, { c[1] * 1.3, 1.25, c[2] * 0.8 }, Iron, "Metal", true)
+	end
+	d(name .. "Seat", { 1.6, 0.2, 1.4 }, { 0, 1.5, 2 }, DeskWood, "Wood", true)
+	d(name .. "SeatPost", { 0.3, 1.4, 0.3 }, { 0, 0.7, 2 }, Iron, "Metal", true)
+	d(name .. "Back", { 1.6, 1.4, 0.2 }, { 0, 2.3, 2.7 }, DeskWood, "Wood", true)
+end
+
+-- A row of tall lockers along x, doors facing -z, one hanging open.
+local function lockerRow(parts: { Part }, name: string, x: number, z: number, count: number)
+	for i = 1, count do
+		local lx = x + (i - (count + 1) / 2) * 2.2
+		part(parts, `{name}{i}`, { 2, 7, 1.8 }, { lx, 3.5, z }, LockerBlue, "Metal", true)
+		for v = 1, 3 do
+			part(
+				parts,
+				`{name}{i}Vent{v}`,
+				{ 1.2, 0.15, 0.05 },
+				{ lx, 6 - v * 0.35, z - 0.93 },
+				Iron,
+				"Metal"
+			)
+		end
+		if i == 3 then
+			local door = part(
+				parts,
+				`{name}{i}Door`,
+				{ 1.8, 6.6, 0.1 },
+				{ lx - 1.5, 3.5, z - 1.6 },
+				LockerBlue,
+				"Metal"
+			)
+			door.rot = { 0, 60, 0 }
+			local eyes = part(
+				parts,
+				`{name}{i}Eyes`,
+				{ 1, 0.25, 0.05 },
+				{ lx, 4.6, z - 0.93 },
+				{ 255, 220, 90 },
+				"Neon"
+			)
+			eyes.light = { color = { 255, 220, 90 }, range = 8, brightness = 0.6 }
+		end
+	end
+end
+
+-- The Spooky School: a fenced schoolyard under dark cliffs. Through the school gate a path
+-- leads up the yard to the old brick school at the back, its bell tower in the middle with a
+-- clock stuck at midnight. The yard has scattered desks, lockers, a chalkboard, a broken-down
+-- school bus, a playground with swings and a slide, a flagpole and a basketball hoop.
+local function spookySchool(): { Part }
+	local parts: { Part } = {}
+	perimeterFence(parts)
+	cliffs(parts, 127, { 58, 60, 78 })
+
+	-- The way in, through the school gate.
+	part(parts, "PathMain", { 8, 0.1, 30 }, { 0, 0.05, -73 }, StoneDark, "Cobblestone")
+	part(parts, "PathCross", { 39, 0.1, 6 }, { 4.5, 0.05, -91 }, StoneDark, "Cobblestone")
+	part(parts, "PathYard", { 10, 0.1, 132 }, { 0, 0.05, 8 }, Asphalt, "Slate")
+	for _, side in { -1, 1 } do
+		local tag = if side < 0 then "Left" else "Right"
+		part(parts, `GatePillar{tag}`, { 2.4, 10, 2.4 }, { side * 7, 5, -62 }, Brick, "Slate", true)
+		part(parts, `GateCap{tag}`, { 3, 0.6, 3 }, { side * 7, 10.3, -62 }, SchoolTrim, "Slate", true)
+		Kit.lampPost(parts, `PathLamp{tag}`, side * 6.5, -80)
+		fenceRun(parts, `InnerFence{tag}`, side * 10, side * 106, -62)
+	end
+	part(parts, "GateBar", { 12, 0.8, 0.8 }, { 0, 9.6, -62 }, Iron, "Metal")
+	local sign = part(parts, "GateSign", { 12, 2.2, 0.3 }, { 0, 11.1, -62 }, SchoolTrim, "WoodPlanks")
+	sign.text = "Spooky School"
+
+	-- Hopscotch and a painted court on the yard (flat, monsters walk over them).
+	for i = 1, 6 do
+		part(parts, `Hopscotch{i}`, { 2.6, 0.05, 2.6 }, { -24, 0.03, -40 + i * 3 }, Chalk, "SmoothPlastic")
+	end
+	part(parts, "CourtLineFront", { 30, 0.05, 0.4 }, { 50, 0.03, -36 }, Chalk, "SmoothPlastic")
+	part(parts, "CourtLineBack", { 30, 0.05, 0.4 }, { 50, 0.03, -6 }, Chalk, "SmoothPlastic")
+	part(parts, "CourtLineLeft", { 0.4, 0.05, 30 }, { 35, 0.03, -21 }, Chalk, "SmoothPlastic")
+	part(parts, "CourtLineRight", { 0.4, 0.05, 30 }, { 65, 0.03, -21 }, Chalk, "SmoothPlastic")
+
+	-- The school at the back: two brick wings either side of the bell tower.
+	local sz = 92 -- the building's middle along z
+	part(parts, "SchoolWall", { 120, 16, 24 }, { 0, 8, sz }, Brick, "Slate", true)
+	part(parts, "SchoolBase", { 122, 1.2, 25 }, { 0, 0.6, sz }, BrickDark, "Slate", true)
+	part(parts, "SchoolCornice", { 122, 0.8, 25 }, { 0, 16.4, sz }, SchoolTrim, "Slate", true)
+	part(parts, "SchoolRoof", { 118, 2, 22 }, { 0, 17.8, sz }, Roof, "Slate", true)
+	local front = sz - 12 - 0.06
+	for row, y in { 5, 11.5 } do
+		for col = 1, 10 do
+			local x = -55 + (col - 1) * 12.2
+			if math.abs(x) > 8 then
+				local lit = (row * 7 + col * 3) % 5 == 0
+				local w = part(
+					parts,
+					`Window{row}x{col}`,
+					{ 4, 3.6, 0.1 },
+					{ x, y, front },
+					if lit then WindowLit else WindowDark,
+					if lit then "Neon" else "Glass"
+				)
+				if lit then
+					w.light = { color = WindowLit, range = 16, brightness = 0.7 }
+				end
+				part(
+					parts,
+					`Sill{row}x{col}`,
+					{ 4.6, 0.3, 0.4 },
+					{ x, y - 2, front - 0.2 },
+					SchoolTrim,
+					"Slate"
+				)
+			end
+		end
+	end
+	-- The bell tower over the front doors.
+	part(parts, "Tower", { 12, 30, 12 }, { 0, 15, sz - 6 }, BrickDark, "Slate", true)
+	part(parts, "TowerTop", { 13, 1, 13 }, { 0, 30.5, sz - 6 }, SchoolTrim, "Slate", true)
+	for _, c in { { -1, -1 }, { -1, 1 }, { 1, -1 }, { 1, 1 } } do
+		part(
+			parts,
+			`Belfry{c[1]}{c[2]}`,
+			{ 1.4, 7, 1.4 },
+			{ c[1] * 5.3, 34.5, sz - 6 + c[2] * 5.3 },
+			Brick,
+			"Slate",
+			true
+		)
+	end
+	part(parts, "BelfryRoof", { 13, 1, 13 }, { 0, 38.5, sz - 6 }, Roof, "Slate", true)
+	part(parts, "Spire", { 6, 5, 6 }, { 0, 41.5, sz - 6 }, Roof, "Slate", true)
+	part(parts, "SpireTip", { 0.4, 3, 0.4 }, { 0, 45.5, sz - 6 }, Iron, "Metal")
+	local bell = part(parts, "Bell", { 3.4, 3.4, 3.4 }, { 0, 34, sz - 6 }, { 205, 155, 60 }, "Metal")
+	bell.shape = "Ball"
+	local clock = part(parts, "Clock", { 6, 6, 0.3 }, { 0, 24, sz - 12.2 }, { 235, 230, 210 }, "Neon")
+	clock.light = { color = { 255, 240, 200 }, range = 20, brightness = 0.7 }
+	part(parts, "ClockHands", { 0.4, 2.6, 0.1 }, { 0, 25, sz - 12.4 }, Black, "SmoothPlastic")
+	part(parts, "DoorFrame", { 8, 8.6, 0.5 }, { 0, 4.3, sz - 12.3 }, SchoolTrim, "Slate", true)
+	local door = part(parts, "Door", { 6.6, 7.6, 0.2 }, { 0, 3.8, sz - 12.6 }, { 70, 40, 30 }, "WoodPlanks")
+	door.text = "OFFICE"
+	part(parts, "Steps", { 12, 0.6, 3 }, { 0, 0.3, sz - 13.5 }, StoneDark, "Slate", true)
+	Kit.lampPost(parts, "DoorLampLeft", -8, sz - 15)
+	Kit.lampPost(parts, "DoorLampRight", 8, sz - 15)
+
+	-- A chalkboard on legs in the yard, with a message on it.
+	part(parts, "ChalkboardLegLeft", { 0.4, 6, 0.4 }, { -38, 3, 20 }, DeskWood, "Wood", true)
+	part(parts, "ChalkboardLegRight", { 0.4, 6, 0.4 }, { -30, 3, 20 }, DeskWood, "Wood", true)
+	part(parts, "Chalkboard", { 9, 4.4, 0.3 }, { -34, 4.6, 20 }, Board, "Slate", true)
+	part(parts, "ChalkScribble", { 5, 0.3, 0.05 }, { -34, 5.4, 19.83 }, Chalk, "SmoothPlastic")
+	part(parts, "ChalkScribble2", { 3.4, 0.3, 0.05 }, { -34.8, 4.4, 19.83 }, Chalk, "SmoothPlastic")
+	part(parts, "ChalkboardFrame", { 9.6, 0.4, 0.5 }, { -34, 2.3, 20 }, DeskWood, "Wood", true)
+
+	-- Desks dragged out into the yard.
+	for i, d in
+		{
+			{ -40, -20, 10 },
+			{ -33, -18, -5 },
+			{ -44, -8, 20 },
+			{ -30, 2, 0 },
+			{ 24, 30, -15 },
+			{ 31, 34, 5 },
+			{ 20, 44, 30 },
+		}
+	do
+		desk(parts, `Desk{i}`, d[1], d[2], d[3])
+	end
+
+	-- Rows of lockers.
+	lockerRow(parts, "LockersWest", -70, 50, 6)
+	lockerRow(parts, "LockersEast", 70, 50, 6)
+
+	-- The broken-down school bus on the east side, its windows dark, one headlight on.
+	local bx, bz = 82, -24
+	local bus = group(parts, { bx, 0, bz }, 90, 0)
+	bus("Bus", { 30, 9, 8 }, { 0, 5.5, 0 }, BusYellow, "Metal", true)
+	bus("BusStripe", { 30.1, 0.6, 8.1 }, { 0, 4.5, 0 }, Black, "Metal")
+	bus("BusRoof", { 29, 0.6, 7.6 }, { 0, 10.3, 0 }, { 190, 150, 40 }, "Metal", true)
+	for i = 1, 6 do
+		bus(`BusWindowLeft{i}`, { 3, 2.4, 0.1 }, { -12 + (i - 1) * 4.4, 7.6, -4.06 }, WindowDark, "Glass")
+		bus(`BusWindowRight{i}`, { 3, 2.4, 0.1 }, { -12 + (i - 1) * 4.4, 7.6, 4.06 }, WindowDark, "Glass")
+	end
+	for i, wx in { -10, 10 } do
+		for j, wz in { -4.2, 4.2 } do
+			bus(`BusWheel{i}{j}`, { 3, 3, 1 }, { wx, 1.5, wz }, Black, "Metal", true)
+		end
+	end
+	local light = bus("BusHeadlight", { 0.2, 1, 1.4 }, { -15.05, 3.5, -2.6 }, WindowLit, "Neon")
+	light.light = { color = WindowLit, range = 18, brightness = 0.8 }
+	local stop = bus("BusSign", { 0.2, 1.4, 3 }, { -15.1, 8.4, 0 }, { 200, 40, 40 }, "Metal")
+	stop.text = "STOP"
+
+	-- The playground on the west side: swings, a slide and a sandpit.
+	local px, pz = -72, -30
+	part(parts, "SwingPostA1", { 0.5, 9, 0.5 }, { px - 9, 4.5, pz - 2 }, Iron, "Metal", true)
+	part(parts, "SwingPostA2", { 0.5, 9, 0.5 }, { px - 9, 4.5, pz + 2 }, Iron, "Metal", true)
+	part(parts, "SwingPostB1", { 0.5, 9, 0.5 }, { px + 9, 4.5, pz - 2 }, Iron, "Metal", true)
+	part(parts, "SwingPostB2", { 0.5, 9, 0.5 }, { px + 9, 4.5, pz + 2 }, Iron, "Metal", true)
+	part(parts, "SwingBar", { 18.5, 0.5, 0.5 }, { px, 9, pz }, Iron, "Metal")
+	for i, sx in { -5, 0, 5 } do
+		part(parts, `SwingChain{i}`, { 0.15, 6.5, 0.15 }, { px + sx, 5.6, pz }, Iron, "Metal")
+		part(parts, `SwingSeat{i}`, { 2, 0.2, 0.9 }, { px + sx, 2.3, pz }, { 120, 40, 40 }, "Wood")
+	end
+	part(parts, "SlideTower", { 4, 6, 4 }, { -80, 3, 0 }, { 140, 40, 40 }, "Metal", true)
+	local chute = part(
+		parts,
+		"SlideChute",
+		{ 3, 0.4, 10 },
+		{ -80, 3.2, -6.5 },
+		{ 200, 170, 40 },
+		"Metal",
+		true
+	)
+	chute.rot = { -28, 0, 0 }
+	part(parts, "Sandpit", { 12, 0.3, 10 }, { -58, 0.15, 10 }, { 180, 160, 110 }, "Ground")
+
+	-- A flagpole with a torn flag, and a basketball hoop by the court.
+	part(parts, "FlagBase", { 2, 0.6, 2 }, { 18, 0.3, -50 }, StoneDark, "Slate", true)
+	part(parts, "Flagpole", { 0.4, 22, 0.4 }, { 18, 11, -50 }, Iron, "Metal", true)
+	part(parts, "Flag", { 4, 2.6, 0.1 }, { 20.2, 20, -50 }, { 80, 50, 110 }, "Fabric")
+	part(parts, "HoopPole", { 0.6, 10, 0.6 }, { 50, 5, -2 }, Iron, "Metal", true)
+	part(parts, "Backboard", { 5, 3.4, 0.3 }, { 50, 10.5, -2.6 }, Chalk, "SmoothPlastic")
+	part(parts, "Hoop", { 2.2, 0.2, 2.2 }, { 50, 9.4, -4 }, { 230, 90, 40 }, "Metal")
+
+	-- Dead trees and lamps round the yard.
+	for i, spot in { { -95, -45, 30 }, { -92, 70, 140 }, { 95, 30, 250 }, { 40, 70, 80 }, { -50, 70, 200 } } do
+		Kit.deadTree(parts, `Tree{i}`, spot[1], spot[2], spot[3])
+	end
+	for i, spot in { { -20, -30 }, { 20, 10 }, { -20, 50 }, { 30, -40 } } do
+		Kit.lampPost(parts, `Lamp{i}`, spot[1], spot[2])
+	end
+	return parts
+end
+
 -- How far a part reaches over the floor from its centre (half its width along x and z), and
 -- how high its bottom is, for any rotation.
 function Scenery.footprint(p: Part): (number, number, number)
@@ -1918,6 +2196,10 @@ Scenery.Zones = {
 	AbandonedCarnival = {
 		parts = abandonedCarnival,
 		roam = Scenery.openGround(abandonedCarnival()),
+	},
+	SpookySchool = {
+		parts = spookySchool,
+		roam = Scenery.openGround(spookySchool()),
 	},
 } :: { [string]: Zone }
 

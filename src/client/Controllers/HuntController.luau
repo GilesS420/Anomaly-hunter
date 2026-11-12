@@ -49,6 +49,7 @@ local MenuButtons: { { name: string, icon: Icons.Kind, key: string?, color: Colo
 	{ name = "Codex", icon = "Book", key = "C", color = Color3.fromRGB(180, 115, 60) },
 	{ name = "Missions", icon = "Scroll", key = "J", color = Color3.fromRGB(210, 160, 50) },
 	{ name = "Gifts", icon = "Gift", key = nil, color = Color3.fromRGB(200, 80, 110) },
+	{ name = "Spin", icon = "Wheel", key = nil, color = Color3.fromRGB(90, 110, 200) },
 	{ name = "Settings", icon = "Gear", key = nil, color = Color3.fromRGB(130, 130, 150) },
 	{ name = "Store", icon = "Coin", key = nil, color = Color3.fromRGB(0, 140, 90) },
 }

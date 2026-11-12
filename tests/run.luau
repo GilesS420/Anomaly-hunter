@@ -193,7 +193,10 @@ check("Phantom Vac holds a Huge Epic", Catching.canVacuum("PhantomVac", "Huge", 
 check("Mythic needs the Void Vac", not Catching.canVacuum("PhantomVac", "Tiny", "Mythic"))
 check("Void Vac holds a Colossal Divine", Catching.canVacuum("VoidVac", "Colossal", "Divine"))
 check("A Mythic names the Void Vac", Catching.vacuumNeeded("DustBuster", "Tiny", "Mythic") == "VoidVac")
-check("A Big monster names the Phantom Vac", Catching.vacuumNeeded("DustBuster", "Big", "Common") == "PhantomVac")
+check(
+	"A Big monster names the Phantom Vac",
+	Catching.vacuumNeeded("DustBuster", "Big", "Common") == "PhantomVac"
+)
 check("A strong enough vacuum needs nothing", Catching.vacuumNeeded("VoidVac", "Colossal", "Divine") == nil)
 check(
 	"An event monster names its own vacuum",
@@ -332,7 +335,10 @@ end
 check("Pumpkin Graveyard is open from the start", Hunt.isZoneUnlocked(1, 1))
 check("Murky Bayou needs the Library", not Hunt.isZoneUnlocked(2, 1) and Hunt.isZoneUnlocked(2, 2))
 check("Abandoned Carnival needs the Ballroom", not Hunt.isZoneUnlocked(3, 2) and Hunt.isZoneUnlocked(3, 3))
-check("zones 4 and 5 stay shut at launch", not Hunt.isZoneUnlocked(4, 6) and not Hunt.isZoneUnlocked(5, 6))
+check(
+	"Spooky School opens with the Attic, zone 5 stays shut",
+	Hunt.isZoneUnlocked(4, 6) and not Hunt.isZoneUnlocked(5, 6)
+)
 do
 	-- Walking through a portal (Util/Hunt.walkCrossesBox): a 14 x 16 x 2 gate, in its own space.
 	local half = { x = 7, y = 8, z = 1 }
@@ -353,7 +359,7 @@ check("open zones have no locked message", Hunt.lockedReason(1, 1) == nil)
 check("locked zones name the wing to buy", string.find(Hunt.lockedReason(2, 1) or "", "Library") ~= nil)
 check(
 	"unreleased zones say they're coming",
-	string.find(Hunt.lockedReason(4, 6) or "", "future update") ~= nil
+	string.find(Hunt.lockedReason(5, 6) or "", "future update") ~= nil
 )
 
 -- Watcher: the event clock, the eyes and event monsters.
@@ -2489,7 +2495,7 @@ do
 	check("a Titan's price has no limit", Weight.valueMultiplier("Titan", titan.kg) > 500)
 	check(
 		"and its drawing keeps growing too",
-		Weight.drawScale("Titan", titan.kg * 4) > Weight.drawScale("Titan", titan.kg)
+		Weight.drawScale("Titan", 4000) > Weight.drawScale("Titan", 1000)
 	)
 	check(
 		"a new Titan starts at TitanStartScale",
@@ -2865,6 +2871,7 @@ do
 			ghost = false,
 			inHub = true,
 			gift = false,
+			spin = false,
 		}
 		for key, value in changes or {} do
 			(base :: any)[key] = value
@@ -2956,12 +2963,12 @@ do
 	end
 	check(
 		"codex has a page per launch zone",
-		zoneIds.PumpkinGraveyard == 9 and zoneIds.MurkyBayou == 9 and zoneIds.AbandonedCarnival == 9
+		zoneIds.PumpkinGraveyard == 9
+			and zoneIds.MurkyBayou == 9
+			and zoneIds.AbandonedCarnival == 9
+			and zoneIds.SpookySchool == 9
 	)
-	check(
-		"codex leaves out zones that aren't in the game yet",
-		zoneIds.SpookySchool == nil and zoneIds.GhostShip == nil
-	)
+	check("codex leaves out zones that aren't in the game yet", zoneIds.GhostShip == nil)
 	check("codex lists every event monster", zoneIds.Events == 12)
 	check("codex pages start with the commonest monster", sections[1].monsters[1] == "Gloomlet")
 	check(
@@ -3185,11 +3192,17 @@ do
 			and Codex.findAmount("Gloomlet", "Gold") > Codex.findAmount("Gloomlet")
 			and Codex.findAmount("LadyOfLanterns") > Codex.findAmount("Gloomlet")
 	)
-	check("codex: claiming a reward that isn't waiting pays nothing", #Codex.claim(fresh, { page }, { ["Find:Nobody"] = true }) == 0)
+	check(
+		"codex: claiming a reward that isn't waiting pays nothing",
+		#Codex.claim(fresh, { page }, { ["Find:Nobody"] = true }) == 0
+	)
 	local one = Codex.claim(fresh, { page }, { ["Find:Gloomlet"] = true })
 	check("codex: claiming one key pays only that", #one == 1 and one[1].key == "Find:Gloomlet")
 	check("codex: a claimed find isn't waiting any more", #Codex.pending(fresh, { page }) == #waiting - 1)
-	check("codex: claiming it again pays nothing", #Codex.claim(fresh, { page }, { ["Find:Gloomlet"] = true }) == 0)
+	check(
+		"codex: claiming it again pays nothing",
+		#Codex.claim(fresh, { page }, { ["Find:Gloomlet"] = true }) == 0
+	)
 	check("codex: claim all takes the rest", #Codex.claim(fresh, { page }) == #waiting - 1)
 	check("codex: nothing waits after claim all", #Codex.pending(fresh, { page }) == 0)
 
@@ -3556,7 +3569,10 @@ do
 	)
 	check("missions: floor still applies", Missions.missionReward(sellSmall, 5_000, 0, 0) == 4_000)
 	check("missions: open zones", #Missions.openZones(1) == 1 and #Missions.openZones(3) == 3)
-	check("missions: zone 4 isn't launched", #Missions.openZones(6) == 3)
+	check(
+		"missions: Spooky School opens with the Attic, zone 5 isn't launched",
+		#Missions.openZones(4) == 4 and #Missions.openZones(6) == 4
+	)
 	local set = Missions.zoneTargets("PumpkinGraveyard", "Rare")
 	check("missions: zone set is Common to Rare", #set == 5 and table.find(set, "Gravepup") ~= nil)
 
@@ -4249,7 +4265,10 @@ do
 	check("movement: 2 s of lag catching up at once is fine", lagged == nil)
 
 	state = Movement.new(0, 3, 0, limits)
-	check("movement: a 300-stud teleport is caught", Movement.step(state, 300, 3, 0, dt, true, limits) == "speed")
+	check(
+		"movement: a 300-stud teleport is caught",
+		Movement.step(state, 300, 3, 0, dt, true, limits) == "speed"
+	)
 	check("movement: and the safe spot is where they stood", state.safeX == 0 and state.safeY == 3)
 	Movement.pulledBack(state, limits)
 	check("movement: after a pull-back the walk budget is empty", state.budget == 0 and state.lastX == 0)
@@ -4541,11 +4560,11 @@ do
 	end
 end
 
-
 -- Roblox badges (Util/Badges, Config/Badges).
 do
 	local quiet: Badges.Live = { worth = 0, event = nil, friendsHere = 0 }
-	local fresh = { tutorial = "Gate", wingsOwned = 1, codex = {}, analytics = { days = 1 }, missions = { streak = 0 } }
+	local fresh =
+		{ tutorial = "Gate", wingsOwned = 1, codex = {}, analytics = { days = 1 }, missions = { streak = 0 } }
 	check("badges: a new save earns Welcome", Badges.earned("Welcome", fresh, quiet))
 	check("badges: a new save has no catch", not Badges.earned("FirstCatch", fresh, quiet))
 	check("badges: unknown key earns nothing", not Badges.earned("Nope", fresh, quiet))
@@ -4588,14 +4607,17 @@ do
 	check("badges: Legendary is not Mythic", not Badges.earned("Mythic", played, busy))
 	played.codex.monsters.TheHeadlessRider = { Plain = true }
 	check("badges: Mythic earned", Badges.earned("Mythic", played, busy))
-	check("badges: every key is a real badge", (function()
-		for _, badge in BadgeConfig.List do
-			if badge.key ~= "Welcome" and not Badges.earned(badge.key, played, busy) then
-				return false
+	check(
+		"badges: every key is a real badge",
+		(function()
+			for _, badge in BadgeConfig.List do
+				if badge.key ~= "Welcome" and not Badges.earned(badge.key, played, busy) then
+					return false
+				end
 			end
-		end
-		return true
-	end)())
+			return true
+		end)()
+	)
 	-- Once an id is set, an earned badge is awarded, and not again once given.
 	local first = BadgeConfig.List[1]
 	local oldId = first.id
@@ -4606,6 +4628,8 @@ do
 	first.id = oldId
 	check("badges: awarded once an id is set", #list == 1 and list[1].key == first.key)
 	check("badges: not awarded twice", #again == 0)
+end
+
 do
 	local AreaLight = require("../src/shared/Config/AreaLight")
 	check(
@@ -4618,7 +4642,10 @@ do
 	for name, look in AreaLight.Looks do
 		check(
 			`area light: {name} look is sane`,
-			look.clockTime >= 0 and look.clockTime <= 24 and #look.tint == 3 and math.abs(look.brightness) < 0.3
+			look.clockTime >= 0
+				and look.clockTime <= 24
+				and #look.tint == 3
+				and math.abs(look.brightness) < 0.3
 		)
 	end
 	-- The hub is daylight, the event sets the sun, zones are night.
@@ -4627,6 +4654,159 @@ do
 		AreaLight.Looks.Hub.clockTime < AreaLight.Looks.HubEvent.clockTime
 			and AreaLight.Looks.HubEvent.clockTime < AreaLight.Looks.Zone.clockTime
 	)
+end
+
+-- Lucky Spin (Util/Spin, Config/Spin).
+do
+	local Spin = require("../src/shared/Util/Spin")
+	local SpinConfig = require("../src/shared/Config/Spin")
+	local MissionsDay = require("../src/shared/Util/Missions")
+	local total, jackpots = 0, 0
+	for _, prize in SpinConfig.Prizes do
+		total += prize.weight
+		if prize.jackpot then
+			jackpots += 1
+		end
+	end
+	check("spin: the weights add up to 100", near(total, 100))
+	check("spin: one jackpot", jackpots == 1)
+	check("spin: eight slices, one per ring tile", #SpinConfig.Prizes == 8)
+	check("spin: one free spin a day", Spin.earned(0) == SpinConfig.FreePerDay)
+	check(
+		"spin: more spins after playing",
+		Spin.earned(15 * 60) == SpinConfig.FreePerDay + 1
+			and Spin.earned(10 * 3600) == SpinConfig.FreePerDay + 2
+	)
+	check("spin: next spin countdown", Spin.nextIn(0) == 15 * 60 and Spin.nextIn(46 * 60) == nil)
+	local record = Spin.empty()
+	local now = 1_800_000_000
+	Spin.refresh(record, now)
+	check("spin: a spin can be used", Spin.use(record, 0))
+	check("spin: not twice on the free one", not Spin.use(record, 0))
+	check("spin: playing earns another", Spin.use(record, 15 * 60) and Spin.left(record, 15 * 60) == 0)
+	Spin.refresh(record, now + 86400)
+	check("spin: a new day gives them back", record.used == 0 and record.day == MissionsDay.day(now + 86400))
+	check(
+		"spin: a broken record is repaired",
+		Spin.repair("junk").used == 0 and Spin.repair({ used = -3 }).used == 0
+	)
+	-- Every roll lands on a real slice, and the picks follow the weights.
+	local hits = {}
+	for i = 0, 9999 do
+		local index = Spin.pick(i / 10000)
+		hits[index] = (hits[index] or 0) + 1
+	end
+	local follows = true
+	for index, prize in SpinConfig.Prizes do
+		follows = follows and math.abs((hits[index] or 0) - prize.weight * 100) <= 1
+	end
+	check("spin: picks follow the weights", follows)
+	check(
+		"spin: rolls of 0 and 1 stay on the wheel",
+		Spin.pick(0) == 1 and Spin.pick(1) == #SpinConfig.Prizes
+	)
+	local everyPays = true
+	local cashShare = 0
+	for index, prize in SpinConfig.Prizes do
+		local reward = Spin.reward(index, 1_000_000, 3)
+		everyPays = everyPays
+			and reward ~= nil
+			and (reward.cash > 0 or (reward.item ~= nil and reward.count > 0))
+		cashShare += prize.weight / total * ((reward :: any).cash / 1_000_000)
+	end
+	check("spin: every slice gives something", everyPays)
+	-- Cheaper than the playtime gifts (17% of base a day) even with all three spins.
+	check("spin: a day of spins pays under 8% of base in cash", cashShare * Spin.earned(math.huge) < 0.08)
+	check(
+		"spin: the bell gets better with the Ballroom",
+		(Spin.reward(5, 0, 1) :: any).item == "BaitBell"
+			and (Spin.reward(5, 0, 3) :: any).item == "SilverBell"
+	)
+end
+
+-- Reward codes (Util/Codes, Config/Codes).
+do
+	local Codes = require("../src/shared/Util/Codes")
+	local CodeList = require("../src/shared/Config/Codes")
+	check(
+		"codes: typed any way",
+		Codes.clean(" welcome ") == "WELCOME" and Codes.clean("Spooky School") == "SPOOKYSCHOOL"
+	)
+	check(
+		"codes: junk is no code",
+		Codes.clean(nil) == nil
+			and Codes.clean("") == nil
+			and Codes.clean(string.rep("A", 5000)) == nil
+			and Codes.clean("!!!") == nil
+	)
+	check("codes: unknown code", (Codes.check({}, "NOPE")) == "unknown")
+	check(
+		"codes: a real code works once",
+		(Codes.check({}, "welcome")) == "ok" and (Codes.check({ WELCOME = true }, "welcome")) == "used"
+	)
+	local unique, valid = true, true
+	local seen = {}
+	for _, entry in CodeList do
+		unique = unique and not seen[entry.code]
+		seen[entry.code] = true
+		valid = valid and Codes.clean(entry.code) == entry.code
+		local reward = Codes.reward(entry, 1_000_000)
+		valid = valid and (reward.cash > 0 or #reward.items > 0)
+		for id in entry.items or {} do
+			local found = false
+			for _, item in reward.items do
+				found = found or item.id == id
+			end
+			valid = valid and found
+		end
+	end
+	check("codes: every code is unique, clean and pays real items", unique and valid)
+	check(
+		"codes: a broken record is repaired",
+		next(Codes.repair("junk")) == nil and Codes.repair({ A = true, B = 5 }).B == nil
+	)
+end
+
+-- Leaderboards (Util/Leaderboard) and Spooky School opening.
+do
+	local Leaderboard = require("../src/shared/Util/Leaderboard")
+	check(
+		"leaderboard: finds count every colour",
+		Leaderboard.finds({ monsters = { A = { Plain = true, Gold = true }, B = { Plain = true } } }) == 3
+	)
+	check("leaderboard: no codex, no finds", Leaderboard.finds({}) == 0)
+	check(
+		"leaderboard: values are whole and safe",
+		Leaderboard.clean(12.7) == 12
+			and Leaderboard.clean(0 / 0) == 0
+			and Leaderboard.clean(-5) == 0
+			and Leaderboard.clean(math.huge) == 2 ^ 53
+	)
+	local ZoneList = require("../src/shared/Config/Zones").List
+	local school = ZoneList[4]
+	check(
+		"spooky school is open with the Attic",
+		school.id == "SpookySchool"
+			and school.launch
+			and Hunt.isZoneUnlocked(4, 4)
+			and not Hunt.isZoneUnlocked(4, 3)
+	)
+	local zone4 = 0
+	for id, monster in Monsters do
+		if monster.zone == 4 then
+			zone4 += 1
+			check(`{id} has a look`, Looks[id] ~= nil)
+		end
+	end
+	check("spooky school has nine monsters", zone4 == 9)
+	local breach = Watcher.zoneWeights(1)
+	check("Breach Storm leaves Spooky School out", breach.Chalkling == nil and breach.Gloomlet ~= nil)
+	for _, spot in Layout.Leaderboards do
+		check(
+			`leaderboard {spot.id} stands in the hub, off the paths to the square`,
+			math.abs(spot.x) > 40 and math.abs(spot.x) < 85 and math.abs(spot.z) < 44
+		)
+	end
 end
 
 if failures > 0 then

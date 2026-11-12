@@ -60,7 +60,7 @@ add({ id = "TheRingmaster", rarity = "Legendary", baseValue = 3_200_000, zone = 
 add({ id = "BigTopTerror", rarity = "Mythic", baseValue = 24_000_000, zone = 3, spawnWeight = 0.45 })
 add({ id = "GoldenCarousel", rarity = "Divine", baseValue = 240_000_000, zone = 3, spawnWeight = 0.05 })
 
--- Zone 4: Spooky School (unlocked by the Attic). Not in the launch: re-simulate before it ships.
+-- Zone 4: Spooky School (unlocked by the Attic). Opened 2026-11-11; values follow the x4 ladder.
 add({ id = "Chalkling", rarity = "Common", baseValue = 65_000, zone = 4, spawnWeight = 27 })
 add({ id = "Paperbat", rarity = "Common", baseValue = 100_000, zone = 4, spawnWeight = 18 })
 add({ id = "LunchGhoul", rarity = "Uncommon", baseValue = 200_000, zone = 4, spawnWeight = 18 })

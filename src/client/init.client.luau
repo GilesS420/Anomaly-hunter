@@ -38,6 +38,7 @@ local TutorialController = require(script.Controllers.TutorialController)
 local CodexController = require(script.Controllers.CodexController)
 local MissionController = require(script.Controllers.MissionController)
 local PlaytimeController = require(script.Controllers.PlaytimeController)
+local SpinController = require(script.Controllers.SpinController)
 local StoreController = require(script.Controllers.StoreController)
 local SettingsController = require(script.Controllers.SettingsController)
 local AwayBookController = require(script.Controllers.AwayBookController)
@@ -86,6 +87,7 @@ local controllers: { { start: () -> () } } = {
 	CodexController,
 	MissionController,
 	PlaytimeController,
+	SpinController,
 	StoreController,
 	SettingsController,
 	AwayBookController,

@@ -25,6 +25,7 @@ export type Facts = {
 	ghost: boolean, -- a Golden Ghost is out right now
 	inHub: boolean, -- in the hub (not in a zone)
 	gift: boolean, -- a playtime gift is waiting (PlaytimeService)
+	spin: boolean, -- a Lucky Spin is waiting (SpinService)
 }
 
 export type Tip = {
@@ -155,6 +156,15 @@ Tips.List = {
 		text = "The more you play, the better the gifts. Open the gift button to claim.",
 		due = function(facts: Facts): boolean
 			return facts.gift
+		end,
+	},
+	{
+		id = "LuckySpin",
+		feature = "Spin",
+		title = "Free Lucky Spin!",
+		text = "A free spin every day, and more as you play. Open the wheel button.",
+		due = function(facts: Facts): boolean
+			return facts.spin
 		end,
 	},
 } :: { Tip }

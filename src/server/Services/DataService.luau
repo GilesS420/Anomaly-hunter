@@ -12,11 +12,13 @@ local RunService = game:GetService("RunService")
 
 local Analytics = require(ReplicatedStorage.Shared.Util.Analytics)
 local Cakes = require(ReplicatedStorage.Shared.Util.Cakes)
+local Codes = require(ReplicatedStorage.Shared.Util.Codes)
 local Feedback = require(ReplicatedStorage.Shared.Util.Feedback)
 local Heists = require(ReplicatedStorage.Shared.Util.Heists)
 local Missions = require(ReplicatedStorage.Shared.Util.Missions)
 local Playtime = require(ReplicatedStorage.Shared.Util.Playtime)
 local Robux = require(ReplicatedStorage.Shared.Util.Robux)
+local Spin = require(ReplicatedStorage.Shared.Util.Spin)
 local Trading = require(ReplicatedStorage.Shared.Util.Trading)
 local Value = require(ReplicatedStorage.Shared.Util.Value)
 local ProfileStore = require(script.Parent.Parent.Vendor.ProfileStore)
@@ -66,6 +68,8 @@ export type Data = {
 	quest: string,
 	playtime: Playtime.Record, -- today's play time and the playtime gifts claimed (PlaytimeService)
 	badges: { [string]: boolean }, -- Roblox badges already given, by Config/Badges key (BadgesService)
+	spin: Spin.Record, -- today's Lucky Spins used (SpinService)
+	codes: { [string]: boolean }, -- reward codes already used, by Config/Codes code (CodesService)
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -104,6 +108,8 @@ DataService.Template = {
 	quest = "",
 	playtime = Playtime.empty(),
 	badges = {},
+	spin = Spin.empty(),
+	codes = {},
 } :: Data
 
 local store = ProfileStore.New(
@@ -204,6 +210,8 @@ local function loadPlayer(player: Player)
 	data.robux = Robux.repair(data.robux)
 	data.heist = Heists.repair(data.heist)
 	data.playtime = Playtime.repair(data.playtime)
+	data.spin = Spin.repair(data.spin)
+	data.codes = Codes.repair(data.codes)
 	data.analytics = Analytics.repair(data.analytics)
 
 	profiles[player] = profile

@@ -54,6 +54,12 @@ Test it in the Client view: `require(game.Players.LocalPlayer.PlayerScripts.Clie
 
 Player data saves through [ProfileStore](https://github.com/MadStudioRoblox/ProfileStore) (by loleris, Apache 2.0), vendored at `src/server/Vendor/ProfileStore.luau` with its license in `licenses/`. To test real saving in Studio, turn on **Game Settings > Security > Enable Studio Access to API Services** (the place must be published). Without it, ProfileStore uses a mock store and nothing persists between play tests.
 
+## Codes, Lucky Spin and leaderboards
+
+- **Codes**: players type them in Settings > Codes. The list is `src/shared/Config/Codes.luau`; each code works once per player. Add a new one there (capitals and digits only) and post it on the game page or group wall; set `ended = true` to retire one.
+- **Lucky Spin**: the wheel button on the left. One free spin a day, plus one after 15 and 45 minutes of play. Prizes and odds are in `src/shared/Config/Spin.luau`. It is never sold for Robux. Admins: F2 > Playtime > "Spins back", or `/spins`.
+- **Leaderboards**: two boards next to Watcher Square ("Richest Hunters" and "Top Collectors"), ranked across all servers. They need **Enable Studio Access to API Services** to show anything in Studio, and Studio scores go to separate boards from the live game.
+
 ## Robux purchases
 
 Everything sold for Robux is in `src/shared/Config/Robux.luau`: 15 Developer Products (5 shop item price tiers, Shop Reroll, Mission Reroll, Mission Skip, Starter Pack, 6 Steal products) and 5 Game Passes. Create each one on the Creator Dashboard (your game > Monetization > Developer Products or Passes) and paste its id over the `0` in that file. Anything still at `0` shows "Robux · soon" in the game. `server/Services/RobuxService.luau` handles `ProcessReceipt`: every purchase id is saved in the player's profile and only marked granted once that save is written, so a purchase is never paid out twice or lost. Purchases in Studio are free test purchases.
