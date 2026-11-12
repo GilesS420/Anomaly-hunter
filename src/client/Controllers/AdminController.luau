@@ -63,8 +63,9 @@ local Gap = 8
 local SideWidth = 160
 local HeaderHeight = 44
 local PopupMaxHeight = 240
-local TimelineLength = 5 -- events shown on the Events tab's timeline
+local TimelineLength = 10 -- events shown on the Events tab's timeline
 local MaxAnnouncement = 150
+
 
 local remote: RemoteEvent
 local monstersRemote: RemoteFunction
