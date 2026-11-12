@@ -50,8 +50,8 @@ Robux.Products = {
 	MissionSkip = { id = 3723586069, price = 39, name = "Mission Skip" },
 	-- Lucky Spins (Giles 2026-11-12): spins that keep until used. The wheel shows every
 	-- slice's odds, and players whose country restricts paid random items can't buy them.
-	Spins1 = { id = 0, price = 19, name = "Lucky Spin" },
-	Spins5 = { id = 0, price = 79, name = "5 Lucky Spins" },
+	Spins1 = { id = 3730748367, price = 19, name = "Lucky Spin" },
+	Spins5 = { id = 3730749251, price = 79, name = "5 Lucky Spins" },
 	-- Once per player.
 	StarterPack = { id = 3723586118, price = 30, name = "Starter Pack" },
 	-- Stealing a monster from another player's mansion (Config/Heists, Giles 2026-10-30):
