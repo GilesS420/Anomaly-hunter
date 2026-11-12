@@ -378,13 +378,20 @@ function MissionController.start()
 			window.close()
 			return
 		end
-		window.status.Text = "Loading..."
+		-- Shows what it already has straight away (fetched ahead, see below), then the server's
+		-- latest (Giles 2026-11-12: menus were slow to open).
 		window.open(nil)
+		if view then
+			render()
+		else
+			window.status.Text = "Loading..."
+		end
 		load()
 		if window.isOpen() then
 			render()
 		end
 	end
+	task.spawn(load) -- fetched ahead, so the first open is instant
 
 	Changed.OnClientEvent:Connect(function(latest: View)
 		local fresh = view == nil or latest.secondsLeft > (endsAt - os.clock()) + 5 -- a new day

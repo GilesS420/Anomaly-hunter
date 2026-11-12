@@ -61,6 +61,14 @@ local WalkAwayDistance = 22 -- studs from the counter before the window closes b
 
 -- Every window made by Ui.window, so the hotbar can step aside while one is open.
 local windows: { ScreenGui } = {}
+-- How to close each window, so opening one can close the others.
+local closers: { [ScreenGui]: () -> () } = {}
+
+-- One menu at a time (Giles 2026-11-12: opening the Lucky Spin and then another menu froze the
+-- game). Opening a window closes every other open window, so menus never pile up on top of
+-- each other, half hidden, each waiting on the server. Except these, which other menus never
+-- close: a running trade (closing it cancels the trade) and the Admin panel.
+local Stays = { TradeUi = true, AdminPanel = true } :: { [string]: boolean }
 local windowsChanged = Instance.new("BindableEvent")
 Ui.windowsChanged = windowsChanged.Event -- fires when any window opens or closes
 
@@ -405,6 +413,13 @@ function Ui.window(name: string, titleText: string): Window
 	end
 
 	local function openWindow(counter: Vector3?)
+		if not gui.Enabled then
+			for other, closeOther in closers do
+				if other ~= gui and other.Enabled and not Stays[other.Name] then
+					closeOther()
+				end
+			end
+		end
 		gui.Enabled = true
 		if watching then
 			watching:Disconnect()
@@ -425,6 +440,7 @@ function Ui.window(name: string, titleText: string): Window
 	end
 
 	close.Activated:Connect(closeWindow)
+	closers[gui] = closeWindow
 
 	window = {
 		gui = gui,
