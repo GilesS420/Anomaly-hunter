@@ -4690,7 +4690,7 @@ do
 	end
 	check("spin: the weights add up to 100", near(total, 100))
 	check("spin: one jackpot", jackpots == 1)
-	check("spin: nine slices", #SpinConfig.Prizes == 9)
+	check("spin: twelve slices", #SpinConfig.Prizes == 12)
 	check("spin: one free spin a day", Spin.earned(0) == SpinConfig.FreePerDay)
 	check(
 		"spin: more spins after playing",
@@ -4735,12 +4735,18 @@ do
 		cashShare += prize.weight / total * ((reward :: any).cash / 1_000_000)
 	end
 	check("spin: every slice gives something", everyPays)
+	local bellIndex = 0
+	for index, prize in SpinConfig.Prizes do
+		if prize.pick == "Bell" then
+			bellIndex = index
+		end
+	end
 	-- Cheaper than the playtime gifts (17% of base a day) even with all three spins.
 	check("spin: a day of spins pays under 8% of base in cash", cashShare * Spin.earned(math.huge) < 0.08)
 	check(
 		"spin: the bell gets better with the Ballroom",
-		(Spin.reward(5, 0, 1) :: any).item == "BaitBell"
-			and (Spin.reward(5, 0, 3) :: any).item == "SilverBell"
+		(Spin.reward(bellIndex, 0, 1) :: any).item == "BaitBell"
+			and (Spin.reward(bellIndex, 0, 3) :: any).item == "SilverBell"
 	)
 	-- Odds written on the wheel add up to 100%.
 	local oddsTotal = 0
@@ -4755,7 +4761,7 @@ do
 			monsterSlices += 1
 		end
 	end
-	check("spin: one monster slice", monsterSlices == 1)
+	check("spin: four monster slices", monsterSlices == 4)
 	local onlyOpen = true
 	for wings = 1, 6 do
 		for _, entry in Spin.monsterPool("Legendary", wings) do
@@ -4772,6 +4778,11 @@ do
 			and Spin.pickMonster("Legendary", 1, 0.99) == "TheGroundskeeper"
 	)
 	check("spin: the Attic opens four Legendaries", #Spin.monsterPool("Legendary", 4) == 4)
+	check(
+		"spin: a slice shows the newest zone's monster",
+		Spin.showMonster("Legendary", 4) == "ThePrincipal"
+			and Spin.showMonster("Mythic", 1) == "TheHeadlessRider"
+	)
 	check(
 		"spin: Ghost Ship (not launched) gives none",
 		Spin.pickMonster("Legendary", 6, 0.999) ~= "CaptainDreadwake"
