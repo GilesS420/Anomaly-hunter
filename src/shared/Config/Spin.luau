@@ -1,8 +1,13 @@
 --!strict
--- The Lucky Spin (thread "Add fresh content to match the market", 2026-11-11): a free prize
--- wheel, the daily "come back tomorrow" hook most top Roblox games have. Free only: spins are
--- never sold for Robux (no paid gambling). Rules in Util/Spin, server/Services/SpinService
--- spins it, client/Controllers/SpinController draws the wheel.
+-- The Lucky Spin (thread "Add fresh content to match the market", 2026-11-11): a prize wheel,
+-- the daily "come back tomorrow" hook most top Roblox games have. Rules in Util/Spin,
+-- server/Services/SpinService spins it, client/Controllers/SpinController draws the wheel.
+--
+-- Extra spins can be bought for Robux (Giles 2026-11-12, thread "Turn lucky spin into a real
+-- wheel"; products Spins1 and Spins5 in Config/Robux). Roblox's rules for paid random items:
+-- every slice shows its odds on the wheel, and players whose country restricts paid random
+-- items (PolicyService.ArePaidRandomItemsRestricted) don't see the Robux buttons at all.
+-- Bought spins keep: they don't run out at the end of the day like the free ones.
 --
 -- A player gets FreePerDay spins when the day starts (the same day as the daily missions,
 -- Config/Missions.ResetOffset) and one more after each of PlayMinutes minutes of play that
@@ -22,6 +27,7 @@ export type Prize = {
 	item: string?, -- a fixed Workshop item
 	count: number?, -- how many of the item (default 1)
 	pick: ("Bell" | "Cake")?, -- an item picked for their progress, like the playtime gifts
+	monster: string?, -- a monster of this rarity from a zone the player has opened (Util/Spin)
 	jackpot: boolean?, -- the big one: a gold slice, and everyone in the server hears of it
 }
 
@@ -30,16 +36,23 @@ local Spin = {}
 Spin.FreePerDay = 1
 Spin.PlayMinutes = { 15, 45 } -- one more spin after this many minutes of play today
 
--- Clockwise round the wheel from the top. Weights add up to 100.
+-- Clockwise round the wheel from the top; every slice is drawn the same size, with its odds
+-- (weight %) written on it. Weights add up to 100.
+-- The Legendary is kept rare (3%) so it stays a moment, and a free player still sees one
+-- about once every 11 days of spins (Giles wants rarities grindy).
 Spin.Prizes = {
 	{ id = "Cash", weight = 30, color = { 90, 170, 110 }, share = 0.02, floor = 2_000 },
-	{ id = "Cake", weight = 18, color = { 220, 120, 160 }, pick = "Cake" },
+	{ id = "Cake", weight = 17, color = { 220, 120, 160 }, pick = "Cake" },
 	{ id = "Charms", weight = 12, color = { 110, 150, 230 }, item = "ReturnCharm", count = 2 },
-	{ id = "BigCash", weight = 15, color = { 60, 140, 90 }, share = 0.05, floor = 5_000 },
-	{ id = "Bell", weight = 14, color = { 200, 160, 80 }, pick = "Bell" },
+	{ id = "BigCash", weight = 14, color = { 50, 120, 80 }, share = 0.05, floor = 5_000 },
+	{ id = "Bell", weight = 13, color = { 200, 150, 80 }, pick = "Bell" },
 	{ id = "Tonic", weight = 6, color = { 150, 100, 220 }, item = "LuckyTonic" },
 	{ id = "GoldBell", weight = 3, color = { 230, 190, 60 }, item = "GoldBell" },
+	{ id = "Monster", weight = 3, color = { 200, 70, 70 }, monster = "Legendary" },
 	{ id = "Jackpot", weight = 2, color = { 255, 211, 107 }, share = 0.25, floor = 25_000, jackpot = true },
 } :: { Prize }
+
+-- Bought spins (Robux products Spins1 and Spins5): how many each product gives.
+Spin.Bundles = { Spins1 = 1, Spins5 = 5 } :: { [string]: number }
 
 return Spin

@@ -1,7 +1,8 @@
 --!strict
 -- Everything sold for Robux (Sprint E, Giles picked these on 2026-10-29). Paying players get
 -- the same things as everyone else, only faster; VIP Hunter is the one perk money alone buys.
--- Monsters are never sold for Robux, except by stealing one from another player (Steal1-6).
+-- Monsters are never sold for Robux, except by stealing one from another player (Steal1-6),
+-- and the 3% Legendary slice on a bought Lucky Spin (Giles asked for it, 2026-11-12).
 --
 -- The ids come from the Creator Dashboard: Developer Products under Monetization >
 -- Developer Products, Game Passes under Monetization > Passes. Paste each id over the 0.
@@ -47,6 +48,10 @@ Robux.Products = {
 	MissionReroll = { id = 3723585979, price = 15, name = "Mission Reroll" },
 	-- Finishes one daily mission (it still has to be claimed).
 	MissionSkip = { id = 3723586069, price = 39, name = "Mission Skip" },
+	-- Lucky Spins (Giles 2026-11-12): spins that keep until used. The wheel shows every
+	-- slice's odds, and players whose country restricts paid random items can't buy them.
+	Spins1 = { id = 0, price = 19, name = "Lucky Spin" },
+	Spins5 = { id = 0, price = 79, name = "5 Lucky Spins" },
 	-- Once per player.
 	StarterPack = { id = 3723586118, price = 30, name = "Starter Pack" },
 	-- Stealing a monster from another player's mansion (Config/Heists, Giles 2026-10-30):

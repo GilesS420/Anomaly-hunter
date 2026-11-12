@@ -19,7 +19,8 @@
 -- Remotes in ReplicatedStorage.RobuxRemotes:
 --   Buy      client -> server (kind: string, arg: any) -> { ok, message }
 --            kinds: "Item" (item id), "ShopReroll", "MissionReroll", "MissionSkip" (mission
---            number), "StarterPack", "Steal" ({ owner = UserId, uid }), "Pass" (pass key)
+--            number), "StarterPack", "Steal" ({ owner = UserId, uid }), "Pass" (pass key),
+--            "Spins" (product key: "Spins1" or "Spins5")
 --   Granted  server -> client (kind: string)   something was paid out: refresh open windows
 -- ReplicatedStorage.RobuxPrices has an attribute per product and pass that is set up (its id
 -- isn't 0): its price in Robux, as Roblox knows it.
@@ -34,6 +35,7 @@ local Heists = require(ReplicatedStorage.Shared.Util.Heists)
 local Missions = require(ReplicatedStorage.Shared.Util.Missions)
 local Robux = require(ReplicatedStorage.Shared.Util.Robux)
 local Shop = require(ReplicatedStorage.Shared.Config.Shop)
+local SpinConfig = require(ReplicatedStorage.Shared.Config.Spin)
 local Workshop = require(ReplicatedStorage.Shared.Util.Workshop)
 local CakeService = require(script.Parent.CakeService)
 local AnalyticsService = require(script.Parent.AnalyticsService)
@@ -42,6 +44,7 @@ local HeistService = require(script.Parent.HeistService)
 local HuntService = require(script.Parent.HuntService)
 local MissionService = require(script.Parent.MissionService)
 local Notify = require(script.Parent.Parent.Notify)
+local SpinService = require(script.Parent.SpinService)
 local Perks = require(script.Parent.Parent.Perks)
 
 local RobuxService = {}
@@ -180,6 +183,9 @@ local function payOut(player: Player, data: DataService.Data, key: string)
 		missionSkip(player, data, pending)
 	elseif key == "StarterPack" then
 		starterPack(player, data)
+	elseif SpinConfig.Bundles[key] then
+		-- Paid for, so given even if Roblox changed its mind about the country since.
+		SpinService.addBought(player, data, SpinConfig.Bundles[key])
 	elseif Heists.isProduct(key) then
 		HeistService.paid(player, data, key, pending)
 	else
@@ -322,6 +328,17 @@ Buy.OnServerInvoke = function(player: Player, kind: unknown, arg: unknown): Resu
 			return { ok = false, message = "You already got the Starter Pack." }
 		end
 		return prompt(player, data, "StarterPack", nil)
+	elseif kind == "Spins" then
+		if typeof(arg) ~= "string" or not SpinConfig.Bundles[arg] then
+			return { ok = false, message = "That isn't for sale." }
+		end
+		if data.tutorial ~= "Done" then
+			return { ok = false, message = "Finish the tutorial first." }
+		end
+		if not SpinService.canBuy(player) then
+			return { ok = false, message = "Spins can't be bought where you play." }
+		end
+		return prompt(player, data, arg, nil)
 	elseif kind == "Steal" then
 		local target: any = if typeof(arg) == "table" then arg else {}
 		return HeistService.request(player, data, target.owner, target.uid, prompt)
