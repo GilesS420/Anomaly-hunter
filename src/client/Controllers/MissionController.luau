@@ -74,8 +74,7 @@ local function tile(parent: Frame, color: Color3, kind: Icons.Kind, image: strin
 	box.AnchorPoint = Vector2.new(0, 0.5)
 	box.Position = UDim2.fromScale(0, 0.5)
 	box.Size = UDim2.fromOffset(TileSize, TileSize)
-	local h, s, v = color:ToHSV()
-	box.BackgroundColor3 = Color3.fromHSV(h, s * 0.75, v * 0.42)
+	box.BackgroundColor3 = Ui.tint(color)
 	box.Parent = parent
 	Ui.corner(box, 12)
 	if image then
@@ -194,9 +193,9 @@ function MissionController.start()
 
 		-- The tier as a small coloured pill.
 		local tier =
-			Ui.text(frame, string.upper(mission.tier), UDim2.fromOffset(70, 18), Ui.Colors.panel, true, 14)
+			Ui.text(frame, string.upper(mission.tier), UDim2.fromOffset(70, 18), Ui.deep(color), true, 14)
 		tier.BackgroundTransparency = 0
-		tier.BackgroundColor3 = color
+		tier.BackgroundColor3 = Ui.tint(color)
 		tier.TextXAlignment = Enum.TextXAlignment.Center
 		Ui.corner(tier, 9)
 		local goal = Ui.text(frame, mission.text, UDim2.new(0.68, 0, 0, 40), Ui.Colors.text, true, 20)
@@ -210,7 +209,7 @@ function MissionController.start()
 		local bar = Instance.new("Frame")
 		bar.Position = UDim2.new(0, 0, 1, -24)
 		bar.Size = UDim2.new(0.68, -70, 0, 12)
-		bar.BackgroundColor3 = Color3.fromRGB(12, 10, 18)
+		bar.BackgroundColor3 = Ui.Style.line
 		bar.Parent = frame
 		Ui.corner(bar, 6)
 		local fill = Instance.new("Frame")

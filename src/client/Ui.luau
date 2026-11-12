@@ -18,26 +18,96 @@ local Scale = require(script.Parent:WaitForChild("Scale"))
 local Ui = {}
 
 -- Shared look for every menu. Change it here, not in each controller.
+-- Palette "Golden hour" (Giles 2026-11-12: the dark menus felt heavy and scared people away;
+-- make them light and cheerful, like the hub's late-afternoon sky). Cream panels, white cards,
+-- lantern-orange titles, dark plum text on the light parts and white text on coloured buttons.
+-- Text that lands on a background it can't be read on is fixed by Ui.watchContrast, so
+-- older code that still asks for white or a bright rarity colour on a card stays readable.
 Ui.Style = {
 	maxRadius = 6, -- no card or button gets rounder than this (pixels)
 	panelRadius = 7, -- the window itself
-	line = Color3.fromRGB(58, 50, 76), -- the one thin outline colour for panels, rows and boxes
+	line = Color3.fromRGB(239, 220, 196), -- the one thin outline colour for panels, rows and boxes
 }
 
 Ui.Colors = {
-	panel = Color3.fromRGB(18, 14, 26),
-	row = Color3.fromRGB(32, 26, 44),
-	rim = Color3.fromRGB(70, 60, 92), -- panel and row outlines (kept dim: flat, no glow)
-	lamp = Color3.fromRGB(255, 176, 84), -- titles, like the lanterns
-	text = Color3.new(1, 1, 1),
-	muted = Color3.fromRGB(190, 180, 210),
-	money = Color3.fromRGB(140, 255, 140),
-	buy = Color3.fromRGB(60, 150, 80),
-	sell = Color3.fromRGB(205, 135, 30),
-	equip = Color3.fromRGB(110, 80, 200),
-	off = Color3.fromRGB(86, 78, 100),
-	confirm = Color3.fromRGB(200, 60, 70),
+	panel = Color3.fromRGB(255, 246, 234), -- warm cream, like the sunlit hub
+	row = Color3.fromRGB(255, 255, 255), -- cards and rows on the panel
+	rim = Color3.fromRGB(222, 198, 170), -- scroll bars and dividers (flat, no glow)
+	lamp = Color3.fromRGB(214, 94, 12), -- titles, like the lanterns
+	text = Color3.new(1, 1, 1), -- text on coloured buttons
+	ink = Color3.fromRGB(59, 40, 80), -- text on panels and cards
+	muted = Color3.fromRGB(138, 118, 152),
+	money = Color3.fromRGB(23, 138, 67),
+	buy = Color3.fromRGB(54, 168, 90),
+	sell = Color3.fromRGB(226, 133, 31),
+	equip = Color3.fromRGB(125, 91, 214),
+	off = Color3.fromRGB(156, 143, 174),
+	confirm = Color3.fromRGB(222, 72, 80),
 }
+
+-- A soft pastel tile in a colour (a rarity, a mission tier), for picture boxes and tags on
+-- the light cards. Its text is drawn in Ui.deep(color).
+function Ui.tint(color: Color3): Color3
+	local h, s = color:ToHSV()
+	if s < 0.08 then
+		return Color3.fromRGB(242, 236, 248) -- grey things (Common, Silver): a light lilac grey
+	end
+	return Color3.fromHSV(h, math.min(s, 1) * 0.16, 1)
+end
+
+-- Relative brightness of a colour as screens show it (WCAG), 0 = black, 1 = white.
+local function luminance(color: Color3): number
+	local function channel(c: number): number
+		return if c <= 0.03928 then c / 12.92 else ((c + 0.055) / 1.055) ^ 2.4
+	end
+	return 0.2126 * channel(color.R) + 0.7152 * channel(color.G) + 0.0722 * channel(color.B)
+end
+
+-- How well text in one colour reads on another: 1 (not at all) to 21 (black on white).
+function Ui.contrast(a: Color3, b: Color3): number
+	local la, lb = luminance(a), luminance(b)
+	return (math.max(la, lb) + 0.05) / (math.min(la, lb) + 0.05)
+end
+
+local Readable = 3 -- below this text is hard to read; it's then fixed to reach Wanted
+local Wanted = 4.5
+
+-- The colour to draw `color` text in on `background` so it can be read: unchanged when it
+-- already reads well, otherwise a darker (on light backgrounds) or lighter shade of the same
+-- hue. White or grey text on a light background becomes Ui.Colors.ink.
+function Ui.readable(color: Color3, background: Color3): Color3
+	if Ui.contrast(color, background) >= Readable then
+		return color
+	end
+	local h, s, v = color:ToHSV()
+	if luminance(background) > 0.4 then
+		if s < 0.15 then
+			return Ui.Colors.ink
+		end
+		s = math.max(s, 0.75)
+		while v > 0.2 do
+			v -= 0.05
+			local shade = Color3.fromHSV(h, s, v)
+			if Ui.contrast(shade, background) >= Wanted then
+				return shade
+			end
+		end
+		return Ui.Colors.ink
+	end
+	-- A dark background: lighten towards white.
+	for step = 1, 12 do
+		local shade = Color3.fromHSV(h, s * (1 - step / 12), v + (1 - v) * step / 12)
+		if Ui.contrast(shade, background) >= Wanted then
+			return shade
+		end
+	end
+	return Color3.new(1, 1, 1)
+end
+
+-- Darker shade of a colour for text on the light cards (rarity names, pills, prices).
+function Ui.deep(color: Color3): Color3
+	return Ui.readable(color, Ui.Colors.row)
+end
 
 -- Pictures for the Workshop's items, which have no preview model (Shop.Item kind).
 Ui.Icons =
@@ -521,6 +591,83 @@ function Ui.row(
 	actions.BackgroundTransparency = 1
 	actions.Parent = row
 	return row, actions
+end
+
+-- Readable text everywhere (Giles 2026-11-12, light menus). Watches every text in `root`
+-- (the PlayerGui) and, when its colour can't be read on what's behind it, swaps in
+-- Ui.readable's shade. Only text on a solid background is touched: HUD text floating over the
+-- 3D world, text with an outline, text over a picture and anything inside a frame with the
+-- attribute KeepTextColor = true are left alone.
+local function backgroundOf(text: GuiObject): Color3?
+	local at: Instance? = text
+	while at and not at:IsA("LayerCollector") do
+		if at:GetAttribute("KeepTextColor") then
+			return nil
+		end
+		if at:IsA("GuiObject") then
+			if at.BackgroundTransparency < 0.35 then
+				return at.BackgroundColor3
+			end
+			if at ~= text then
+				local picture = (at:IsA("ImageLabel") or at:IsA("ImageButton")) and (at :: any).Image ~= ""
+				if picture or at:IsA("ViewportFrame") then
+					return nil -- drawn over a picture: can't tell what's behind
+				end
+			end
+		end
+		at = at.Parent
+	end
+	return nil
+end
+
+local watched: { [Instance]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+local pending: { [Instance]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+
+local function fix(text: TextLabel | TextButton | TextBox)
+	pending[text] = nil
+	if not text.Parent or text.TextStrokeTransparency < 0.6 then
+		return
+	end
+	local background = backgroundOf(text)
+	if not background then
+		return
+	end
+	local color = Ui.readable(text.TextColor3, background)
+	if color ~= text.TextColor3 then
+		text.TextColor3 = color
+	end
+end
+
+local function later(text: Instance)
+	if pending[text] then
+		return
+	end
+	pending[text] = true
+	task.defer(fix, text :: any)
+end
+
+local function watch(object: Instance)
+	if not (object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox")) then
+		return
+	end
+	later(object)
+	if watched[object] then
+		return
+	end
+	watched[object] = true
+	local function again()
+		later(object)
+	end
+	object:GetPropertyChangedSignal("TextColor3"):Connect(again)
+	object:GetPropertyChangedSignal("BackgroundColor3"):Connect(again)
+	object:GetPropertyChangedSignal("BackgroundTransparency"):Connect(again)
+end
+
+function Ui.watchContrast(root: Instance)
+	for _, object in root:GetDescendants() do
+		watch(object)
+	end
+	root.DescendantAdded:Connect(watch)
 end
 
 return Ui

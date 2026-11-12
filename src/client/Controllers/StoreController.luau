@@ -121,19 +121,19 @@ function StoreController.start()
 		Ui.corner(frame, 12)
 		Ui.rim(frame, Ui.Style.line, 1)
 
-		-- The picture: the one set on the dashboard, or a drawn stand-in on a dark tile.
+		-- The picture: the one set on the dashboard, or a drawn stand-in on a lilac tile.
 		local image = Robux.image(key)
 		local picture: GuiObject
 		if image then
 			local label = Instance.new("ImageLabel")
 			label.Image = image
 			label.ScaleType = Enum.ScaleType.Crop
-			label.BackgroundColor3 = Color3.fromRGB(12, 10, 18)
+			label.BackgroundColor3 = Ui.Style.line
 			label.ImageColor3 = if owned then Color3.fromRGB(150, 145, 160) else Color3.new(1, 1, 1)
 			picture = label
 		else
 			local tile = Instance.new("Frame")
-			tile.BackgroundColor3 = Color3.fromRGB(46, 30, 74)
+			tile.BackgroundColor3 = Ui.tint(Ui.Colors.equip)
 			Icons.draw(tile, StandIns[key] or "Coin", 0.16)
 			picture = tile
 		end
@@ -145,7 +145,7 @@ function StoreController.start()
 		Ui.corner(picture, 10)
 
 		if ribbon then -- "Once only" on the Starter Pack
-			local tag = Ui.text(frame, ribbon, UDim2.fromOffset(96, 22), Color3.fromRGB(26, 16, 32), true, 15)
+			local tag = Ui.text(frame, ribbon, UDim2.fromOffset(96, 22), Ui.Colors.ink, true, 15)
 			tag.AnchorPoint = Vector2.new(0.5, 0.5)
 			tag.Position = UDim2.new(0.5, 0, 0, 10)
 			tag.BackgroundTransparency = 0
