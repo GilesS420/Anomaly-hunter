@@ -7,18 +7,26 @@
 -- better shot at a variant; miss and the meter drops back to half. Walking out of
 -- reach or getting knocked out lets it escape too (dazed for a moment, so you can grab it
 -- again).
--- The client only says "start catching this", "stop" and "tapped at"; every rule is checked
--- here.
+-- The client only says "start catching this", "stop" and "tapped this far into the struggle";
+-- every rule is checked here. The struggles and the ring are timed by the client's own clock
+-- (Giles 2026-11-12: taps in the middle counted as misses, like input lag): it starts each
+-- one itself the moment its meter gets there and says how many seconds in the tap came. The
+-- server keeps the same timeline (each struggle starts at the exact moment the meter reaches
+-- it, not at the next frame) and only checks that the count is possible for the player's
+-- ping and the server's own frame times (Catching.tapElapsed).
 --
 -- Remotes in ReplicatedStorage.CatchRemotes:
 --   StartCatch  client -> server (model)
 --   StopCatch   client -> server () lets go (the client doesn't send it any more since
 --               catching stopped needing a hold; kept so an older client can't break it)
---   Strike      client -> server (serverTime the player tapped)
---   State       server -> client ("Holding", {model, seconds, stops}), ("Struggle", {model, startedAt,
---               speed, centre, width, timeout}), ("Struggled", {model}), ("Ring", {model,
---               startedAt, seconds, startScale, window}), ("Ringed", {model, hit}) or ("Ended",
+--   Strike      client -> server (stop number, seconds into that struggle or ring)
+--   State       server -> client ("Holding", {model, seconds, stops, centres, speed, width,
+--               ring, timeout}), ("Struggle", {model, index, startedAt, speed, centre, width,
+--               timeout}), ("Struggled", {model, index}), ("Ring", {model, index, startedAt,
+--               seconds, startScale, window}), ("Ringed", {model, index, hit}) or ("Ended",
 --               {result, model})
+--   A stop number counts the struggles and then the ring from 1, the order the meter
+--   reaches them.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -53,6 +61,7 @@ type Hold = {
 	filled: number, -- seconds filled before fillStart
 	fillStart: number, -- server time the meter last started filling
 	plan: Catching.StrugglePlan,
+	centres: { number }, -- where the zone sits in each struggle (sent to the client up front)
 	nextMark: number, -- index into plan.marks of the next struggle
 	struggle: { startedAt: number, centre: number }?, -- the struggle going on now
 	ring: number?, -- server time the Lucky Ring appeared, while it's up
@@ -68,6 +77,10 @@ local StartCooldown = 0.25 -- seconds between StartCatch requests (stops spam)
 local random = Random.new()
 
 local holds: { [Player]: Hold } = {}
+-- The server's slowest frame of the last couple of seconds: a tap that arrives during a slow
+-- frame is that much later, so it gets that much more lag allowance.
+local hitch = 0
+local hitchAt = 0
 local heldBy: { [Model]: Player } = {}
 local lastStart: { [Player]: number } = {}
 local pendingStart: { [Player]: Model } = {} -- a quick re-press waiting for the cooldown to pass
@@ -123,6 +136,14 @@ local function distanceTo(player: Player, model: Model): number
 		return math.huge
 	end
 	return (root.Position - position).Magnitude
+end
+
+-- How much lag this player's taps may have right now (Catching.allowance).
+local function allowanceFor(player: Player): number
+	local ok, ping = pcall(function()
+		return player:GetNetworkPing()
+	end)
+	return Catching.allowance(if ok then ping else nil, hitch)
 end
 
 -- Removes the glow, beam and attributes and forgets the hold. Doesn't touch the roaming.
@@ -387,6 +408,7 @@ local function onStartCatch(player: Player, model: unknown)
 		filled = 0,
 		fillStart = serverNow,
 		plan = plan,
+		centres = Catching.zoneCentres(plan, random),
 		nextMark = 1,
 		struggle = nil,
 		ring = nil,
@@ -407,19 +429,41 @@ local function onStartCatch(player: Player, model: unknown)
 		end)
 	end
 
-	State:FireClient(player, "Holding", { model = model, seconds = seconds, stops = Catching.stops(plan) })
+	State:FireClient(player, "Holding", {
+		model = model,
+		seconds = seconds,
+		stops = Catching.stops(plan),
+		centres = hold.centres,
+		speed = plan.speed,
+		width = plan.zone,
+		ring = plan.ring ~= nil,
+		timeout = Struggles.TimeoutSeconds,
+	})
 end
 
--- The meter stops and the monster struggles: the client shows the needle and the zone.
-local function beginStruggle(player: Player, hold: Hold, serverNow: number)
-	hold.filled = hold.plan.marks[hold.nextMark] * hold.total
+-- The stop number of the struggle going on now (or the ring: one after the last struggle).
+local function currentStop(hold: Hold): number
+	return if hold.ring then #hold.plan.marks + 1 else hold.nextMark - 1
+end
+
+-- The server time the meter reaches `share` (0 to 1) of the way, filling from where it is.
+local function reachesAt(hold: Hold, share: number): number
+	return hold.fillStart + (share * hold.total - hold.filled)
+end
+
+-- The meter stops and the monster struggles, from the moment the meter got to the mark
+-- (startedAt), which the client works out the same way.
+local function beginStruggle(player: Player, hold: Hold, startedAt: number)
+	local index = hold.nextMark
+	hold.filled = hold.plan.marks[index] * hold.total
 	hold.nextMark += 1
-	local centre = Catching.zoneCentre(hold.plan.zone, random)
-	hold.struggle = { startedAt = serverNow, centre = centre }
+	local centre = hold.centres[index] or 0.5
+	hold.struggle = { startedAt = startedAt, centre = centre }
 	hold.model:SetAttribute("CatchPaused", hold.filled / hold.total)
 	State:FireClient(player, "Struggle", {
 		model = hold.model,
-		startedAt = serverNow,
+		index = index,
+		startedAt = startedAt,
 		speed = hold.plan.speed,
 		centre = centre,
 		width = hold.plan.zone,
@@ -428,71 +472,118 @@ local function beginStruggle(player: Player, hold: Hold, serverNow: number)
 end
 
 -- The tap landed: the meter fills on from where it stopped, from the moment of the tap.
-local function endStruggle(player: Player, hold: Hold, serverNow: number)
+local function endStruggle(player: Player, hold: Hold, at: number)
+	local index = currentStop(hold)
 	hold.struggle = nil
-	hold.fillStart = serverNow
+	hold.fillStart = at
 	hold.model:SetAttribute("CatchPaused", nil)
-	hold.model:SetAttribute("CatchStart", serverNow - hold.filled)
-	hold.model:SetAttribute("CatchEnd", serverNow - hold.filled + hold.total)
-	State:FireClient(player, "Struggled", { model = hold.model })
+	hold.model:SetAttribute("CatchStart", at - hold.filled)
+	hold.model:SetAttribute("CatchEnd", at - hold.filled + hold.total)
+	State:FireClient(player, "Struggled", { model = hold.model, index = index })
 end
 
 -- The Lucky Ring appears: the meter stops while it shrinks.
-local function beginRing(player: Player, hold: Hold, serverNow: number)
+local function beginRing(player: Player, hold: Hold, startedAt: number)
 	hold.filled = (hold.plan.ring :: number) * hold.total
-	hold.ring = serverNow
+	hold.ring = startedAt
 	hold.ringDone = true
 	hold.model:SetAttribute("CatchPaused", hold.filled / hold.total)
 	local ring = Struggles.Ring
 	State:FireClient(player, "Ring", {
 		model = hold.model,
-		startedAt = serverNow,
+		index = #hold.plan.marks + 1,
+		startedAt = startedAt,
 		seconds = ring.seconds,
 		startScale = ring.startScale,
 		window = ring.window,
 	})
 end
 
--- Missed the ring: the monster jerks the meter back, then it fills on from there.
-local function missRing(player: Player, hold: Hold, serverNow: number)
+-- Missed the ring: the monster jerks the meter back, then it fills on from there (from `at`).
+local function missRing(player: Player, hold: Hold, at: number)
 	hold.ring = nil
 	hold.filled = math.min(hold.filled, Struggles.Ring.fallBack * hold.total)
-	hold.fillStart = serverNow
+	hold.fillStart = at
 	hold.model:SetAttribute("CatchPaused", nil)
-	hold.model:SetAttribute("CatchStart", serverNow - hold.filled)
-	hold.model:SetAttribute("CatchEnd", serverNow - hold.filled + hold.total)
-	State:FireClient(player, "Ringed", { model = hold.model, hit = false })
+	hold.model:SetAttribute("CatchStart", at - hold.filled)
+	hold.model:SetAttribute("CatchEnd", at - hold.filled + hold.total)
+	State:FireClient(player, "Ringed", { model = hold.model, index = #hold.plan.marks + 1, hit = false })
 end
 
-local function onStrike(player: Player, tappedAt: unknown)
+-- While filling: starts the next struggle or the ring if the meter gets there by `horizon`
+-- (server time), dated to the moment it gets there. True if one started.
+local function beginDue(player: Player, hold: Hold, horizon: number): boolean
+	if hold.struggle or hold.ring then
+		return false
+	end
+	local mark = hold.plan.marks[hold.nextMark]
+	if mark then
+		local at = reachesAt(hold, mark)
+		if at <= horizon then
+			beginStruggle(player, hold, at)
+			return true
+		end
+		return false
+	end
+	local ring = hold.plan.ring
+	if ring and not hold.ringDone then
+		local at = reachesAt(hold, ring)
+		if at <= horizon then
+			beginRing(player, hold, at)
+			return true
+		end
+	end
+	return false
+end
+
+local function onStrike(player: Player, stop: unknown, claimed: unknown)
 	local hold = holds[player]
-	if not hold or not (hold.struggle or hold.ring) then
+	if not hold then
 		return
 	end
 	local serverNow = workspace:GetServerTimeNow()
-	-- The client's own clock reading of the tap, so lag doesn't move the needle (and the meter
-	-- fills on from the moment of the tap, as the client already shows).
-	local at = Catching.tapTime(tappedAt, serverNow)
+	if not (hold.struggle or hold.ring) then
+		-- The client's meter can get to a struggle a moment before this server's frame does
+		-- (a busy server); a tap that comes in just before counts for it.
+		beginDue(player, hold, serverNow + Struggles.ClockSlack)
+	end
+	if not (hold.struggle or hold.ring) then
+		return
+	end
+	if typeof(stop) == "number" and stop ~= currentStop(hold) then
+		return -- a tap meant for a struggle that's already over
+	end
+	local allowance = allowanceFor(player)
 	local ringAt = hold.ring
 	if ringAt then
-		if Catching.ringHit(at - ringAt) then
-			State:FireClient(player, "Ringed", { model = hold.model, hit = true })
+		local seconds = Catching.tapElapsed(claimed, serverNow - ringAt, allowance)
+		if Catching.ringHit(seconds) then
+			State:FireClient(player, "Ringed", { model = hold.model, index = currentStop(hold), hit = true })
 			finish(player, true)
 		else
-			missRing(player, hold, at)
+			missRing(player, hold, ringAt + seconds)
 		end
 		return
 	end
 	local struggle = hold.struggle :: { startedAt: number, centre: number }
-	if Catching.struggleHit(at - struggle.startedAt, hold.plan.speed, struggle.centre, hold.plan.zone) then
-		endStruggle(player, hold, at)
+	local seconds = Catching.tapElapsed(claimed, serverNow - struggle.startedAt, allowance)
+	if
+		seconds <= Struggles.TimeoutSeconds
+		and Catching.struggleHit(seconds, hold.plan.speed, struggle.centre, hold.plan.zone)
+	then
+		endStruggle(player, hold, struggle.startedAt + seconds)
 	else
 		release(player, `{hold.name} broke free! Tap when the needle is in the zone.`)
 	end
 end
 
 -- Checks every catch in progress each frame.
-local function update()
+local function update(dt: number)
+	local clock = os.clock()
+	if dt >= hitch or clock - hitchAt > 2 then
+		hitch = dt
+		hitchAt = clock
+	end
 	local serverNow = workspace:GetServerTimeNow()
 	for player, hold in holds do
 		local struggle = hold.struggle
@@ -506,22 +597,15 @@ local function update()
 		elseif distanceTo(player, hold.model) > hold.reach then
 			release(player, `{hold.name} got away!`)
 		elseif struggle then
-			if serverNow - struggle.startedAt > Struggles.TimeoutSeconds + Struggles.LagAllowance then
+			if serverNow - struggle.startedAt > Struggles.TimeoutSeconds + allowanceFor(player) then
 				release(player, `{hold.name} broke free! Tap when the needle is in the zone.`)
 			end
 		elseif hold.ring then
-			if serverNow - hold.ring > Struggles.Ring.seconds + Struggles.LagAllowance then
-				missRing(player, hold, serverNow)
+			if serverNow - hold.ring > Struggles.Ring.seconds + allowanceFor(player) then
+				missRing(player, hold, hold.ring + Struggles.Ring.seconds)
 			end
-		else
-			local filled = hold.filled + (serverNow - hold.fillStart)
-			local mark = hold.plan.marks[hold.nextMark]
-			local ring = hold.plan.ring
-			if mark and filled >= mark * hold.total then
-				beginStruggle(player, hold, serverNow)
-			elseif ring and not hold.ringDone and filled >= ring * hold.total then
-				beginRing(player, hold, serverNow)
-			elseif filled >= hold.total then
+		elseif not beginDue(player, hold, serverNow) then
+			if hold.filled + (serverNow - hold.fillStart) >= hold.total then
 				finish(player)
 			end
 		end
