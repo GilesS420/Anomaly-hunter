@@ -275,13 +275,33 @@ do
 			and #Catching.stops(Catching.strugglePlan("Common", "Normal")) == 1
 	)
 	check(
-		"a tap's own time counts, even a little ahead of the server's clock",
-		Catching.tapTime(9.9, 10) == 9.9
-			and Catching.tapTime(10.1, 10) == 10 -- slightly ahead: counted as now, not thrown away
-			and Catching.tapTime(11, 10) == 10
-			and Catching.tapTime(5, 10) == 10 -- too old: when it arrived
-			and Catching.tapTime("x", 10) == 10
-			and Catching.tapTime(0 / 0, 10) == 10
+		"a tap's own count counts, within the lag allowance",
+		Catching.tapElapsed(0.8, 1.0, 0.35) == 0.8 -- a bit of lag: the client's count wins
+			and Catching.tapElapsed(1.1, 1.0, 0.35) == 1.1 -- a little ahead (clocks differ): still counts
+			and Catching.tapElapsed(3, 1.0, 0.35) == 1.25 -- from the future: no later than ClockSlack
+			and Catching.tapElapsed(0, 1.0, 0.35) == 0.65 -- too old: no earlier than the allowance
+			and Catching.tapElapsed("x", 1.0, 0.35) == 1.0
+			and Catching.tapElapsed(0 / 0, 1.0, 0.35) == 1.0
+			and Catching.tapElapsed(math.huge, 1.0, 0.35) == 1.0
+	)
+	check(
+		"slow connections and busy servers get more lag allowance, up to a cap",
+		Catching.allowance(0, 0) == 0.35
+			and math.abs(Catching.allowance(0.3, 0.1) - 0.75) < 1e-9
+			and Catching.allowance(5, 5) == 1.25
+			and Catching.allowance(0 / 0, nil) == 0.35
+	)
+	check(
+		"a tap with the needle's edge on the zone still counts",
+		Catching.struggleHit(0.5 / 0.6, 0.6, 0.5, 0.2) -- needle in the middle
+			and Catching.struggleHit((0.5 + 0.11) / 0.6, 0.6, 0.5, 0.2) -- just past the edge
+			and not Catching.struggleHit((0.5 + 0.2) / 0.6, 0.6, 0.5, 0.2)
+	)
+	local centred = Catching.strugglePlan("Divine", "Normal")
+	local zoneCentres = Catching.zoneCentres(centred, fakeRandom(5))
+	check(
+		"every struggle gets its zone when the catch starts",
+		#zoneCentres == #centred.marks and zoneCentres[1] >= 0.25 and zoneCentres[1] <= 1
 	)
 	local plain, boosted = 0, 0
 	local variantRng = fakeRandom(21)
