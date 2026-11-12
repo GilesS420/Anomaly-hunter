@@ -9,8 +9,12 @@
 -- Flat and with as little text as possible (Giles 2026-11-05).
 --
 -- Roblox has no pie shapes, so each slice is a fan of thin bars from the centre, inside a
--- CanvasGroup with a round corner that clips them to a circle. Rotating the CanvasGroup turns
--- everything on it. All sizes are a share of the disc, so the wheel fits any window size.
+-- CanvasGroup with a round corner that clips them to a circle. A GuiObject turns round its
+-- own middle, so each bar is a full-width see-through frame centred on the disc with only its
+-- top half filled. The pictures (real monster, cake and item previews, which are
+-- ViewportFrames and stay out of the CanvasGroup) and the text sit on a plain "Face" frame on
+-- top that turns with the disc. All sizes are a share of the disc, so the wheel fits any
+-- window size.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -48,6 +52,8 @@ local Turns = 5 -- whole turns before it stops
 local BarStep = 1 -- degrees between the bars that fill a slice
 local BarWidth = 0.013 -- a bar's width, as a share of the disc (a little more than the gap)
 local LabelRadius = 0.31 -- where a slice's picture and text sit, as a share of the disc
+local LabelWidth = 0.14 -- a slice's picture and text, as a share of the disc (12 slices)
+local LabelHeight = 0.32
 local Bundles = { "Spins1", "Spins5" } -- Robux products, in the order of their buttons
 local BundleCount = { Spins1 = 1, Spins5 = 5 }
 
@@ -116,8 +122,14 @@ local function label(
 	return textLabel
 end
 
--- The picture on a slice: a frame-drawn icon, or an emoji for the Workshop items.
+-- The picture on a slice: the real monster, cake or item (its preview model), or a
+-- frame-drawn money bag or chest for cash.
 local function picture(box: Frame, slice: Slice)
+	if slice.look then
+		local view = Ui.picture(box, UDim2.fromScale(1, 1), slice.look)
+		view.ZIndex = 4
+		return
+	end
 	local kind: Icons.Kind? = nil
 	if slice.monster then
 		kind = "Ghost"
@@ -184,6 +196,15 @@ function SpinController.start()
 	disc.BackgroundColor3 = Ui.Colors.row
 	disc.Parent = wheel
 	round(disc)
+
+	local face = Instance.new("Frame") -- the pictures and text, turned with the disc
+	face.Name = "Face"
+	face.AnchorPoint = Vector2.new(0.5, 0.5)
+	face.Position = UDim2.fromScale(0.5, 0.5)
+	face.Size = disc.Size
+	face.BackgroundTransparency = 1
+	face.ZIndex = 3
+	face.Parent = wheel
 
 	local hub = Instance.new("TextButton")
 	hub.Name = "Hub"
@@ -254,6 +275,12 @@ function SpinController.start()
 	paintBuy()
 	player:GetAttributeChangedSignal("SpinShop"):Connect(paintBuy)
 	Robux.infoLoaded:Connect(paintBuy)
+	-- The server reads the prices from Roblox a moment after it starts.
+	task.spawn(function()
+		local prices = ReplicatedStorage:WaitForChild("RobuxPrices")
+		prices.AttributeChanged:Connect(paintBuy)
+		paintBuy()
+	end)
 
 	local view: View? = nil
 	local rolling = false
@@ -284,11 +311,31 @@ function SpinController.start()
 		hub.AutoButtonColor = ready
 	end
 
+	-- One spoke from the centre to the rim at `angle` (clockwise from the top): a see-through
+	-- frame across the whole disc, turned round its middle (the disc's centre), with only the
+	-- half above the centre filled.
+	local function ray(angle: number, width: number, color: Color3, z: number)
+		local frame = Instance.new("Frame")
+		frame.AnchorPoint = Vector2.new(0.5, 0.5)
+		frame.Position = UDim2.fromScale(0.5, 0.5)
+		frame.Size = UDim2.fromScale(width, 1)
+		frame.Rotation = angle
+		frame.BackgroundTransparency = 1
+		frame.ZIndex = z
+		frame.Parent = disc
+		local fill = Instance.new("Frame")
+		fill.Size = UDim2.fromScale(1, 0.5)
+		fill.BackgroundColor3 = color
+		fill.BorderSizePixel = 0
+		fill.ZIndex = z
+		fill.Parent = frame
+	end
+
 	-- Draws the slices (once, and again only if the prizes on the wheel change).
 	local function build(slices: { Slice })
 		local ids = {}
 		for _, slice in slices do
-			table.insert(ids, slice.id)
+			table.insert(ids, `{slice.id}={slice.look or ""}`)
 		end
 		local key = table.concat(ids, ",")
 		if built == key then
@@ -302,9 +349,11 @@ function SpinController.start()
 		end
 		built = key
 		table.clear(captions)
-		for _, child in disc:GetChildren() do
-			if child:IsA("GuiObject") then
-				child:Destroy()
+		for _, layer in { disc, face } :: { GuiObject } do
+			for _, child in layer:GetChildren() do
+				if child:IsA("GuiObject") then
+					child:Destroy()
+				end
 			end
 		end
 		local count = #slices
@@ -320,26 +369,10 @@ function SpinController.start()
 			local start = middle - sliceAngle / 2
 			local color = rgb(slice.color)
 			for bar = 0, bars - 1 do
-				local frame = Instance.new("Frame")
-				frame.AnchorPoint = Vector2.new(0.5, 1)
-				frame.Position = UDim2.fromScale(0.5, 0.5)
-				frame.Size = UDim2.fromScale(BarWidth, 0.5)
-				frame.Rotation = start + (bar + 0.5) * step
-				frame.BackgroundColor3 = color
-				frame.BorderSizePixel = 0
-				frame.ZIndex = 1
-				frame.Parent = disc
+				ray(start + (bar + 0.5) * step, BarWidth, color, 1)
 			end
 			-- A thin dark line on the slice's left edge (hides where the bars overlap).
-			local line = Instance.new("Frame")
-			line.AnchorPoint = Vector2.new(0.5, 1)
-			line.Position = UDim2.fromScale(0.5, 0.5)
-			line.Size = UDim2.fromScale(0.008, 0.5)
-			line.Rotation = start
-			line.BackgroundColor3 = Ink
-			line.BorderSizePixel = 0
-			line.ZIndex = 2
-			line.Parent = disc
+			ray(start, 0.008, Ink, 2)
 
 			-- The picture, the prize and the odds, reading outwards from the hub.
 			local radians = math.rad(middle)
@@ -349,28 +382,28 @@ function SpinController.start()
 			holder.AnchorPoint = Vector2.new(0.5, 0.5)
 			holder.Position =
 				UDim2.fromScale(0.5 + LabelRadius * math.sin(radians), 0.5 - LabelRadius * math.cos(radians))
-			holder.Size = UDim2.fromScale(0.17, 0.3)
+			holder.Size = UDim2.fromScale(LabelWidth, LabelHeight)
 			holder.Rotation = middle
 			holder.ZIndex = 3
-			holder.Parent = disc
+			holder.Parent = face
 			local box = Instance.new("Frame")
 			box.BackgroundTransparency = 1
 			box.AnchorPoint = Vector2.new(0.5, 0)
 			box.Position = UDim2.fromScale(0.5, 0)
-			box.Size = UDim2.fromScale(1, 0.42)
+			box.Size = UDim2.fromScale(1, LabelWidth / LabelHeight)
 			box.Parent = holder
 			square(box)
 			picture(box, slice)
 			local text = label(
 				holder,
 				caption(slice),
-				0.46,
-				0.2,
+				0.47,
+				0.17,
 				if slice.jackpot then Gold else Color3.new(1, 1, 1),
 				true
 			)
 			captions[index] = text
-			local chance = label(holder, odds(slice.odds), 0.68, 0.15, Color3.new(1, 1, 1), false)
+			local chance = label(holder, odds(slice.odds), 0.65, 0.12, Color3.new(1, 1, 1), false)
 			chance.TextTransparency = 0.15
 		end
 	end
@@ -396,21 +429,23 @@ function SpinController.start()
 	local function roll(index: number)
 		local from = disc.Rotation % 360
 		disc.Rotation = from
+		face.Rotation = from
 		local middle = (index - 1) * sliceAngle
 		local wobble = (math.random() - 0.5) * sliceAngle * 0.6
 		local stop = (-middle + wobble) % 360
 		local target = from + Turns * 360 + ((stop - from) % 360)
-		local tween = TweenService:Create(
-			disc,
-			TweenInfo.new(SpinSeconds, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-			{ Rotation = target }
-		)
+		local info = TweenInfo.new(SpinSeconds, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+		local tween = TweenService:Create(disc, info, { Rotation = target })
+		local faceTween = TweenService:Create(face, info, { Rotation = target })
 		tween:Play()
+		faceTween:Play()
 		local deadline = os.clock() + SpinSeconds + 0.5
 		while tween.PlaybackState == Enum.PlaybackState.Playing and os.clock() < deadline do
 			if not window.isOpen() then
 				tween:Cancel()
+				faceTween:Cancel()
 				disc.Rotation = target
+				face.Rotation = target
 				break
 			end
 			task.wait(0.05)
@@ -448,15 +483,7 @@ function SpinController.start()
 			window.close()
 			return
 		end
-		-- Shows what it already has straight away (fetched ahead, see below), then the
-		-- server's latest (Giles 2026-11-12: menus were slow to open).
 		prize.Text = ""
-		window.open(nil)
-		if view then
-			render()
-		else
-			window.status.Text = "Loading..."
-		end
 		-- Drawn before it shows, from what it already has (fetched ahead, see below), so it
 		-- opens complete with no "Loading..." and no flicker; the server's latest then only
 		-- redraws it if something changed (Giles 2026-11-12).
@@ -476,7 +503,6 @@ function SpinController.start()
 		load()
 		render()
 	end)
-	task.spawn(load) -- fetched ahead, so the first open is instant
 
 	local hud =
 		player:WaitForChild("PlayerGui"):WaitForChild("HuntUi"):WaitForChild("Canvas"):WaitForChild("Hud")

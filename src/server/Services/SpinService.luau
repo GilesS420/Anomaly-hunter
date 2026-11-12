@@ -80,14 +80,30 @@ local function played(data: DataService.Data): number
 	return data.playtime.seconds
 end
 
-local function viewFor(data: DataService.Data): View
+-- The monster previews each player's wheel shows, by the list they were built for, so they're
+-- only built again when it changes (a new zone opened).
+local shownMonsters: { [Player]: string } = {}
+
+local function viewFor(player: Player, data: DataService.Data): View
 	Spin.refresh(data.spin, os.time())
 	local base = baseFor(data)
 	local slices: { Slice } = {}
+	local shown: { Value.CaughtMonster } = {}
 	for index, prize in Config.Prizes do
 		local reward = Spin.reward(index, base, data.wingsOwned)
 		local look: string? = nil
-		if reward and reward.item then
+		local name = reward and reward.itemName
+		local monsterId = if reward and reward.monster
+			then Spin.showMonster(reward.monster, data.wingsOwned)
+			else nil
+		if monsterId then
+			-- The slice shows the real monster: the likeliest one (newest opened zone).
+			local caught: Value.CaughtMonster =
+				{ monsterId = monsterId, size = "Normal", effects = {}, familiarity = 0 }
+			table.insert(shown, caught)
+			look = InventoryService.lookOf(caught)
+			name = Format.name(monsterId)
+		elseif reward and reward.item then
 			look = if reward.kind == "Food"
 				then InventoryService.cakeLook(reward.item)
 				else ToolModel.look(reward.item)
@@ -97,7 +113,7 @@ local function viewFor(data: DataService.Data): View
 			color = prize.color,
 			cash = if reward then reward.cash else 0,
 			item = reward and reward.item,
-			itemName = reward and reward.itemName,
+			itemName = name,
 			kind = reward and reward.kind,
 			count = if reward then reward.count else 0,
 			look = look,
@@ -105,6 +121,15 @@ local function viewFor(data: DataService.Data): View
 			odds = Spin.odds(index),
 			monster = reward and reward.monster,
 		})
+	end
+	local ids = {}
+	for _, caught in shown do
+		table.insert(ids, caught.monsterId)
+	end
+	local key = table.concat(ids, ",")
+	if shownMonsters[player] ~= key then
+		shownMonsters[player] = key
+		InventoryService.showLooks(player, "Spin", shown)
 	end
 	local seconds = played(data)
 	return {
@@ -147,7 +172,7 @@ SpinRemote.OnServerInvoke = function(player: Player, word: unknown): Result
 	if not Spin.use(data.spin, played(data)) then
 		spinning[player] = nil
 		attributes(player, data)
-		return { ok = false, message = "No spins left.", view = viewFor(data) }
+		return { ok = false, message = "No spins left.", view = viewFor(player, data) }
 	end
 	local ok, result = pcall(function(): Result
 		return pay(player, data, base)
@@ -227,7 +252,7 @@ pay = function(player: Player, data: DataService.Data, base: number): Result
 			Notify.toastAll(`{player.DisplayName} hit the Lucky Spin JACKPOT!`)
 		end
 	end)
-	return { ok = true, message = message, index = index, view = viewFor(data) }
+	return { ok = true, message = message, index = index, view = viewFor(player, data) }
 end
 
 GetView.OnServerInvoke = function(player: Player): View?
@@ -235,7 +260,7 @@ GetView.OnServerInvoke = function(player: Player): View?
 	if not data then
 		return nil
 	end
-	return viewFor(data)
+	return viewFor(player, data)
 end
 
 -- Admin: gives back today's used spins (the free ones and the earned ones come back; bought
@@ -293,6 +318,7 @@ function SpinService.start()
 	end
 	Players.PlayerRemoving:Connect(function(player)
 		spinning[player] = nil
+		shownMonsters[player] = nil
 	end)
 
 	local waited = 0

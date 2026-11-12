@@ -140,6 +140,18 @@ function Spin.monsterPool(rarity: string, wingsOwned: number): { { id: string, w
 	return pool
 end
 
+-- The monster a `rarity` slice shows: the one from the newest zone they've opened (the most
+-- likely pick), or nil if none is open.
+function Spin.showMonster(rarity: string, wingsOwned: number): string?
+	local best: { id: string, weight: number }? = nil
+	for _, entry in Spin.monsterPool(rarity, wingsOwned) do
+		if not best or entry.weight > best.weight then
+			best = entry
+		end
+	end
+	return if best then best.id else nil
+end
+
 -- The monster a roll in [0, 1) picks from the pool, or nil if the pool is empty.
 function Spin.pickMonster(rarity: string, wingsOwned: number, roll: number): string?
 	local pool = Spin.monsterPool(rarity, wingsOwned)
