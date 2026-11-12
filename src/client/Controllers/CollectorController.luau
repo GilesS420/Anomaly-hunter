@@ -212,12 +212,10 @@ function CollectorController.start()
 		if typeof(counter) ~= "Vector3" then
 			return
 		end
-		window.status.Text = "Loading..."
-		window.open(counter)
+		-- Drawn before it shows, so it opens complete (Giles 2026-11-12: no visible loading).
 		local ok, offer = pcall(GetList.InvokeServer, GetList)
-		if window.isOpen() then
-			render(if ok then offer else nil)
-		end
+		render(if ok then offer else nil)
+		window.open(counter)
 	end)
 end
 

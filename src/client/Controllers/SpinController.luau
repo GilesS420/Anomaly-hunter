@@ -457,8 +457,17 @@ function SpinController.start()
 		else
 			window.status.Text = "Loading..."
 		end
+		-- Drawn before it shows, from what it already has (fetched ahead, see below), so it
+		-- opens complete with no "Loading..." and no flicker; the server's latest then only
+		-- redraws it if something changed (Giles 2026-11-12).
+		if not view then
+			load() -- only the very first time, if the early fetch hasn't come back yet
+		end
+		render()
+		window.open(nil)
+		local before = view
 		load()
-		if window.isOpen() then
+		if window.isOpen() and not rolling and not Ui.same(before, view) then
 			render()
 		end
 	end
@@ -467,6 +476,7 @@ function SpinController.start()
 		load()
 		render()
 	end)
+	task.spawn(load) -- fetched ahead, so the first open is instant
 
 	local hud =
 		player:WaitForChild("PlayerGui"):WaitForChild("HuntUi"):WaitForChild("Canvas"):WaitForChild("Hud")

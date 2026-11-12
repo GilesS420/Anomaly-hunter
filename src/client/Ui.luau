@@ -61,6 +61,14 @@ local WalkAwayDistance = 22 -- studs from the counter before the window closes b
 
 -- Every window made by Ui.window, so the hotbar can step aside while one is open.
 local windows: { ScreenGui } = {}
+-- How to close each window, so opening one can close the others.
+local closers: { [ScreenGui]: () -> () } = {}
+
+-- One menu at a time (Giles 2026-11-12: opening the Lucky Spin and then another menu froze the
+-- game). Opening a window closes every other open window, so menus never pile up on top of
+-- each other, half hidden, each waiting on the server. Except these, which other menus never
+-- close: a running trade (closing it cancels the trade) and the Admin panel.
+local Stays = { TradeUi = true, AdminPanel = true } :: { [string]: boolean }
 local windowsChanged = Instance.new("BindableEvent")
 Ui.windowsChanged = windowsChanged.Event -- fires when any window opens or closes
 
@@ -300,6 +308,31 @@ function Ui.picture(parent: Instance, size: UDim2, look: string?, icon: string?)
 	return viewport
 end
 
+-- True when two answers from the server hold the same things (tables compared all the way
+-- down). Menus use it to redraw only when something really changed, so an open menu never
+-- flickers (Giles 2026-11-12). Countdowns the server sends along (secondsLeft, resetIn, nextIn,
+-- seconds) tick every second and are left out: the menus count those down themselves.
+local Ticking = { secondsLeft = true, resetIn = true, nextIn = true, seconds = true }
+function Ui.same(a: any, b: any): boolean
+	if a == b then
+		return true
+	end
+	if typeof(a) ~= "table" or typeof(b) ~= "table" then
+		return false
+	end
+	for key, value in a do
+		if not Ticking[key] and not Ui.same(value, b[key]) then
+			return false
+		end
+	end
+	for key in b do
+		if not Ticking[key] and a[key] == nil then
+			return false
+		end
+	end
+	return true
+end
+
 -- Removes every row from a list (keeps its layout).
 function Ui.clear(list: ScrollingFrame)
 	for _, child in list:GetChildren() do
@@ -405,6 +438,13 @@ function Ui.window(name: string, titleText: string): Window
 	end
 
 	local function openWindow(counter: Vector3?)
+		if not gui.Enabled then
+			for other, closeOther in closers do
+				if other ~= gui and other.Enabled and not Stays[other.Name] then
+					closeOther()
+				end
+			end
+		end
 		gui.Enabled = true
 		if watching then
 			watching:Disconnect()
@@ -425,6 +465,7 @@ function Ui.window(name: string, titleText: string): Window
 	end
 
 	close.Activated:Connect(closeWindow)
+	closers[gui] = closeWindow
 
 	window = {
 		gui = gui,
