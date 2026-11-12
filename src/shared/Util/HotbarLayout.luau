@@ -4,8 +4,9 @@
 -- A Tool is known by a key: "V:vacuum" for whichever vacuum is in use (a new one takes the
 -- old one's slot), "T:<item id>" for other tools, "C:<item id>" for cakes and
 -- "M:<monster uid>" for monsters. `slots` maps a key to its slot (one key per slot), and
--- `benched` lists the keys dragged off the bar (Backpack only). Slots stay remembered while
--- the Tool is gone (a used-up cake), until something else is put in that slot.
+-- `benched` lists the keys dragged off the bar (Backpack only). The numbers are only used
+-- for ORDER: the bar closes up with no gaps (Giles 2026-11-12), and a Tool that's gone for
+-- now (a used-up cake) comes back in line where its number puts it.
 -- Saved in data.hotbar (server/Services/HotbarService), used by client HotbarController.
 
 local HotbarLayout = {}
