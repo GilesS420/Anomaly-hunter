@@ -210,30 +210,29 @@ function StoreController.start()
 		task.defer(showArrows)
 	end
 
+	-- The cards are drawn ahead, while the window is shut, and kept up to date, so opening the
+	-- Store only shows it (Giles 2026-11-12: it took a while to open the first time).
 	local function toggle()
 		if window.isOpen() then
 			window.close()
 		else
-			render()
 			window.open(nil)
+			task.defer(showArrows)
 		end
 	end
 
 	Robux.onGranted(function()
-		if window.isOpen() then
-			render()
-		end
+		render()
 	end)
 	Robux.infoLoaded:Connect(function() -- the dashboard pictures came in
-		if window.isOpen() then
-			render()
-		end
+		render()
 	end)
 	player.AttributeChanged:Connect(function(name)
-		if window.isOpen() and (string.sub(name, 1, 4) == "Pass" or name == "StarterPack") then
+		if string.sub(name, 1, 4) == "Pass" or name == "StarterPack" then
 			render()
 		end
 	end)
+	render()
 
 	-- [VIP] in gold before a VIP Hunter's chat messages.
 	TextChatService.OnIncomingMessage = function(message: TextChatMessage)

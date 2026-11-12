@@ -45,6 +45,7 @@ function BakeryController.start()
 	local window = Ui.window("BakeryUi", "Haunted Bakery")
 	ShopCards.prepare(window, false)
 	local restockAt = 0 -- os.clock() when the stock changes
+	local shown: any = nil -- the stock on screen, so a refresh only redraws when it changed
 	local money = 0
 	local waiting = false -- a request is on its way; ignore more taps until it answers
 	local generation = 0 -- bumps each time the window opens, so an old countdown loop stops
@@ -112,6 +113,7 @@ function BakeryController.start()
 	end
 
 	function render(view: View?)
+		shown = view
 		Ui.clear(window.list)
 		for _, child in window.footer:GetChildren() do
 			child:Destroy()
@@ -125,11 +127,20 @@ function BakeryController.start()
 		showTreats(view)
 	end
 
-	local function refresh()
+	-- Asks the server for the stock and redraws, only if it changed (no flicker). `force`
+	-- draws even a closed window, so it opens complete.
+	local function refresh(force: boolean?)
 		local ok, view = pcall(GetShop.InvokeServer, GetShop)
-		if window.isOpen() then
-			render(if ok then view else nil)
+		local got = if ok then view else nil
+		if not force and not window.isOpen() then
+			return
 		end
+		if not force and got and Ui.same(shown, got) then
+			restockAt = os.clock() + got.secondsLeft -- same stock: just the new countdown
+			updateStatus()
+			return
+		end
+		render(got)
 	end
 
 	-- A Robux purchase came through (a reroll, a cake): show what changed.
@@ -150,11 +161,11 @@ function BakeryController.start()
 		if typeof(counter) ~= "Vector3" then
 			return
 		end
-		window.status.Text = "Loading..."
+		-- Drawn before it shows, so it opens complete (Giles 2026-11-12: no visible loading).
+		refresh(true)
 		window.open(counter)
 		generation += 1
 		local mine = generation
-		refresh()
 		-- Tick the countdown; fetch the new stock when it runs out.
 		task.spawn(function()
 			while window.isOpen() and generation == mine do

@@ -416,12 +416,23 @@ function InventoryController.start()
 			window.close()
 			return
 		end
-		window.status.Text = "Loading..."
+		-- Drawn before it shows (from the last answer, or the first one), then redrawn only
+		-- if the server's latest differs, so it never flickers (Giles 2026-11-12).
+		local function fetch()
+			local ok, result = pcall(GetView.InvokeServer, GetView)
+			if ok and result then
+				view = result
+			end
+		end
+		if not view then
+			fetch()
+		end
+		render()
 		window.open(nil)
 		HotbarController.setOpen(true)
-		local ok, result = pcall(GetView.InvokeServer, GetView)
-		view = if ok then result else nil
-		if window.isOpen() then
+		local before = view
+		fetch()
+		if window.isOpen() and not Ui.same(before, view) then
 			render()
 		end
 	end
@@ -440,7 +451,7 @@ function InventoryController.start()
 		task.delay(0.3, function()
 			refetching = false
 			local ok, result = pcall(GetView.InvokeServer, GetView)
-			if ok and result and window.isOpen() then
+			if ok and result and window.isOpen() and not Ui.same(view, result) then
 				view = result
 				render()
 			end

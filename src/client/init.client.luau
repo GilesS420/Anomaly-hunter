@@ -50,6 +50,7 @@ local PotionController = require(script.Controllers.PotionController)
 local MutationLogController = require(script.Controllers.MutationLogController)
 local DialogueController = require(script.Controllers.DialogueController)
 local AnnouncementController = require(script.Controllers.AnnouncementController)
+local PreloadController = require(script.Controllers.PreloadController)
 
 local controllers: { { start: () -> () } } = {
 	ToastController,
@@ -99,6 +100,7 @@ local controllers: { { start: () -> () } } = {
 	LookLoadController,
 	DialogueController,
 	AnnouncementController,
+	PreloadController,
 }
 
 for _, controller in controllers do

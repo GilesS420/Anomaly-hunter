@@ -51,6 +51,7 @@ function WorkshopController.start()
 	local window = Ui.window("WorkshopUi", "Hunter's Workshop")
 	ShopCards.prepare(window, false)
 	local restockAt = 0 -- os.clock() when the stock changes
+	local shown: any = nil -- the stock on screen, so a refresh only redraws when it changed
 	local money = 0
 	local store = "Workshop" -- which shop is open: "Workshop" or "VacuumVault"
 	local waiting = false -- a request is on its way; ignore more taps until it answers
@@ -76,6 +77,7 @@ function WorkshopController.start()
 	end
 
 	function render(view: View?)
+		shown = view
 		Ui.clear(window.list)
 		if not view then
 			window.status.Text = "Your save is still loading..."
@@ -150,11 +152,20 @@ function WorkshopController.start()
 		ShopCards.show(window.list, cards, if store == "Workshop" then ShopCards.rerollRow else nil)
 	end
 
-	local function refresh()
+	-- Asks the server for the stock and redraws, only if it changed (no flicker). `force`
+	-- draws even a closed window, so it opens complete.
+	local function refresh(force: boolean?)
 		local ok, view = pcall(GetShop.InvokeServer, GetShop, store)
-		if window.isOpen() then
-			render(if ok then view else nil)
+		local got = if ok then view else nil
+		if not force and not window.isOpen() then
+			return
 		end
+		if not force and got and Ui.same(shown, got) then
+			restockAt = os.clock() + got.secondsLeft -- same stock: just the new countdown
+			updateStatus()
+			return
+		end
+		render(got)
 	end
 
 	-- A Robux purchase came through (a reroll, a vacuum...): show what changed.
@@ -177,12 +188,11 @@ function WorkshopController.start()
 		end
 		store = if which == "VacuumVault" then "VacuumVault" else "Workshop"
 		window.title.Text = if store == "VacuumVault" then "Vacuum Vault" else "Hunter's Workshop"
-		Ui.clear(window.list)
-		window.status.Text = "Loading..."
+		-- Drawn before it shows, so it opens complete (Giles 2026-11-12: no visible loading).
+		refresh(true)
 		window.open(counter)
 		generation += 1
 		local mine = generation
-		refresh()
 		-- Tick the countdown; fetch the new stock when it runs out.
 		task.spawn(function()
 			while window.isOpen() and generation == mine do

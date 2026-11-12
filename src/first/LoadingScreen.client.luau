@@ -6,6 +6,8 @@
 --   2. their character exists
 --   3. the server has built their mansion (player attribute MansionReady, set by MansionService)
 --   4. the mansion's monsters have reached this client (attribute MansionMonsters is how many)
+--   5. the menus' pictures are downloaded (attribute MenusReady, set by the client's
+--      PreloadController, which gives up after a few seconds by itself)
 -- A step that takes too long never traps anyone: after SkipAfter seconds an "Enter anyway"
 -- button shows up, and after GiveUpAfter seconds it fades out by itself.
 --
@@ -372,6 +374,11 @@ waitFor(function()
 	local mansion = myMansion()
 	local monsters = if mansion then mansion:FindFirstChild("Monsters") else nil
 	return monsters ~= nil and #monsters:GetChildren() >= expected
+end)
+
+stage("Stocking the shops...", 0.92)
+waitFor(function()
+	return player:GetAttribute("MenusReady") == true
 end)
 
 stage("Ready. Good luck, hunter.", 1)
