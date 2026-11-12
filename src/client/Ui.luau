@@ -308,6 +308,31 @@ function Ui.picture(parent: Instance, size: UDim2, look: string?, icon: string?)
 	return viewport
 end
 
+-- True when two answers from the server hold the same things (tables compared all the way
+-- down). Menus use it to redraw only when something really changed, so an open menu never
+-- flickers (Giles 2026-11-12). Countdowns the server sends along (secondsLeft, resetIn, nextIn,
+-- seconds) tick every second and are left out: the menus count those down themselves.
+local Ticking = { secondsLeft = true, resetIn = true, nextIn = true, seconds = true }
+function Ui.same(a: any, b: any): boolean
+	if a == b then
+		return true
+	end
+	if typeof(a) ~= "table" or typeof(b) ~= "table" then
+		return false
+	end
+	for key, value in a do
+		if not Ticking[key] and not Ui.same(value, b[key]) then
+			return false
+		end
+	end
+	for key in b do
+		if not Ticking[key] and a[key] == nil then
+			return false
+		end
+	end
+	return true
+end
+
 -- Removes every row from a list (keeps its layout).
 function Ui.clear(list: ScrollingFrame)
 	for _, child in list:GetChildren() do
