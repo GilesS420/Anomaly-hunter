@@ -100,6 +100,9 @@ ServerChecks.KnownRemotes = {
 	"SpinRemotes.GetView",
 	"SpinRemotes.Spin",
 	"CodesRemotes.Redeem",
+	"RebirthRemotes.Offer",
+	"RebirthRemotes.Rebirth",
+	"Remotes.RareCatch",
 	"InventoryRemotes.GetView",
 	"InventoryRemotes.Move",
 	"InventoryRemotes.Lock",
@@ -330,6 +333,13 @@ local function checkSave(player: Player)
 	local slots = Perks.storageSlots(player) -- more with the Big Storage pass
 	check(#data.storage <= slots, `Backpack holds {#data.storage}/{slots}`)
 	check(#data.vault <= Wings.VaultSlots, `Vault holds {#data.vault}/{Wings.VaultSlots}`)
+	check(
+		typeof(data.rebirths) == "number"
+			and data.rebirths >= 0
+			and data.rebirths == math.floor(data.rebirths)
+			and player:GetAttribute("Rebirths") == (if data.rebirths > 0 then data.rebirths else nil),
+		`rebirths are a whole number and match the player list ({data.rebirths})`
+	)
 	local robux = data.robux
 	check(
 		typeof(robux) == "table"

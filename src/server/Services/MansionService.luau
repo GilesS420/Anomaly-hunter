@@ -34,6 +34,7 @@ local Hunt = require(ReplicatedStorage.Shared.Util.Hunt)
 local Layout = require(ReplicatedStorage.Shared.Config.Layout)
 local Mansion = require(ReplicatedStorage.Shared.Util.Mansion)
 local Monsters = require(ReplicatedStorage.Shared.Config.Monsters)
+local Rebirth = require(ReplicatedStorage.Shared.Util.Rebirth)
 local Roam = require(ReplicatedStorage.Shared.Util.Roam)
 local Rooms = require(ReplicatedStorage.Shared.Config.Rooms)
 local Storage = require(ReplicatedStorage.Shared.Util.Storage)
@@ -1017,7 +1018,11 @@ updateExpandSign = function(state: State, wingsOwned: number)
 	local wing = Mansion.nextWing(wingsOwned)
 	local heading, price, unlocks, buyable
 	if not wing then
-		heading, price, unlocks, buyable = "MANSION COMPLETE", "Fully expanded", "(every wing owned)", false
+		-- Every wing owned: the sign becomes the Rebirth sign (RebirthService).
+		local data = DataService.get(state.player)
+		local done = Rebirth.count(data and data.rebirths)
+		heading, price, unlocks, buyable =
+			"REBIRTH", Format.money(Rebirth.cost(done)), `(+{Rebirth.bonusPercent(1)}% sell forever)`, false
 	elseif not wing.launch then
 		heading, price, unlocks, buyable = "EXPAND MANSION", "Coming soon", `({wing.id} wing)`, false
 	else
@@ -1035,12 +1040,31 @@ updateExpandSign = function(state: State, wingsOwned: number)
 			else Color3.fromRGB(255, 210, 90)
 		sign.unlocks[i].Text = unlocks
 	end
-	sign.arrow.Enabled = buyable
-	sign.prompt.Enabled = buyable
+	sign.arrow.Enabled = buyable or not wing
+	sign.prompt.Enabled = buyable or not wing
 	if wing and buyable then
 		sign.prompt.ActionText = `Buy {wing.id}`
 		sign.prompt.ObjectText = Format.money(wing.price)
+	elseif not wing then
+		sign.prompt.ActionText = "Rebirth"
+		sign.prompt.ObjectText = price
 	end
+end
+
+-- Brings the expand sign up to date (RebirthService, after a rebirth's cost changes).
+function MansionService.refreshSign(player: Player)
+	local state = mansions[player]
+	local data = DataService.get(player)
+	if state and data then
+		updateExpandSign(state, data.wingsOwned)
+	end
+end
+
+-- Called when the owner presses the sign with every wing owned (RebirthService sets it, so
+-- MansionService doesn't need to require it).
+local rebirthPressed: ((Player) -> ())? = nil
+function MansionService.onRebirthPressed(callback: (Player) -> ())
+	rebirthPressed = callback
 end
 
 -- Builds the mansion once the player has both a loaded save and a plot.
@@ -1126,7 +1150,11 @@ local function purchase(state: State, player: Player)
 	end
 	local result, wing = Mansion.canBuyNext(data.wingsOwned, data.money)
 	if result == "AllOwned" or not wing then
-		Notify.toast(player, "You own every wing already!")
+		if rebirthPressed then
+			rebirthPressed(player)
+		else
+			Notify.toast(player, "You own every wing already!")
+		end
 	elseif result == "ComingSoon" then
 		Notify.toast(player, `The {wing.id} opens in a future update.`)
 	elseif result == "TooPoor" then
