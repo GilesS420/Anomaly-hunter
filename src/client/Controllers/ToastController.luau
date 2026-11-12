@@ -145,8 +145,8 @@ local function show(holder: Frame, text: string)
 	frame.Name = "Toast"
 	frame.LayoutOrder = order
 	frame.Size = UDim2.new(1, 0, 0, ROW_HEIGHT)
-	frame.BackgroundColor3 = Color3.fromRGB(25, 20, 35)
-	frame.BackgroundTransparency = 0.35
+	frame.BackgroundColor3 = Ui.Colors.panel -- light, like the menus (2026-11-12)
+	frame.BackgroundTransparency = 0.06
 	frame.BorderSizePixel = 0
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = Ui.radius(10)
@@ -160,8 +160,8 @@ local function show(holder: Frame, text: string)
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.FredokaOne
 	label.Text = text
-	label.TextColor3 = Color3.new(1, 1, 1)
-	label.TextStrokeTransparency = 0.6
+	label.TextColor3 = Ui.Colors.ink
+	label.TextStrokeTransparency = 1
 	label.TextScaled = true -- shrinks long messages to fit on small screens
 	label.TextWrapped = true
 	local size = Instance.new("UITextSizeConstraint")

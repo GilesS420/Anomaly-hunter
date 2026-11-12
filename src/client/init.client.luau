@@ -3,6 +3,7 @@
 -- Each controller starts in its own thread, so one that is still waiting for the server
 -- (for example for a remote to appear) never holds up the others.
 
+local Ui = require(script.Ui)
 local ToastController = require(script.Controllers.ToastController)
 local RoamController = require(script.Controllers.RoamController)
 local CatchController = require(script.Controllers.CatchController)
@@ -102,6 +103,10 @@ local controllers: { { start: () -> () } } = {
 	AnnouncementController,
 	PreloadController,
 }
+
+-- Light menus (2026-11-12): any text that ends up hard to read on its background is shaded
+-- so it reads (client/Ui.watchContrast). Started first, so it sees every menu being built.
+Ui.watchContrast(game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"))
 
 for _, controller in controllers do
 	task.spawn(controller.start)
