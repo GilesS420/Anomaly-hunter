@@ -68,7 +68,12 @@ end
 
 -- The weakest vacuum (in shop order) that can catch this monster, or nil when this vacuum
 -- already can. Names the vacuum in the "Too strong!" toast, and lets the client skip the meter.
-function Catching.vacuumNeeded(vacuumId: string, sizeId: string, rarityId: string, monsterId: string?): string?
+function Catching.vacuumNeeded(
+	vacuumId: string,
+	sizeId: string,
+	rarityId: string,
+	monsterId: string?
+): string?
 	if Catching.canVacuum(vacuumId, sizeId, rarityId, monsterId) then
 		return nil
 	end
@@ -142,19 +147,25 @@ function Catching.stops(plan: StrugglePlan): { number }
 	return result
 end
 
--- When a tap really happened (server time), from the client's own reading of its clock:
--- trusted from LagAllowance behind the server to ClockSlack ahead of it (never later than
--- now), otherwise the time it arrived.
-function Catching.tapTime(tappedAt: unknown, serverNow: number): number
-	if
-		typeof(tappedAt) == "number"
-		and tappedAt == tappedAt -- not NaN
-		and tappedAt <= serverNow + Struggles.ClockSlack
-		and tappedAt >= serverNow - Struggles.LagAllowance
-	then
-		return math.min(tappedAt, serverNow)
+-- How many seconds of lag a tap may have, for a player with this ping (seconds, round trip)
+-- on a server whose slowest recent frame took `hitch` seconds (Config/Struggles).
+function Catching.allowance(ping: number?, hitch: number?): number
+	local p = if typeof(ping) == "number" and ping == ping then math.max(ping, 0) else 0
+	local h = if typeof(hitch) == "number" and hitch == hitch then math.max(hitch, 0) else 0
+	return math.clamp(Struggles.LagAllowance + p + h, Struggles.LagAllowance, Struggles.MaxLagAllowance)
+end
+
+-- How far into a struggle (or Lucky Ring) a tap came, in seconds. `claimed` is the client's
+-- own count; `serverElapsed` is the server's count when the tap arrived. The claim is
+-- trusted, but kept between serverElapsed - allowance (a tap can't be older than the lag)
+-- and serverElapsed + ClockSlack (nor from the future); junk counts as serverElapsed.
+function Catching.tapElapsed(claimed: unknown, serverElapsed: number, allowance: number): number
+	if typeof(claimed) ~= "number" or claimed ~= claimed or math.abs(claimed) == math.huge then
+		return serverElapsed
 	end
-	return serverNow
+	local low = math.max(serverElapsed - allowance, 0)
+	local high = math.max(serverElapsed + Struggles.ClockSlack, low)
+	return math.clamp(claimed, low, high)
 end
 
 -- How big the Lucky Ring is `seconds` after it appears, as a multiple of the gold circle
@@ -177,6 +188,17 @@ function Catching.needle(seconds: number, speed: number): number
 	return if along <= 1 then along else 2 - along
 end
 
+-- Where the zone sits for every struggle of a catch, picked when the catch starts so the
+-- client can start each struggle itself the moment its meter gets there.
+function Catching.zoneCentres(plan: StrugglePlan, random: Random?): { number }
+	local rng = random or Random.new()
+	local centres = {}
+	for _ in plan.marks do
+		table.insert(centres, Catching.zoneCentre(plan.zone, rng))
+	end
+	return centres
+end
+
 -- Where the zone sits: its centre, somewhere it fits with a margin, never at the very start.
 function Catching.zoneCentre(width: number, random: Random?): number
 	local rng = random or Random.new()
@@ -187,7 +209,7 @@ end
 
 -- Whether a tap `seconds` into a struggle lands the needle in the zone.
 function Catching.struggleHit(seconds: number, speed: number, centre: number, width: number): boolean
-	return math.abs(Catching.needle(seconds, speed) - centre) <= width / 2
+	return math.abs(Catching.needle(seconds, speed) - centre) <= width / 2 + Struggles.HitGrace
 end
 
 return Catching

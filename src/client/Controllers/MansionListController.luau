@@ -100,7 +100,7 @@ function MansionListController.start()
 	panel.Position = UDim2.fromOffset(TAB_WIDTH - 2, 0)
 	panel.Size = UDim2.new(0, PANEL_WIDTH, 1, 0)
 	panel.BackgroundColor3 = Ui.Colors.panel
-	panel.BackgroundTransparency = 0.08
+	panel.BackgroundTransparency = 0.18 -- 10% more see-through (Giles 2026-11-13)
 	panel.Parent = drawer
 	Ui.corner(panel, 10)
 	Ui.rim(panel, Ui.Style.line, 1)

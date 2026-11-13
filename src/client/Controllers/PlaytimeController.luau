@@ -167,13 +167,21 @@ function PlaytimeController.start()
 			window.close()
 			return
 		end
-		window.status.Text = "Loading..."
+		-- Drawn before it shows, from what it already has (fetched ahead, see below), so it
+		-- opens complete with no "Loading..." and no flicker; the server's latest then only
+		-- redraws it if something changed (Giles 2026-11-12).
+		if not view then
+			load() -- only the very first time, if the early fetch hasn't come back yet
+		end
+		render()
 		window.open(nil)
+		local before = view
 		load()
-		if window.isOpen() then
+		if window.isOpen() and not Ui.same(before, view) then
 			render()
 		end
 	end
+	task.spawn(load) -- fetched ahead, so the first open is instant
 
 	local hud =
 		player:WaitForChild("PlayerGui"):WaitForChild("HuntUi"):WaitForChild("Canvas"):WaitForChild("Hud")
@@ -202,8 +210,11 @@ function PlaytimeController.start()
 	end
 	local function showDot()
 		if window.isOpen() and not busy then
+			local before = view
 			load()
-			render()
+			if window.isOpen() and not Ui.same(before, view) then
+				render()
+			end
 		end
 	end
 	player:GetAttributeChangedSignal("PlaytimeNext"):Connect(readNext)

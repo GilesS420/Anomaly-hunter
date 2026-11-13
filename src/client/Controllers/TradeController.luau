@@ -102,8 +102,8 @@ end
 
 local function grid(parent: Instance, cell: Vector2, horizontal: boolean): ScrollingFrame
 	local frame = Instance.new("ScrollingFrame")
-	frame.BackgroundColor3 = Color3.fromRGB(12, 10, 18)
-	frame.BackgroundTransparency = 0.3
+	frame.BackgroundColor3 = Ui.Style.line -- a soft well on the card
+	frame.BackgroundTransparency = 0.4
 	frame.BorderSizePixel = 0
 	frame.ScrollBarThickness = 6
 	frame.ScrollBarImageColor3 = Ui.Colors.rim

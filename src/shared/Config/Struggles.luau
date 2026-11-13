@@ -41,13 +41,20 @@ Struggles.ZoneBySize = {
 -- Seconds you get to tap before the monster breaks free anyway.
 Struggles.TimeoutSeconds = 4
 
--- How far a tap's time may be from the server's clock (lag) and still count, in seconds.
+-- The client times every struggle and Lucky Ring itself (Giles 2026-11-12: a tap right in the
+-- middle sometimes counted as a miss, like input lag). It sends how many seconds into the
+-- struggle the tap came, by its own clock, and the server only checks that number is
+-- possible: no later than the server's own count plus ClockSlack, and no earlier than the
+-- server's count minus the lag allowance. The allowance is LagAllowance plus the player's
+-- ping plus the server's slowest recent frame, at most MaxLagAllowance, so a slow
+-- connection or a busy server never turns a good tap into a miss.
 Struggles.LagAllowance = 0.35
+Struggles.MaxLagAllowance = 1.25
+Struggles.ClockSlack = 0.25
 
--- How far ahead of the server's clock a tap's time may be (the client's synced clock is never
--- exact) and still count, in seconds. Without it a tap right on time could be thrown away and
--- judged late, which felt like a delayed click.
-Struggles.ClockSlack = 0.15
+-- The needle is a few pixels wide: a tap counts while any of it touches the zone, so the
+-- zone is this much wider on each side than it's drawn (share of the bar).
+Struggles.HitGrace = 0.02
 
 -- The Lucky Ring (quick time event A): Epic and rarer monsters, and every event monster, have
 -- one last chance after their struggles. A ring shrinks onto a gold circle; tap as it lines up

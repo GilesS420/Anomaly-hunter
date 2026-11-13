@@ -33,8 +33,8 @@ export type Card = {
 	robux: Action?, -- the Robux button (nil: a grey "Robux" that does nothing)
 }
 
-ShopCards.InStock = Color3.fromRGB(140, 230, 140)
-ShopCards.NoStock = Color3.fromRGB(230, 110, 110)
+ShopCards.InStock = Color3.fromRGB(158, 240, 166)
+ShopCards.NoStock = Color3.fromRGB(255, 154, 154)
 
 -- The Robux button for an item sold through product `product` (a row's `robux`), or nil if it
 -- can't be bought with Robux (not set up yet, or a tool you own).
@@ -100,26 +100,24 @@ function ShopCards.pad(card: GuiObject)
 	padding.Parent = card
 end
 
--- A small rounded tag in the rarity's colour.
+-- A small rounded tag in the rarity's colour: a tinted tag with the name in a readable shade.
 function ShopCards.pill(parent: Instance, text: string, color: Color3, size: UDim2): Frame
 	local pill = Instance.new("Frame")
 	pill.Size = size
-	local h, s, v = color:ToHSV()
-	pill.BackgroundColor3 = Color3.fromHSV(h, s, v * 0.35)
+	pill.BackgroundColor3 = Ui.tint(color)
 	pill.Parent = parent
 	Ui.corner(pill, 6)
-	local label = Ui.text(pill, text, UDim2.fromScale(1, 1), color, true, 16)
+	local label = Ui.text(pill, text, UDim2.fromScale(1, 1), Ui.deep(color), true, 16)
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	return pill
 end
 
--- The square on the left of a card with the item's picture, on a dark tile tinted in its
+-- The square on the left of a card with the item's picture, on a tile tinted in its
 -- rarity colour (flat: no rim).
 function ShopCards.pictureBox(parent: Instance, side: number, color: Color3, look: string?, icon: string?)
 	local box = Instance.new("Frame")
 	box.Size = UDim2.fromOffset(side, side)
-	local h, s, v = color:ToHSV()
-	box.BackgroundColor3 = Color3.fromHSV(h, s * 0.6, math.min(v * 0.28, 0.3))
+	box.BackgroundColor3 = Ui.tint(color)
 	box.Parent = parent
 	Ui.corner(box, 8)
 	Ui.picture(box, UDim2.fromScale(1, 1), look, icon)
@@ -151,7 +149,7 @@ local function draw(list: ScrollingFrame, order: number, card: Card)
 	middle.Position = UDim2.fromOffset(left, 0)
 	middle.Size = UDim2.new(0.55, -left, 0, inner)
 	middle.Parent = row
-	Ui.text(middle, card.name, UDim2.new(1, 0, 0.3, 0), Ui.Colors.text, true, 22)
+	Ui.text(middle, card.name, UDim2.new(1, 0, 0.3, 0), Ui.Colors.ink, true, 22)
 	local stock = Ui.text(middle, card.stock, UDim2.new(1, 0, 0.22, 0), card.stockColor, false, 16)
 	stock.Position = UDim2.fromScale(0, 0.32)
 	local priceText = if card.price > 0 then Format.money(card.price) else "Free"

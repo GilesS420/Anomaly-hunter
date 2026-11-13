@@ -111,14 +111,15 @@ local ComboColor = Color3.fromRGB(190, 120, 255) -- combos are purple, effects l
 
 -- What each catch variant looks like on the cards (dots) and the goal strip.
 local VariantColor = {
-	Silver = Color3.fromRGB(205, 210, 225),
+	Silver = Color3.fromRGB(170, 178, 198),
 	Gold = Color3.fromRGB(255, 196, 60),
 	Shiny = Color3.fromRGB(120, 235, 255),
 	Rainbow = Color3.fromRGB(255, 120, 210),
 } :: { [string]: Color3 }
-local Unfound = Ui.Style.line
-local CardColor = Color3.fromRGB(26, 21, 36)
-local Line = Color3.fromRGB(52, 44, 68) -- thin card and tab edges
+local Unfound = Color3.fromRGB(96, 156, 170) -- not found yet: a faint teal
+local CardColor = Ui.Colors.row
+local Picked = Ui.tint(Ui.Colors.lamp) -- the picked card and the open tab
+local Line = Ui.Style.line -- thin card and tab edges
 local Gap = 8 -- between cards, and the margin round the content
 local CardTarget = 112 -- cards are about this wide, then stretched to fill the row
 
@@ -362,7 +363,7 @@ function CodexController.start()
 		button.LayoutOrder = order
 		button.Text = ""
 		button.AutoButtonColor = true
-		button.BackgroundColor3 = if chosen then Color3.fromRGB(40, 32, 54) else CardColor
+		button.BackgroundColor3 = if chosen then Picked else CardColor
 		button.ClipsDescendants = true
 		button.Parent = list
 		Ui.corner(button, 6)
@@ -659,7 +660,7 @@ function CodexController.start()
 				local button = Instance.new("TextButton")
 				button.LayoutOrder = i
 				button.Size = UDim2.new(1, 0, 0, 38)
-				button.BackgroundColor3 = Color3.fromRGB(40, 32, 54)
+				button.BackgroundColor3 = Picked
 				button.BorderSizePixel = 0
 				button.AutoButtonColor = true
 				button.Font = Enum.Font.FredokaOne
@@ -697,7 +698,7 @@ function CodexController.start()
 		for id, button in tabButtons do
 			local open = id == shown
 			button.BackgroundTransparency = if open then 0 else 1
-			button.TextColor3 = if open then Ui.Colors.text else Ui.Colors.muted
+			button.TextColor3 = if open then Ui.Colors.ink else Ui.Colors.muted
 			local mark = button:FindFirstChild("Mark") :: Frame?
 			if mark then
 				mark.Visible = open
@@ -749,11 +750,22 @@ function CodexController.start()
 			window.close()
 			return
 		end
-		window.status.Text = "Loading..."
+		-- Drawn before it shows (from the last answer, or the first one), then redrawn only
+		-- if the server's latest differs, so it never flickers (Giles 2026-11-12).
+		local function fetch()
+			local ok, result = pcall(GetView.InvokeServer, GetView)
+			if ok and result then
+				view = result
+			end
+		end
+		if not view then
+			fetch()
+		end
+		render()
 		window.open(nil)
-		local ok, result = pcall(GetView.InvokeServer, GetView)
-		view = if ok then result else nil
-		if window.isOpen() then
+		local before = view
+		fetch()
+		if window.isOpen() and not Ui.same(before, view) then
 			render()
 		end
 	end

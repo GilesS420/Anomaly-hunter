@@ -43,7 +43,7 @@ local function build()
 	banner.Size = UDim2.new(0.7, 0, 0, 0)
 	banner.AutomaticSize = Enum.AutomaticSize.Y
 	banner.BackgroundColor3 = Ui.Colors.panel
-	banner.BackgroundTransparency = 0.1
+	banner.BackgroundTransparency = 0.2 -- 10% more see-through (Giles 2026-11-13)
 	banner.Visible = false
 	banner.Parent = canvas
 	Ui.corner(banner, 12)

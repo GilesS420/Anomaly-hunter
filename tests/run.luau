@@ -275,13 +275,33 @@ do
 			and #Catching.stops(Catching.strugglePlan("Common", "Normal")) == 1
 	)
 	check(
-		"a tap's own time counts, even a little ahead of the server's clock",
-		Catching.tapTime(9.9, 10) == 9.9
-			and Catching.tapTime(10.1, 10) == 10 -- slightly ahead: counted as now, not thrown away
-			and Catching.tapTime(11, 10) == 10
-			and Catching.tapTime(5, 10) == 10 -- too old: when it arrived
-			and Catching.tapTime("x", 10) == 10
-			and Catching.tapTime(0 / 0, 10) == 10
+		"a tap's own count counts, within the lag allowance",
+		Catching.tapElapsed(0.8, 1.0, 0.35) == 0.8 -- a bit of lag: the client's count wins
+			and Catching.tapElapsed(1.1, 1.0, 0.35) == 1.1 -- a little ahead (clocks differ): still counts
+			and Catching.tapElapsed(3, 1.0, 0.35) == 1.25 -- from the future: no later than ClockSlack
+			and Catching.tapElapsed(0, 1.0, 0.35) == 0.65 -- too old: no earlier than the allowance
+			and Catching.tapElapsed("x", 1.0, 0.35) == 1.0
+			and Catching.tapElapsed(0 / 0, 1.0, 0.35) == 1.0
+			and Catching.tapElapsed(math.huge, 1.0, 0.35) == 1.0
+	)
+	check(
+		"slow connections and busy servers get more lag allowance, up to a cap",
+		Catching.allowance(0, 0) == 0.35
+			and math.abs(Catching.allowance(0.3, 0.1) - 0.75) < 1e-9
+			and Catching.allowance(5, 5) == 1.25
+			and Catching.allowance(0 / 0, nil) == 0.35
+	)
+	check(
+		"a tap with the needle's edge on the zone still counts",
+		Catching.struggleHit(0.5 / 0.6, 0.6, 0.5, 0.2) -- needle in the middle
+			and Catching.struggleHit((0.5 + 0.11) / 0.6, 0.6, 0.5, 0.2) -- just past the edge
+			and not Catching.struggleHit((0.5 + 0.2) / 0.6, 0.6, 0.5, 0.2)
+	)
+	local centred = Catching.strugglePlan("Divine", "Normal")
+	local zoneCentres = Catching.zoneCentres(centred, fakeRandom(5))
+	check(
+		"every struggle gets its zone when the catch starts",
+		#zoneCentres == #centred.marks and zoneCentres[1] >= 0.25 and zoneCentres[1] <= 1
 	)
 	local plain, boosted = 0, 0
 	local variantRng = fakeRandom(21)
@@ -4670,7 +4690,7 @@ do
 	end
 	check("spin: the weights add up to 100", near(total, 100))
 	check("spin: one jackpot", jackpots == 1)
-	check("spin: eight slices, one per ring tile", #SpinConfig.Prizes == 8)
+	check("spin: twelve slices", #SpinConfig.Prizes == 12)
 	check("spin: one free spin a day", Spin.earned(0) == SpinConfig.FreePerDay)
 	check(
 		"spin: more spins after playing",
@@ -4711,16 +4731,93 @@ do
 		local reward = Spin.reward(index, 1_000_000, 3)
 		everyPays = everyPays
 			and reward ~= nil
-			and (reward.cash > 0 or (reward.item ~= nil and reward.count > 0))
+			and (reward.cash > 0 or (reward.item ~= nil and reward.count > 0) or reward.monster ~= nil)
 		cashShare += prize.weight / total * ((reward :: any).cash / 1_000_000)
 	end
 	check("spin: every slice gives something", everyPays)
+	local bellIndex = 0
+	for index, prize in SpinConfig.Prizes do
+		if prize.pick == "Bell" then
+			bellIndex = index
+		end
+	end
 	-- Cheaper than the playtime gifts (17% of base a day) even with all three spins.
 	check("spin: a day of spins pays under 8% of base in cash", cashShare * Spin.earned(math.huge) < 0.08)
 	check(
 		"spin: the bell gets better with the Ballroom",
-		(Spin.reward(5, 0, 1) :: any).item == "BaitBell"
-			and (Spin.reward(5, 0, 3) :: any).item == "SilverBell"
+		(Spin.reward(bellIndex, 0, 1) :: any).item == "BaitBell"
+			and (Spin.reward(bellIndex, 0, 3) :: any).item == "SilverBell"
+	)
+	-- Odds written on the wheel add up to 100%.
+	local oddsTotal = 0
+	for index in SpinConfig.Prizes do
+		oddsTotal += Spin.odds(index)
+	end
+	check("spin: the odds on the wheel add up to 100%", near(oddsTotal, 100))
+	-- The monster slice: a Legendary, only from zones the player has opened.
+	local monsterSlices = 0
+	for _, prize in SpinConfig.Prizes do
+		if prize.monster then
+			monsterSlices += 1
+		end
+	end
+	check("spin: four monster slices", monsterSlices == 4)
+	local onlyOpen = true
+	for wings = 1, 6 do
+		for _, entry in Spin.monsterPool("Legendary", wings) do
+			local monster = Monsters[entry.id]
+			onlyOpen = onlyOpen
+				and monster.rarity == "Legendary"
+				and Hunt.isZoneUnlocked(monster.zone :: number, wings)
+		end
+	end
+	check("spin: the monster comes from an opened zone", onlyOpen)
+	check(
+		"spin: one wing gives the zone 1 Legendary",
+		#Spin.monsterPool("Legendary", 1) == 1
+			and Spin.pickMonster("Legendary", 1, 0.99) == "TheGroundskeeper"
+	)
+	check("spin: the Attic opens four Legendaries", #Spin.monsterPool("Legendary", 4) == 4)
+	check(
+		"spin: a slice shows the newest zone's monster",
+		Spin.showMonster("Legendary", 4) == "ThePrincipal"
+			and Spin.showMonster("Mythic", 1) == "TheHeadlessRider"
+	)
+	check(
+		"spin: Ghost Ship (not launched) gives none",
+		Spin.pickMonster("Legendary", 6, 0.999) ~= "CaptainDreadwake"
+	)
+	local newest = 0
+	for i = 0, 999 do
+		if Spin.pickMonster("Legendary", 4, i / 1000) == "ThePrincipal" then
+			newest += 1
+		end
+	end
+	check("spin: the newest zone is the likeliest (4 in 10)", newest == 400)
+	-- Bought spins: used after the free ones, kept from day to day, repaired if broken.
+	local paid = Spin.empty()
+	Spin.refresh(paid, now)
+	Spin.buy(paid, 5)
+	check("spin: bought spins add up", Spin.left(paid, 0) == SpinConfig.FreePerDay + 5)
+	Spin.use(paid, 0)
+	check("spin: the free spin goes first", paid.bought == 5 and paid.used == 1)
+	Spin.use(paid, 0)
+	check("spin: then a bought one", paid.bought == 4)
+	Spin.refresh(paid, now + 86400)
+	check("spin: bought spins keep overnight", paid.bought == 4)
+	check(
+		"spin: broken bought count is repaired",
+		Spin.repair({ used = 0, day = 0, bought = -2 }).bought == 0
+			and Spin.repair({ used = 0, day = 0 }).bought == 0
+	)
+	check(
+		"spin: a bundle per spin product",
+		SpinConfig.Bundles.Spins1 == 1 and SpinConfig.Bundles.Spins5 == 5
+	)
+	local RobuxConfig = require("../src/shared/Config/Robux")
+	check(
+		"spin: the spin products are in Config/Robux",
+		RobuxConfig.Products.Spins1 ~= nil and RobuxConfig.Products.Spins5 ~= nil
 	)
 end
 

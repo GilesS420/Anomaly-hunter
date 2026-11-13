@@ -6,6 +6,7 @@
 -- the server's price in ReplicatedStorage.RobuxPrices shows. Only products and passes that
 -- are set up on the Creator Dashboard (id not 0) have a price.
 
+local ContentProvider = game:GetService("ContentProvider")
 local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -38,19 +39,51 @@ local function ask(key: string, id: number, infoType: Enum.InfoType)
 	end
 end
 
+-- All the questions go out at once (one after the other took up to half a minute with ~30
+-- products, and the Robux Store waited for them), then the pictures are downloaded so the
+-- Store shows them the moment it opens (Giles 2026-11-12: the Store was slow to load).
+local loaded = false
 task.spawn(function()
+	local asks: { () -> () } = {}
 	for key, product in Config.Products do
 		if product.id ~= 0 then
-			ask(key, product.id, Enum.InfoType.Product)
+			table.insert(asks, function()
+				ask(key, product.id, Enum.InfoType.Product)
+			end)
 		end
 	end
 	for key, pass in Config.Passes do
 		if pass.id ~= 0 then
-			ask(key, pass.id, Enum.InfoType.GamePass)
+			table.insert(asks, function()
+				ask(key, pass.id, Enum.InfoType.GamePass)
+			end)
 		end
 	end
+	local waiting = #asks
+	for _, run in asks do
+		task.spawn(function()
+			run()
+			waiting -= 1
+		end)
+	end
+	while waiting > 0 do
+		task.wait(0.1)
+	end
+	local images: { string } = {}
+	for _, id in pictures do
+		table.insert(images, `rbxassetid://{id}`)
+	end
+	if #images > 0 then
+		pcall(ContentProvider.PreloadAsync, ContentProvider, images)
+	end
+	loaded = true
 	infoLoaded:Fire()
 end)
+
+-- True once Roblox has answered for every product and pass and their pictures are downloaded.
+function Robux.isLoaded(): boolean
+	return loaded
+end
 
 -- The picture of a product or pass key as an Image ("rbxassetid://..."), or nil when it has
 -- none (not set up, no picture on the dashboard, or Roblox hasn't answered yet). The Robux
@@ -61,7 +94,8 @@ function Robux.image(key: string): string?
 	return if id then `rbxassetid://{id}` else nil
 end
 
--- Runs `callback` once Roblox has answered for every product and pass (prices and pictures).
+-- Fires once Roblox has answered for every product and pass (prices and pictures) and the
+-- pictures are downloaded.
 Robux.infoLoaded = infoLoaded.Event
 
 -- The Robux price of a product or pass key ("ItemTier2", "VIP"), or nil if it isn't set up.

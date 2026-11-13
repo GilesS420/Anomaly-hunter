@@ -168,7 +168,7 @@ local function buildCard(): (ScreenGui, TextLabel, TextLabel, TextLabel, TextBut
 	card.Size = UDim2.new(0.3, 0, 0, 0)
 	card.AutomaticSize = Enum.AutomaticSize.Y
 	card.BackgroundColor3 = Ui.Colors.panel
-	card.BackgroundTransparency = 0.08
+	card.BackgroundTransparency = 0.18 -- 10% more see-through (Giles 2026-11-13)
 	card.Parent = canvas
 	Ui.corner(card, 12)
 	Ui.rim(card, Ui.Style.line, 1)

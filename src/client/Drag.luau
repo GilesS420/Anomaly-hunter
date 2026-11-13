@@ -6,6 +6,8 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 
+local Ui = require(script.Parent:WaitForChild("Ui"))
+
 local Drag = {}
 
 local Threshold = 8 -- pixels before a press becomes a drag
@@ -69,9 +71,9 @@ function Drag.attach(
 				local made = Instance.new("TextLabel")
 				made.Size = UDim2.fromOffset(110, 34)
 				made.AnchorPoint = Vector2.new(0.5, 0.5)
-				made.BackgroundColor3 = Color3.fromRGB(32, 26, 44)
-				made.BackgroundTransparency = 0.1
-				made.TextColor3 = Color3.new(1, 1, 1)
+				made.BackgroundColor3 = Ui.Colors.panel
+				made.BackgroundTransparency = 0.15 -- 10% more see-through (Giles 2026-11-13)
+				made.TextColor3 = Ui.Colors.ink
 				made.Font = Enum.Font.FredokaOne
 				made.TextScaled = true
 				made.Text = label()

@@ -390,11 +390,15 @@ end
 
 local function checkRules()
 	print("Rules turn away junk")
-	local now = 1000
-	check(Catching.tapTime(0 / 0, now) == now, "a NaN tap time counts as 'now'")
-	check(Catching.tapTime(math.huge, now) == now, "a tap time in the far future counts as 'now'")
-	check(Catching.tapTime(now - 60, now) == now, "a tap time a minute ago counts as 'now'")
-	check(Catching.tapTime("soon", now) == now, "a tap time that isn't a number counts as 'now'")
+	local now = 2 -- seconds into a struggle when the tap arrives
+	check(Catching.tapElapsed(0 / 0, now, 0.35) == now, "a NaN tap count counts as 'now'")
+	check(Catching.tapElapsed(math.huge, now, 0.35) == now, "a tap count of infinity counts as 'now'")
+	check(
+		Catching.tapElapsed(-60, now, 0.35) >= now - 0.35,
+		"a tap count from long ago is held to the lag allowance"
+	)
+	check(Catching.tapElapsed(60, now, 0.35) <= now + 0.25, "a tap count from the future is held to now")
+	check(Catching.tapElapsed("soon", now, 0.35) == now, "a tap count that isn't a number counts as 'now'")
 	check(Nickname.clean(string.rep("A", 500)) == nil, "a 500 letter name is refused")
 	check(Nickname.clean("\255\254") == nil, "a name that isn't valid text is refused")
 	local cleaned = Nickname.clean("Bob\n\tthe\0Great")

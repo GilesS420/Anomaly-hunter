@@ -2,15 +2,16 @@
 -- Our own hotbar, in place of Roblox's, and the bottom row of the Backpack: nine numbered
 -- slots holding Tools from your inventory (vacuums, Bait Bells, Return Charms, cakes and the
 -- monsters in it). Press 1 to 9 or click/tap a slot to hold that Tool, again to put it away.
--- Like Roblox's: a Tool keeps its slot, and a new one goes in the first empty slot (tools,
+-- Tools keep their order and close up with no gaps; a new one goes on the end (tools,
 -- then cakes, then monsters when several arrive at once). With the Backpack open every slot
 -- shows, and you can drag a card onto a slot, drag slots onto each other to swap them, or
 -- drag one off the bar to keep it in the Backpack only (InventoryController).
 -- The server tags each Tool with Section ("Tool", "Cake" or "Monster") and Order
 -- (HuntService, CakeService, InventoryService).
--- Where things sit is saved (Util/HotbarLayout, server HotbarService), so after a respawn or
--- rejoin every Tool goes back to its own slot, and a new one takes the first slot nothing
--- is remembered in (Giles 2026-10-24).
+-- The order is saved (Util/HotbarLayout, server HotbarService), so after a respawn or
+-- rejoin everything comes back in the same order (Giles 2026-10-24). The bar never has
+-- gaps: when a Tool is used up, sold or dragged off, the ones after it move up, and a new
+-- one goes on the end (Giles 2026-11-12).
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
@@ -300,7 +301,7 @@ function HotbarController.start()
 		buttons[i] = button
 	end
 
-	-- Drops Tools that are gone and puts new ones in the first empty slots.
+	-- Drops Tools that are gone, adds new ones and closes every gap.
 	local function arrange()
 		local have = HotbarController.tools() -- sorted, so tools fill in first, then cakes, then monsters
 		local present: { [Tool]: boolean } = {}
@@ -321,48 +322,48 @@ function HotbarController.start()
 		if not loaded then
 			return -- the saved layout first
 		end
-		-- Tools with a remembered slot go back to it, benched ones stay off the bar.
-		local placing: { Tool } = {}
+		-- No gaps (Giles 2026-11-12): the bar keeps the order things were in, not their slot
+		-- numbers. Tools on the bar keep their place in line, a Tool coming back (respawn,
+		-- rejoin, a cake bought again) slots in where its remembered number puts it, and new
+		-- ones go on the end (tools, then cakes, then monsters). Then everything closes up.
+		local ranked: { { tool: Tool, rank: number, onBar: boolean } } = {}
+		local fresh: { Tool } = {}
 		for _, tool in have do
-			if slotOf(tool) or benched[tool] then
+			if benched[tool] then
 				continue
 			end
+			local at = slotOf(tool)
 			local key = keyOf(tool)
-			local home = if key then saved.slots[key] else nil
-			if key and HotbarLayout.isBenched(saved, key) then
+			if at then
+				table.insert(ranked, { tool = tool, rank = at, onBar = true })
+			elseif key and HotbarLayout.isBenched(saved, key) then
 				benched[tool] = true
-			elseif home and not slots[home] then
-				slots[home] = tool
+			elseif key and saved.slots[key] then
+				table.insert(ranked, { tool = tool, rank = saved.slots[key], onBar = false })
 			else
-				table.insert(placing, tool)
+				table.insert(fresh, tool)
 			end
 		end
-		-- New ones take the first empty slot that isn't kept for a Tool that's away (a used-up
-		-- cake), or else any empty slot.
-		local kept: { [number]: boolean } = {}
-		for _, slot in saved.slots do
-			kept[slot] = true
+		table.sort(ranked, function(a, b)
+			if a.rank ~= b.rank then
+				return a.rank < b.rank
+			end
+			return a.onBar and not b.onBar -- already on the bar stays in front
+		end)
+		local line: { Tool } = {}
+		for _, entry in ranked do
+			table.insert(line, entry.tool)
 		end
-		for _, tool in placing do
-			local free: number? = nil
-			for i = 1, Slots do
-				if not slots[i] and not kept[i] then
-					free = i
-					break
-				end
-			end
-			if not free then
-				for i = 1, Slots do
-					if not slots[i] then
-						free = i
-						break
-					end
-				end
-			end
-			if free then
-				slots[free] = tool
-				kept[free] = true
-				remember(tool, free)
+		for _, tool in fresh do
+			table.insert(line, tool)
+		end
+		table.clear(slots)
+		for i = 1, math.min(#line, Slots) do
+			local tool = line[i]
+			slots[i] = tool
+			local key = keyOf(tool)
+			if key and saved.slots[key] ~= i then
+				remember(tool, i)
 			end
 		end
 	end

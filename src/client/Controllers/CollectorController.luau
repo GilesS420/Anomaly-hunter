@@ -76,7 +76,7 @@ local function card(list: ScrollingFrame, order: number, monster: Row, sell: () 
 	local box = Instance.new("Frame")
 	box.Position = UDim2.fromOffset(0, 22)
 	box.Size = UDim2.new(1, 0, 1, -22)
-	box.BackgroundColor3 = Color3.fromRGB(14, 11, 20)
+	box.BackgroundColor3 = Ui.Colors.panel
 	box.Parent = effects
 	Ui.corner(box, 6)
 	Ui.rim(box, Ui.Style.line, 1)
@@ -212,12 +212,10 @@ function CollectorController.start()
 		if typeof(counter) ~= "Vector3" then
 			return
 		end
-		window.status.Text = "Loading..."
-		window.open(counter)
+		-- Drawn before it shows, so it opens complete (Giles 2026-11-12: no visible loading).
 		local ok, offer = pcall(GetList.InvokeServer, GetList)
-		if window.isOpen() then
-			render(if ok then offer else nil)
-		end
+		render(if ok then offer else nil)
+		window.open(counter)
 	end)
 end
 
