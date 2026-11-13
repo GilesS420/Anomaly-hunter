@@ -146,7 +146,7 @@ local function show(holder: Frame, text: string)
 	frame.LayoutOrder = order
 	frame.Size = UDim2.new(1, 0, 0, ROW_HEIGHT)
 	frame.BackgroundColor3 = Ui.Colors.panel -- the menus' colour (2026-11-12)
-	frame.BackgroundTransparency = 0.06
+	frame.BackgroundTransparency = 0.16 -- 10% more see-through (Giles 2026-11-13)
 	frame.BorderSizePixel = 0
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = Ui.radius(10)

@@ -91,7 +91,7 @@ local function buildGoal(column: Frame)
 	box.LayoutOrder = 0
 	box.Size = UDim2.new(1, 0, 0, 52)
 	box.BackgroundColor3 = Ui.Colors.panel
-	box.BackgroundTransparency = 0.25
+	box.BackgroundTransparency = 0.35 -- 10% more see-through (Giles 2026-11-13)
 	box.Visible = false
 	box.Parent = column
 	Ui.corner(box, 8)

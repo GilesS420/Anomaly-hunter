@@ -120,7 +120,7 @@ function MutationLogController.start()
 	panel.Position = UDim2.new(left, UDim.new(1, -lift - IconSize - 10))
 	panel.Size = UDim2.fromOffset(PanelWidth, PanelHeight)
 	panel.BackgroundColor3 = Ui.Colors.panel
-	panel.BackgroundTransparency = 0.05
+	panel.BackgroundTransparency = 0.15 -- 10% more see-through (Giles 2026-11-13)
 	panel.Visible = false
 	panel.Parent = canvas
 	Ui.corner(panel, 10)

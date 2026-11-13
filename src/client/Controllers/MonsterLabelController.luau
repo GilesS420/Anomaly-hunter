@@ -102,7 +102,7 @@ function MonsterLabelController.start()
 	card.AutomaticSize = Enum.AutomaticSize.XY
 	card.Size = UDim2.fromOffset(0, 0)
 	card.BackgroundColor3 = Ui.Colors.panel
-	card.BackgroundTransparency = 0.08
+	card.BackgroundTransparency = 0.18 -- 10% more see-through (Giles 2026-11-13)
 	card.Parent = canvas
 	Ui.corner(card, 10)
 	local rim = Ui.rim(card, Ui.Style.line, 1)
