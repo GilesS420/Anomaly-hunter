@@ -161,6 +161,13 @@ function SpinController.start()
 
 	local window = Ui.window("SpinUi", "Lucky Spin")
 	window.list.Visible = false -- the wheel has its own body, sized to the window
+	-- A bigger window than the other menus, so the wheel is big (Giles 2026-11-13): it still
+	-- takes the same share of a small screen, but grows to 760 x 860 on a big one.
+	window.panel.Size = UDim2.fromScale(0.92, 0.94)
+	local limit = window.panel:FindFirstChildWhichIsA("UISizeConstraint")
+	if limit then
+		limit.MaxSize = Vector2.new(760, 860)
+	end
 
 	local body = Instance.new("Frame")
 	body.Name = "Body"
@@ -175,7 +182,7 @@ function SpinController.start()
 	wheel.BackgroundTransparency = 1
 	wheel.AnchorPoint = Vector2.new(0.5, 0)
 	wheel.Position = UDim2.fromScale(0.5, 0)
-	wheel.Size = UDim2.new(1, 0, 1, -34)
+	wheel.Size = UDim2.new(1, 0, 1, -30)
 	wheel.Parent = body
 	square(wheel)
 
