@@ -17,6 +17,7 @@ local Feedback = require(ReplicatedStorage.Shared.Util.Feedback)
 local Heists = require(ReplicatedStorage.Shared.Util.Heists)
 local Missions = require(ReplicatedStorage.Shared.Util.Missions)
 local Playtime = require(ReplicatedStorage.Shared.Util.Playtime)
+local Rebirth = require(ReplicatedStorage.Shared.Util.Rebirth)
 local Robux = require(ReplicatedStorage.Shared.Util.Robux)
 local Spin = require(ReplicatedStorage.Shared.Util.Spin)
 local Trading = require(ReplicatedStorage.Shared.Util.Trading)
@@ -70,6 +71,7 @@ export type Data = {
 	badges: { [string]: boolean }, -- Roblox badges already given, by Config/Badges key (BadgesService)
 	spin: Spin.Record, -- today's Lucky Spins used (SpinService)
 	codes: { [string]: boolean }, -- reward codes already used, by Config/Codes code (CodesService)
+	rebirths: number, -- rebirths done (RebirthService, Util/Rebirth)
 }
 
 -- Bump when the save layout changes in a way Reconcile can't handle (renamed keys etc).
@@ -110,6 +112,7 @@ DataService.Template = {
 	badges = {},
 	spin = Spin.empty(),
 	codes = {},
+	rebirths = 0,
 } :: Data
 
 local store = ProfileStore.New(
@@ -167,6 +170,11 @@ local function makeLeaderstats(player: Player, data: Data)
 	money.Name = "Money"
 	money.Value = data.money
 	money.Parent = leaderstats
+	-- A Rebirths column like most simulators; RebirthService keeps it up to date.
+	local rebirths = Instance.new("IntValue")
+	rebirths.Name = "Rebirths"
+	rebirths.Value = Rebirth.count(data.rebirths)
+	rebirths.Parent = leaderstats
 	leaderstats.Parent = player
 	moneyValues[player] = money
 end

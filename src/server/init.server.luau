@@ -39,6 +39,8 @@ local CodexService = require(script.Services.CodexService)
 local MissionService = require(script.Services.MissionService)
 local PlaytimeService = require(script.Services.PlaytimeService)
 local SpinService = require(script.Services.SpinService)
+local RareCatchService = require(script.Services.RareCatchService)
+local RebirthService = require(script.Services.RebirthService)
 local CodesService = require(script.Services.CodesService)
 local RobuxService = require(script.Services.RobuxService)
 local SettingsService = require(script.Services.SettingsService)
@@ -92,6 +94,8 @@ local services: { { name: string, start: () -> ...any } } = {
 	{ name = "MissionService", start = MissionService.start },
 	{ name = "PlaytimeService", start = PlaytimeService.start },
 	{ name = "SpinService", start = SpinService.start },
+	{ name = "RareCatchService", start = RareCatchService.start },
+	{ name = "RebirthService", start = RebirthService.start },
 	{ name = "CodesService", start = CodesService.start },
 	{ name = "RobuxService", start = RobuxService.start },
 	{ name = "SettingsService", start = SettingsService.start },

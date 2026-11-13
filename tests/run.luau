@@ -4906,6 +4906,81 @@ do
 	end
 end
 
+-- Rare catch shout-outs (Util/RareCatch) and Rebirth (Util/Rebirth).
+do
+	local RareCatch = require("../src/shared/Util/RareCatch")
+	local RareConfig = require("../src/shared/Config/RareCatch")
+	local RarityList = require("../src/shared/Config/Rarities")
+	local VariantList = require("../src/shared/Config/Variants")
+	check(
+		"rare catch: commons and rares stay quiet",
+		RareCatch.level("Common", nil) == "None"
+			and RareCatch.level("Rare", nil) == "None"
+			and RareCatch.level("Rare", "Silver") == "None"
+	)
+	check(
+		"rare catch: Epic reveals, Mythic shouts, Divine goes global",
+		RareCatch.level("Epic", nil) == "Reveal"
+			and RareCatch.level("Mythic", nil) == "Server"
+			and RareCatch.level("Divine", nil) == "Global"
+			and RareCatch.shouts("Server")
+			and not RareCatch.shouts("Reveal")
+	)
+	check(
+		"rare catch: a Rainbow shouts, a Rainbow Mythic goes global, Gold only reveals",
+		RareCatch.level("Common", "Rainbow") == "Server"
+			and RareCatch.level("Mythic", "Rainbow") == "Global"
+			and RareCatch.level("Common", "Gold") == "Reveal"
+	)
+	local known = true
+	for id in RareConfig.ByRarity do
+		known = known and RarityList[id] ~= nil and RareConfig.Colors[id] ~= nil
+	end
+	local variantIds = {}
+	for _, variant in VariantList do
+		variantIds[variant.id] = true
+	end
+	for id in RareConfig.ByVariant do
+		known = known and variantIds[id] == true
+	end
+	check("rare catch: every rarity and variant named is real and has a colour", known)
+	check(
+		"rare catch: the chat line reads well",
+		RareCatch.line("Giles", "Pale Stalker", "Divine", "Rainbow")
+				== "Giles caught a Rainbow Divine Pale Stalker!"
+			and RareCatch.line("Sam", "Imp", "Epic", nil) == "Sam caught an Epic Imp!"
+	)
+
+	local Rebirth = require("../src/shared/Util/Rebirth")
+	local RebirthConfig = require("../src/shared/Config/Rebirth")
+	local WingList = require("../src/shared/Config/Wings").List
+	local all = #WingList
+	check(
+		"rebirth: needs every wing and the money",
+		Rebirth.check(all - 1, 1e15, 0) == "NotComplete"
+			and Rebirth.check(all, RebirthConfig.FirstCost - 1, 0) == "TooPoor"
+			and Rebirth.check(all, RebirthConfig.FirstCost, 0) == "Ok"
+	)
+	check(
+		"rebirth: each one costs more and the bonus adds up (+50% each, not multiplied)",
+		Rebirth.cost(1) == RebirthConfig.FirstCost * RebirthConfig.CostGrowth
+			and Rebirth.bonusPercent(0) == 0
+			and Rebirth.bonusPercent(1) == 50
+			and Rebirth.bonusPercent(3) == 150
+	)
+	check(
+		"rebirth: the first one costs more than the last wing",
+		RebirthConfig.FirstCost > WingList[all].price
+	)
+	check(
+		"rebirth: odd saved counts read as whole numbers",
+		Rebirth.count(nil) == 0
+			and Rebirth.count(-2) == 0
+			and Rebirth.count(2.7) == 2
+			and Rebirth.count(0 / 0) == 0
+	)
+end
+
 if failures > 0 then
 	error(`{failures} check(s) failed`)
 end

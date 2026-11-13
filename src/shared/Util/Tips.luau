@@ -11,6 +11,7 @@
 local GoldenGhost = require("../Config/GoldenGhost")
 local Heists = require("../Config/Heists")
 local VariantMachine = require("../Config/VariantMachine")
+local Wings = require("../Config/Wings")
 
 local Tips = {}
 
@@ -165,6 +166,16 @@ Tips.List = {
 		text = "A free spin every day, and more as you play. Open the wheel button.",
 		due = function(facts: Facts): boolean
 			return facts.spin
+		end,
+	},
+	{
+		-- Every wing owned: the expand sign is now the Rebirth sign (RebirthService).
+		id = "Rebirth",
+		title = "Rebirth unlocked!",
+		text = "Every wing is yours. Press E at the REBIRTH sign by your mansion: start over for +50% sell forever.",
+		touch = "Every wing is yours. Tap the REBIRTH sign by your mansion: start over for +50% sell forever.",
+		due = function(facts: Facts): boolean
+			return facts.wings >= #Wings.List
 		end,
 	},
 } :: { Tip }

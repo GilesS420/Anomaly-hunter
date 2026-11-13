@@ -60,6 +60,11 @@ Player data saves through [ProfileStore](https://github.com/MadStudioRoblox/Prof
 - **Lucky Spin**: the wheel button on the left. One free spin a day, plus one after 15 and 45 minutes of play. Prizes and odds are in `src/shared/Config/Spin.luau`. It is never sold for Robux. Admins: F2 > Playtime > "Spins back", or `/spins`.
 - **Leaderboards**: two boards next to Watcher Square ("Richest Hunters" and "Top Collectors"), ranked across all servers. They need **Enable Studio Access to API Services** to show anything in Studio, and Studio scores go to separate boards from the live game.
 
+## Rebirth and rare catch shout-outs
+
+- **Rebirth** (`server/Services/RebirthService.luau`, numbers in `src/shared/Config/Rebirth.luau`): once every wing is owned, the expand sign turns into a REBIRTH sign. With $10B (x4 for each next one) a player can start over: money, wings and every monster reset; tools, items, cakes (packed back into the hotbar), the Codex, badges and Robux purchases stay. Each rebirth adds +50% to what the Collector pays (added to the other sell bonuses), and the player list gets a Rebirths column. Studio: `/wings 6`, `/money 10000000000`, then press E at the sign; `/rebirths <n>` sets the count without a reset.
+- **Rare catches** (`server/Services/RareCatchService.luau`, levels in `src/shared/Config/RareCatch.luau`): Epic and up gets a reveal card for the catcher; Mythic, Nightmare and any Rainbow gets a banner and a chat line for the whole server; Divine, Eldritch and a Rainbow Mythic also show in the chat of every other server (MessagingService, so only in a published game).
+
 ## Robux purchases
 
 Everything sold for Robux is in `src/shared/Config/Robux.luau`: 15 Developer Products (5 shop item price tiers, Shop Reroll, Mission Reroll, Mission Skip, Starter Pack, 6 Steal products) and 5 Game Passes. Create each one on the Creator Dashboard (your game > Monetization > Developer Products or Passes) and paste its id over the `0` in that file. Anything still at `0` shows "Robux · soon" in the game. `server/Services/RobuxService.luau` handles `ProcessReceipt`: every purchase id is saved in the player's profile and only marked granted once that save is written, so a purchase is never paid out twice or lost. Purchases in Studio are free test purchases.
