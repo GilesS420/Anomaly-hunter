@@ -72,7 +72,7 @@ function Drag.attach(
 				made.Size = UDim2.fromOffset(110, 34)
 				made.AnchorPoint = Vector2.new(0.5, 0.5)
 				made.BackgroundColor3 = Ui.Colors.panel
-				made.BackgroundTransparency = 0.05
+				made.BackgroundTransparency = 0.15 -- 10% more see-through (Giles 2026-11-13)
 				made.TextColor3 = Ui.Colors.ink
 				made.Font = Enum.Font.FredokaOne
 				made.TextScaled = true
