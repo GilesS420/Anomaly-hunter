@@ -116,7 +116,7 @@ local VariantColor = {
 	Shiny = Color3.fromRGB(120, 235, 255),
 	Rainbow = Color3.fromRGB(255, 120, 210),
 } :: { [string]: Color3 }
-local Unfound = Color3.fromRGB(214, 200, 186) -- not found yet: a faint sand colour
+local Unfound = Color3.fromRGB(96, 156, 170) -- not found yet: a faint teal
 local CardColor = Ui.Colors.row
 local Picked = Ui.tint(Ui.Colors.lamp) -- the picked card and the open tab
 local Line = Ui.Style.line -- thin card and tab edges

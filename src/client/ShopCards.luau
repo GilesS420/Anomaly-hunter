@@ -33,8 +33,8 @@ export type Card = {
 	robux: Action?, -- the Robux button (nil: a grey "Robux" that does nothing)
 }
 
-ShopCards.InStock = Color3.fromRGB(31, 150, 72)
-ShopCards.NoStock = Color3.fromRGB(205, 60, 60)
+ShopCards.InStock = Color3.fromRGB(158, 240, 166)
+ShopCards.NoStock = Color3.fromRGB(255, 154, 154)
 
 -- The Robux button for an item sold through product `product` (a row's `robux`), or nil if it
 -- can't be bought with Robux (not set up yet, or a tool you own).
@@ -100,7 +100,7 @@ function ShopCards.pad(card: GuiObject)
 	padding.Parent = card
 end
 
--- A small rounded tag in the rarity's colour: a pastel tag with the name in a deep shade.
+-- A small rounded tag in the rarity's colour: a tinted tag with the name in a readable shade.
 function ShopCards.pill(parent: Instance, text: string, color: Color3, size: UDim2): Frame
 	local pill = Instance.new("Frame")
 	pill.Size = size
@@ -112,7 +112,7 @@ function ShopCards.pill(parent: Instance, text: string, color: Color3, size: UDi
 	return pill
 end
 
--- The square on the left of a card with the item's picture, on a pastel tile tinted in its
+-- The square on the left of a card with the item's picture, on a tile tinted in its
 -- rarity colour (flat: no rim).
 function ShopCards.pictureBox(parent: Instance, side: number, color: Color3, look: string?, icon: string?)
 	local box = Instance.new("Frame")
