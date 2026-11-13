@@ -18,41 +18,37 @@ local Scale = require(script.Parent:WaitForChild("Scale"))
 local Ui = {}
 
 -- Shared look for every menu. Change it here, not in each controller.
--- Palette "Golden hour" (Giles 2026-11-12: the dark menus felt heavy and scared people away;
--- make them light and cheerful, like the hub's late-afternoon sky). Cream panels, white cards,
--- lantern-orange titles, dark plum text on the light parts and white text on coloured buttons.
--- Text that lands on a background it can't be read on is fixed by Ui.watchContrast, so
--- older code that still asks for white or a bright rarity colour on a card stays readable.
+-- Palette "Lagoon teal" (Giles 2026-11-12/13: the old dark menus felt heavy and scared people
+-- away, the cream "Golden hour" try was too light for the hub). A fresh mid-tone teal: the
+-- opposite of the hub's orange sun, and still calm on the dark event sky. Gold titles, white
+-- text. Text that lands on a background it can't be read on is fixed by Ui.watchContrast, so
+-- a bright rarity colour or an old dark text colour stays readable.
 Ui.Style = {
 	maxRadius = 6, -- no card or button gets rounder than this (pixels)
 	panelRadius = 7, -- the window itself
-	line = Color3.fromRGB(239, 220, 196), -- the one thin outline colour for panels, rows and boxes
+	line = Color3.fromRGB(63, 132, 148), -- the one thin outline colour for panels, rows and boxes
 }
 
 Ui.Colors = {
-	panel = Color3.fromRGB(255, 246, 234), -- warm cream, like the sunlit hub
-	row = Color3.fromRGB(255, 255, 255), -- cards and rows on the panel
-	rim = Color3.fromRGB(222, 198, 170), -- scroll bars and dividers (flat, no glow)
-	lamp = Color3.fromRGB(214, 94, 12), -- titles, like the lanterns
+	panel = Color3.fromRGB(30, 88, 104), -- lagoon teal
+	row = Color3.fromRGB(44, 110, 126), -- cards and rows on the panel, a step lighter
+	rim = Color3.fromRGB(86, 150, 166), -- scroll bars and dividers (flat, no glow)
+	lamp = Color3.fromRGB(255, 190, 92), -- titles, like the lanterns
 	text = Color3.new(1, 1, 1), -- text on coloured buttons
-	ink = Color3.fromRGB(59, 40, 80), -- text on panels and cards
-	muted = Color3.fromRGB(138, 118, 152),
-	money = Color3.fromRGB(23, 138, 67),
-	buy = Color3.fromRGB(54, 168, 90),
+	ink = Color3.fromRGB(252, 248, 240), -- text on panels and cards
+	muted = Color3.fromRGB(205, 225, 230),
+	money = Color3.fromRGB(150, 240, 150),
+	buy = Color3.fromRGB(56, 168, 90),
 	sell = Color3.fromRGB(226, 133, 31),
 	equip = Color3.fromRGB(125, 91, 214),
-	off = Color3.fromRGB(156, 143, 174),
+	off = Color3.fromRGB(100, 140, 150),
 	confirm = Color3.fromRGB(222, 72, 80),
 }
 
--- A soft pastel tile in a colour (a rarity, a mission tier), for picture boxes and tags on
--- the light cards. Its text is drawn in Ui.deep(color).
+-- A tile in a colour (a rarity, a mission tier) for picture boxes and tags on the cards: the
+-- card colour with a wash of `color`. Its text is drawn in Ui.deep(color).
 function Ui.tint(color: Color3): Color3
-	local h, s = color:ToHSV()
-	if s < 0.08 then
-		return Color3.fromRGB(242, 236, 248) -- grey things (Common, Silver): a light lilac grey
-	end
-	return Color3.fromHSV(h, math.min(s, 1) * 0.16, 1)
+	return Ui.Colors.row:Lerp(color, 0.3)
 end
 
 -- Relative brightness of a colour as screens show it (WCAG), 0 = black, 1 = white.
@@ -69,12 +65,13 @@ function Ui.contrast(a: Color3, b: Color3): number
 	return (math.max(la, lb) + 0.05) / (math.min(la, lb) + 0.05)
 end
 
+local DarkInk = Color3.fromRGB(40, 28, 56) -- text on light things (gold tags, pale buttons)
 local Readable = 3 -- below this text is hard to read; it's then fixed to reach Wanted
 local Wanted = 4.5
 
 -- The colour to draw `color` text in on `background` so it can be read: unchanged when it
 -- already reads well, otherwise a darker (on light backgrounds) or lighter shade of the same
--- hue. White or grey text on a light background becomes Ui.Colors.ink.
+-- hue. White or grey text on a light background becomes DarkInk.
 function Ui.readable(color: Color3, background: Color3): Color3
 	if Ui.contrast(color, background) >= Readable then
 		return color
@@ -82,7 +79,7 @@ function Ui.readable(color: Color3, background: Color3): Color3
 	local h, s, v = color:ToHSV()
 	if luminance(background) > 0.4 then
 		if s < 0.15 then
-			return Ui.Colors.ink
+			return DarkInk
 		end
 		s = math.max(s, 0.75)
 		while v > 0.2 do
@@ -92,7 +89,7 @@ function Ui.readable(color: Color3, background: Color3): Color3
 				return shade
 			end
 		end
-		return Ui.Colors.ink
+		return DarkInk
 	end
 	-- A dark background: lighten towards white.
 	for step = 1, 12 do
@@ -104,7 +101,7 @@ function Ui.readable(color: Color3, background: Color3): Color3
 	return Color3.new(1, 1, 1)
 end
 
--- Darker shade of a colour for text on the light cards (rarity names, pills, prices).
+-- A shade of a colour that reads on the cards (rarity names, pills, prices).
 function Ui.deep(color: Color3): Color3
 	return Ui.readable(color, Ui.Colors.row)
 end

@@ -121,7 +121,7 @@ function StoreController.start()
 		Ui.corner(frame, 12)
 		Ui.rim(frame, Ui.Style.line, 1)
 
-		-- The picture: the one set on the dashboard, or a drawn stand-in on a lilac tile.
+		-- The picture: the one set on the dashboard, or a drawn stand-in on a tinted tile.
 		local image = Robux.image(key)
 		local picture: GuiObject
 		if image then
@@ -145,7 +145,7 @@ function StoreController.start()
 		Ui.corner(picture, 10)
 
 		if ribbon then -- "Once only" on the Starter Pack
-			local tag = Ui.text(frame, ribbon, UDim2.fromOffset(96, 22), Ui.Colors.ink, true, 15)
+			local tag = Ui.text(frame, ribbon, UDim2.fromOffset(96, 22), Color3.fromRGB(40, 28, 56), true, 15)
 			tag.AnchorPoint = Vector2.new(0.5, 0.5)
 			tag.Position = UDim2.new(0.5, 0, 0, 10)
 			tag.BackgroundTransparency = 0

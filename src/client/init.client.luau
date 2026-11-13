@@ -104,7 +104,7 @@ local controllers: { { start: () -> () } } = {
 	PreloadController,
 }
 
--- Light menus (2026-11-12): any text that ends up hard to read on its background is shaded
+-- Menu colours (2026-11-12): any text that ends up hard to read on its background is shaded
 -- so it reads (client/Ui.watchContrast). Started first, so it sees every menu being built.
 Ui.watchContrast(game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"))
 
